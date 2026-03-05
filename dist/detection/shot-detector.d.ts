@@ -1,0 +1,149 @@
+/**
+ * Shot boundary detection for basketball shot analysis.
+ *
+ * This module provides the ShotBoundaryDetector class which analyzes
+ * sequences of pose landmarks to detect when basketball shots start and end.
+ *
+ * Detection is based on:
+ * - Hand position tracking (wrist Y coordinates)
+ * - Velocity thresholds for upward movement
+ * - Arm return heuristics for shot completion
+ *
+ * @see Feature 4.0 - Shot Detection & Phase Identification
+ */
+import type { PoseLandmarks } from "../pose/types";
+/**
+ * Configuration options for the shot boundary detector.
+ */
+export interface ShotBoundaryDetectorConfig {
+    /**
+     * Minimum upward velocity (negative dy/frame) to trigger shot start.
+     * Lower values = more sensitive. Default: 0.015
+     */
+    readonly velocityThreshold?: number;
+    /**
+     * Number of frames to use for smoothing landmark positions.
+     * Higher values = more noise reduction but more lag. Default: 3
+     */
+    readonly smoothingWindowSize?: number;
+    /**
+     * Minimum number of frames for a valid shot.
+     * Filters out pump fakes and noise. Default: 20
+     */
+    readonly minShotDuration?: number;
+    /**
+     * Number of consecutive frames with upward velocity needed to confirm shot start.
+     * Default: 3
+     */
+    readonly minUpwardFrames?: number;
+    /**
+     * Threshold for arm return detection (wrist Y position relative to shoulder).
+     * When wrist drops below this ratio of shoulder Y, shot ends. Default: 1.0
+     */
+    readonly armReturnThreshold?: number;
+    /**
+     * Number of frames to look ahead/behind for confirming boundaries.
+     * Default: 3
+     */
+    readonly confirmationWindow?: number;
+}
+/**
+ * A detected shot boundary (start or end).
+ */
+export interface DetectedBoundary {
+    /** Type of boundary */
+    readonly type: "start" | "end";
+    /** Frame index where the boundary occurs */
+    readonly frameIndex: number;
+    /** Confidence score (0-1) for this boundary detection */
+    readonly confidence: number;
+    /** Whether this boundary is at the edge of the video (partial shot) */
+    readonly isPartial: boolean;
+}
+/**
+ * Detected shot with start and end boundaries.
+ */
+export interface DetectedShot {
+    /** Starting boundary */
+    readonly start: DetectedBoundary;
+    /** Ending boundary */
+    readonly end: DetectedBoundary;
+    /** Whether the shot starts at frame 0 (video started mid-shot) */
+    readonly isPartialStart: boolean;
+    /** Whether the shot ends at the last frame (video ended mid-shot) */
+    readonly isPartialEnd: boolean;
+}
+/**
+ * Detects shot boundaries (start and end points) from pose landmark sequences.
+ *
+ * The detector analyzes wrist positions over time to identify:
+ * - Shot start: When wrists begin sustained upward movement
+ * - Shot end: When the shooting arm returns to a neutral position
+ *
+ * @example
+ * ```typescript
+ * const detector = createShotBoundaryDetector({ velocityThreshold: 0.02 });
+ * const boundaries = detector.detectBoundaries(landmarkSequence);
+ *
+ * for (const boundary of boundaries) {
+ *   console.log(`Shot ${boundary.type} at frame ${boundary.frameIndex}`);
+ * }
+ * ```
+ */
+export declare class ShotBoundaryDetector {
+    private readonly config;
+    constructor(config?: ShotBoundaryDetectorConfig);
+    /**
+     * Detects all shot boundaries in a sequence of pose landmarks.
+     *
+     * @param sequence - Array of PoseLandmarks from consecutive frames
+     * @returns Array of detected boundaries (start/end pairs)
+     */
+    detectBoundaries(sequence: readonly PoseLandmarks[]): DetectedBoundary[];
+    /**
+     * Detects shots as paired start/end boundaries.
+     *
+     * @param sequence - Array of PoseLandmarks from consecutive frames
+     * @returns Array of detected shots with boundaries
+     */
+    detectShots(sequence: readonly PoseLandmarks[]): DetectedShot[];
+    /**
+     * Extracts relevant landmark data from each frame.
+     */
+    private extractFrameData;
+    /**
+     * Calculates wrist velocity for each frame.
+     * Velocity is the change in Y position per frame.
+     * Negative velocity = upward movement (lower Y value).
+     */
+    private calculateVelocities;
+    /**
+     * Finds shot start and end boundaries based on velocity patterns.
+     */
+    private findBoundaries;
+    /**
+     * Checks if the video starts in the middle of a shot motion.
+     * Returns true if the first few frames show consistent upward movement.
+     */
+    private checkStartsInMotion;
+    /**
+     * Calculates confidence score for a shot start detection.
+     */
+    private calculateStartConfidence;
+    /**
+     * Calculates confidence score for a shot end detection.
+     */
+    private calculateEndConfidence;
+    /**
+     * Pairs start and end boundaries into complete shots.
+     */
+    private pairBoundaries;
+}
+/**
+ * Factory function to create a ShotBoundaryDetector.
+ *
+ * @param config - Optional configuration options
+ * @returns A new ShotBoundaryDetector instance
+ */
+export declare function createShotBoundaryDetector(config?: ShotBoundaryDetectorConfig): ShotBoundaryDetector;
+//# sourceMappingURL=shot-detector.d.ts.map

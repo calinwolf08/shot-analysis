@@ -68,3 +68,14 @@ export {
   getPhaseDuration,
   getShotDuration,
 } from "./types";
+
+// Shot boundary detector
+export {
+  ShotBoundaryDetector,
+  createShotBoundaryDetector,
+} from "./shot-detector";
+export type {
+  ShotBoundaryDetectorConfig,
+  DetectedBoundary,
+  DetectedShot,
+} from "./shot-detector";

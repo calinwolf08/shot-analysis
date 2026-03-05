@@ -49,4 +49,6 @@
 export { ShotPhase, SHOT_PHASES, TOTAL_SHOT_PHASES } from "./types";
 // Helper function exports
 export { createEmptyPhaseRange, createEmptyShot, createNoShotFrameLabel, hasPhase, getPhaseDuration, getShotDuration, } from "./types";
+// Shot boundary detector
+export { ShotBoundaryDetector, createShotBoundaryDetector, } from "./shot-detector";
 //# sourceMappingURL=index.js.map

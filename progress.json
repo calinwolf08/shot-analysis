@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T21:11:24.756Z"
+		"updated_at": "2026-03-05T21:15:11.326Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -741,8 +741,8 @@
 				{
 					"id": "4.1",
 					"name": "Shot & Phase Type Definitions",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As the analyzer, I want to automatically detect when shots occur and identify key phases so that I can extract metrics at the right moments.",
@@ -785,7 +785,8 @@
 							"id": "4.1.6",
 							"description": "Run npm run check to verify types compile"
 						}
-					]
+					],
+					"commit_hash": "b67c3c0c219db143414fa679a358e95b7ee5cfe0"
 				},
 				{
 					"id": "4.2",
