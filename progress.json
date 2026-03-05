@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T22:48:15.711Z"
+		"updated_at": "2026-03-05T22:55:13.891Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -1624,8 +1624,8 @@
 				{
 					"id": "6.1",
 					"name": "Profile Types & Validation",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want to compare extracted metrics against target profiles so that I can identify form issues using well-defined profile structures.",
@@ -1665,7 +1665,8 @@
 							"id": "6.1.5",
 							"description": "Run npm run check to verify types compile"
 						}
-					]
+					],
+					"commit_hash": "6b45afe42c6fb7623e01f89cd6612b66bf3cdfef"
 				},
 				{
 					"id": "6.2",

@@ -50,3 +50,42 @@ export {
   type SafeValidateProfileResult,
   type SafeValidateComparisonResult,
 } from "./schemas";
+
+// Built-in profile exports
+export { youthFundamentalsProfile } from "./youth";
+export { highSchoolProfile } from "./high-school";
+export { proFormProfile } from "./pro";
+
+/**
+ * All built-in profiles as a record keyed by profile name.
+ * Convenient for looking up profiles by name.
+ */
+import { youthFundamentalsProfile } from "./youth";
+import { highSchoolProfile } from "./high-school";
+import { proFormProfile } from "./pro";
+import type { FormProfile } from "./types";
+
+export const builtInProfiles: Readonly<Record<string, FormProfile>> = {
+  "youth-fundamentals": youthFundamentalsProfile,
+  "high-school": highSchoolProfile,
+  "pro-form": proFormProfile,
+} as const;
+
+/**
+ * Array of all built-in profiles for iteration.
+ */
+export const allBuiltInProfiles: readonly FormProfile[] = [
+  youthFundamentalsProfile,
+  highSchoolProfile,
+  proFormProfile,
+] as const;
+
+/**
+ * Gets a built-in profile by name.
+ *
+ * @param name - The profile name (e.g., "youth-fundamentals", "high-school", "pro-form")
+ * @returns The profile if found, undefined otherwise
+ */
+export function getBuiltInProfile(name: string): FormProfile | undefined {
+  return builtInProfiles[name];
+}
