@@ -41,4 +41,6 @@ export { ShootingElbowFlareCalculator, ShootingElbowAngleCalculator, MaxArmExten
 export { GuideElbowFlareCalculator, GuideHandPositionCalculator, GuideHandReleaseCalculator, createGuideArmCalculators, } from "./guide-arm";
 // Ball Position Calculators
 export { inferBallCenter, areHandsTogether, BallDipCalculator, BallPathCalculator, SetPointHeightCalculator, SetPointDurationCalculator, ReleasePointCalculator, ReleaseAngleCalculator, BallBehindHeadCalculator, createBallMetricCalculators, } from "./ball";
+// Lower Body Calculators
+export { HipDropCalculator, KneeFlexionCalculator, LegExtensionStartCalculator, createLowerBodyCalculators, } from "./lower-body";
 //# sourceMappingURL=index.js.map
