@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T22:34:06.800Z"
+		"updated_at": "2026-03-05T22:42:56.081Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -1049,7 +1049,7 @@
 		{
 			"id": "5.0",
 			"name": "Metric Extraction",
-			"status": "pending",
+			"status": "complete",
 			"parallel_group": 4,
 			"tasks": [
 				{
@@ -1512,8 +1512,8 @@
 				{
 					"id": "5.8",
 					"name": "Metric Integration Tests",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want integration tests that verify all metrics work together correctly with realistic shot data.",
@@ -1559,14 +1559,15 @@
 							"id": "5.8.7",
 							"description": "Run all integration tests and fix any failures"
 						}
-					]
+					],
+					"commit_hash": "dc7386e6e68c6f61c95adc16d19a38cbd6c322a7"
 				},
 				{
 					"id": "5.9",
 					"name": "Feature 5 Validation Gate",
-					"status": "pending",
-					"phase": "pending",
-					"attempts": 0,
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 1,
 					"context": {
 						"user_story": "As a developer, I need to verify that Feature 5 is complete and all tests pass before proceeding to Profile Comparison.",
 						"acceptance_criteria": [
