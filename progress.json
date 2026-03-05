@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T21:06:36.333Z"
+		"updated_at": "2026-03-05T21:11:24.756Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -457,7 +457,7 @@
 		{
 			"id": "3.0",
 			"name": "Pose Detection & Landmark Extraction",
-			"status": "pending",
+			"status": "complete",
 			"parallel_group": 2,
 			"tasks": [
 				{
@@ -686,8 +686,8 @@
 				{
 					"id": "3.5",
 					"name": "Feature 3 Validation Gate",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I need to verify that Feature 3 is complete and all tests pass before proceeding to Shot Detection.",
@@ -727,7 +727,8 @@
 							"id": "3.5.6",
 							"description": "Document any known limitations or future improvements"
 						}
-					]
+					],
+					"commit_hash": "180ca79d7c1f1b16ae6a6da856d78e72091a072a"
 				}
 			]
 		},
