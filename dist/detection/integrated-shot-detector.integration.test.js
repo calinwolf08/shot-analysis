@@ -200,7 +200,7 @@ describe("ShotDetector Integration Tests", () => {
             const shots = detector.processFrames(sequence);
             expect(shots.length).toBe(1);
             const phases = shots[0].phases;
-            const detectedPhases = Object.keys(phases).filter(k => phases[k] !== undefined);
+            const detectedPhases = Object.keys(phases).filter((k) => phases[k] !== undefined);
             // Should detect at least 3 phases
             expect(detectedPhases.length).toBeGreaterThanOrEqual(3);
         });
@@ -238,7 +238,7 @@ describe("ShotDetector Integration Tests", () => {
             if (shots.length > 0) {
                 const shot = shots[0];
                 // Quick release should still have some phases
-                const phaseCount = Object.values(shot.phases).filter(p => p !== undefined).length;
+                const phaseCount = Object.values(shot.phases).filter((p) => p !== undefined).length;
                 expect(phaseCount).toBeGreaterThan(0);
             }
         });
@@ -357,7 +357,7 @@ describe("ShotDetector Integration Tests", () => {
             // Lower confidence for some frames
             const lowConfSequence = sequence.map((frame, i) => {
                 if (i >= 20 && i <= 30) {
-                    const landmarks = frame.landmarks.map(l => ({
+                    const landmarks = frame.landmarks.map((l) => ({
                         ...l,
                         confidence: 0.5,
                         visibility: 0.6,

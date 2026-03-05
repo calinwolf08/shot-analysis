@@ -337,7 +337,9 @@ describe("MetricCalculator interface", () => {
                 name: "testMetric",
                 description: "A test metric",
                 unit: "degrees",
-                calculate: () => ({ value: { value: 90, unit: "degrees", frame: 0, confidence: 1 } }),
+                calculate: () => ({
+                    value: { value: 90, unit: "degrees", frame: 0, confidence: 1 },
+                }),
             };
             expect(calculator.name).toBe("testMetric");
             expect(calculator.description).toBe("A test metric");
@@ -539,7 +541,12 @@ describe("getAverageMetricConfidence", () => {
 describe("filterMetricsByConfidence", () => {
     const metrics = {
         highConfidence: { value: 90, unit: "degrees", frame: 10, confidence: 0.95 },
-        mediumConfidence: { value: 85, unit: "degrees", frame: 20, confidence: 0.7 },
+        mediumConfidence: {
+            value: 85,
+            unit: "degrees",
+            frame: 20,
+            confidence: 0.7,
+        },
         lowConfidence: { value: 80, unit: "degrees", frame: 30, confidence: 0.4 },
     };
     it("returns all metrics when threshold is 0", () => {
@@ -610,7 +617,12 @@ describe("edge cases", () => {
                         return { error: "Release phase not detected - metric unavailable" };
                     }
                     return {
-                        value: { value: 5.2, unit: "m/s", frame: releasePhase.startFrame, confidence: 0.9 },
+                        value: {
+                            value: 5.2,
+                            unit: "m/s",
+                            frame: releasePhase.startFrame,
+                            confidence: 0.9,
+                        },
                     };
                 },
             };
@@ -639,7 +651,12 @@ describe("edge cases", () => {
                         return { error: "Guide hand occluded - cannot calculate metric" };
                     }
                     return {
-                        value: { value: "correct", unit: "position", frame: 50, confidence: 0.85 },
+                        value: {
+                            value: "correct",
+                            unit: "position",
+                            frame: 50,
+                            confidence: 0.85,
+                        },
                     };
                 },
             };
@@ -663,8 +680,18 @@ describe("edge cases", () => {
                         [ShotPhase.Release]: { startFrame: 60, endFrame: 65 },
                     },
                     metrics: {
-                        elbowAngle: { value: 165, unit: "degrees", frame: 60, confidence: 0.95 },
-                        kneeAngle: { value: 120, unit: "degrees", frame: 25, confidence: 0.88 },
+                        elbowAngle: {
+                            value: 165,
+                            unit: "degrees",
+                            frame: 60,
+                            confidence: 0.95,
+                        },
+                        kneeAngle: {
+                            value: 120,
+                            unit: "degrees",
+                            frame: 25,
+                            confidence: 0.88,
+                        },
                     },
                     overallConfidence: 0.91,
                 },
@@ -674,7 +701,12 @@ describe("edge cases", () => {
                     phases: {},
                     metrics: {
                         // Only one metric available due to partial detection
-                        kneeAngle: { value: 115, unit: "degrees", frame: 110, confidence: 0.72 },
+                        kneeAngle: {
+                            value: 115,
+                            unit: "degrees",
+                            frame: 110,
+                            confidence: 0.72,
+                        },
                     },
                     overallConfidence: 0.72,
                 },

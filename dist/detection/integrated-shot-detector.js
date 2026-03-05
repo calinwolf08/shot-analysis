@@ -164,11 +164,9 @@ export class ShotDetector {
         // This allows early detection of shot starts
         const detectedShots = this.boundaryDetector.detectShots(this.state.accumulatedFrames);
         // Update state based on detected shots
-        const currentShotIndex = detectedShots.length > 0
-            ? detectedShots.length - 1
-            : undefined;
+        const currentShotIndex = detectedShots.length > 0 ? detectedShots.length - 1 : undefined;
         const inShot = detectedShots.length > 0 &&
-            detectedShots.some(shot => shot.start.frameIndex <= frameIndex &&
+            detectedShots.some((shot) => shot.start.frameIndex <= frameIndex &&
                 (shot.end.isPartial || shot.end.frameIndex >= frameIndex));
         // Determine current phase if in a shot
         let currentPhase;
@@ -182,7 +180,9 @@ export class ShotDetector {
                     const phaseResult = this.phaseDetector.detectPhases(this.state.accumulatedFrames, startFrame, endFrame);
                     // Find which phase the current frame is in
                     for (const [phase, range] of Object.entries(phaseResult.phases)) {
-                        if (range && frameIndex >= range.startFrame && frameIndex <= range.endFrame) {
+                        if (range &&
+                            frameIndex >= range.startFrame &&
+                            frameIndex <= range.endFrame) {
                             currentPhase = phase;
                             break;
                         }
@@ -235,7 +235,7 @@ export class ShotDetector {
         // Detect completed shots (those with both start and non-partial end)
         const detectedShots = this.boundaryDetector.detectShots(this.state.accumulatedFrames);
         // Only return shots that have completed (non-partial end)
-        const completedShots = detectedShots.filter(shot => !shot.end.isPartial);
+        const completedShots = detectedShots.filter((shot) => !shot.end.isPartial);
         return completedShots.map((detected, index) => this.createShotWithPhases(this.state.accumulatedFrames, detected, index));
     }
     /**

@@ -83,8 +83,14 @@ function createRealisticLandmarks(
   landmarks[LANDMARK_INDEX.RIGHT_ANKLE] = createLandmark(0.55, ankleY);
   landmarks[LANDMARK_INDEX.LEFT_HEEL] = createLandmark(0.44, ankleY + 0.02);
   landmarks[LANDMARK_INDEX.RIGHT_HEEL] = createLandmark(0.56, ankleY + 0.02);
-  landmarks[LANDMARK_INDEX.LEFT_FOOT_INDEX] = createLandmark(0.46, ankleY + 0.04);
-  landmarks[LANDMARK_INDEX.RIGHT_FOOT_INDEX] = createLandmark(0.54, ankleY + 0.04);
+  landmarks[LANDMARK_INDEX.LEFT_FOOT_INDEX] = createLandmark(
+    0.46,
+    ankleY + 0.04,
+  );
+  landmarks[LANDMARK_INDEX.RIGHT_FOOT_INDEX] = createLandmark(
+    0.54,
+    ankleY + 0.04,
+  );
 
   return landmarks;
 }
@@ -153,8 +159,14 @@ function createRealisticShotSequence(): PoseLandmarks[] {
     const wristY = 0.125 + progress * 0.08; // Hands start to separate
     const landmarks = createRealisticLandmarks(wristY, 0.54);
     // Shooting hand stays higher, guide hand drops
-    landmarks[LANDMARK_INDEX.LEFT_WRIST] = createLandmark(0.38, wristY + progress * 0.15);
-    landmarks[LANDMARK_INDEX.RIGHT_WRIST] = createLandmark(0.58, wristY - progress * 0.02);
+    landmarks[LANDMARK_INDEX.LEFT_WRIST] = createLandmark(
+      0.38,
+      wristY + progress * 0.15,
+    );
+    landmarks[LANDMARK_INDEX.RIGHT_WRIST] = createLandmark(
+      0.58,
+      wristY - progress * 0.02,
+    );
     frames.push(createPoseLandmarks(landmarks));
   }
 
@@ -252,7 +264,7 @@ describe("ShotDetector Integration Tests", () => {
 
       const phases = shots[0]!.phases;
       const detectedPhases = Object.keys(phases).filter(
-        k => phases[k as ShotPhase] !== undefined
+        (k) => phases[k as ShotPhase] !== undefined,
       );
 
       // Should detect at least 3 phases
@@ -298,7 +310,9 @@ describe("ShotDetector Integration Tests", () => {
       if (shots.length > 0) {
         const shot = shots[0]!;
         // Quick release should still have some phases
-        const phaseCount = Object.values(shot.phases).filter(p => p !== undefined).length;
+        const phaseCount = Object.values(shot.phases).filter(
+          (p) => p !== undefined,
+        ).length;
         expect(phaseCount).toBeGreaterThan(0);
       }
     });
@@ -331,7 +345,9 @@ describe("ShotDetector Integration Tests", () => {
 
       if (shots.length >= 2) {
         // Second shot should start after first shot ends
-        expect(shots[1]!.frameRange.start).toBeGreaterThan(shots[0]!.frameRange.end);
+        expect(shots[1]!.frameRange.start).toBeGreaterThan(
+          shots[0]!.frameRange.end,
+        );
       }
     });
   });
@@ -357,8 +373,12 @@ describe("ShotDetector Integration Tests", () => {
 
       // Shot ranges should be the same
       if (batchShots.length > 0 && incrementalShots.length > 0) {
-        expect(incrementalShots[0]!.frameRange.start).toBe(batchShots[0]!.frameRange.start);
-        expect(incrementalShots[0]!.frameRange.end).toBe(batchShots[0]!.frameRange.end);
+        expect(incrementalShots[0]!.frameRange.start).toBe(
+          batchShots[0]!.frameRange.start,
+        );
+        expect(incrementalShots[0]!.frameRange.end).toBe(
+          batchShots[0]!.frameRange.end,
+        );
       }
     });
 
@@ -366,7 +386,8 @@ describe("ShotDetector Integration Tests", () => {
       const detector = createShotDetector();
       const sequence = createRealisticShotSequence();
 
-      const phaseChanges: Array<{ frame: number; phase?: string | undefined }> = [];
+      const phaseChanges: Array<{ frame: number; phase?: string | undefined }> =
+        [];
       let lastPhase: string | undefined;
 
       for (let i = 0; i < sequence.length; i++) {
@@ -449,7 +470,7 @@ describe("ShotDetector Integration Tests", () => {
       // Lower confidence for some frames
       const lowConfSequence = sequence.map((frame, i) => {
         if (i >= 20 && i <= 30) {
-          const landmarks = frame.landmarks.map(l => ({
+          const landmarks = frame.landmarks.map((l) => ({
             ...l,
             confidence: 0.5,
             visibility: 0.6,

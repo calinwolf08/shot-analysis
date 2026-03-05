@@ -55,4 +55,17 @@ export {
 } from "./types";
 
 // Orchestrator
-export { MetricOrchestrator, type MetricsCalculationResult } from "./metric-orchestrator";
+export {
+  MetricOrchestrator,
+  type MetricsCalculationResult,
+} from "./metric-orchestrator";
+
+// Shooting Arm Calculators
+export {
+  ShootingElbowFlareCalculator,
+  ShootingElbowAngleCalculator,
+  MaxArmExtensionCalculator,
+  WristSnapAngleCalculator,
+  FollowThroughHoldCalculator,
+  createShootingArmCalculators,
+} from "./shooting-arm";

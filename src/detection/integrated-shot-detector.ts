@@ -218,11 +218,7 @@ export class ShotDetector {
 
     for (let i = 0; i < detectedShots.length; i++) {
       const detected = detectedShots[i]!;
-      const shot = this.createShotWithPhases(
-        sequence,
-        detected,
-        i,
-      );
+      const shot = this.createShotWithPhases(sequence, detected, i);
       shots.push(shot);
     }
 
@@ -251,13 +247,14 @@ export class ShotDetector {
     );
 
     // Update state based on detected shots
-    const currentShotIndex = detectedShots.length > 0
-      ? detectedShots.length - 1
-      : undefined;
-    const inShot = detectedShots.length > 0 &&
-      detectedShots.some(shot =>
-        shot.start.frameIndex <= frameIndex &&
-        (shot.end.isPartial || shot.end.frameIndex >= frameIndex)
+    const currentShotIndex =
+      detectedShots.length > 0 ? detectedShots.length - 1 : undefined;
+    const inShot =
+      detectedShots.length > 0 &&
+      detectedShots.some(
+        (shot) =>
+          shot.start.frameIndex <= frameIndex &&
+          (shot.end.isPartial || shot.end.frameIndex >= frameIndex),
       );
 
     // Determine current phase if in a shot
@@ -267,7 +264,10 @@ export class ShotDetector {
       if (frameIndex >= currentShot.start.frameIndex) {
         // Try to detect phases for the current shot region
         const startFrame = currentShot.start.frameIndex;
-        const endFrame = Math.min(frameIndex, this.state.accumulatedFrames.length - 1);
+        const endFrame = Math.min(
+          frameIndex,
+          this.state.accumulatedFrames.length - 1,
+        );
 
         if (endFrame > startFrame) {
           const phaseResult = this.phaseDetector.detectPhases(
@@ -278,7 +278,11 @@ export class ShotDetector {
 
           // Find which phase the current frame is in
           for (const [phase, range] of Object.entries(phaseResult.phases)) {
-            if (range && frameIndex >= range.startFrame && frameIndex <= range.endFrame) {
+            if (
+              range &&
+              frameIndex >= range.startFrame &&
+              frameIndex <= range.endFrame
+            ) {
               currentPhase = phase;
               break;
             }
@@ -342,10 +346,10 @@ export class ShotDetector {
     );
 
     // Only return shots that have completed (non-partial end)
-    const completedShots = detectedShots.filter(shot => !shot.end.isPartial);
+    const completedShots = detectedShots.filter((shot) => !shot.end.isPartial);
 
     return completedShots.map((detected, index) =>
-      this.createShotWithPhases(this.state.accumulatedFrames, detected, index)
+      this.createShotWithPhases(this.state.accumulatedFrames, detected, index),
     );
   }
 
@@ -370,8 +374,7 @@ export class ShotDetector {
     // Calculate overall confidence from boundary and phase detection
     const boundaryConfidence =
       (detected.start.confidence + detected.end.confidence) / 2;
-    const overallConfidence =
-      (boundaryConfidence + phaseResult.confidence) / 2;
+    const overallConfidence = (boundaryConfidence + phaseResult.confidence) / 2;
 
     return {
       shotIndex,

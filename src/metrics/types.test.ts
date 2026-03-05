@@ -133,9 +133,7 @@ describe("ShotAnalysis type", () => {
       expectTypeOf<ShotAnalysis["metrics"]>().toEqualTypeOf<
         Readonly<Record<string, MetricValue>>
       >();
-      expectTypeOf<
-        ShotAnalysis["overallConfidence"]
-      >().toEqualTypeOf<number>();
+      expectTypeOf<ShotAnalysis["overallConfidence"]>().toEqualTypeOf<number>();
     });
   });
 
@@ -351,10 +349,12 @@ describe("MetricCalculatorContext type", () => {
     });
 
     it("enforces readonly properties at type level", () => {
+      expectTypeOf<MetricCalculatorContext["poseLandmarks"]>().toEqualTypeOf<
+        readonly PoseLandmarks[]
+      >();
       expectTypeOf<
-        MetricCalculatorContext["poseLandmarks"]
-      >().toEqualTypeOf<readonly PoseLandmarks[]>();
-      expectTypeOf<MetricCalculatorContext["phases"]>().toEqualTypeOf<ShotPhases>();
+        MetricCalculatorContext["phases"]
+      >().toEqualTypeOf<ShotPhases>();
       expectTypeOf<MetricCalculatorContext["frameRange"]>().toEqualTypeOf<{
         readonly start: number;
         readonly end: number;
@@ -407,12 +407,12 @@ describe("MetricCalculatorResult type", () => {
     });
 
     it("enforces readonly and optional properties at type level", () => {
-      expectTypeOf<
-        MetricCalculatorResult["value"]
-      >().toEqualTypeOf<MetricValue | undefined>();
-      expectTypeOf<
-        MetricCalculatorResult["error"]
-      >().toEqualTypeOf<string | undefined>();
+      expectTypeOf<MetricCalculatorResult["value"]>().toEqualTypeOf<
+        MetricValue | undefined
+      >();
+      expectTypeOf<MetricCalculatorResult["error"]>().toEqualTypeOf<
+        string | undefined
+      >();
     });
   });
 });
@@ -424,7 +424,9 @@ describe("MetricCalculator interface", () => {
         name: "testMetric",
         description: "A test metric",
         unit: "degrees",
-        calculate: () => ({ value: { value: 90, unit: "degrees", frame: 0, confidence: 1 } }),
+        calculate: () => ({
+          value: { value: 90, unit: "degrees", frame: 0, confidence: 1 },
+        }),
       };
 
       expect(calculator.name).toBe("testMetric");
@@ -662,7 +664,12 @@ describe("getAverageMetricConfidence", () => {
 describe("filterMetricsByConfidence", () => {
   const metrics: Readonly<Record<string, MetricValue>> = {
     highConfidence: { value: 90, unit: "degrees", frame: 10, confidence: 0.95 },
-    mediumConfidence: { value: 85, unit: "degrees", frame: 20, confidence: 0.7 },
+    mediumConfidence: {
+      value: 85,
+      unit: "degrees",
+      frame: 20,
+      confidence: 0.7,
+    },
     lowConfidence: { value: 80, unit: "degrees", frame: 30, confidence: 0.4 },
   };
 
@@ -697,7 +704,9 @@ describe("filterMetricsByConfidence", () => {
 
   it("returns readonly record", () => {
     const filtered = filterMetricsByConfidence(metrics, 0.5);
-    expectTypeOf(filtered).toEqualTypeOf<Readonly<Record<string, MetricValue>>>();
+    expectTypeOf(filtered).toEqualTypeOf<
+      Readonly<Record<string, MetricValue>>
+    >();
   });
 });
 
@@ -748,7 +757,12 @@ describe("edge cases", () => {
             return { error: "Release phase not detected - metric unavailable" };
           }
           return {
-            value: { value: 5.2, unit: "m/s", frame: releasePhase.startFrame, confidence: 0.9 },
+            value: {
+              value: 5.2,
+              unit: "m/s",
+              frame: releasePhase.startFrame,
+              confidence: 0.9,
+            },
           };
         },
       };
@@ -765,7 +779,9 @@ describe("edge cases", () => {
       };
 
       const result = calculator.calculate(context);
-      expect(result.error).toBe("Release phase not detected - metric unavailable");
+      expect(result.error).toBe(
+        "Release phase not detected - metric unavailable",
+      );
     });
 
     it("handles occluded body parts", () => {
@@ -782,7 +798,12 @@ describe("edge cases", () => {
           }
 
           return {
-            value: { value: "correct", unit: "position", frame: 50, confidence: 0.85 },
+            value: {
+              value: "correct",
+              unit: "position",
+              frame: 50,
+              confidence: 0.85,
+            },
           };
         },
       };
@@ -795,7 +816,9 @@ describe("edge cases", () => {
       };
 
       const result = calculator.calculate(context);
-      expect(result.error).toBe("Guide hand occluded - cannot calculate metric");
+      expect(result.error).toBe(
+        "Guide hand occluded - cannot calculate metric",
+      );
     });
   });
 
@@ -809,8 +832,18 @@ describe("edge cases", () => {
             [ShotPhase.Release]: { startFrame: 60, endFrame: 65 },
           },
           metrics: {
-            elbowAngle: { value: 165, unit: "degrees", frame: 60, confidence: 0.95 },
-            kneeAngle: { value: 120, unit: "degrees", frame: 25, confidence: 0.88 },
+            elbowAngle: {
+              value: 165,
+              unit: "degrees",
+              frame: 60,
+              confidence: 0.95,
+            },
+            kneeAngle: {
+              value: 120,
+              unit: "degrees",
+              frame: 25,
+              confidence: 0.88,
+            },
           },
           overallConfidence: 0.91,
         },
@@ -820,7 +853,12 @@ describe("edge cases", () => {
           phases: {},
           metrics: {
             // Only one metric available due to partial detection
-            kneeAngle: { value: 115, unit: "degrees", frame: 110, confidence: 0.72 },
+            kneeAngle: {
+              value: 115,
+              unit: "degrees",
+              frame: 110,
+              confidence: 0.72,
+            },
           },
           overallConfidence: 0.72,
         },

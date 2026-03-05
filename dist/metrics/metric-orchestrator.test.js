@@ -82,12 +82,14 @@ describe("MetricOrchestrator", () => {
                 value: { value: 165, unit: "degrees", frame: 60, confidence: 0.95 },
             });
             const calc2 = createMockCalculator("elbowAngle", {
-                value: { value: 170, unit: "degrees", frame: 65, confidence: 0.90 },
+                value: { value: 170, unit: "degrees", frame: 65, confidence: 0.9 },
             });
             orchestrator.registerCalculator(calc1);
             orchestrator.registerCalculator(calc2);
             // Should only have one calculator with this name
-            expect(orchestrator.getCalculatorNames().filter((name) => name === "elbowAngle")).toHaveLength(1);
+            expect(orchestrator
+                .getCalculatorNames()
+                .filter((name) => name === "elbowAngle")).toHaveLength(1);
         });
     });
     describe("getCalculatorNames", () => {
@@ -269,7 +271,10 @@ describe("MetricOrchestrator", () => {
                 const successCalc = createMockCalculator("success", {
                     value: { value: 100, unit: "test", frame: 0, confidence: 0.9 },
                 });
-                const orchestrator = new MetricOrchestrator([throwingCalc, successCalc]);
+                const orchestrator = new MetricOrchestrator([
+                    throwingCalc,
+                    successCalc,
+                ]);
                 const result = orchestrator.calculateMetrics([createMockPoseLandmarks(0)], { start: 0, end: 0 }, {}, config);
                 expect(result.metrics["success"]).toBeDefined();
                 expect(result.errors["throwing"]).toBeDefined();

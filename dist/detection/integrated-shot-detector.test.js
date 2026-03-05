@@ -458,7 +458,11 @@ describe("ShotDetector", () => {
                 for (const phase of Object.values(ShotPhase)) {
                     const range = phases[phase];
                     if (range !== undefined) {
-                        phaseRanges.push({ name: phase, startFrame: range.startFrame, endFrame: range.endFrame });
+                        phaseRanges.push({
+                            name: phase,
+                            startFrame: range.startFrame,
+                            endFrame: range.endFrame,
+                        });
                     }
                 }
                 phaseRanges.sort((a, b) => a.startFrame - b.startFrame);

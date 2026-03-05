@@ -34,5 +34,7 @@
 // Helper functions
 export { createEmptyMetricValue, createEmptyShotAnalysis, createEmptyVideoMetadata, createEmptyAnalysisResult, isSuccessfulMetricResult, getAverageMetricConfidence, filterMetricsByConfidence, } from "./types";
 // Orchestrator
-export { MetricOrchestrator } from "./metric-orchestrator";
+export { MetricOrchestrator, } from "./metric-orchestrator";
+// Shooting Arm Calculators
+export { ShootingElbowFlareCalculator, ShootingElbowAngleCalculator, MaxArmExtensionCalculator, WristSnapAngleCalculator, FollowThroughHoldCalculator, createShootingArmCalculators, } from "./shooting-arm";
 //# sourceMappingURL=index.js.map
