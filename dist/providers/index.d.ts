@@ -6,4 +6,5 @@
  */
 export type { VideoFrame, FrameMetadata, FrameProvider } from './types';
 export { InvalidFpsError } from './types';
+export { VideoFileProvider, createVideoFileProvider, VideoFileNotFoundError, VideoFileCorruptedError, UnsupportedVideoFormatError } from './video-file';
 //# sourceMappingURL=index.d.ts.map

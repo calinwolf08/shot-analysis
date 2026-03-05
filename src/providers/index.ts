@@ -7,3 +7,12 @@
 
 export type { VideoFrame, FrameMetadata, FrameProvider } from './types';
 export { InvalidFpsError } from './types';
+
+// Video file provider exports
+export {
+  VideoFileProvider,
+  createVideoFileProvider,
+  VideoFileNotFoundError,
+  VideoFileCorruptedError,
+  UnsupportedVideoFormatError
+} from './video-file';

@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T20:05:49.802Z"
+		"updated_at": "2026-03-05T20:08:46.659Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -243,8 +243,8 @@
 				{
 					"id": "2.1",
 					"name": "FrameProvider Interface & Types",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want to provide video frames to the analyzer so that I can process both recorded clips and live camera feeds using a consistent interface.",
@@ -288,7 +288,8 @@
 							"id": "2.1.6",
 							"description": "Run npm run check to verify types compile correctly"
 						}
-					]
+					],
+					"commit_hash": "4c499d6942a139d6fa4280491b2d6f386e93a51d"
 				},
 				{
 					"id": "2.2",
