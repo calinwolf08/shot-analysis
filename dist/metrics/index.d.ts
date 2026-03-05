@@ -39,4 +39,5 @@ export { GuideElbowFlareCalculator, GuideHandPositionCalculator, GuideHandReleas
 export { inferBallCenter, areHandsTogether, BallDipCalculator, BallPathCalculator, SetPointHeightCalculator, SetPointDurationCalculator, ReleasePointCalculator, ReleaseAngleCalculator, BallBehindHeadCalculator, createBallMetricCalculators, type InferredBallPosition, } from "./ball";
 export { HipDropCalculator, KneeFlexionCalculator, LegExtensionStartCalculator, createLowerBodyCalculators, } from "./lower-body";
 export { BackPostureCalculator, HeadTiltCalculator, ShoulderAlignmentCalculator, HandCupVsHingeCalculator, createPostureCalculators, type HandPositionCategory, } from "./posture";
+export { BallRiseStartCalculator, LegRiseStartCalculator, BallLegSyncCalculator, ReleaseStartCalculator, TotalShotDurationCalculator, createTimingCalculators, } from "./timing";
 //# sourceMappingURL=index.d.ts.map

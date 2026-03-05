@@ -45,4 +45,6 @@ export { inferBallCenter, areHandsTogether, BallDipCalculator, BallPathCalculato
 export { HipDropCalculator, KneeFlexionCalculator, LegExtensionStartCalculator, createLowerBodyCalculators, } from "./lower-body";
 // Posture & Alignment Calculators
 export { BackPostureCalculator, HeadTiltCalculator, ShoulderAlignmentCalculator, HandCupVsHingeCalculator, createPostureCalculators, } from "./posture";
+// Timing & Synchronization Calculators
+export { BallRiseStartCalculator, LegRiseStartCalculator, BallLegSyncCalculator, ReleaseStartCalculator, TotalShotDurationCalculator, createTimingCalculators, } from "./timing";
 //# sourceMappingURL=index.js.map

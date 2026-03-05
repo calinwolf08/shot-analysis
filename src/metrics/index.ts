@@ -111,3 +111,13 @@ export {
   createPostureCalculators,
   type HandPositionCategory,
 } from "./posture";
+
+// Timing & Synchronization Calculators
+export {
+  BallRiseStartCalculator,
+  LegRiseStartCalculator,
+  BallLegSyncCalculator,
+  ReleaseStartCalculator,
+  TotalShotDurationCalculator,
+  createTimingCalculators,
+} from "./timing";

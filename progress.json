@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T22:20:16.161Z"
+		"updated_at": "2026-03-05T22:26:21.070Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -1378,8 +1378,8 @@
 				{
 					"id": "5.6",
 					"name": "Posture & Alignment Metrics",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As the analyzer, I want to measure body posture and alignment so that I can provide feedback on form stability.",
@@ -1438,7 +1438,8 @@
 							"id": "5.6.10",
 							"description": "Run all tests and fix any failures"
 						}
-					]
+					],
+					"commit_hash": "44074a2a23339d1e37a4c6f623e3d35662a91642"
 				},
 				{
 					"id": "5.7",
