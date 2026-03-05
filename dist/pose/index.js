@@ -11,4 +11,5 @@ export { getLandmarkByIndex, getLandmarkByName, createEmptyLandmark, createEmpty
 export { PoseDetectionError, DetectorClosedError } from "./detector";
 export { MediaPipeNodeDetector, ModelNotFoundError, WasmInitializationError, ModelCreationError, createMediaPipeNodeDetector, DEFAULT_MODEL_PATH, MODEL_PATHS, } from "./mediapipe-node";
 export { MediaPipeBrowserDetector, WebGLNotAvailableError, WebGLFallbackBehavior, RuntimeDelegate, createMediaPipeBrowserDetector, detectWebGLSupport, } from "./mediapipe-browser";
+export { createPoseDetector, detectRuntime, UnknownRuntimeError, } from "./factory";
 //# sourceMappingURL=index.js.map

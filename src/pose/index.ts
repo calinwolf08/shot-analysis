@@ -52,3 +52,11 @@ export {
   createMediaPipeBrowserDetector,
   detectWebGLSupport,
 } from "./mediapipe-browser";
+
+// Factory with runtime auto-detection
+export type { PoseDetectorRuntime, PoseDetectorConfig } from "./factory";
+export {
+  createPoseDetector,
+  detectRuntime,
+  UnknownRuntimeError,
+} from "./factory";
