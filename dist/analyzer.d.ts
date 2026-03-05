@@ -39,13 +39,15 @@
  * @see Feature 7.0 - Main Analyzer Integration
  */
 import type { AnalysisConfig, ValidatedAnalysisConfig } from "./config";
+import type { FormProfile, ProfileComparison } from "./profiles/types";
 import type { PoseDetector } from "./pose/detector";
 import { type PoseDetectorConfig } from "./pose/factory";
 import { ShotDetector, type ShotDetectorConfig } from "./detection/integrated-shot-detector";
 import { MetricOrchestrator } from "./metrics";
 import { type ProfileRegistry } from "./profiles/registry";
-import type { FrameProvider } from "./providers/types";
-import type { AnalysisResult } from "./metrics/types";
+import type { FrameProvider, VideoFrame } from "./providers/types";
+import type { PoseLandmarks as MetricsPoseLandmarks, ShotPhase } from "./types";
+import type { AnalysisResult, MetricValue } from "./metrics/types";
 /**
  * Error thrown when analyzer methods are called before initialization.
  */
@@ -71,6 +73,24 @@ export interface ShotAnalyzerOptions {
      * Configuration for the shot detector.
      */
     readonly shotDetectorConfig?: ShotDetectorConfig;
+}
+/**
+ * Analysis result for a single frame during live processing.
+ *
+ * Contains the current state of analysis including detected landmarks,
+ * current shot phase (if within a shot), and partial metrics accumulated so far.
+ */
+export interface FrameAnalysis {
+    /** Zero-based frame index */
+    readonly frameIndex: number;
+    /** Timestamp of the frame in milliseconds */
+    readonly timestamp: number;
+    /** Detected pose landmarks for this frame (undefined if no pose detected) */
+    readonly landmarks?: MetricsPoseLandmarks;
+    /** Current shot phase if within a shot (undefined if not in a shot) */
+    readonly currentPhase?: ShotPhase;
+    /** Partial metrics calculated so far (may be updated incrementally) */
+    readonly partialMetrics?: Readonly<Record<string, MetricValue>>;
 }
 /**
  * Main analyzer class that orchestrates all shot analysis components.
@@ -106,8 +126,12 @@ export declare class ShotAnalyzer {
     private readonly metricOrchestrator;
     /** Profile registry for accessing form profiles */
     private readonly profileRegistry;
+    /** Profile comparison engine for comparing shots to profiles */
+    private readonly comparisonEngine;
     /** Whether the analyzer has been initialized */
     private initialized;
+    /** Internal state for live session processing */
+    private liveSessionState;
     /**
      * Creates a new ShotAnalyzer instance.
      *
@@ -232,6 +256,115 @@ export declare class ShotAnalyzer {
      * ```
      */
     analyzeVideo(frameProvider: FrameProvider): Promise<AnalysisResult>;
+    /**
+     * Processes a single video frame for live/incremental analysis.
+     *
+     * This method enables real-time analysis by processing frames one at a time.
+     * Internal state is maintained between calls to track shot progress and
+     * accumulate metrics. Use `finalizeLiveSession()` to get the complete
+     * analysis result when done.
+     *
+     * @param frame - The video frame to process
+     * @returns Promise resolving to the frame analysis with current state
+     *
+     * @throws {ShotAnalyzerNotInitializedError} If analyzer is not initialized
+     *
+     * @example
+     * ```typescript
+     * const analyzer = await createShotAnalyzer(config);
+     *
+     * // Process frames as they arrive from camera
+     * for await (const frame of cameraStream) {
+     *   const analysis = await analyzer.processFrame(frame);
+     *   if (analysis.currentPhase) {
+     *     console.log(`Current phase: ${analysis.currentPhase}`);
+     *   }
+     * }
+     *
+     * // Get final results when done
+     * const result = await analyzer.finalizeLiveSession();
+     * ```
+     */
+    processFrame(frame: VideoFrame): Promise<FrameAnalysis>;
+    /**
+     * Finalizes a live session and returns the complete analysis result.
+     *
+     * This method completes any partial shot analysis in progress, extracts
+     * metrics for all detected shots, and resets the internal state for a
+     * new session.
+     *
+     * @returns Promise resolving to the complete analysis result
+     *
+     * @throws {ShotAnalyzerNotInitializedError} If analyzer is not initialized
+     *
+     * @example
+     * ```typescript
+     * const analyzer = await createShotAnalyzer(config);
+     *
+     * // Process frames...
+     * await analyzer.processFrame(frame1);
+     * await analyzer.processFrame(frame2);
+     *
+     * // Get complete analysis
+     * const result = await analyzer.finalizeLiveSession();
+     * console.log(`Detected ${result.shots.length} shots`);
+     * ```
+     */
+    finalizeLiveSession(): Promise<AnalysisResult>;
+    /**
+     * Compares analysis results against a form profile.
+     *
+     * Returns a ProfileComparison for each shot in the analysis result,
+     * comparing the shot's metrics against the specified profile's targets.
+     *
+     * @param result - The analysis result to compare
+     * @param profileName - Name of the profile to compare against (defaults to config profile)
+     * @returns Array of ProfileComparison, one for each shot
+     *
+     * @throws {Error} If the specified profile is not found
+     *
+     * @example
+     * ```typescript
+     * const result = await analyzer.analyzeVideo(provider);
+     * const comparisons = analyzer.compareToProfile(result);
+     *
+     * for (const comparison of comparisons) {
+     *   console.log(`Shot compared to ${comparison.profile}`);
+     *   console.log(`  Pass: ${comparison.summary.passCount}`);
+     *   console.log(`  Fail: ${comparison.summary.failCount}`);
+     * }
+     * ```
+     */
+    compareToProfile(result: AnalysisResult, profileName?: string): ProfileComparison[];
+    /**
+     * Registers a custom form profile for use in comparisons.
+     *
+     * This is a passthrough to the profile registry. The profile will be
+     * available for use with `compareToProfile()` immediately after registration.
+     *
+     * @param profile - The form profile to register
+     *
+     * @throws {Error} If the profile is invalid (fails validation)
+     *
+     * @example
+     * ```typescript
+     * analyzer.registerProfile({
+     *   name: "my-custom-profile",
+     *   description: "Optimized for tall players",
+     *   targets: {
+     *     releaseAngle: {
+     *       ideal: 55,
+     *       acceptable: { min: 50, max: 60 },
+     *       priority: "high",
+     *       feedback: { tooLow: "Release higher", tooHigh: "Lower your release" }
+     *     }
+     *   }
+     * });
+     *
+     * const comparisons = analyzer.compareToProfile(result, "my-custom-profile");
+     * ```
+     */
+    registerProfile(profile: FormProfile): void;
 }
 /**
  * Factory function to create and initialize a ShotAnalyzer in one step.

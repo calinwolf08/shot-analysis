@@ -41,7 +41,8 @@
 
 import type { AnalysisConfig, ValidatedAnalysisConfig } from "./config";
 import { validateConfig } from "./config";
-import type { FormProfile } from "./profiles/types";
+import type { FormProfile, ProfileComparison } from "./profiles/types";
+import { ProfileComparisonEngine } from "./profiles/comparison";
 import type { PoseDetector } from "./pose/detector";
 import { createPoseDetector, type PoseDetectorConfig } from "./pose/factory";
 import type { PoseLandmarks as PosePoseLandmarks } from "./pose/types";
@@ -59,12 +60,13 @@ import {
   createTimingCalculators,
 } from "./metrics";
 import { getProfileRegistry, type ProfileRegistry } from "./profiles/registry";
-import type { FrameProvider } from "./providers/types";
-import type { PoseLandmarks as MetricsPoseLandmarks } from "./types";
+import type { FrameProvider, VideoFrame } from "./providers/types";
+import type { PoseLandmarks as MetricsPoseLandmarks, ShotPhase } from "./types";
 import type {
   AnalysisResult,
   ShotAnalysis,
   VideoMetadata,
+  MetricValue,
 } from "./metrics/types";
 
 /**
@@ -133,6 +135,42 @@ export interface ShotAnalyzerOptions {
 }
 
 /**
+ * Analysis result for a single frame during live processing.
+ *
+ * Contains the current state of analysis including detected landmarks,
+ * current shot phase (if within a shot), and partial metrics accumulated so far.
+ */
+export interface FrameAnalysis {
+  /** Zero-based frame index */
+  readonly frameIndex: number;
+  /** Timestamp of the frame in milliseconds */
+  readonly timestamp: number;
+  /** Detected pose landmarks for this frame (undefined if no pose detected) */
+  readonly landmarks?: MetricsPoseLandmarks;
+  /** Current shot phase if within a shot (undefined if not in a shot) */
+  readonly currentPhase?: ShotPhase;
+  /** Partial metrics calculated so far (may be updated incrementally) */
+  readonly partialMetrics?: Readonly<Record<string, MetricValue>>;
+}
+
+/**
+ * Internal state for live session processing.
+ */
+interface LiveSessionState {
+  /** Accumulated pose landmarks from processed frames */
+  poseLandmarks: PosePoseLandmarks[];
+  /** Converted landmarks for metrics extraction */
+  metricsLandmarks: MetricsPoseLandmarks[];
+  /** Frame metadata for video dimensions */
+  frameWidth: number;
+  frameHeight: number;
+  /** Last timestamp for duration calculation */
+  lastTimestamp: number;
+  /** Total frames processed in this session */
+  totalFrames: number;
+}
+
+/**
  * Main analyzer class that orchestrates all shot analysis components.
  *
  * Integrates pose detection, shot boundary detection, metric extraction,
@@ -172,8 +210,14 @@ export class ShotAnalyzer {
   /** Profile registry for accessing form profiles */
   private readonly profileRegistry: ProfileRegistry;
 
+  /** Profile comparison engine for comparing shots to profiles */
+  private readonly comparisonEngine: ProfileComparisonEngine;
+
   /** Whether the analyzer has been initialized */
   private initialized = false;
+
+  /** Internal state for live session processing */
+  private liveSessionState: LiveSessionState | null = null;
 
   /**
    * Creates a new ShotAnalyzer instance.
@@ -218,6 +262,9 @@ export class ShotAnalyzer {
 
     // Get profile registry (singleton)
     this.profileRegistry = getProfileRegistry();
+
+    // Create comparison engine
+    this.comparisonEngine = new ProfileComparisonEngine();
 
     // Register custom profile if provided
     // Cast is safe because config.FormProfile and profiles/types.FormProfile are structurally identical
@@ -457,6 +504,306 @@ export class ShotAnalyzer {
       videoMetadata,
       config: this.config as AnalysisConfig,
     };
+  }
+
+  // =========================================================================
+  // Live Session Support Methods
+  // =========================================================================
+
+  /**
+   * Processes a single video frame for live/incremental analysis.
+   *
+   * This method enables real-time analysis by processing frames one at a time.
+   * Internal state is maintained between calls to track shot progress and
+   * accumulate metrics. Use `finalizeLiveSession()` to get the complete
+   * analysis result when done.
+   *
+   * @param frame - The video frame to process
+   * @returns Promise resolving to the frame analysis with current state
+   *
+   * @throws {ShotAnalyzerNotInitializedError} If analyzer is not initialized
+   *
+   * @example
+   * ```typescript
+   * const analyzer = await createShotAnalyzer(config);
+   *
+   * // Process frames as they arrive from camera
+   * for await (const frame of cameraStream) {
+   *   const analysis = await analyzer.processFrame(frame);
+   *   if (analysis.currentPhase) {
+   *     console.log(`Current phase: ${analysis.currentPhase}`);
+   *   }
+   * }
+   *
+   * // Get final results when done
+   * const result = await analyzer.finalizeLiveSession();
+   * ```
+   */
+  async processFrame(frame: VideoFrame): Promise<FrameAnalysis> {
+    if (!this.initialized || !this.poseDetector) {
+      throw new ShotAnalyzerNotInitializedError("processFrame");
+    }
+
+    // Initialize live session state if not already started
+    if (!this.liveSessionState) {
+      this.liveSessionState = {
+        poseLandmarks: [],
+        metricsLandmarks: [],
+        frameWidth: frame.width,
+        frameHeight: frame.height,
+        lastTimestamp: 0,
+        totalFrames: 0,
+      };
+    }
+
+    // Run pose detection on the frame
+    const poseLandmarks = await this.poseDetector.detect(frame);
+
+    // Update session state
+    this.liveSessionState.lastTimestamp = frame.timestamp;
+    this.liveSessionState.totalFrames++;
+
+    // Build the frame analysis result
+    let landmarks: MetricsPoseLandmarks | undefined;
+    let currentPhase: ShotPhase | undefined;
+    const partialMetrics: Record<string, MetricValue> = {};
+
+    if (poseLandmarks) {
+      // Store landmarks for later finalization
+      this.liveSessionState.poseLandmarks.push(poseLandmarks);
+
+      // Convert to metrics format
+      const metricsLandmarks = convertToMetricsPoseLandmarks(
+        poseLandmarks,
+        frame.frameIndex,
+        frame.timestamp,
+      );
+      this.liveSessionState.metricsLandmarks.push(metricsLandmarks);
+      landmarks = metricsLandmarks;
+
+      // Try to detect current phase using shot detector's incremental processing
+      // Note: This is a simplified check - full phase detection happens at finalization
+      if (this.liveSessionState.poseLandmarks.length >= 2) {
+        // Process frames to see if we're in a shot
+        // We use a temporary detector state check
+        const tempShots = this.shotDetector.processFrames(
+          this.liveSessionState.poseLandmarks,
+        );
+
+        // If we have any shots and the current frame is within the last shot's range
+        if (tempShots.length > 0) {
+          const lastShot = tempShots[tempShots.length - 1];
+          if (lastShot && frame.frameIndex <= lastShot.frameRange.end) {
+            // Find which phase we're in
+            for (const [phaseName, phaseRange] of Object.entries(
+              lastShot.phases,
+            )) {
+              if (
+                phaseRange &&
+                frame.frameIndex >= phaseRange.startFrame &&
+                frame.frameIndex <= phaseRange.endFrame
+              ) {
+                currentPhase = phaseName as ShotPhase;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Build result object, only including optional properties if they have values
+    const result: FrameAnalysis = {
+      frameIndex: frame.frameIndex,
+      timestamp: frame.timestamp,
+      partialMetrics,
+    };
+
+    if (landmarks !== undefined) {
+      (result as { landmarks: MetricsPoseLandmarks }).landmarks = landmarks;
+    }
+
+    if (currentPhase !== undefined) {
+      (result as { currentPhase: ShotPhase }).currentPhase = currentPhase;
+    }
+
+    return result;
+  }
+
+  /**
+   * Finalizes a live session and returns the complete analysis result.
+   *
+   * This method completes any partial shot analysis in progress, extracts
+   * metrics for all detected shots, and resets the internal state for a
+   * new session.
+   *
+   * @returns Promise resolving to the complete analysis result
+   *
+   * @throws {ShotAnalyzerNotInitializedError} If analyzer is not initialized
+   *
+   * @example
+   * ```typescript
+   * const analyzer = await createShotAnalyzer(config);
+   *
+   * // Process frames...
+   * await analyzer.processFrame(frame1);
+   * await analyzer.processFrame(frame2);
+   *
+   * // Get complete analysis
+   * const result = await analyzer.finalizeLiveSession();
+   * console.log(`Detected ${result.shots.length} shots`);
+   * ```
+   */
+  async finalizeLiveSession(): Promise<AnalysisResult> {
+    if (!this.initialized || !this.poseDetector) {
+      throw new ShotAnalyzerNotInitializedError("finalizeLiveSession");
+    }
+
+    // Handle case where no frames were processed
+    if (!this.liveSessionState) {
+      return {
+        shots: [],
+        videoMetadata: {
+          width: 0,
+          height: 0,
+          fps: 30, // Default fps when no frames
+          totalFrames: 0,
+        },
+        config: this.config as AnalysisConfig,
+      };
+    }
+
+    const state = this.liveSessionState;
+
+    // Build video metadata
+    const videoMetadata: VideoMetadata = {
+      width: state.frameWidth,
+      height: state.frameHeight,
+      duration: state.lastTimestamp,
+      fps:
+        state.totalFrames > 1
+          ? state.totalFrames / (state.lastTimestamp / 1000)
+          : 30,
+      totalFrames: state.totalFrames,
+    };
+
+    // Reset state for next session
+    this.liveSessionState = null;
+
+    // Handle empty session or too few landmarks
+    if (state.poseLandmarks.length < 2) {
+      return {
+        shots: [],
+        videoMetadata,
+        config: this.config as AnalysisConfig,
+      };
+    }
+
+    // Reset shot detector state for fresh detection
+    this.shotDetector.reset();
+
+    // Detect shots from the accumulated landmarks
+    const detectedShots = this.shotDetector.processFrames(state.poseLandmarks);
+
+    // Extract metrics for each detected shot
+    const shotAnalyses: ShotAnalysis[] = [];
+
+    for (const shot of detectedShots) {
+      // Get landmarks for this shot's frame range
+      const shotLandmarks = state.metricsLandmarks.slice(
+        shot.frameRange.start,
+        shot.frameRange.end + 1,
+      );
+
+      // Analyze the shot with metric extraction
+      const analysis = this.metricOrchestrator.analyzeShot(
+        shot.shotIndex,
+        shotLandmarks,
+        shot.frameRange,
+        shot.phases,
+        this.config as AnalysisConfig,
+      );
+
+      shotAnalyses.push(analysis);
+    }
+
+    return {
+      shots: shotAnalyses,
+      videoMetadata,
+      config: this.config as AnalysisConfig,
+    };
+  }
+
+  /**
+   * Compares analysis results against a form profile.
+   *
+   * Returns a ProfileComparison for each shot in the analysis result,
+   * comparing the shot's metrics against the specified profile's targets.
+   *
+   * @param result - The analysis result to compare
+   * @param profileName - Name of the profile to compare against (defaults to config profile)
+   * @returns Array of ProfileComparison, one for each shot
+   *
+   * @throws {Error} If the specified profile is not found
+   *
+   * @example
+   * ```typescript
+   * const result = await analyzer.analyzeVideo(provider);
+   * const comparisons = analyzer.compareToProfile(result);
+   *
+   * for (const comparison of comparisons) {
+   *   console.log(`Shot compared to ${comparison.profile}`);
+   *   console.log(`  Pass: ${comparison.summary.passCount}`);
+   *   console.log(`  Fail: ${comparison.summary.failCount}`);
+   * }
+   * ```
+   */
+  compareToProfile(
+    result: AnalysisResult,
+    profileName?: string,
+  ): ProfileComparison[] {
+    // Use config profile if not specified
+    const targetProfile = profileName ?? this.config.profile;
+
+    // Get the profile (throws if not found)
+    const profile = this.profileRegistry.get(targetProfile);
+
+    // Compare each shot against the profile
+    return result.shots.map((shot) =>
+      this.comparisonEngine.compareToProfile(shot, profile),
+    );
+  }
+
+  /**
+   * Registers a custom form profile for use in comparisons.
+   *
+   * This is a passthrough to the profile registry. The profile will be
+   * available for use with `compareToProfile()` immediately after registration.
+   *
+   * @param profile - The form profile to register
+   *
+   * @throws {Error} If the profile is invalid (fails validation)
+   *
+   * @example
+   * ```typescript
+   * analyzer.registerProfile({
+   *   name: "my-custom-profile",
+   *   description: "Optimized for tall players",
+   *   targets: {
+   *     releaseAngle: {
+   *       ideal: 55,
+   *       acceptable: { min: 50, max: 60 },
+   *       priority: "high",
+   *       feedback: { tooLow: "Release higher", tooHigh: "Lower your release" }
+   *     }
+   *   }
+   * });
+   *
+   * const comparisons = analyzer.compareToProfile(result, "my-custom-profile");
+   * ```
+   */
+  registerProfile(profile: FormProfile): void {
+    this.profileRegistry.register(profile);
   }
 }
 

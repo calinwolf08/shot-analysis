@@ -11,4 +11,15 @@ export { validateConfig, safeValidateConfig, createConfig, createDefaultConfig, 
 export { calculateAngle, calculateDistance, calculateDistance2D, normalizeToBodyScale, calculateRelativePosition, movingAverage, movingAveragePoint3D, smoothLandmarkSequence, } from "./utils";
 export type { FrameProvider, MediaStreamProviderOptions } from "./providers";
 export { VideoFileProvider, createVideoFileProvider, VideoFileNotFoundError, VideoFileCorruptedError, UnsupportedVideoFormatError, MediaStreamProvider, createMediaStreamProvider, MediaStreamEndedError, MediaStreamInactiveError, NoVideoTrackError, InvalidFpsError, } from "./providers";
+export type { FrameAnalysis, ShotAnalyzerOptions } from "./analyzer";
+export { ShotAnalyzer, createShotAnalyzer, ShotAnalyzerNotInitializedError, ShotAnalyzerAlreadyInitializedError, } from "./analyzer";
+export type { ShotAnalysis, VideoMetadata, AnalysisResult, MetricCalculator, MetricCalculatorContext, MetricCalculatorResult, } from "./metrics/types";
+export { createEmptyMetricValue, createEmptyShotAnalysis, createEmptyVideoMetadata, createEmptyAnalysisResult, isSuccessfulMetricResult, getAverageMetricConfidence, filterMetricsByConfidence, } from "./metrics/types";
+export type { MetricFeedback, MetricComparisonResult, ComparisonSummary, ProfileComparison, ProfileValidationResult, } from "./profiles/types";
+export { DEFAULT_FEEDBACK_MESSAGES, createEmptyComparisonSummary, createEmptyProfileComparison, isNumericTarget, isCategoricalTarget, getFeedbackMessage, } from "./profiles/types";
+export { ProfileRegistry, getProfileRegistry } from "./profiles/registry";
+export { ProfileComparisonEngine, type ProfileComparisonEngineOptions, } from "./profiles/comparison";
+export { youthFundamentalsProfile, highSchoolProfile, proFormProfile, builtInProfiles, allBuiltInProfiles, getBuiltInProfile, } from "./profiles";
+export { ShotPhase as DetectionShotPhase, SHOT_PHASES, TOTAL_SHOT_PHASES, } from "./detection/types";
+export type { PhaseRange, ShotBoundary, ShotPhases, Shot, FrameLabel, ShotDetectionResult, } from "./detection/types";
 //# sourceMappingURL=index.d.ts.map

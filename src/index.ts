@@ -85,3 +85,83 @@ export {
   // Shared errors
   InvalidFpsError,
 } from "./providers";
+
+// Analyzer exports
+export type { FrameAnalysis, ShotAnalyzerOptions } from "./analyzer";
+export {
+  ShotAnalyzer,
+  createShotAnalyzer,
+  ShotAnalyzerNotInitializedError,
+  ShotAnalyzerAlreadyInitializedError,
+} from "./analyzer";
+
+// Metrics types exports
+export type {
+  ShotAnalysis,
+  VideoMetadata,
+  AnalysisResult,
+  MetricCalculator,
+  MetricCalculatorContext,
+  MetricCalculatorResult,
+} from "./metrics/types";
+
+export {
+  createEmptyMetricValue,
+  createEmptyShotAnalysis,
+  createEmptyVideoMetadata,
+  createEmptyAnalysisResult,
+  isSuccessfulMetricResult,
+  getAverageMetricConfidence,
+  filterMetricsByConfidence,
+} from "./metrics/types";
+
+// Profile exports
+export type {
+  MetricFeedback,
+  MetricComparisonResult,
+  ComparisonSummary,
+  ProfileComparison,
+  ProfileValidationResult,
+} from "./profiles/types";
+
+export {
+  DEFAULT_FEEDBACK_MESSAGES,
+  createEmptyComparisonSummary,
+  createEmptyProfileComparison,
+  isNumericTarget,
+  isCategoricalTarget,
+  getFeedbackMessage,
+} from "./profiles/types";
+
+export { ProfileRegistry, getProfileRegistry } from "./profiles/registry";
+
+export {
+  ProfileComparisonEngine,
+  type ProfileComparisonEngineOptions,
+} from "./profiles/comparison";
+
+// Built-in profiles
+export {
+  youthFundamentalsProfile,
+  highSchoolProfile,
+  proFormProfile,
+  builtInProfiles,
+  allBuiltInProfiles,
+  getBuiltInProfile,
+} from "./profiles";
+
+// Detection types exports
+export {
+  ShotPhase as DetectionShotPhase,
+  SHOT_PHASES,
+  TOTAL_SHOT_PHASES,
+} from "./detection/types";
+
+export type {
+  PhaseRange,
+  ShotBoundary,
+  ShotPhases,
+  Shot,
+  FrameLabel,
+  ShotDetectionResult,
+} from "./detection/types";

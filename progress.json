@@ -3,7 +3,7 @@
     "name": "basketball-shot-analysis",
     "root_path": "/home/calin/projects/shot-analysis",
     "created_at": "2026-03-04T00:00:00.000Z",
-    "updated_at": "2026-03-05T23:26:37.324Z"
+    "updated_at": "2026-03-05T23:37:01.103Z"
   },
   "status": "in_progress",
   "validation_commands": {
@@ -1986,8 +1986,8 @@
         {
           "id": "7.2",
           "name": "Video Analysis Pipeline",
-          "status": "pending",
-          "phase": "pending",
+          "status": "complete",
+          "phase": "complete",
           "attempts": 0,
           "context": {
             "user_story": "As a developer, I want to analyze a complete video and get all shot metrics so that I can process recorded clips.",
@@ -2053,7 +2053,8 @@
               "id": "7.2.11",
               "description": "Run all tests and fix any failures"
             }
-          ]
+          ],
+          "commit_hash": "1aa3a735b000dd6999c3d054a640d7f0c8feaa00"
         },
         {
           "id": "7.3",

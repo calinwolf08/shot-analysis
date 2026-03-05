@@ -750,4 +750,515 @@ describe("ShotAnalyzer", () => {
 
     return { provider, getCallCount: () => callCount };
   }
+
+  // =========================================================================
+  // 7.3.1 - processFrame() tests
+  // =========================================================================
+  describe("processFrame()", () => {
+    /**
+     * Creates a mock video frame for testing.
+     */
+    function createMockVideoFrame(
+      frameIndex: number,
+      timestamp: number,
+    ): VideoFrame {
+      return {
+        data: new Uint8ClampedArray(640 * 480 * 4),
+        width: 640,
+        height: 480,
+        timestamp,
+        frameIndex,
+      };
+    }
+
+    it("throws ShotAnalyzerNotInitializedError when called before initialize()", async () => {
+      const analyzer = new ShotAnalyzer(createDefaultConfig());
+      const frame = createMockVideoFrame(0, 0);
+
+      await expect(analyzer.processFrame(frame)).rejects.toThrow(
+        ShotAnalyzerNotInitializedError,
+      );
+    });
+
+    it("returns FrameAnalysis with frameIndex", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const frame = createMockVideoFrame(5, 166.67);
+
+      const result = await analyzer.processFrame(frame);
+
+      expect(result).toBeDefined();
+      expect(result.frameIndex).toBe(5);
+    });
+
+    it("returns FrameAnalysis with timestamp", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const frame = createMockVideoFrame(10, 333.33);
+
+      const result = await analyzer.processFrame(frame);
+
+      expect(result.timestamp).toBe(333.33);
+    });
+
+    it("landmarks property is undefined when no pose detected (mock case)", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const frame = createMockVideoFrame(0, 0);
+
+      const result = await analyzer.processFrame(frame);
+
+      // In mock case, pose detection returns null, so landmarks should be undefined
+      expect(result.landmarks).toBeUndefined();
+    });
+
+    it("currentPhase property is undefined when not in shot", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const frame = createMockVideoFrame(0, 0);
+
+      const result = await analyzer.processFrame(frame);
+
+      // With mock pose detector returning null, no shot phase detected
+      expect(result.currentPhase).toBeUndefined();
+    });
+
+    it("includes partialMetrics in result", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const frame = createMockVideoFrame(0, 0);
+
+      const result = await analyzer.processFrame(frame);
+
+      // partialMetrics should always be present (even if empty object)
+      expect(result.partialMetrics).toBeDefined();
+    });
+
+    it("processes frames incrementally", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+
+      // Process multiple frames
+      const result1 = await analyzer.processFrame(createMockVideoFrame(0, 0));
+      const result2 = await analyzer.processFrame(
+        createMockVideoFrame(1, 33.33),
+      );
+      const result3 = await analyzer.processFrame(
+        createMockVideoFrame(2, 66.67),
+      );
+
+      expect(result1.frameIndex).toBe(0);
+      expect(result2.frameIndex).toBe(1);
+      expect(result3.frameIndex).toBe(2);
+    });
+
+    it("completes within acceptable time (<100ms per frame ideally)", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const frame = createMockVideoFrame(0, 0);
+
+      const startTime = performance.now();
+      await analyzer.processFrame(frame);
+      const endTime = performance.now();
+
+      // Allow generous buffer for mocked tests, but ensure it's reasonably fast
+      // In real usage with MediaPipe, this should be <100ms
+      expect(endTime - startTime).toBeLessThan(1000);
+    });
+  });
+
+  // =========================================================================
+  // 7.3.3 - Internal state management tests
+  // =========================================================================
+  describe("live session internal state", () => {
+    function createMockVideoFrame(
+      frameIndex: number,
+      timestamp: number,
+    ): VideoFrame {
+      return {
+        data: new Uint8ClampedArray(640 * 480 * 4),
+        width: 640,
+        height: 480,
+        timestamp,
+        frameIndex,
+      };
+    }
+
+    it("maintains accumulated landmarks across processFrame calls", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+
+      await analyzer.processFrame(createMockVideoFrame(0, 0));
+      await analyzer.processFrame(createMockVideoFrame(1, 33.33));
+      await analyzer.processFrame(createMockVideoFrame(2, 66.67));
+
+      // Internal state should have 3 frames worth of data
+      // We verify this indirectly through finalize
+      const result = await analyzer.finalizeLiveSession();
+      expect(result.videoMetadata.totalFrames).toBe(3);
+    });
+
+    it("starts fresh session after previous finalization", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+
+      // First session
+      await analyzer.processFrame(createMockVideoFrame(0, 0));
+      await analyzer.processFrame(createMockVideoFrame(1, 33.33));
+      await analyzer.finalizeLiveSession();
+
+      // Second session should start fresh
+      await analyzer.processFrame(createMockVideoFrame(0, 0));
+      const result = await analyzer.finalizeLiveSession();
+
+      expect(result.videoMetadata.totalFrames).toBe(1);
+    });
+
+    it("resets internal state on finalize", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+
+      await analyzer.processFrame(createMockVideoFrame(0, 0));
+      await analyzer.processFrame(createMockVideoFrame(1, 33.33));
+      await analyzer.finalizeLiveSession();
+
+      // Processing after finalize should start from scratch
+      await analyzer.processFrame(createMockVideoFrame(5, 166.67));
+      await analyzer.processFrame(createMockVideoFrame(6, 200.0));
+
+      const result = await analyzer.finalizeLiveSession();
+      expect(result.videoMetadata.totalFrames).toBe(2);
+    });
+
+    it("tracks frame metadata correctly", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+
+      const frame1 = createMockVideoFrame(0, 0);
+      const frame2 = createMockVideoFrame(1, 33.33);
+
+      await analyzer.processFrame(frame1);
+      await analyzer.processFrame(frame2);
+
+      const result = await analyzer.finalizeLiveSession();
+
+      expect(result.videoMetadata.width).toBe(640);
+      expect(result.videoMetadata.height).toBe(480);
+    });
+  });
+
+  // =========================================================================
+  // 7.3.5 - finalizeLiveSession() tests
+  // =========================================================================
+  describe("finalizeLiveSession()", () => {
+    function createMockVideoFrame(
+      frameIndex: number,
+      timestamp: number,
+    ): VideoFrame {
+      return {
+        data: new Uint8ClampedArray(640 * 480 * 4),
+        width: 640,
+        height: 480,
+        timestamp,
+        frameIndex,
+      };
+    }
+
+    it("throws ShotAnalyzerNotInitializedError when called before initialize()", async () => {
+      const analyzer = new ShotAnalyzer(createDefaultConfig());
+
+      await expect(analyzer.finalizeLiveSession()).rejects.toThrow(
+        ShotAnalyzerNotInitializedError,
+      );
+    });
+
+    it("returns AnalysisResult when called after initialize()", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+
+      const result = await analyzer.finalizeLiveSession();
+
+      expect(result).toBeDefined();
+      expect(result.shots).toBeDefined();
+      expect(result.videoMetadata).toBeDefined();
+      expect(result.config).toBeDefined();
+    });
+
+    it("returns empty result when no frames processed", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+
+      const result = await analyzer.finalizeLiveSession();
+
+      expect(result.shots).toEqual([]);
+      expect(result.videoMetadata.totalFrames).toBe(0);
+    });
+
+    it("completes partial shots in progress", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+
+      // Process some frames that might contain partial shot
+      for (let i = 0; i < 30; i++) {
+        await analyzer.processFrame(createMockVideoFrame(i, i * 33.33));
+      }
+
+      const result = await analyzer.finalizeLiveSession();
+
+      // Should have processed and finalized the frames
+      expect(result.videoMetadata.totalFrames).toBe(30);
+      // May or may not detect shots depending on pose data
+      expect(Array.isArray(result.shots)).toBe(true);
+    });
+
+    it("includes config in result", async () => {
+      const config = createConfig({
+        shootingHand: "left",
+        profile: "high-school",
+      });
+      const analyzer = await createShotAnalyzer(config);
+
+      await analyzer.processFrame(createMockVideoFrame(0, 0));
+      const result = await analyzer.finalizeLiveSession();
+
+      expect(result.config.shootingHand).toBe("left");
+      expect(result.config.profile).toBe("high-school");
+    });
+
+    it("can be called multiple times after processing frames each time", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+
+      // First batch
+      await analyzer.processFrame(createMockVideoFrame(0, 0));
+      const result1 = await analyzer.finalizeLiveSession();
+      expect(result1.videoMetadata.totalFrames).toBe(1);
+
+      // Second batch
+      await analyzer.processFrame(createMockVideoFrame(0, 0));
+      await analyzer.processFrame(createMockVideoFrame(1, 33.33));
+      const result2 = await analyzer.finalizeLiveSession();
+      expect(result2.videoMetadata.totalFrames).toBe(2);
+    });
+
+    it("calculates duration from processed frames", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+
+      await analyzer.processFrame(createMockVideoFrame(0, 0));
+      await analyzer.processFrame(createMockVideoFrame(1, 33.33));
+      await analyzer.processFrame(createMockVideoFrame(2, 66.67));
+
+      const result = await analyzer.finalizeLiveSession();
+
+      // Duration should be calculated from frame timestamps
+      // The last frame timestamp represents approximate duration
+      expect(result.videoMetadata.duration).toBeCloseTo(66.67, 1);
+    });
+  });
+
+  // =========================================================================
+  // 7.3.7 - compareToProfile() tests
+  // =========================================================================
+  describe("compareToProfile()", () => {
+    it("compares analysis result to default profile", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(60);
+
+      const analysisResult = await analyzer.analyzeVideo(provider);
+      const comparisons = analyzer.compareToProfile(analysisResult);
+
+      expect(Array.isArray(comparisons)).toBe(true);
+    });
+
+    it("compares analysis result to specified profile", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(60);
+
+      const analysisResult = await analyzer.analyzeVideo(provider);
+      const comparisons = analyzer.compareToProfile(
+        analysisResult,
+        "youth-fundamentals",
+      );
+
+      expect(Array.isArray(comparisons)).toBe(true);
+      // Each comparison should reference the specified profile
+      for (const comparison of comparisons) {
+        expect(comparison.profile).toBe("youth-fundamentals");
+      }
+    });
+
+    it("throws error for unknown profile", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(60);
+
+      const analysisResult = await analyzer.analyzeVideo(provider);
+
+      expect(() =>
+        analyzer.compareToProfile(analysisResult, "unknown-profile-xyz"),
+      ).toThrow(/not found/i);
+    });
+
+    it("returns ProfileComparison[] with correct structure", async () => {
+      const analyzer = await createShotAnalyzer(
+        createConfig({
+          profile: "youth-fundamentals",
+        }),
+      );
+      const { provider } = createTrackingFrameProvider(60);
+
+      const analysisResult = await analyzer.analyzeVideo(provider);
+      const comparisons = analyzer.compareToProfile(analysisResult);
+
+      for (const comparison of comparisons) {
+        expect(comparison).toHaveProperty("profile");
+        expect(comparison).toHaveProperty("metrics");
+        expect(comparison).toHaveProperty("summary");
+        expect(comparison.summary).toHaveProperty("passCount");
+        expect(comparison.summary).toHaveProperty("failCount");
+        expect(comparison.summary).toHaveProperty("warningCount");
+        expect(comparison.summary).toHaveProperty("priorityIssues");
+      }
+    });
+
+    it("returns one ProfileComparison per shot", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(200);
+
+      const analysisResult = await analyzer.analyzeVideo(provider);
+      const comparisons = analyzer.compareToProfile(analysisResult);
+
+      // Should have one comparison per detected shot
+      expect(comparisons.length).toBe(analysisResult.shots.length);
+    });
+
+    it("uses config profile when profileName not specified", async () => {
+      const analyzer = await createShotAnalyzer(
+        createConfig({
+          profile: "pro-form",
+        }),
+      );
+      const { provider } = createTrackingFrameProvider(60);
+
+      const analysisResult = await analyzer.analyzeVideo(provider);
+      const comparisons = analyzer.compareToProfile(analysisResult);
+
+      for (const comparison of comparisons) {
+        expect(comparison.profile).toBe("pro-form");
+      }
+    });
+
+    it("returns empty array when no shots detected", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(0);
+
+      const analysisResult = await analyzer.analyzeVideo(provider);
+      const comparisons = analyzer.compareToProfile(analysisResult);
+
+      expect(comparisons).toEqual([]);
+    });
+  });
+
+  // =========================================================================
+  // 7.3.9 - registerProfile() tests
+  // =========================================================================
+  describe("registerProfile()", () => {
+    it("registers a custom profile successfully", async () => {
+      const analyzer = new ShotAnalyzer(createDefaultConfig());
+
+      const customProfile = {
+        name: "my-custom-profile-123",
+        description: "Custom test profile",
+        targets: {
+          testMetric: {
+            ideal: 90,
+            acceptable: { min: 80, max: 100 },
+            priority: "high" as const,
+            feedback: {
+              tooLow: "Too low",
+              tooHigh: "Too high",
+            },
+          },
+        },
+      };
+
+      analyzer.registerProfile(customProfile);
+
+      expect(analyzer.getProfiles()).toContain("my-custom-profile-123");
+    });
+
+    it("registered profile can be used in compareToProfile", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(60);
+
+      const customProfile = {
+        name: "compare-test-profile",
+        description: "Profile for comparison test",
+        targets: {},
+      };
+
+      analyzer.registerProfile(customProfile);
+
+      const analysisResult = await analyzer.analyzeVideo(provider);
+
+      // Should not throw - profile is registered
+      const comparisons = analyzer.compareToProfile(
+        analysisResult,
+        "compare-test-profile",
+      );
+
+      for (const comparison of comparisons) {
+        expect(comparison.profile).toBe("compare-test-profile");
+      }
+    });
+
+    it("throws error for invalid profile", () => {
+      const analyzer = new ShotAnalyzer(createDefaultConfig());
+
+      const invalidProfile = {
+        name: "", // Empty name is invalid
+        description: "Invalid profile",
+        targets: {},
+      };
+
+      expect(() => analyzer.registerProfile(invalidProfile)).toThrow();
+    });
+
+    it("overrides existing profile with same name", () => {
+      const analyzer = new ShotAnalyzer(createDefaultConfig());
+
+      const profile1 = {
+        name: "override-test-profile",
+        description: "First version",
+        targets: {},
+      };
+
+      const profile2 = {
+        name: "override-test-profile",
+        description: "Second version",
+        targets: {},
+      };
+
+      analyzer.registerProfile(profile1);
+      analyzer.registerProfile(profile2);
+
+      // Profile should be registered (overridden)
+      expect(analyzer.getProfiles()).toContain("override-test-profile");
+    });
+
+    it("registers multiple unique profiles", () => {
+      const analyzer = new ShotAnalyzer(createDefaultConfig());
+
+      const profiles = [
+        {
+          name: "multi-test-1",
+          description: "Profile 1",
+          targets: {},
+        },
+        {
+          name: "multi-test-2",
+          description: "Profile 2",
+          targets: {},
+        },
+        {
+          name: "multi-test-3",
+          description: "Profile 3",
+          targets: {},
+        },
+      ];
+
+      for (const profile of profiles) {
+        analyzer.registerProfile(profile);
+      }
+
+      const registeredProfiles = analyzer.getProfiles();
+      expect(registeredProfiles).toContain("multi-test-1");
+      expect(registeredProfiles).toContain("multi-test-2");
+      expect(registeredProfiles).toContain("multi-test-3");
+    });
+  });
 });
