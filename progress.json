@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T21:00:32.785Z"
+		"updated_at": "2026-03-05T21:06:36.333Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -631,8 +631,8 @@
 				{
 					"id": "3.4",
 					"name": "Detector Factory & Runtime Selection",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want automatic runtime detection so that the correct pose detector is used without manual configuration.",
@@ -680,7 +680,8 @@
 							"id": "3.4.7",
 							"description": "Run all tests and fix any failures"
 						}
-					]
+					],
+					"commit_hash": "a08078cce9b651cdc3f04abf8e0eb83a70edaf06"
 				},
 				{
 					"id": "3.5",
