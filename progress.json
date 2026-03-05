@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T20:19:01.372Z"
+		"updated_at": "2026-03-05T20:32:47.894Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -237,7 +237,7 @@
 		{
 			"id": "2.0",
 			"name": "Video Frame Processing",
-			"status": "pending",
+			"status": "complete",
 			"parallel_group": 1,
 			"tasks": [
 				{
@@ -412,8 +412,8 @@
 				{
 					"id": "2.4",
 					"name": "Feature 2 Validation Gate",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I need to verify that Feature 2 is complete and all tests pass before proceeding to dependent features.",
@@ -449,7 +449,8 @@
 							"id": "2.4.5",
 							"description": "Document any known limitations or future improvements"
 						}
-					]
+					],
+					"commit_hash": "e77553883f2eb7806dc78887d1d8a464d6660f9c"
 				}
 			]
 		},
