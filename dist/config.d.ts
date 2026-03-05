@@ -1,5 +1,13 @@
 /**
  * Configuration types and validation for the basketball shot analysis module.
+ *
+ * Known Limitations:
+ * - Custom profiles are validated at runtime but not persisted; consumers must
+ *   re-register custom profiles on each analyzer instantiation
+ * - Profile target validation ensures structure but not semantic correctness
+ *   (e.g., acceptable range min/max could be inverted or unreasonable values)
+ * - Default profile 'youth-fundamentals' must exist when referenced;
+ *   built-in profiles are implemented in Feature 6.0
  */
 import { z } from 'zod';
 import type { ShootingHand, TimingUnit, NumericRange, MetricPriority } from './types';

@@ -1,6 +1,13 @@
 /**
  * Geometry utility functions for calculating angles and distances
  * between body landmarks in 3D space.
+ *
+ * Known Limitations:
+ * - calculateAngle returns 0 for degenerate cases (identical/collinear points);
+ *   consumers should check for this condition if distinguishing between
+ *   "no angle" and "zero angle" is important
+ * - All calculations assume Euclidean space; does not account for camera
+ *   perspective distortion in 2D projections
  */
 /**
  * Calculates the angle in degrees formed by three points (a-vertex-c).

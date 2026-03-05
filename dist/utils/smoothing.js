@@ -1,6 +1,13 @@
 /**
  * Smoothing utility functions for reducing noise in landmark data.
  * Uses moving average techniques to smooth out jitter from pose detection.
+ *
+ * Known Limitations:
+ * - Uses fixed window sizes; adaptive window sizing based on signal characteristics
+ *   could improve results for varying frame rates or noise levels
+ * - Simple moving average may introduce lag; consider exponential moving average
+ *   for more responsive smoothing in live processing scenarios
+ * - No built-in outlier rejection; spikes in data are averaged rather than filtered
  */
 /** Default window size for smoothing operations */
 const DEFAULT_WINDOW_SIZE = 3;

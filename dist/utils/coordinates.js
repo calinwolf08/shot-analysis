@@ -1,6 +1,12 @@
 /**
  * Coordinate normalization utility functions for converting raw landmark
  * positions to body-scale-normalized values.
+ *
+ * Known Limitations:
+ * - Relies on shoulder width as sole body-scale reference; extreme shoulder
+ *   positions (arms raised, hunched) may distort normalization
+ * - No validation that shoulder width value is physiologically reasonable
+ * - Does not account for perspective foreshortening in z-axis depth values
  */
 /**
  * Normalizes a distance measurement using shoulder width as a body-scale reference.
