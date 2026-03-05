@@ -3,15 +3,15 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for src/pose/factory.ts</title>
+    <title>Code coverage report for src/analyzer.ts</title>
     <meta charset="utf-8" />
-    <link rel="stylesheet" href="../../prettify.css" />
-    <link rel="stylesheet" href="../../base.css" />
-    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style type='text/css'>
         .coverage-summary .sorter {
-            background-image: url(../../sort-arrow-sprite.png);
+            background-image: url(../sort-arrow-sprite.png);
         }
     </style>
 </head>
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">src/pose</a> factory.ts</h1>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">src</a> analyzer.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">82.97% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/78</span>
+                <span class='fraction'>78/94</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>14/14</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">64.28% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>9/14</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">82.97% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/78</span>
+                <span class='fraction'>78/94</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -328,7 +328,94 @@
 <a name='L263'></a><a href='#L263'>263</a>
 <a name='L264'></a><a href='#L264'>264</a>
 <a name='L265'></a><a href='#L265'>265</a>
-<a name='L266'></a><a href='#L266'>266</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a>
+<a name='L283'></a><a href='#L283'>283</a>
+<a name='L284'></a><a href='#L284'>284</a>
+<a name='L285'></a><a href='#L285'>285</a>
+<a name='L286'></a><a href='#L286'>286</a>
+<a name='L287'></a><a href='#L287'>287</a>
+<a name='L288'></a><a href='#L288'>288</a>
+<a name='L289'></a><a href='#L289'>289</a>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a>
+<a name='L309'></a><a href='#L309'>309</a>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a>
+<a name='L314'></a><a href='#L314'>314</a>
+<a name='L315'></a><a href='#L315'>315</a>
+<a name='L316'></a><a href='#L316'>316</a>
+<a name='L317'></a><a href='#L317'>317</a>
+<a name='L318'></a><a href='#L318'>318</a>
+<a name='L319'></a><a href='#L319'>319</a>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a>
+<a name='L325'></a><a href='#L325'>325</a>
+<a name='L326'></a><a href='#L326'>326</a>
+<a name='L327'></a><a href='#L327'>327</a>
+<a name='L328'></a><a href='#L328'>328</a>
+<a name='L329'></a><a href='#L329'>329</a>
+<a name='L330'></a><a href='#L330'>330</a>
+<a name='L331'></a><a href='#L331'>331</a>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a>
+<a name='L338'></a><a href='#L338'>338</a>
+<a name='L339'></a><a href='#L339'>339</a>
+<a name='L340'></a><a href='#L340'>340</a>
+<a name='L341'></a><a href='#L341'>341</a>
+<a name='L342'></a><a href='#L342'>342</a>
+<a name='L343'></a><a href='#L343'>343</a>
+<a name='L344'></a><a href='#L344'>344</a>
+<a name='L345'></a><a href='#L345'>345</a>
+<a name='L346'></a><a href='#L346'>346</a>
+<a name='L347'></a><a href='#L347'>347</a>
+<a name='L348'></a><a href='#L348'>348</a>
+<a name='L349'></a><a href='#L349'>349</a>
+<a name='L350'></a><a href='#L350'>350</a>
+<a name='L351'></a><a href='#L351'>351</a>
+<a name='L352'></a><a href='#L352'>352</a>
+<a name='L353'></a><a href='#L353'>353</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -392,12 +479,28 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -436,30 +539,28 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -469,9 +570,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -483,16 +581,36 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -509,355 +627,498 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">41x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >/**<span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" ></span></span></span>
- * Pose Detector Factory with automatic runtime detection.
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
+ * ShotAnalyzer - Main orchestration class for basketball shot form analysis.
  *
- * This module provides a factory function that automatically selects
- * the appropriate pose detector implementation based on the runtime
- * environment (Node.js vs browser).
+ * This class integrates all analysis components (pose detection, shot detection,
+ * metric extraction, profile comparison) into a clean public API.
  *
- * @example
+ * ## Usage
+ *
  * ```typescript
- * // Auto-detect runtime
- * const detector = await createPoseDetector();
+ * import { ShotAnalyzer, createShotAnalyzer, createConfig } from './analyzer';
  *
- * // Explicit runtime selection
- * const nodeDetector = await createPoseDetector({ runtime: 'node' });
- * const browserDetector = await createPoseDetector({ runtime: 'browser' });
+ * // Option 1: Using factory function (recommended for most cases)
+ * const analyzer = await createShotAnalyzer(createConfig({
+ *   shootingHand: 'right',
+ *   profile: 'youth-fundamentals',
+ * }));
  *
- * // With configuration
- * const configuredDetector = await createPoseDetector({
- *   runtime: 'auto',
- *   modelComplexity: 2,
- *   minDetectionConfidence: 0.6,
- * });
+ * // Option 2: Manual instantiation with lazy initialization
+ * const analyzer = new ShotAnalyzer(config);
+ * await analyzer.initialize();
+ *
+ * // Use the analyzer...
+ * const result = await analyzer.analyzeVideo(frameProvider);
+ *
+ * // Clean up
+ * await analyzer.dispose();
  * ```
- */
-&nbsp;
-import type { PoseDetector } from "./detector";
-import type { MediaPipeNodeConfig } from "./mediapipe-node";
-import type { MediaPipeBrowserConfig } from "./mediapipe-browser";
-import { createMediaPipeNodeDetector } from "./mediapipe-node";
-import {
-  createMediaPipeBrowserDetector,
-  RuntimeDelegate,
-  WebGLFallbackBehavior,
-} from "./mediapipe-browser";
-&nbsp;
-/**
- * Supported runtime environments for pose detection.
- */
-export type PoseDetectorRuntime = "node" | "browser" | "auto";
-&nbsp;
-/**
- * Configuration options for createPoseDetector factory.
  *
- * Combines common options with runtime-specific options.
+ * ## Known Limitations
+ *
+ * 1. **Single Shooter**: The analyzer assumes a single person is shooting in the frame.
+ *    Multiple people may cause incorrect landmark associations.
+ *
+ * 2. **Async Initialization**: The pose detector requires async initialization.
+ *    Use `initialize()` or the factory function before calling analysis methods.
+ *
+ * 3. **Resource Management**: Call `dispose()` when done to release MediaPipe resources.
+ *
+ * @see Feature 7.0 - Main Analyzer Integration
  */
-export interface PoseDetectorConfig {
-  /**
-   * Runtime environment to use.
-   * - 'node': Use Node.js MediaPipe implementation
-   * - 'browser': Use browser MediaPipe implementation
-   * - 'auto': Auto-detect based on environment (default)
-   * @default 'auto'
-   */
-  runtime?: PoseDetectorRuntime;
 &nbsp;
-  /**
-   * Path to the pose landmarker model file (.task).
-   * Can be a file path or URL.
-   */
-  modelPath?: string;
+import type { AnalysisConfig, ValidatedAnalysisConfig } from "./config";
+import { validateConfig } from "./config";
+import type { FormProfile } from "./profiles/types";
+import type { PoseDetector } from "./pose/detector";
+import { createPoseDetector, type PoseDetectorConfig } from "./pose/factory";
+import {
+  ShotDetector,
+  type ShotDetectorConfig,
+} from "./detection/integrated-shot-detector";
+import {
+  MetricOrchestrator,
+  createShootingArmCalculators,
+  createGuideArmCalculators,
+  createBallMetricCalculators,
+  createLowerBodyCalculators,
+  createPostureCalculators,
+  createTimingCalculators,
+} from "./metrics";
+import { getProfileRegistry, type ProfileRegistry } from "./profiles/registry";
 &nbsp;
-  /**
-   * Model complexity (0-2). Higher values are more accurate but slower.
-   * - 0: Lite model
-   * - 1: Full model
-   * - 2: Heavy model
-   * @default 1
-   */
-  modelComplexity?: 0 | 1 | 2;
-&nbsp;
-  /**
-   * Minimum confidence value for a pose detection to be considered successful.
-   * Value between 0 and 1.
-   * @default 0.5
-   */
-  minDetectionConfidence?: number;
-&nbsp;
-  /**
-   * Minimum confidence value for pose tracking to be considered successful.
-   * Value between 0 and 1.
-   * @default 0.5
-   */
-  minTrackingConfidence?: number;
-&nbsp;
-  /**
-   * Minimum confidence value for pose presence to be considered valid.
-   * Value between 0 and 1.
-   * @default 0.5
-   */
-  minPresenceConfidence?: number;
-&nbsp;
-  // Browser-specific options
-&nbsp;
-  /**
-   * Running mode for the pose landmarker (browser only).
-   * - "IMAGE": For single frame processing (default)
-   * - "VIDEO": For real-time video processing with temporal smoothing
-   * @default "IMAGE"
-   */
-  runningMode?: "IMAGE" | "VIDEO";
-&nbsp;
-  /**
-   * Runtime delegate preference (browser only).
-   * - "GPU": Use WebGL for better performance (default)
-   * - "CPU": Use WASM only (fallback for browsers without WebGL)
-   * @default "GPU"
-   */
-  delegate?: "GPU" | "CPU";
-&nbsp;
-  /**
-   * Behavior when GPU delegate is requested but WebGL is not available (browser only).
-   * - "AUTO": Automatically fall back to CPU delegate (default)
-   * - "ERROR": Throw WebGLNotAvailableError
-   * @default "AUTO"
-   */
-  webglFallback?: "AUTO" | "ERROR";
+/**
+ * Error thrown when analyzer methods are called before initialization.
+ */
+export class ShotAnalyzerNotInitializedError extends Error {
+<span class="fstat-no" title="function not covered" >  constructor(method: string) {</span>
+<span class="cstat-no" title="statement not covered" >    super(</span>
+<span class="cstat-no" title="statement not covered" >      `ShotAnalyzer.${method}() called before initialization. ` +</span>
+        `Call initialize() or use createShotAnalyzer() factory function.`,
+<span class="cstat-no" title="statement not covered" >    );</span>
+<span class="cstat-no" title="statement not covered" >    this.name = "ShotAnalyzerNotInitializedError";</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
 }
 &nbsp;
 /**
- * Error thrown when an unknown runtime is specified.
+ * Error thrown when initialize() is called on an already initialized analyzer.
  */
-<span class="cstat-no" title="statement not covered" >export class UnknownRuntimeError extends Error {</span>
-<span class="cstat-no" title="statement not covered" >  readonly runtime: PoseDetectorRuntime;</span>
-&nbsp;
-<span class="cstat-no" title="statement not covered" >  constructor(runtime: PoseDetectorRuntime) {</span>
-<span class="cstat-no" title="statement not covered" >    super(</span>
-<span class="cstat-no" title="statement not covered" >      `Unknown runtime "${runtime}". Supported runtimes are: 'node', 'browser', 'auto'.`,</span>
-<span class="cstat-no" title="statement not covered" >    );</span>
-<span class="cstat-no" title="statement not covered" >    this.name = "UnknownRuntimeError";</span>
-<span class="cstat-no" title="statement not covered" >    this.runtime = runtime;</span>
-<span class="cstat-no" title="statement not covered" >  }</span>
-<span class="cstat-no" title="statement not covered" >}</span>
+export class ShotAnalyzerAlreadyInitializedError extends Error {
+  constructor() {
+    super(
+      "ShotAnalyzer is already initialized. " +
+        "Call dispose() first if you need to re-initialize.",
+    );
+    this.name = "ShotAnalyzerAlreadyInitializedError";
+  }
+}
 &nbsp;
 /**
- * Detects the current runtime environment.
- *
- * Uses the presence of the `window` global to determine if running
- * in a browser or Node.js environment.
- *
- * @returns 'browser' if window is defined, 'node' otherwise
+ * Configuration for the ShotAnalyzer initialization.
  */
-<span class="cstat-no" title="statement not covered" >export function detectRuntime(): "node" | "browser" {</span>
-<span class="cstat-no" title="statement not covered" >  return typeof window !== "undefined" ? "browser" : "node";</span>
-<span class="cstat-no" title="statement not covered" >}</span>
+export interface ShotAnalyzerOptions {
+  /**
+   * Configuration for the pose detector.
+   * Passed to createPoseDetector() during initialization.
+   */
+  readonly poseDetectorConfig?: PoseDetectorConfig;
+&nbsp;
+  /**
+   * Configuration for the shot detector.
+   */
+  readonly shotDetectorConfig?: ShotDetectorConfig;
+}
 &nbsp;
 /**
- * Creates a pose detector with automatic runtime detection.
+ * Main analyzer class that orchestrates all shot analysis components.
  *
- * This factory function creates the appropriate PoseDetector implementation
- * based on the runtime environment. By default, it auto-detects whether
- * to use the Node.js or browser implementation.
- *
- * @param config - Configuration options including runtime selection
- * @returns Promise resolving to an initialized PoseDetector
- *
- * @throws {UnknownRuntimeError} If an invalid runtime is specified
- * @throws {ModelNotFoundError} If the model file cannot be found
- * @throws {WasmInitializationError} If WASM runtime fails to initialize
- * @throws {ModelCreationError} If model creation fails
- * @throws {WebGLNotAvailableError} If GPU delegate requested with ERROR fallback and WebGL unavailable (browser only)
+ * Integrates pose detection, shot boundary detection, metric extraction,
+ * and profile comparison into a unified API.
  *
  * @example
  * ```typescript
- * // Auto-detect runtime (recommended for library code)
- * const detector = await createPoseDetector();
+ * const analyzer = new ShotAnalyzer(config);
+ * await analyzer.initialize();
  *
- * // Explicit Node.js runtime
- * const nodeDetector = await createPoseDetector({ runtime: 'node' });
+ * // Get available profiles
+ * console.log(analyzer.getProfiles());
  *
- * // Explicit browser runtime with VIDEO mode
- * const browserDetector = await createPoseDetector({
- *   runtime: 'browser',
- *   runningMode: 'VIDEO',
- *   delegate: 'GPU',
- * });
+ * // Get current configuration
+ * console.log(analyzer.getConfig());
  *
- * // Custom model configuration
- * const customDetector = await createPoseDetector({
- *   modelComplexity: 2,
- *   minDetectionConfidence: 0.7,
- * });
- *
- * try {
- *   const result = await detector.detect(frame);
- *   // Process result...
- * } finally {
- *   await detector.close();
- * }
+ * // Clean up when done
+ * await analyzer.dispose();
  * ```
  */
-<span class="cstat-no" title="statement not covered" >export async function createPoseDetector(</span>
-<span class="cstat-no" title="statement not covered" >  config: PoseDetectorConfig = {},</span>
-<span class="cstat-no" title="statement not covered" >): Promise&lt;PoseDetector&gt; {</span>
-<span class="cstat-no" title="statement not covered" >  const { runtime = "auto", ...restConfig } = config;</span>
+export class ShotAnalyzer {
+  /** Validated configuration */
+  private readonly config: ValidatedAnalysisConfig;
 &nbsp;
-  // Determine the actual runtime to use
-<span class="cstat-no" title="statement not covered" >  const actualRuntime = runtime === "auto" ? detectRuntime() : runtime;</span>
+  /** Optional initialization options */
+  private readonly options: ShotAnalyzerOptions;
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  switch (actualRuntime) {</span>
-<span class="cstat-no" title="statement not covered" >    case "node": {</span>
-      // Extract only Node.js compatible options (omit undefined values)
-<span class="cstat-no" title="statement not covered" >      const nodeConfig: MediaPipeNodeConfig = {};</span>
+  /** Pose detector instance (initialized on initialize()) */
+  private poseDetector: PoseDetector | null = null;
 &nbsp;
-<span class="cstat-no" title="statement not covered" >      if (restConfig.modelPath !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        nodeConfig.modelPath = restConfig.modelPath;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-<span class="cstat-no" title="statement not covered" >      if (restConfig.modelComplexity !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        nodeConfig.modelComplexity = restConfig.modelComplexity;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-<span class="cstat-no" title="statement not covered" >      if (restConfig.minDetectionConfidence !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        nodeConfig.minDetectionConfidence = restConfig.minDetectionConfidence;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-<span class="cstat-no" title="statement not covered" >      if (restConfig.minTrackingConfidence !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        nodeConfig.minTrackingConfidence = restConfig.minTrackingConfidence;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-<span class="cstat-no" title="statement not covered" >      if (restConfig.minPresenceConfidence !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        nodeConfig.minPresenceConfidence = restConfig.minPresenceConfidence;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
+  /** Shot detector instance (created on construction) */
+  private readonly shotDetector: ShotDetector;
 &nbsp;
-<span class="cstat-no" title="statement not covered" >      return createMediaPipeNodeDetector(nodeConfig);</span>
+  /** Metric orchestrator with all calculators registered */
+  private readonly metricOrchestrator: MetricOrchestrator;
+&nbsp;
+  /** Profile registry for accessing form profiles */
+  private readonly profileRegistry: ProfileRegistry;
+&nbsp;
+  /** Whether the analyzer has been initialized */
+  private initialized = false;
+&nbsp;
+  /**
+   * Creates a new ShotAnalyzer instance.
+   *
+   * The analyzer is not ready for use until `initialize()` is called.
+   * For a simpler API, use the `createShotAnalyzer()` factory function.
+   *
+   * @param config - Analysis configuration (validated on construction)
+   * @param options - Optional initialization options
+   *
+   * @throws {z.ZodError} If config validation fails
+   *
+   * @example
+   * ```typescript
+   * const analyzer = new ShotAnalyzer(createConfig({
+   *   shootingHand: 'right',
+   *   profile: 'youth-fundamentals',
+   * }));
+   * await analyzer.initialize();
+   * ```
+   */
+  constructor(
+    config: AnalysisConfig | ValidatedAnalysisConfig,
+    options: ShotAnalyzerOptions = {},
+  ) {
+    // Validate configuration - throws ZodError if invalid
+    this.config = validateConfig(config);
+    this.options = options;
+&nbsp;
+    // Create shot detector (synchronous, no async init needed)
+    this.shotDetector = new ShotDetector(options.shotDetectorConfig);
+&nbsp;
+    // Create metric orchestrator with all calculators
+    this.metricOrchestrator = new MetricOrchestrator([
+      ...createShootingArmCalculators(),
+      ...createGuideArmCalculators(),
+      ...createBallMetricCalculators(),
+      ...createLowerBodyCalculators(),
+      ...createPostureCalculators(),
+      ...createTimingCalculators(),
+    ]);
+&nbsp;
+    // Get profile registry (singleton)
+    this.profileRegistry = getProfileRegistry();
+&nbsp;
+    // Register custom profile if provided
+    // Cast is safe because config.FormProfile and profiles/types.FormProfile are structurally identical
+    if (this.config.customProfile) {
+      this.profileRegistry.register(this.config.customProfile as FormProfile);
+    }
+  }
+&nbsp;
+  /**
+   * Initializes the analyzer by setting up the pose detector.
+   *
+   * This method must be called before using analysis methods.
+   * The pose detector requires async initialization due to model loading.
+   *
+   * @throws {ShotAnalyzerAlreadyInitializedError} If already initialized
+   *
+   * @example
+   * ```typescript
+   * const analyzer = new ShotAnalyzer(config);
+   * await analyzer.initialize();
+   * // Now ready to use
+   * ```
+   */
+  async initialize(): Promise&lt;void&gt; {
+    if (this.initialized) {
+      throw new ShotAnalyzerAlreadyInitializedError();
+    }
+&nbsp;
+    // Create pose detector (async due to model loading)
+    this.poseDetector = await createPoseDetector(
+      this.options.poseDetectorConfig,
+    );
+&nbsp;
+    this.initialized = true;
+  }
+&nbsp;
+  /**
+   * Releases resources used by the analyzer.
+   *
+   * Closes the pose detector and resets initialization state.
+   * Can be called multiple times safely.
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   const analyzer = await createShotAnalyzer(config);
+   *   // Use analyzer...
+   * } finally {
+   *   await analyzer.dispose();
+   * }
+   * ```
+   */
+  async dispose(): Promise&lt;void&gt; {
+    if (this.poseDetector) {
+      await this.poseDetector.close();
+      this.poseDetector = null;
+    }
+    this.initialized = false;
+  }
+&nbsp;
+  /**
+   * Returns whether the analyzer has been initialized.
+   *
+   * @returns true if initialize() has been called and dispose() has not
+   */
+  isInitialized(): boolean {
+    return this.initialized;
+  }
+&nbsp;
+  /**
+   * Returns the configuration used to create the analyzer.
+   *
+   * @returns The validated analysis configuration
+   */
+  getConfig(): ValidatedAnalysisConfig {
+    return this.config;
+  }
+&nbsp;
+  /**
+   * Returns the names of all available form profiles.
+   *
+   * Includes built-in profiles and any custom profiles that have been registered.
+   *
+   * @returns Array of profile names, sorted alphabetically
+   */
+  getProfiles(): string[] {
+    return this.profileRegistry.list();
+  }
+&nbsp;
+  /**
+   * Returns the internal pose detector instance.
+   *
+   * @internal For testing and advanced use cases only
+   * @throws {ShotAnalyzerNotInitializedError} If not initialized
+   */
+<span class="fstat-no" title="function not covered" >  getPoseDetector(): PoseDetector {</span>
+<span class="cstat-no" title="statement not covered" >    if (!this.poseDetector) {</span>
+<span class="cstat-no" title="statement not covered" >      throw new ShotAnalyzerNotInitializedError("getPoseDetector");</span>
 <span class="cstat-no" title="statement not covered" >    }</span>
-&nbsp;
-<span class="cstat-no" title="statement not covered" >    case "browser": {</span>
-      // Extract browser-compatible options including browser-specific ones (omit undefined values)
-<span class="cstat-no" title="statement not covered" >      const browserConfig: MediaPipeBrowserConfig = {};</span>
-&nbsp;
-<span class="cstat-no" title="statement not covered" >      if (restConfig.modelPath !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        browserConfig.modelPath = restConfig.modelPath;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-<span class="cstat-no" title="statement not covered" >      if (restConfig.modelComplexity !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        browserConfig.modelComplexity = restConfig.modelComplexity;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-<span class="cstat-no" title="statement not covered" >      if (restConfig.minDetectionConfidence !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        browserConfig.minDetectionConfidence =</span>
-<span class="cstat-no" title="statement not covered" >          restConfig.minDetectionConfidence;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-<span class="cstat-no" title="statement not covered" >      if (restConfig.minTrackingConfidence !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        browserConfig.minTrackingConfidence = restConfig.minTrackingConfidence;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-<span class="cstat-no" title="statement not covered" >      if (restConfig.minPresenceConfidence !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        browserConfig.minPresenceConfidence = restConfig.minPresenceConfidence;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-<span class="cstat-no" title="statement not covered" >      if (restConfig.runningMode !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        browserConfig.runningMode = restConfig.runningMode;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-<span class="cstat-no" title="statement not covered" >      if (restConfig.delegate !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        browserConfig.delegate =</span>
-<span class="cstat-no" title="statement not covered" >          restConfig.delegate === "GPU"</span>
-<span class="cstat-no" title="statement not covered" >            ? RuntimeDelegate.GPU</span>
-<span class="cstat-no" title="statement not covered" >            : RuntimeDelegate.CPU;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-<span class="cstat-no" title="statement not covered" >      if (restConfig.webglFallback !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >        browserConfig.webglFallback =</span>
-<span class="cstat-no" title="statement not covered" >          restConfig.webglFallback === "AUTO"</span>
-<span class="cstat-no" title="statement not covered" >            ? WebGLFallbackBehavior.AUTO</span>
-<span class="cstat-no" title="statement not covered" >            : WebGLFallbackBehavior.ERROR;</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
-&nbsp;
-<span class="cstat-no" title="statement not covered" >      return createMediaPipeBrowserDetector(browserConfig);</span>
-<span class="cstat-no" title="statement not covered" >    }</span>
-&nbsp;
-<span class="cstat-no" title="statement not covered" >    default:</span>
-<span class="cstat-no" title="statement not covered" >      throw new UnknownRuntimeError(actualRuntime);</span>
+<span class="cstat-no" title="statement not covered" >    return this.poseDetector;</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
-<span class="cstat-no" title="statement not covered" >}</span>
+&nbsp;
+  /**
+   * Returns the internal shot detector instance.
+   *
+   * @internal For testing and advanced use cases only
+   */
+<span class="fstat-no" title="function not covered" >  getShotDetector(): ShotDetector {</span>
+<span class="cstat-no" title="statement not covered" >    return this.shotDetector;</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+&nbsp;
+  /**
+   * Returns the internal metric orchestrator instance.
+   *
+   * @internal For testing and advanced use cases only
+   */
+<span class="fstat-no" title="function not covered" >  getMetricOrchestrator(): MetricOrchestrator {</span>
+<span class="cstat-no" title="statement not covered" >    return this.metricOrchestrator;</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+&nbsp;
+  /**
+   * Returns the internal profile registry instance.
+   *
+   * @internal For testing and advanced use cases only
+   */
+<span class="fstat-no" title="function not covered" >  getProfileRegistry(): ProfileRegistry {</span>
+<span class="cstat-no" title="statement not covered" >    return this.profileRegistry;</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+}
+&nbsp;
+/**
+ * Factory function to create and initialize a ShotAnalyzer in one step.
+ *
+ * This is the recommended way to create a ShotAnalyzer for most use cases.
+ * It handles async initialization automatically.
+ *
+ * @param config - Analysis configuration
+ * @param options - Optional initialization options
+ * @returns Promise resolving to an initialized ShotAnalyzer
+ *
+ * @throws {z.ZodError} If config validation fails
+ *
+ * @example
+ * ```typescript
+ * const analyzer = await createShotAnalyzer(createConfig({
+ *   shootingHand: 'right',
+ *   profile: 'youth-fundamentals',
+ * }));
+ *
+ * // Analyzer is ready to use immediately
+ * const result = await analyzer.analyzeVideo(frameProvider);
+ *
+ * await analyzer.dispose();
+ * ```
+ */
+export async function createShotAnalyzer(
+  config: AnalysisConfig | ValidatedAnalysisConfig,
+  options: ShotAnalyzerOptions = {},
+): Promise&lt;ShotAnalyzer&gt; {
+  const analyzer = new ShotAnalyzer(config, options);
+  await analyzer.initialize();
+  return analyzer;
+}
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -867,14 +1128,14 @@ export interface PoseDetectorConfig {
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
                 at 2026-03-05T23:26:21.872Z
             </div>
-        <script src="../../prettify.js"></script>
+        <script src="../prettify.js"></script>
         <script>
             window.onload = function () {
                 prettyPrint();
             };
         </script>
-        <script src="../../sorter.js"></script>
-        <script src="../../block-navigation.js"></script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
     </body>
 </html>
     

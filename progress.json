@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T23:15:30.000Z"
+		"updated_at": "2026-03-05T23:17:58.515Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -1909,7 +1909,8 @@
 							"id": "6.5.6",
 							"description": "Document any known limitations or future improvements"
 						}
-					]
+					],
+					"commit_hash": "7ec5378d664c0f1e06f5267f5768df7baaaa196d"
 				}
 			]
 		},
