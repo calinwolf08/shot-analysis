@@ -1,1314 +1,2220 @@
 {
-  "project": {
-    "name": "basketball-shot-analysis",
-    "root_path": "/home/calin/projects/shot-analysis",
-    "created_at": "2026-03-04T00:00:00.000Z",
-    "updated_at": "2026-03-04T00:00:00.000Z"
-  },
-  "status": "pending",
-  "validation_commands": {
-    "typescript": "npm run check",
-    "unit_tests": "npm run test:unit -- --run",
-    "integration_tests": "npm run test:integration -- --run",
-    "all_tests": "npm run test -- --run"
-  },
-  "features": [
-    {
-      "id": "1.0",
-      "name": "Configuration & Validation",
-      "status": "pending",
-      "parallel_group": 1,
-      "tasks": [
-        {
-          "id": "1.1",
-          "name": "Core Types & Configuration Schema",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want to configure the analyzer for shooter handedness and analysis preferences so that the system correctly identifies shooting vs guide hand and applies appropriate landmark mappings.",
-            "acceptance_criteria": [
-              "AnalysisConfig interface defines shootingHand ('left' | 'right'), profile name, customProfile, minConfidenceThreshold, and outputTimingUnit",
-              "Zod schema validates all configuration fields with appropriate constraints",
-              "VideoFrame type includes image data, timestamp, and frame index",
-              "All shared types are exported from src/types.ts",
-              "Unit tests cover all validation scenarios with 100% branch coverage"
-            ],
-            "edge_cases": [
-              "Invalid shootingHand value (not 'left' or 'right') should fail validation",
-              "minConfidenceThreshold outside 0-1 range should fail validation",
-              "Empty profile name should fail validation"
-            ],
-            "data_model": "AnalysisConfig: { shootingHand: 'left' | 'right', profile: string, customProfile?: FormProfile, minConfidenceThreshold: number (0-1), outputTimingUnit: 'frames' | 'ms' | 'percent' }",
-            "technical_notes": "Use Zod for runtime validation. Export all types from src/types.ts. Use strict TypeScript mode. Types will be used by all subsequent features. Write tests BEFORE implementation (TDD)."
-          },
-          "subtasks": [
-            { "id": "1.1.1", "description": "Create src/types.ts with VideoFrame, FrameMetadata, and shared type definitions" },
-            { "id": "1.1.2", "description": "Create src/config.ts with AnalysisConfig interface and Zod schema" },
-            { "id": "1.1.3", "description": "Write unit tests for configuration schema validation in src/config.test.ts BEFORE implementing validation logic" },
-            { "id": "1.1.4", "description": "Implement validation logic to make all tests pass" },
-            { "id": "1.1.5", "description": "Create src/index.ts with initial exports" },
-            { "id": "1.1.6", "description": "Run npm run check and npm run test:unit -- --run to verify everything passes" }
-          ]
-        },
-        {
-          "id": "1.2",
-          "name": "Configuration Validation & Defaults",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want sensible default configuration values and clear validation errors so that I can quickly set up the analyzer without specifying every option.",
-            "acceptance_criteria": [
-              "createDefaultConfig() function returns valid default configuration",
-              "validateConfig() function returns validated config or throws descriptive errors",
-              "Handedness mapping returns correct landmark indices for left/right shooters",
-              "Default profile is 'youth-fundamentals'",
-              "All functions have unit tests covering happy path and error cases"
-            ],
-            "edge_cases": [
-              "Partial config provided should merge with defaults",
-              "Invalid custom profile structure should throw specific validation error",
-              "Missing required fields should list all missing fields in error"
-            ],
-            "data_model": "Handedness mapping: rightHanded = { shootingShoulder: 12, shootingElbow: 14, shootingWrist: 16, guideShoulder: 11, guideElbow: 13, guideWrist: 15 }, leftHanded swaps indices",
-            "technical_notes": "MediaPipe landmarks: right shoulder=12, right elbow=14, right wrist=16, left shoulder=11, left elbow=13, left wrist=15. Use factory pattern for config creation. Write tests first."
-          },
-          "subtasks": [
-            { "id": "1.2.1", "description": "Write unit tests for createDefaultConfig() function" },
-            { "id": "1.2.2", "description": "Implement createDefaultConfig() function to pass tests" },
-            { "id": "1.2.3", "description": "Write unit tests for validateConfig() with valid and invalid inputs" },
-            { "id": "1.2.4", "description": "Implement validateConfig() function to pass tests" },
-            { "id": "1.2.5", "description": "Write unit tests for getHandednessMapping() for both left and right handed" },
-            { "id": "1.2.6", "description": "Implement getHandednessMapping() function to pass tests" },
-            { "id": "1.2.7", "description": "Run npm run check and npm run test:unit -- --run to verify all tests pass" }
-          ]
-        },
-        {
-          "id": "1.3",
-          "name": "Geometry & Coordinate Utilities",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I need geometry utilities to calculate angles and distances between body landmarks so that I can extract biomechanical metrics accurately.",
-            "acceptance_criteria": [
-              "calculateAngle() computes angle between three points in degrees (0-360)",
-              "calculateDistance() computes Euclidean distance between two 3D points",
-              "normalizeToBodyScale() normalizes distances using shoulder width as reference",
-              "calculateRelativePosition() returns position relative to reference point (e.g., head)",
-              "All edge cases have explicit unit tests"
-            ],
-            "edge_cases": [
-              "Collinear points should return 180 degrees for angle",
-              "Identical points should return 0 for distance",
-              "Zero shoulder width should throw error (can't normalize)",
-              "Negative coordinates should work correctly"
-            ],
-            "data_model": "Point3D: { x: number, y: number, z: number }. Angles in degrees (0-360 or -180 to 180 as appropriate). Normalized distances are unitless ratios.",
-            "technical_notes": "Use Math.atan2 for angle calculations to handle all quadrants. Shoulder width = distance between landmarks 11 and 12. Consider smoothing utilities for noisy landmark data. TDD approach required."
-          },
-          "subtasks": [
-            { "id": "1.3.1", "description": "Write unit tests for Point3D type and calculateAngle() function including edge cases" },
-            { "id": "1.3.2", "description": "Create src/utils/geometry.ts and implement calculateAngle() to pass tests" },
-            { "id": "1.3.3", "description": "Write unit tests for calculateDistance() and calculateDistance2D() functions" },
-            { "id": "1.3.4", "description": "Implement distance functions to pass tests" },
-            { "id": "1.3.5", "description": "Write unit tests for normalizeToBodyScale() and calculateRelativePosition()" },
-            { "id": "1.3.6", "description": "Create src/utils/coordinates.ts and implement normalization functions to pass tests" },
-            { "id": "1.3.7", "description": "Write unit tests for smoothing functions (moving average)" },
-            { "id": "1.3.8", "description": "Create src/utils/smoothing.ts and implement smoothing to pass tests" },
-            { "id": "1.3.9", "description": "Run npm run check and npm run test:unit -- --run to verify all tests pass" }
-          ]
-        },
-        {
-          "id": "1.4",
-          "name": "Feature 1 Validation Gate",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I need to verify that Feature 1 is complete and all tests pass before proceeding to dependent features.",
-            "acceptance_criteria": [
-              "npm run check passes with zero TypeScript errors",
-              "npm run test:unit -- --run passes with zero failures",
-              "All configuration types are properly exported",
-              "All utility functions are properly exported",
-              "Test coverage for Feature 1 files is >80%"
-            ],
-            "edge_cases": [],
-            "data_model": "",
-            "technical_notes": "This is a validation gate. Do NOT proceed to Feature 3.0 until this gate passes. Fix any failures before marking complete."
-          },
-          "subtasks": [
-            { "id": "1.4.1", "description": "Run npm run check and fix any TypeScript errors" },
-            { "id": "1.4.2", "description": "Run npm run test:unit -- --run and fix any test failures" },
-            { "id": "1.4.3", "description": "Review test coverage report and add tests if coverage <80%" },
-            { "id": "1.4.4", "description": "Verify all exports in src/index.ts are correct" },
-            { "id": "1.4.5", "description": "Document any known limitations or future improvements" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "2.0",
-      "name": "Video Frame Processing",
-      "status": "pending",
-      "parallel_group": 1,
-      "tasks": [
-        {
-          "id": "2.1",
-          "name": "FrameProvider Interface & Types",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want to provide video frames to the analyzer so that I can process both recorded clips and live camera feeds using a consistent interface.",
-            "acceptance_criteria": [
-              "FrameProvider interface defines getNextFrame(), getFps(), and getMetadata() methods",
-              "getNextFrame() returns Promise<VideoFrame | null> (null when complete)",
-              "getFps() returns frame rate as number",
-              "getMetadata() returns { width: number, height: number, duration?: number }",
-              "Interface is well-documented with JSDoc comments"
-            ],
-            "edge_cases": [
-              "Variable frame rate videos should be handled by normalizing to consistent timing",
-              "Live streams have no duration (undefined)",
-              "Zero fps should throw error"
-            ],
-            "data_model": "FrameProvider interface, VideoFrame: { data: ImageData, timestamp: number, frameIndex: number }, FrameMetadata: { width: number, height: number, duration?: number }",
-            "technical_notes": "Interface must work with both video files (Node.js) and live streams (browser). Use abstract interface pattern to allow different implementations."
-          },
-          "subtasks": [
-            { "id": "2.1.1", "description": "Create src/providers/types.ts with FrameProvider interface and VideoFrame type" },
-            { "id": "2.1.2", "description": "Define FrameMetadata type with width, height, and optional duration" },
-            { "id": "2.1.3", "description": "Add JSDoc documentation for all interface methods" },
-            { "id": "2.1.4", "description": "Write type tests to verify interface contracts" },
-            { "id": "2.1.5", "description": "Export types from src/providers/index.ts" },
-            { "id": "2.1.6", "description": "Run npm run check to verify types compile correctly" }
-          ]
-        },
-        {
-          "id": "2.2",
-          "name": "Video File Provider Implementation",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want to process video files for offline analysis so that I can analyze pre-recorded shooting clips.",
-            "acceptance_criteria": [
-              "createVideoFileProvider(path) returns Promise<FrameProvider>",
-              "Supports common video formats (mp4, mov, webm)",
-              "Extracts frames at correct timestamps",
-              "Returns null from getNextFrame() when video ends",
-              "All public methods have unit tests"
-            ],
-            "edge_cases": [
-              "File not found should throw descriptive error",
-              "Corrupted video file should throw error with details",
-              "Corrupted individual frames should be skipped with warning logged",
-              "Empty video (0 frames) should return null immediately"
-            ],
-            "data_model": "VideoFileProvider implements FrameProvider. Internal state: currentFrame index, fps, metadata, frame buffer.",
-            "technical_notes": "For Node.js, consider using ffmpeg via fluent-ffmpeg or similar. Frame extraction is CPU-intensive; consider batch extraction. Handle seeking for large files."
-          },
-          "subtasks": [
-            { "id": "2.2.1", "description": "Write unit tests for VideoFileProvider constructor and error cases" },
-            { "id": "2.2.2", "description": "Create src/providers/video-file.ts with VideoFileProvider class skeleton" },
-            { "id": "2.2.3", "description": "Write unit tests for getMetadata() method" },
-            { "id": "2.2.4", "description": "Implement video file loading and metadata extraction to pass tests" },
-            { "id": "2.2.5", "description": "Write unit tests for getNextFrame() with mock video data" },
-            { "id": "2.2.6", "description": "Implement getNextFrame() with frame extraction logic to pass tests" },
-            { "id": "2.2.7", "description": "Write integration test with a real test video file" },
-            { "id": "2.2.8", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "2.3",
-          "name": "MediaStream Provider Implementation",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want to process live camera feeds for real-time analysis so that I can provide immediate feedback during practice sessions.",
-            "acceptance_criteria": [
-              "createMediaStreamProvider(stream) returns FrameProvider",
-              "Works with browser MediaStream from getUserMedia()",
-              "Extracts frames at configured frame rate",
-              "Handles stream lifecycle correctly"
-            ],
-            "edge_cases": [
-              "Stream ends unexpectedly should handle gracefully",
-              "Low-light/poor quality frames should still be processed (confidence will be low)",
-              "Tab backgrounded may pause stream - should handle resume"
-            ],
-            "data_model": "MediaStreamProvider implements FrameProvider. Uses canvas to extract ImageData from video element.",
-            "technical_notes": "Browser-only implementation. Use requestAnimationFrame or setInterval for frame extraction. Consider frame rate limiting to reduce CPU usage."
-          },
-          "subtasks": [
-            { "id": "2.3.1", "description": "Write unit tests for MediaStreamProvider with mocked MediaStream" },
-            { "id": "2.3.2", "description": "Create src/providers/media-stream.ts with MediaStreamProvider class skeleton" },
-            { "id": "2.3.3", "description": "Write unit tests for stream attachment and frame extraction" },
-            { "id": "2.3.4", "description": "Implement stream attachment to hidden video element to pass tests" },
-            { "id": "2.3.5", "description": "Implement canvas-based frame extraction to pass tests" },
-            { "id": "2.3.6", "description": "Write unit tests for frame rate limiting" },
-            { "id": "2.3.7", "description": "Implement frame rate limiting and timestamp tracking to pass tests" },
-            { "id": "2.3.8", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "2.4",
-          "name": "Feature 2 Validation Gate",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I need to verify that Feature 2 is complete and all tests pass before proceeding to dependent features.",
-            "acceptance_criteria": [
-              "npm run check passes with zero TypeScript errors",
-              "npm run test:unit -- --run passes with zero failures",
-              "FrameProvider interface is properly exported",
-              "Both VideoFileProvider and MediaStreamProvider work correctly",
-              "Test coverage for Feature 2 files is >80%"
-            ],
-            "edge_cases": [],
-            "data_model": "",
-            "technical_notes": "This is a validation gate. Do NOT proceed to Feature 3.0 until BOTH Feature 1.4 and Feature 2.4 gates pass."
-          },
-          "subtasks": [
-            { "id": "2.4.1", "description": "Run npm run check and fix any TypeScript errors" },
-            { "id": "2.4.2", "description": "Run npm run test:unit -- --run and fix any test failures" },
-            { "id": "2.4.3", "description": "Review test coverage report and add tests if coverage <80%" },
-            { "id": "2.4.4", "description": "Verify all exports in src/providers/index.ts are correct" },
-            { "id": "2.4.5", "description": "Document any known limitations or future improvements" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "3.0",
-      "name": "Pose Detection & Landmark Extraction",
-      "status": "pending",
-      "parallel_group": 2,
-      "tasks": [
-        {
-          "id": "3.1",
-          "name": "PoseDetector Interface & Landmark Types",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to extract body landmarks from each frame so that I can calculate biomechanical metrics using consistent types.",
-            "acceptance_criteria": [
-              "PoseDetector interface defines detect() and close() methods",
-              "PoseLandmarks type includes all 33 MediaPipe landmarks with 3D coordinates",
-              "Each landmark has visibility and confidence scores",
-              "Landmark indices match MediaPipe Pose Landmarker specification",
-              "Type tests verify all landmark indices are accessible"
-            ],
-            "edge_cases": [
-              "No pose detected in frame should return null or empty landmarks with 0 confidence",
-              "Partially visible pose should have low visibility scores on occluded landmarks"
-            ],
-            "data_model": "PoseLandmarks: { landmarks: Landmark[], poseConfidence: number }. Landmark: { x: number, y: number, z: number, visibility: number, confidence: number }. Key indices: shoulders (11,12), elbows (13,14), wrists (15,16), hips (23,24), knees (25,26), ankles (27,28), index fingers (19,20), nose (0), eyes (1-4), ears (7,8).",
-            "technical_notes": "MediaPipe provides 33 landmarks. Coordinates are normalized 0-1 relative to image dimensions. Z is relative depth. Use enum or const object for landmark indices."
-          },
-          "subtasks": [
-            { "id": "3.1.1", "description": "Create src/pose/types.ts with Landmark and PoseLandmarks types" },
-            { "id": "3.1.2", "description": "Define LANDMARK_INDEX enum/const with all 33 landmark names and indices" },
-            { "id": "3.1.3", "description": "Write type tests to verify all landmark indices are correctly defined" },
-            { "id": "3.1.4", "description": "Create src/pose/detector.ts with PoseDetector interface" },
-            { "id": "3.1.5", "description": "Write unit tests for helper functions to access landmarks by name" },
-            { "id": "3.1.6", "description": "Implement helper functions to pass tests" },
-            { "id": "3.1.7", "description": "Run npm run check to verify types compile" }
-          ]
-        },
-        {
-          "id": "3.2",
-          "name": "MediaPipe Node.js Implementation",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want to run pose detection in Node.js so that I can analyze video files on a server or CLI.",
-            "acceptance_criteria": [
-              "MediaPipeNodeDetector implements PoseDetector interface",
-              "Uses @mediapipe/tasks-vision package",
-              "Configurable model complexity for speed/accuracy tradeoff",
-              "close() properly releases resources",
-              "Integration tests verify real pose detection works"
-            ],
-            "edge_cases": [
-              "Model file not found should throw clear error",
-              "GPU not available should fall back to CPU",
-              "Memory leak prevention with proper cleanup"
-            ],
-            "data_model": "MediaPipeNodeDetector class with private poseLandmarker instance. Config: modelComplexity (0-2), minDetectionConfidence, minTrackingConfidence.",
-            "technical_notes": "Use Pose Landmarker (not Pose), full landmark set (33 points). Model file needs to be downloaded/bundled. Consider lazy initialization."
-          },
-          "subtasks": [
-            { "id": "3.2.1", "description": "Write unit tests for MediaPipeNodeDetector constructor and configuration" },
-            { "id": "3.2.2", "description": "Create src/pose/mediapipe-node.ts with MediaPipeNodeDetector class skeleton" },
-            { "id": "3.2.3", "description": "Write unit tests for detect() method with mock MediaPipe" },
-            { "id": "3.2.4", "description": "Implement async initialization with model loading" },
-            { "id": "3.2.5", "description": "Implement detect() method that processes ImageData" },
-            { "id": "3.2.6", "description": "Implement close() method for resource cleanup" },
-            { "id": "3.2.7", "description": "Write integration tests with real model and test image" },
-            { "id": "3.2.8", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "3.3",
-          "name": "MediaPipe Browser Implementation",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want to run pose detection in the browser so that I can provide real-time feedback in a web app.",
-            "acceptance_criteria": [
-              "MediaPipeBrowserDetector implements PoseDetector interface",
-              "Uses WASM/WebGL runtime for performance",
-              "Works with both ImageData and HTMLVideoElement",
-              "close() properly releases WebGL resources",
-              "Unit tests verify all methods work correctly"
-            ],
-            "edge_cases": [
-              "WebGL not supported should fall back to WASM-only",
-              "Browser tab backgrounded may affect detection",
-              "Mobile browser memory constraints"
-            ],
-            "data_model": "MediaPipeBrowserDetector class. Same interface as Node.js version but different runtime.",
-            "technical_notes": "Use MediaPipe Vision tasks web bundle. WebGL delegate preferred for performance. Consider worker thread for non-blocking detection."
-          },
-          "subtasks": [
-            { "id": "3.3.1", "description": "Write unit tests for MediaPipeBrowserDetector with mocked MediaPipe" },
-            { "id": "3.3.2", "description": "Create src/pose/mediapipe-browser.ts with MediaPipeBrowserDetector class skeleton" },
-            { "id": "3.3.3", "description": "Write unit tests for detect() method" },
-            { "id": "3.3.4", "description": "Implement async initialization with WASM/WebGL setup" },
-            { "id": "3.3.5", "description": "Implement detect() method for browser environment" },
-            { "id": "3.3.6", "description": "Add runtime capability detection (WebGL vs WASM)" },
-            { "id": "3.3.7", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "3.4",
-          "name": "Detector Factory & Runtime Selection",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want automatic runtime detection so that the correct pose detector is used without manual configuration.",
-            "acceptance_criteria": [
-              "createPoseDetector(runtime?) returns Promise<PoseDetector>",
-              "Auto-detects runtime if not specified (Node.js vs browser)",
-              "Supports explicit runtime override",
-              "Returns initialized detector ready for use",
-              "Unit tests cover all runtime selection scenarios"
-            ],
-            "edge_cases": [
-              "Unknown runtime should throw descriptive error",
-              "Initialization failure should throw with root cause",
-              "Multiple createPoseDetector calls should work (no singleton issues)"
-            ],
-            "data_model": "Factory function with optional runtime parameter: 'node' | 'browser' | 'auto'. Returns Promise<PoseDetector>.",
-            "technical_notes": "Use typeof window check for browser detection. Consider lazy loading implementations to reduce bundle size when only one runtime is needed."
-          },
-          "subtasks": [
-            { "id": "3.4.1", "description": "Write unit tests for runtime auto-detection logic" },
-            { "id": "3.4.2", "description": "Create src/pose/factory.ts with createPoseDetector function skeleton" },
-            { "id": "3.4.3", "description": "Write unit tests for explicit runtime selection" },
-            { "id": "3.4.4", "description": "Implement runtime auto-detection logic to pass tests" },
-            { "id": "3.4.5", "description": "Implement configuration options passthrough to implementations" },
-            { "id": "3.4.6", "description": "Export factory from src/pose/index.ts" },
-            { "id": "3.4.7", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "3.5",
-          "name": "Feature 3 Validation Gate",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I need to verify that Feature 3 is complete and all tests pass before proceeding to Shot Detection.",
-            "acceptance_criteria": [
-              "npm run check passes with zero TypeScript errors",
-              "npm run test:unit -- --run passes with zero failures",
-              "Integration tests with real MediaPipe pass",
-              "PoseDetector interface and implementations are properly exported",
-              "Test coverage for Feature 3 files is >80%"
-            ],
-            "edge_cases": [],
-            "data_model": "",
-            "technical_notes": "This is a validation gate. Do NOT proceed to Feature 4.0 until this gate passes. Fix any failures before marking complete."
-          },
-          "subtasks": [
-            { "id": "3.5.1", "description": "Run npm run check and fix any TypeScript errors" },
-            { "id": "3.5.2", "description": "Run npm run test:unit -- --run and fix any test failures" },
-            { "id": "3.5.3", "description": "Run integration tests with real MediaPipe and fix any failures" },
-            { "id": "3.5.4", "description": "Review test coverage report and add tests if coverage <80%" },
-            { "id": "3.5.5", "description": "Verify all exports in src/pose/index.ts are correct" },
-            { "id": "3.5.6", "description": "Document any known limitations or future improvements" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "4.0",
-      "name": "Shot Detection & Phase Identification",
-      "status": "pending",
-      "parallel_group": 3,
-      "tasks": [
-        {
-          "id": "4.1",
-          "name": "Shot & Phase Type Definitions",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to automatically detect when shots occur and identify key phases so that I can extract metrics at the right moments.",
-            "acceptance_criteria": [
-              "ShotPhase enum defines: gather, load, rise, setPoint, release, followThrough",
-              "Shot type includes shotIndex, frameRange, and phases object",
-              "PhaseRange type includes startFrame and endFrame",
-              "FrameLabel type associates frame numbers with phase labels",
-              "Type tests verify all type structures are correct"
-            ],
-            "edge_cases": [
-              "Some phases may be missing (partial shots)",
-              "Phase boundaries may overlap during detection"
-            ],
-            "data_model": "ShotPhase: enum with 6 values. Shot: { shotIndex: number, frameRange: { start: number, end: number }, phases: { [ShotPhase]: PhaseRange } }. PhaseRange: { startFrame: number, endFrame: number }.",
-            "technical_notes": "Phases are sequential but some may be skipped (e.g., no gather if video starts mid-shot). Use optional fields for phases."
-          },
-          "subtasks": [
-            { "id": "4.1.1", "description": "Create src/detection/types.ts with ShotPhase enum" },
-            { "id": "4.1.2", "description": "Define Shot, PhaseRange, and ShotBoundary types" },
-            { "id": "4.1.3", "description": "Define FrameLabel type for frame-to-phase mapping" },
-            { "id": "4.1.4", "description": "Write type tests to verify all type structures" },
-            { "id": "4.1.5", "description": "Export types from src/detection/index.ts" },
-            { "id": "4.1.6", "description": "Run npm run check to verify types compile" }
-          ]
-        },
-        {
-          "id": "4.2",
-          "name": "Shot Boundary Detection Logic",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to detect when a shot starts and ends so that I can isolate individual shots in multi-shot videos.",
-            "acceptance_criteria": [
-              "Detects shot start: hands come together, upward wrist motion begins",
-              "Detects shot end: follow-through completes, arm returns down",
-              "Returns array of shot boundaries with frame numbers",
-              "Works with multiple shots in one video",
-              "Unit tests cover all detection scenarios"
-            ],
-            "edge_cases": [
-              "Video starts mid-shot: mark as partial shot starting at frame 0",
-              "Video ends mid-shot: mark as partial shot ending at last frame",
-              "Very fast shots may have merged phases",
-              "Fake pump motions should not trigger shot detection"
-            ],
-            "data_model": "ShotBoundary: { startFrame: number, endFrame: number, isPartialStart: boolean, isPartialEnd: boolean }. Detection uses hand position velocity and position thresholds.",
-            "technical_notes": "Track wrist vertical velocity (y-coordinate change over time). Shot starts when wrists move upward together. Shot ends when shooting arm returns to neutral. Use smoothing to avoid noise triggering."
-          },
-          "subtasks": [
-            { "id": "4.2.1", "description": "Write unit tests for shot start detection with mock landmark sequences" },
-            { "id": "4.2.2", "description": "Create src/detection/shot-detector.ts with ShotBoundaryDetector class skeleton" },
-            { "id": "4.2.3", "description": "Write unit tests for shot end detection" },
-            { "id": "4.2.4", "description": "Implement hand position tracking over frame sequence" },
-            { "id": "4.2.5", "description": "Implement shot start detection with velocity thresholds to pass tests" },
-            { "id": "4.2.6", "description": "Implement shot end detection with arm return heuristics to pass tests" },
-            { "id": "4.2.7", "description": "Write unit tests for partial shot handling" },
-            { "id": "4.2.8", "description": "Implement partial shot handling to pass tests" },
-            { "id": "4.2.9", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "4.3",
-          "name": "Phase Identification Logic",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to identify shot phases (gather, load, rise, set point, release, follow-through) so that I can extract metrics at the correct moments.",
-            "acceptance_criteria": [
-              "Identifies all 6 phases with frame ranges",
-              "Gather: ball received, preparing to shoot",
-              "Load/Dip: lowering into legs, ball may dip",
-              "Rise: legs extending, ball moving upward",
-              "Set Point: ball at highest point before release",
-              "Release: shooting arm extends, wrist snaps",
-              "Follow-through: arm fully extended, held",
-              "Each phase detection has unit tests"
-            ],
-            "edge_cases": [
-              "Quick shooter may skip or abbreviate phases",
-              "Set point may be very brief (Curry-style quick release)",
-              "Partial shots missing early phases"
-            ],
-            "data_model": "PhaseDetection result: { gather?: PhaseRange, load?: PhaseRange, rise?: PhaseRange, setPoint?: PhaseRange, release?: PhaseRange, followThrough?: PhaseRange }",
-            "technical_notes": "Phase transitions based on: hip vertical position (load), knee angle (load to rise), wrist height peaks (set point), hand separation velocity (release), arm extension angle (follow-through). Use hysteresis to avoid flickering."
-          },
-          "subtasks": [
-            { "id": "4.3.1", "description": "Write unit tests for gather phase detection" },
-            { "id": "4.3.2", "description": "Create src/detection/phase-detector.ts with PhaseDetector class skeleton" },
-            { "id": "4.3.3", "description": "Implement gather phase detection to pass tests" },
-            { "id": "4.3.4", "description": "Write unit tests for load phase detection" },
-            { "id": "4.3.5", "description": "Implement load phase detection to pass tests" },
-            { "id": "4.3.6", "description": "Write unit tests for rise phase detection" },
-            { "id": "4.3.7", "description": "Implement rise phase detection to pass tests" },
-            { "id": "4.3.8", "description": "Write unit tests for set point detection" },
-            { "id": "4.3.9", "description": "Implement set point detection to pass tests" },
-            { "id": "4.3.10", "description": "Write unit tests for release and follow-through detection" },
-            { "id": "4.3.11", "description": "Implement release and follow-through detection to pass tests" },
-            { "id": "4.3.12", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "4.4",
-          "name": "Shot Detector Integration",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want a unified shot detector that combines boundary and phase detection into a single output structure.",
-            "acceptance_criteria": [
-              "ShotDetector class combines boundary and phase detection",
-              "processFrames() takes landmark sequence, returns Shot[]",
-              "Each Shot includes complete phase breakdown",
-              "Handles reset between shots for continuous processing",
-              "Integration tests verify full detection pipeline"
-            ],
-            "edge_cases": [
-              "Empty landmark array returns empty shot array",
-              "Single-frame input should not detect a shot",
-              "Very long videos should not cause memory issues"
-            ],
-            "data_model": "ShotDetector class. Input: PoseLandmarks[]. Output: Shot[]. Uses ShotBoundaryDetector and PhaseDetector internally.",
-            "technical_notes": "Stream-friendly design: can process frames incrementally for live video. Maintain state between processFrame calls. finalize() to complete partial shots."
-          },
-          "subtasks": [
-            { "id": "4.4.1", "description": "Write unit tests for ShotDetector constructor and initialization" },
-            { "id": "4.4.2", "description": "Create integrated ShotDetector class combining boundary and phase detection" },
-            { "id": "4.4.3", "description": "Write unit tests for processFrames() batch processing" },
-            { "id": "4.4.4", "description": "Implement processFrames() to pass tests" },
-            { "id": "4.4.5", "description": "Write unit tests for processFrame() incremental processing" },
-            { "id": "4.4.6", "description": "Implement processFrame() for live processing to pass tests" },
-            { "id": "4.4.7", "description": "Write unit tests for finalize()" },
-            { "id": "4.4.8", "description": "Implement finalize() to complete partial shots" },
-            { "id": "4.4.9", "description": "Write integration tests with realistic landmark sequences" },
-            { "id": "4.4.10", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "4.5",
-          "name": "Feature 4 Validation Gate",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I need to verify that Feature 4 is complete and all tests pass before proceeding to Metric Extraction.",
-            "acceptance_criteria": [
-              "npm run check passes with zero TypeScript errors",
-              "npm run test:unit -- --run passes with zero failures",
-              "Integration tests with realistic landmark sequences pass",
-              "Shot detection accuracy meets expectations",
-              "Test coverage for Feature 4 files is >80%"
-            ],
-            "edge_cases": [],
-            "data_model": "",
-            "technical_notes": "This is a validation gate. Do NOT proceed to Feature 5.0 until this gate passes. Fix any failures before marking complete."
-          },
-          "subtasks": [
-            { "id": "4.5.1", "description": "Run npm run check and fix any TypeScript errors" },
-            { "id": "4.5.2", "description": "Run npm run test:unit -- --run and fix any test failures" },
-            { "id": "4.5.3", "description": "Run integration tests and fix any failures" },
-            { "id": "4.5.4", "description": "Review test coverage report and add tests if coverage <80%" },
-            { "id": "4.5.5", "description": "Validate shot detection accuracy with test videos" },
-            { "id": "4.5.6", "description": "Document any known limitations or future improvements" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "5.0",
-      "name": "Metric Extraction",
-      "status": "pending",
-      "parallel_group": 4,
-      "tasks": [
-        {
-          "id": "5.1",
-          "name": "Metric Types & Orchestration Interface",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to calculate detailed form metrics for each shot so that I can compare against ideal form profiles using a consistent structure.",
-            "acceptance_criteria": [
-              "MetricValue type includes value, unit, frame, and confidence",
-              "ShotAnalysis type includes shotIndex, frameRange, phases, metrics, and overallConfidence",
-              "AnalysisResult type includes shots array, videoMetadata, and config",
-              "MetricCalculator interface defines calculate() method",
-              "Type tests verify all structures are correct"
-            ],
-            "edge_cases": [
-              "Metric calculation fails due to low confidence landmarks",
-              "Some metrics unavailable for certain shots (occluded body parts)"
-            ],
-            "data_model": "MetricValue: { value: number | string, unit: string, frame: number, confidence: number }. ShotAnalysis: { shotIndex: number, frameRange: {...}, phases: {...}, metrics: { [name]: MetricValue }, overallConfidence: number }. AnalysisResult: { shots: ShotAnalysis[], videoMetadata: {...}, config: AnalysisConfig }.",
-            "technical_notes": "Use strategy pattern for metric calculators. Each calculator is independent and can be tested in isolation. Metrics are keyed by string name for flexibility."
-          },
-          "subtasks": [
-            { "id": "5.1.1", "description": "Create src/metrics/types.ts with MetricValue and ShotAnalysis types" },
-            { "id": "5.1.2", "description": "Define AnalysisResult type with shots array and metadata" },
-            { "id": "5.1.3", "description": "Define MetricCalculator interface with calculate() method" },
-            { "id": "5.1.4", "description": "Write type tests to verify all type structures" },
-            { "id": "5.1.5", "description": "Write unit tests for MetricOrchestrator class" },
-            { "id": "5.1.6", "description": "Create MetricOrchestrator class to run all calculators on a shot" },
-            { "id": "5.1.7", "description": "Run npm run check to verify types compile" }
-          ]
-        },
-        {
-          "id": "5.2",
-          "name": "Shooting Arm Metrics",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to measure shooting arm mechanics so that I can provide feedback on elbow position, extension, and wrist action.",
-            "acceptance_criteria": [
-              "shootingElbowFlare: angle of elbow relative to body plane (degrees) at set point and release",
-              "shootingElbowAngle: bend angle at elbow (degrees) at set point and release",
-              "maxArmExtension: maximum elbow extension achieved (degrees) at follow-through",
-              "wristSnapAngle: wrist flexion from set to release (degrees)",
-              "followThroughHold: duration arm stays extended (% of shot)",
-              "Each metric has unit tests with mock landmark data"
-            ],
-            "edge_cases": [
-              "Elbow occluded: return metric with low confidence",
-              "Very quick release may have minimal elbow angle change",
-              "Follow-through not held: duration may be 0"
-            ],
-            "data_model": "All metrics return MetricValue. shootingElbowFlare: measure angle between shoulder-elbow-wrist plane and body vertical. shootingElbowAngle: angle at elbow vertex. wristSnapAngle: change in wrist angle between frames.",
-            "technical_notes": "Use handedness mapping to get correct landmark indices. Calculate body plane from shoulders and hips. Elbow flare is deviation from ideal vertical plane."
-          },
-          "subtasks": [
-            { "id": "5.2.1", "description": "Write unit tests for shootingElbowFlare metric with mock landmarks" },
-            { "id": "5.2.2", "description": "Create src/metrics/shooting-arm.ts with ShootingArmCalculator class skeleton" },
-            { "id": "5.2.3", "description": "Implement shootingElbowFlare metric calculation to pass tests" },
-            { "id": "5.2.4", "description": "Write unit tests for shootingElbowAngle metric" },
-            { "id": "5.2.5", "description": "Implement shootingElbowAngle metric calculation to pass tests" },
-            { "id": "5.2.6", "description": "Write unit tests for maxArmExtension metric" },
-            { "id": "5.2.7", "description": "Implement maxArmExtension metric calculation to pass tests" },
-            { "id": "5.2.8", "description": "Write unit tests for wristSnapAngle metric" },
-            { "id": "5.2.9", "description": "Implement wristSnapAngle metric calculation to pass tests" },
-            { "id": "5.2.10", "description": "Write unit tests for followThroughHold metric" },
-            { "id": "5.2.11", "description": "Implement followThroughHold metric calculation to pass tests" },
-            { "id": "5.2.12", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "5.3",
-          "name": "Guide Arm Metrics",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to measure guide arm mechanics so that I can provide feedback on guide hand positioning and timing.",
-            "acceptance_criteria": [
-              "guideElbowFlare: guide arm elbow angle from body (degrees) at set point",
-              "guideHandPosition: position relative to ball/shooting hand (categorical) at set point",
-              "guideHandRelease: when guide hand separates (% of shot) at release",
-              "Each metric has unit tests"
-            ],
-            "edge_cases": [
-              "Guide arm occluded on side-view camera",
-              "Guide hand may stay in contact longer for young shooters"
-            ],
-            "data_model": "guideElbowFlare: degrees. guideHandPosition: categorical ('side', 'under', 'front', 'thumb-up'). guideHandRelease: percentage of total shot duration.",
-            "technical_notes": "Guide hand position inferred from relative position of guide wrist to shooting wrist. Hand separation detected by distance threshold between index fingers."
-          },
-          "subtasks": [
-            { "id": "5.3.1", "description": "Write unit tests for guideElbowFlare metric with mock landmarks" },
-            { "id": "5.3.2", "description": "Create src/metrics/guide-arm.ts with GuideArmCalculator class skeleton" },
-            { "id": "5.3.3", "description": "Implement guideElbowFlare metric calculation to pass tests" },
-            { "id": "5.3.4", "description": "Write unit tests for guideHandPosition categorical classification" },
-            { "id": "5.3.5", "description": "Implement guideHandPosition to pass tests" },
-            { "id": "5.3.6", "description": "Write unit tests for guideHandRelease timing calculation" },
-            { "id": "5.3.7", "description": "Implement guideHandRelease timing to pass tests" },
-            { "id": "5.3.8", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "5.4",
-          "name": "Ball Position Metrics (Inferred)",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to track inferred ball position so that I can measure set point height, ball path, and release point.",
-            "acceptance_criteria": [
-              "ballDip: how far ball drops before rising (normalized distance)",
-              "ballPath: straightness of path to set point (deviation score)",
-              "setPointHeight: height of set point relative to head (normalized)",
-              "setPointDuration: how long ball stays at set point (ms)",
-              "releasePoint: height/position at release (normalized coords)",
-              "releaseAngle: angle of shooting arm at release (degrees)",
-              "ballBehindHead: furthest back position relative to head (normalized)",
-              "Each metric has unit tests"
-            ],
-            "edge_cases": [
-              "Hands separate early: ball position cannot be inferred",
-              "Ball never dips (some shooting styles): dip = 0",
-              "Quick release: set point duration may be <50ms"
-            ],
-            "data_model": "Ball center inferred as midpoint of index fingers (landmarks 19, 20) when hands are together. All distances normalized to shoulder width. Heights relative to head (nose landmark 0).",
-            "technical_notes": "Ball position tracking only valid when hands are together. After hands separate (release), ball cannot be tracked. Mark ball metrics with lower confidence than body metrics."
-          },
-          "subtasks": [
-            { "id": "5.4.1", "description": "Write unit tests for ball center inference from index finger positions" },
-            { "id": "5.4.2", "description": "Create src/metrics/ball.ts with BallMetricsCalculator class skeleton" },
-            { "id": "5.4.3", "description": "Implement ball center inference to pass tests" },
-            { "id": "5.4.4", "description": "Write unit tests for ballDip and ballPath metrics" },
-            { "id": "5.4.5", "description": "Implement ballDip and ballPath to pass tests" },
-            { "id": "5.4.6", "description": "Write unit tests for setPointHeight and setPointDuration" },
-            { "id": "5.4.7", "description": "Implement setPointHeight and setPointDuration to pass tests" },
-            { "id": "5.4.8", "description": "Write unit tests for releasePoint and releaseAngle" },
-            { "id": "5.4.9", "description": "Implement releasePoint and releaseAngle to pass tests" },
-            { "id": "5.4.10", "description": "Write unit tests for ballBehindHead" },
-            { "id": "5.4.11", "description": "Implement ballBehindHead to pass tests" },
-            { "id": "5.4.12", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "5.5",
-          "name": "Lower Body Metrics",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to measure lower body mechanics so that I can provide feedback on leg power and timing.",
-            "acceptance_criteria": [
-              "hipDrop: how far hips drop in load phase (normalized distance)",
-              "kneeFlexion: maximum knee bend (degrees) at load",
-              "legExtensionStart: when legs begin extending (% of shot)",
-              "Each metric has unit tests"
-            ],
-            "edge_cases": [
-              "Stationary set shot: minimal hip drop",
-              "Jump shot: significant hip drop then explosive extension",
-              "Lower body occluded in some camera angles"
-            ],
-            "data_model": "hipDrop: normalized to shoulder width, measured from standing height. kneeFlexion: angle at knee (180 = straight). legExtensionStart: percentage of total shot duration when knee angle starts increasing.",
-            "technical_notes": "Use hip landmarks (23, 24) for hip drop. Knee angle from hip-knee-ankle landmarks. Track knee angle over time to find extension start."
-          },
-          "subtasks": [
-            { "id": "5.5.1", "description": "Write unit tests for hipDrop metric with mock landmarks" },
-            { "id": "5.5.2", "description": "Create src/metrics/lower-body.ts with LowerBodyCalculator class skeleton" },
-            { "id": "5.5.3", "description": "Implement hipDrop metric calculation to pass tests" },
-            { "id": "5.5.4", "description": "Write unit tests for kneeFlexion metric" },
-            { "id": "5.5.5", "description": "Implement kneeFlexion metric calculation to pass tests" },
-            { "id": "5.5.6", "description": "Write unit tests for legExtensionStart timing" },
-            { "id": "5.5.7", "description": "Implement legExtensionStart timing to pass tests" },
-            { "id": "5.5.8", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "5.6",
-          "name": "Posture & Alignment Metrics",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to measure body posture and alignment so that I can provide feedback on form stability.",
-            "acceptance_criteria": [
-              "backPosture: spine angle from vertical (degrees) throughout shot",
-              "headTilt: head angle from neutral (degrees) at release and follow-through",
-              "shoulderAlignment: shoulder rotation relative to target (degrees) at set point",
-              "handCupVsHinge: whether hand cups under or hinges back (categorical/angle) at set point",
-              "Each metric has unit tests"
-            ],
-            "edge_cases": [
-              "Significant lean may be intentional (fadeaway)",
-              "Head tracking for the shot may cause tilt"
-            ],
-            "data_model": "backPosture: angle from vertical (0 = perfectly upright). headTilt: degrees from neutral. shoulderAlignment: rotation angle (0 = square to target). handCupVsHinge: categorical ('cup', 'hinge', 'neutral') with angle value.",
-            "technical_notes": "Spine angle from hip-shoulder vector. Head tilt from ear-eye landmarks. Shoulder alignment from shoulder landmark positions. Hand position inferred from wrist orientation."
-          },
-          "subtasks": [
-            { "id": "5.6.1", "description": "Write unit tests for backPosture metric with mock landmarks" },
-            { "id": "5.6.2", "description": "Create src/metrics/posture.ts with PostureCalculator class skeleton" },
-            { "id": "5.6.3", "description": "Implement backPosture metric calculation to pass tests" },
-            { "id": "5.6.4", "description": "Write unit tests for headTilt metric" },
-            { "id": "5.6.5", "description": "Implement headTilt metric calculation to pass tests" },
-            { "id": "5.6.6", "description": "Write unit tests for shoulderAlignment metric" },
-            { "id": "5.6.7", "description": "Implement shoulderAlignment metric calculation to pass tests" },
-            { "id": "5.6.8", "description": "Write unit tests for handCupVsHinge classification" },
-            { "id": "5.6.9", "description": "Implement handCupVsHinge classification to pass tests" },
-            { "id": "5.6.10", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "5.7",
-          "name": "Timing & Synchronization Metrics",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to measure shot timing and synchronization so that I can provide feedback on rhythm and coordination.",
-            "acceptance_criteria": [
-              "ballRiseStart: when ball begins upward motion (% of shot)",
-              "legRiseStart: when legs begin extending (% of shot)",
-              "ballLegSync: difference between ball and leg rise (%, negative = ball first)",
-              "releaseStart: when release motion begins (% of shot)",
-              "totalShotDuration: full shot from gather to follow-through (ms)",
-              "Each metric has unit tests"
-            ],
-            "edge_cases": [
-              "Ball and legs perfectly synchronized: sync = 0",
-              "Very quick shot: total duration <500ms",
-              "Hesitation or pump fake extends duration"
-            ],
-            "data_model": "All timing metrics as percentage except totalShotDuration in milliseconds. Percentages relative to total shot duration from gather to follow-through end.",
-            "technical_notes": "Use fps from frame metadata to convert frames to ms. Detect motion starts using velocity thresholds. Consider smoothing to avoid noise triggering early detection."
-          },
-          "subtasks": [
-            { "id": "5.7.1", "description": "Write unit tests for ballRiseStart detection with mock landmarks" },
-            { "id": "5.7.2", "description": "Create src/metrics/timing.ts with TimingCalculator class skeleton" },
-            { "id": "5.7.3", "description": "Implement ballRiseStart detection to pass tests" },
-            { "id": "5.7.4", "description": "Write unit tests for legRiseStart detection" },
-            { "id": "5.7.5", "description": "Implement legRiseStart detection to pass tests" },
-            { "id": "5.7.6", "description": "Write unit tests for ballLegSync calculation" },
-            { "id": "5.7.7", "description": "Implement ballLegSync calculation to pass tests" },
-            { "id": "5.7.8", "description": "Write unit tests for releaseStart and totalShotDuration" },
-            { "id": "5.7.9", "description": "Implement releaseStart and totalShotDuration to pass tests" },
-            { "id": "5.7.10", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "5.8",
-          "name": "Metric Integration Tests",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want integration tests that verify all metrics work together correctly with realistic shot data.",
-            "acceptance_criteria": [
-              "Integration tests cover MetricOrchestrator running all calculators",
-              "Tests verify metric values are within expected ranges for test shots",
-              "Tests verify confidence scores are calculated correctly",
-              "Tests verify all metrics are returned in correct structure"
-            ],
-            "edge_cases": [
-              "Shot with some occluded landmarks should still produce partial metrics",
-              "Shot with very low confidence should affect overall confidence score"
-            ],
-            "data_model": "Use realistic mock landmark sequences representing complete shots. Expected values should be pre-calculated for validation.",
-            "technical_notes": "Create test fixtures with annotated expected values. Test both good-form and poor-form shots. Verify metric consistency across multiple runs."
-          },
-          "subtasks": [
-            { "id": "5.8.1", "description": "Create test fixtures with realistic landmark sequences for complete shots" },
-            { "id": "5.8.2", "description": "Manually calculate expected metric values for test fixtures" },
-            { "id": "5.8.3", "description": "Write integration tests for MetricOrchestrator with all calculators" },
-            { "id": "5.8.4", "description": "Write integration tests for good-form shot analysis" },
-            { "id": "5.8.5", "description": "Write integration tests for poor-form shot analysis" },
-            { "id": "5.8.6", "description": "Write integration tests for shots with occlusions" },
-            { "id": "5.8.7", "description": "Run all integration tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "5.9",
-          "name": "Feature 5 Validation Gate",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I need to verify that Feature 5 is complete and all tests pass before proceeding to Profile Comparison.",
-            "acceptance_criteria": [
-              "npm run check passes with zero TypeScript errors",
-              "npm run test:unit -- --run passes with zero failures",
-              "All integration tests pass",
-              "All 25+ metrics are implemented and tested",
-              "Test coverage for Feature 5 files is >80%"
-            ],
-            "edge_cases": [],
-            "data_model": "",
-            "technical_notes": "This is a validation gate. Do NOT proceed to Feature 6.0 until this gate passes. This is the largest feature - ensure thorough testing."
-          },
-          "subtasks": [
-            { "id": "5.9.1", "description": "Run npm run check and fix any TypeScript errors" },
-            { "id": "5.9.2", "description": "Run npm run test:unit -- --run and fix any test failures" },
-            { "id": "5.9.3", "description": "Run all integration tests and fix any failures" },
-            { "id": "5.9.4", "description": "Review test coverage report and add tests if coverage <80%" },
-            { "id": "5.9.5", "description": "Verify all 25+ metrics are implemented" },
-            { "id": "5.9.6", "description": "Verify metric accuracy with test data" },
-            { "id": "5.9.7", "description": "Document any known limitations or future improvements" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "6.0",
-      "name": "Form Profile Comparison",
-      "status": "pending",
-      "parallel_group": 5,
-      "tasks": [
-        {
-          "id": "6.1",
-          "name": "Profile Types & Validation",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want to compare extracted metrics against target profiles so that I can identify form issues using well-defined profile structures.",
-            "acceptance_criteria": [
-              "FormProfile interface defines name, description, and targets",
-              "Each target has ideal value, acceptable range, priority, and feedback messages",
-              "ProfileComparison output includes status (pass/fail/warning) for each metric",
-              "Zod schema validates profile structure",
-              "All types have validation tests"
-            ],
-            "edge_cases": [
-              "Profile with no targets should be valid but useless",
-              "Unknown metric name in profile should warn but not fail",
-              "Missing feedback messages should use defaults"
-            ],
-            "data_model": "FormProfile: { name: string, description: string, targets: { [metricName]: { ideal: number|string, acceptable: { min: number, max: number } | string[], priority: 'high'|'medium'|'low', feedback: { tooLow?: string, tooHigh?: string, incorrect?: string } } } }. ProfileComparison: { profile: string, metrics: { [name]: { value, target, status, deviation?, feedback? } }, summary: { passCount, failCount, warningCount, priorityIssues: string[] } }.",
-            "technical_notes": "Use Zod for runtime validation. Support both numeric ranges and categorical acceptable values. Priority helps sort feedback importance."
-          },
-          "subtasks": [
-            { "id": "6.1.1", "description": "Create src/profiles/types.ts with FormProfile interface" },
-            { "id": "6.1.2", "description": "Define ProfileComparison output type" },
-            { "id": "6.1.3", "description": "Write unit tests for profile Zod schema validation" },
-            { "id": "6.1.4", "description": "Create Zod schema for profile validation to pass tests" },
-            { "id": "6.1.5", "description": "Run npm run check to verify types compile" }
-          ]
-        },
-        {
-          "id": "6.2",
-          "name": "Built-in Profiles",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want pre-defined form profiles for common skill levels so that I can immediately compare without custom configuration.",
-            "acceptance_criteria": [
-              "youth-fundamentals: age-appropriate targets for developing players (8-12)",
-              "high-school: more refined mechanics expectations (13-18)",
-              "pro-form: elite-level targets",
-              "All profiles include feedback messages for common issues",
-              "All profiles pass validation"
-            ],
-            "edge_cases": [
-              "Profile values may need adjustment based on user feedback",
-              "Some metrics may not have meaningful targets for youth"
-            ],
-            "data_model": "Each profile is a FormProfile object with targets for relevant metrics. Youth profile has wider acceptable ranges. Pro profile has tighter ranges. All include corrective feedback text.",
-            "technical_notes": "Research typical values for each level. Youth: focus on fundamentals (elbow alignment, follow-through). High school: add timing/rhythm. Pro: precision on all metrics."
-          },
-          "subtasks": [
-            { "id": "6.2.1", "description": "Write unit tests for youth-fundamentals profile validation" },
-            { "id": "6.2.2", "description": "Create src/profiles/youth.ts with youth-fundamentals profile" },
-            { "id": "6.2.3", "description": "Write unit tests for high-school profile validation" },
-            { "id": "6.2.4", "description": "Create src/profiles/high-school.ts with high-school profile" },
-            { "id": "6.2.5", "description": "Write unit tests for pro-form profile validation" },
-            { "id": "6.2.6", "description": "Create src/profiles/pro.ts with pro-form profile" },
-            { "id": "6.2.7", "description": "Add comprehensive feedback messages for each profile" },
-            { "id": "6.2.8", "description": "Export all profiles from src/profiles/index.ts" },
-            { "id": "6.2.9", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "6.3",
-          "name": "Profile Comparison Engine",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As the analyzer, I want to compare shot metrics against a profile so that I can identify form issues and provide feedback.",
-            "acceptance_criteria": [
-              "compareToProfile() compares all metrics against selected profile",
-              "Returns pass/fail/warning status for each metric",
-              "Calculates deviation from ideal value for numeric metrics",
-              "Provides corrective feedback text for failures",
-              "Prioritizes issues by profile-defined priority",
-              "All comparison logic has unit tests"
-            ],
-            "edge_cases": [
-              "Metric not in profile: skip comparison",
-              "Metric with low confidence: mark as warning regardless of value",
-              "Categorical metric comparison uses string matching"
-            ],
-            "data_model": "Input: ShotAnalysis, FormProfile. Output: ProfileComparison. Status determination: value in acceptable range = pass, outside range but close = warning, far outside = fail.",
-            "technical_notes": "Define 'close' threshold as percentage of acceptable range. Sort priority issues by priority level (high first). Handle both numeric and categorical comparisons."
-          },
-          "subtasks": [
-            { "id": "6.3.1", "description": "Write unit tests for numeric metric comparison with various scenarios" },
-            { "id": "6.3.2", "description": "Create src/profiles/comparison.ts with ProfileComparisonEngine class skeleton" },
-            { "id": "6.3.3", "description": "Implement numeric metric comparison to pass tests" },
-            { "id": "6.3.4", "description": "Write unit tests for categorical metric comparison" },
-            { "id": "6.3.5", "description": "Implement categorical metric comparison to pass tests" },
-            { "id": "6.3.6", "description": "Write unit tests for status determination (pass/fail/warning)" },
-            { "id": "6.3.7", "description": "Implement status determination to pass tests" },
-            { "id": "6.3.8", "description": "Write unit tests for feedback message selection" },
-            { "id": "6.3.9", "description": "Implement feedback message selection to pass tests" },
-            { "id": "6.3.10", "description": "Write unit tests for summary generation" },
-            { "id": "6.3.11", "description": "Implement summary generation with priority sorting to pass tests" },
-            { "id": "6.3.12", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "6.4",
-          "name": "Profile Management & Custom Profiles",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want to register custom profiles and list available profiles so that I can extend the system for specific needs.",
-            "acceptance_criteria": [
-              "getProfiles() returns list of available profile names",
-              "registerProfile() adds custom profile to registry",
-              "Custom profiles override built-in profiles with same name",
-              "Invalid profiles throw validation errors",
-              "All registry operations have unit tests"
-            ],
-            "edge_cases": [
-              "Registering profile with existing name: override (warn in console)",
-              "Empty profile registry: only built-ins available",
-              "Accessing non-existent profile: throw descriptive error"
-            ],
-            "data_model": "ProfileRegistry class with Map<string, FormProfile>. Built-in profiles pre-registered. Methods: register(), get(), list(), has().",
-            "technical_notes": "Use singleton pattern for global registry. Support late registration (profiles can be added after analyzer initialization). Validate profiles on registration."
-          },
-          "subtasks": [
-            { "id": "6.4.1", "description": "Write unit tests for ProfileRegistry constructor and built-in profiles" },
-            { "id": "6.4.2", "description": "Create src/profiles/registry.ts with ProfileRegistry class skeleton" },
-            { "id": "6.4.3", "description": "Write unit tests for registerProfile() with valid and invalid profiles" },
-            { "id": "6.4.4", "description": "Implement registerProfile() with validation to pass tests" },
-            { "id": "6.4.5", "description": "Write unit tests for getProfile() and listProfiles()" },
-            { "id": "6.4.6", "description": "Implement getProfile() and listProfiles() to pass tests" },
-            { "id": "6.4.7", "description": "Pre-register built-in profiles in registry" },
-            { "id": "6.4.8", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "6.5",
-          "name": "Feature 6 Validation Gate",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I need to verify that Feature 6 is complete and all tests pass before proceeding to Main Analyzer Integration.",
-            "acceptance_criteria": [
-              "npm run check passes with zero TypeScript errors",
-              "npm run test:unit -- --run passes with zero failures",
-              "All 3 built-in profiles are valid and complete",
-              "Profile comparison produces correct results for test data",
-              "Test coverage for Feature 6 files is >80%"
-            ],
-            "edge_cases": [],
-            "data_model": "",
-            "technical_notes": "This is a validation gate. Do NOT proceed to Feature 7.0 until this gate passes. Fix any failures before marking complete."
-          },
-          "subtasks": [
-            { "id": "6.5.1", "description": "Run npm run check and fix any TypeScript errors" },
-            { "id": "6.5.2", "description": "Run npm run test:unit -- --run and fix any test failures" },
-            { "id": "6.5.3", "description": "Verify all 3 built-in profiles are complete with feedback messages" },
-            { "id": "6.5.4", "description": "Review test coverage report and add tests if coverage <80%" },
-            { "id": "6.5.5", "description": "Test profile comparison with sample shot analysis data" },
-            { "id": "6.5.6", "description": "Document any known limitations or future improvements" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "7.0",
-      "name": "Main Analyzer Integration",
-      "status": "pending",
-      "parallel_group": 6,
-      "tasks": [
-        {
-          "id": "7.1",
-          "name": "ShotAnalyzer Class Structure",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want a single ShotAnalyzer class that orchestrates all analysis components so that I have a clean public API.",
-            "acceptance_criteria": [
-              "ShotAnalyzer constructor accepts AnalysisConfig",
-              "Validates and stores configuration",
-              "Initializes internal components (detector, shot detector, metric calculators)",
-              "Provides getter methods for profiles and configuration",
-              "All public methods have unit tests"
-            ],
-            "edge_cases": [
-              "Invalid config: throw during construction",
-              "Missing optional config: use defaults",
-              "Re-initialization: should work cleanly"
-            ],
-            "data_model": "ShotAnalyzer class. Private members: config, poseDetector, shotDetector, metricOrchestrator, profileRegistry. Public methods defined in design document.",
-            "technical_notes": "Async initialization for pose detector. Consider factory function createShotAnalyzer() for cleaner async setup. Lazy initialization option for browser bundle size."
-          },
-          "subtasks": [
-            { "id": "7.1.1", "description": "Write unit tests for ShotAnalyzer constructor with valid config" },
-            { "id": "7.1.2", "description": "Create src/analyzer.ts with ShotAnalyzer class skeleton" },
-            { "id": "7.1.3", "description": "Write unit tests for constructor with invalid config" },
-            { "id": "7.1.4", "description": "Implement constructor with config validation to pass tests" },
-            { "id": "7.1.5", "description": "Write unit tests for async initialize() method" },
-            { "id": "7.1.6", "description": "Implement async initialize() method for pose detector" },
-            { "id": "7.1.7", "description": "Write unit tests for getProfiles() and getConfig()" },
-            { "id": "7.1.8", "description": "Implement getter methods to pass tests" },
-            { "id": "7.1.9", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "7.2",
-          "name": "Video Analysis Pipeline",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want to analyze a complete video and get all shot metrics so that I can process recorded clips.",
-            "acceptance_criteria": [
-              "analyzeVideo(FrameProvider) returns Promise<AnalysisResult>",
-              "Processes all frames through pose detection",
-              "Detects shots and phases",
-              "Extracts all metrics for each shot",
-              "Returns complete AnalysisResult with all data",
-              "Integration tests verify full pipeline"
-            ],
-            "edge_cases": [
-              "Empty video: return empty shots array",
-              "No shots detected: return empty shots array",
-              "Very long video: should not run out of memory",
-              "Low quality video: all metrics will have low confidence"
-            ],
-            "data_model": "Pipeline: FrameProvider → Pose Detection → Shot Detection → Metric Extraction → AnalysisResult. Process frames sequentially, batch shot analysis.",
-            "technical_notes": "Stream frames to avoid loading entire video in memory. Batch pose results before shot detection. Report progress for long videos (optional callback)."
-          },
-          "subtasks": [
-            { "id": "7.2.1", "description": "Write unit tests for analyzeVideo() with mock frame provider" },
-            { "id": "7.2.2", "description": "Implement analyzeVideo() method shell to pass basic tests" },
-            { "id": "7.2.3", "description": "Write unit tests for frame processing loop" },
-            { "id": "7.2.4", "description": "Implement frame processing loop with pose detection" },
-            { "id": "7.2.5", "description": "Write unit tests for shot detection integration" },
-            { "id": "7.2.6", "description": "Integrate shot detection on collected landmarks" },
-            { "id": "7.2.7", "description": "Write unit tests for metric extraction integration" },
-            { "id": "7.2.8", "description": "Integrate metric extraction for each detected shot" },
-            { "id": "7.2.9", "description": "Assemble and return AnalysisResult" },
-            { "id": "7.2.10", "description": "Write integration tests with mock frame provider" },
-            { "id": "7.2.11", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "7.3",
-          "name": "Live Session Support & Public API",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I want to process live video frames incrementally so that I can provide real-time feedback during practice.",
-            "acceptance_criteria": [
-              "processFrame(VideoFrame) returns Promise<FrameAnalysis> with current state",
-              "finalizeLiveSession() completes any partial shots and returns AnalysisResult",
-              "compareToProfile(result, profileName?) returns ProfileComparison[]",
-              "registerProfile(profile) adds custom profile to registry",
-              "All public methods have unit tests"
-            ],
-            "edge_cases": [
-              "processFrame called before initialize: throw error",
-              "finalizeLiveSession with no frames: return empty result",
-              "compareToProfile with unknown profile: throw error"
-            ],
-            "data_model": "FrameAnalysis: { frameIndex, timestamp, landmarks?, currentPhase?, partialMetrics? }. Maintains internal state between processFrame calls.",
-            "technical_notes": "Live processing needs to be fast (<100ms per frame ideally). Partial metrics updated incrementally. Consider debouncing for real-time feedback display."
-          },
-          "subtasks": [
-            { "id": "7.3.1", "description": "Write unit tests for processFrame() with mock frames" },
-            { "id": "7.3.2", "description": "Implement processFrame() for incremental processing to pass tests" },
-            { "id": "7.3.3", "description": "Write unit tests for internal state management" },
-            { "id": "7.3.4", "description": "Implement internal state management for live sessions" },
-            { "id": "7.3.5", "description": "Write unit tests for finalizeLiveSession()" },
-            { "id": "7.3.6", "description": "Implement finalizeLiveSession() to pass tests" },
-            { "id": "7.3.7", "description": "Write unit tests for compareToProfile()" },
-            { "id": "7.3.8", "description": "Implement compareToProfile() to pass tests" },
-            { "id": "7.3.9", "description": "Write unit tests for registerProfile()" },
-            { "id": "7.3.10", "description": "Implement registerProfile() passthrough to registry" },
-            { "id": "7.3.11", "description": "Update src/index.ts with all public exports" },
-            { "id": "7.3.12", "description": "Run all tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "7.4",
-          "name": "End-to-End Integration Tests",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I need comprehensive E2E tests that verify the complete analysis pipeline works correctly from video input to profile comparison output.",
-            "acceptance_criteria": [
-              "E2E tests cover complete video analysis workflow",
-              "E2E tests cover live session workflow",
-              "E2E tests verify profile comparison with real analysis results",
-              "Tests use real test video files with known expected outputs",
-              "All E2E tests pass reliably"
-            ],
-            "edge_cases": [
-              "Video with multiple shots should detect all shots",
-              "Video with poor lighting should produce low confidence metrics",
-              "Live session interruption should handle gracefully"
-            ],
-            "data_model": "E2E tests use real FrameProvider implementations with test video files. Expected outputs are pre-calculated for validation.",
-            "technical_notes": "E2E tests may be slower - consider separate test script. Use test video clips with manually verified shot detection. Test both Node.js and browser environments if possible."
-          },
-          "subtasks": [
-            { "id": "7.4.1", "description": "Create tests/e2e/ directory structure" },
-            { "id": "7.4.2", "description": "Add test video files with known shot counts and timings" },
-            { "id": "7.4.3", "description": "Write E2E test for complete video analysis workflow" },
-            { "id": "7.4.4", "description": "Write E2E test for multi-shot video analysis" },
-            { "id": "7.4.5", "description": "Write E2E test for live session workflow" },
-            { "id": "7.4.6", "description": "Write E2E test for profile comparison with analysis results" },
-            { "id": "7.4.7", "description": "Write E2E test for custom profile registration and comparison" },
-            { "id": "7.4.8", "description": "Run all E2E tests and fix any failures" }
-          ]
-        },
-        {
-          "id": "7.5",
-          "name": "Final Validation Gate",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a developer, I need to verify that the entire module is complete, all tests pass, and the public API works as documented.",
-            "acceptance_criteria": [
-              "npm run check passes with zero TypeScript errors",
-              "npm run test:unit -- --run passes with zero failures",
-              "npm run test:integration -- --run passes with zero failures",
-              "All E2E tests pass",
-              "Public API matches design document specification",
-              "Test coverage across all files is >80%",
-              "Module can be imported and used as documented"
-            ],
-            "edge_cases": [],
-            "data_model": "",
-            "technical_notes": "This is the FINAL validation gate. All tests must pass. All TypeScript must compile. The module must be production-ready."
-          },
-          "subtasks": [
-            { "id": "7.5.1", "description": "Run npm run check and fix any TypeScript errors" },
-            { "id": "7.5.2", "description": "Run npm run test:unit -- --run and fix any test failures" },
-            { "id": "7.5.3", "description": "Run npm run test:integration -- --run and fix any test failures" },
-            { "id": "7.5.4", "description": "Run all E2E tests and fix any failures" },
-            { "id": "7.5.5", "description": "Review overall test coverage and add tests if <80%" },
-            { "id": "7.5.6", "description": "Verify all public API methods match design document" },
-            { "id": "7.5.7", "description": "Test module import and basic usage in clean environment" },
-            { "id": "7.5.8", "description": "Document any known limitations or future improvements" },
-            { "id": "7.5.9", "description": "Mark project as complete" }
-          ]
-        }
-      ]
-    }
-  ]
+	"project": {
+		"name": "basketball-shot-analysis",
+		"root_path": "/home/calin/projects/shot-analysis",
+		"created_at": "2026-03-04T00:00:00.000Z",
+		"updated_at": "2026-03-05T19:50:05.941Z"
+	},
+	"status": "in_progress",
+	"validation_commands": {
+		"typescript": "npm run check",
+		"unit_tests": "npm run test:unit -- --run",
+		"integration_tests": "npm run test:integration -- --run",
+		"all_tests": "npm run test -- --run"
+	},
+	"features": [
+		{
+			"id": "1.0",
+			"name": "Configuration & Validation",
+			"status": "pending",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "1.1",
+					"name": "Core Types & Configuration Schema",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to configure the analyzer for shooter handedness and analysis preferences so that the system correctly identifies shooting vs guide hand and applies appropriate landmark mappings.",
+						"acceptance_criteria": [
+							"AnalysisConfig interface defines shootingHand ('left' | 'right'), profile name, customProfile, minConfidenceThreshold, and outputTimingUnit",
+							"Zod schema validates all configuration fields with appropriate constraints",
+							"VideoFrame type includes image data, timestamp, and frame index",
+							"All shared types are exported from src/types.ts",
+							"Unit tests cover all validation scenarios with 100% branch coverage"
+						],
+						"edge_cases": [
+							"Invalid shootingHand value (not 'left' or 'right') should fail validation",
+							"minConfidenceThreshold outside 0-1 range should fail validation",
+							"Empty profile name should fail validation"
+						],
+						"data_model": "AnalysisConfig: { shootingHand: 'left' | 'right', profile: string, customProfile?: FormProfile, minConfidenceThreshold: number (0-1), outputTimingUnit: 'frames' | 'ms' | 'percent' }",
+						"technical_notes": "Use Zod for runtime validation. Export all types from src/types.ts. Use strict TypeScript mode. Types will be used by all subsequent features. Write tests BEFORE implementation (TDD)."
+					},
+					"subtasks": [
+						{
+							"id": "1.1.1",
+							"description": "Create src/types.ts with VideoFrame, FrameMetadata, and shared type definitions"
+						},
+						{
+							"id": "1.1.2",
+							"description": "Create src/config.ts with AnalysisConfig interface and Zod schema"
+						},
+						{
+							"id": "1.1.3",
+							"description": "Write unit tests for configuration schema validation in src/config.test.ts BEFORE implementing validation logic"
+						},
+						{
+							"id": "1.1.4",
+							"description": "Implement validation logic to make all tests pass"
+						},
+						{
+							"id": "1.1.5",
+							"description": "Create src/index.ts with initial exports"
+						},
+						{
+							"id": "1.1.6",
+							"description": "Run npm run check and npm run test:unit -- --run to verify everything passes"
+						}
+					]
+				},
+				{
+					"id": "1.2",
+					"name": "Configuration Validation & Defaults",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want sensible default configuration values and clear validation errors so that I can quickly set up the analyzer without specifying every option.",
+						"acceptance_criteria": [
+							"createDefaultConfig() function returns valid default configuration",
+							"validateConfig() function returns validated config or throws descriptive errors",
+							"Handedness mapping returns correct landmark indices for left/right shooters",
+							"Default profile is 'youth-fundamentals'",
+							"All functions have unit tests covering happy path and error cases"
+						],
+						"edge_cases": [
+							"Partial config provided should merge with defaults",
+							"Invalid custom profile structure should throw specific validation error",
+							"Missing required fields should list all missing fields in error"
+						],
+						"data_model": "Handedness mapping: rightHanded = { shootingShoulder: 12, shootingElbow: 14, shootingWrist: 16, guideShoulder: 11, guideElbow: 13, guideWrist: 15 }, leftHanded swaps indices",
+						"technical_notes": "MediaPipe landmarks: right shoulder=12, right elbow=14, right wrist=16, left shoulder=11, left elbow=13, left wrist=15. Use factory pattern for config creation. Write tests first."
+					},
+					"subtasks": [
+						{
+							"id": "1.2.1",
+							"description": "Write unit tests for createDefaultConfig() function"
+						},
+						{
+							"id": "1.2.2",
+							"description": "Implement createDefaultConfig() function to pass tests"
+						},
+						{
+							"id": "1.2.3",
+							"description": "Write unit tests for validateConfig() with valid and invalid inputs"
+						},
+						{
+							"id": "1.2.4",
+							"description": "Implement validateConfig() function to pass tests"
+						},
+						{
+							"id": "1.2.5",
+							"description": "Write unit tests for getHandednessMapping() for both left and right handed"
+						},
+						{
+							"id": "1.2.6",
+							"description": "Implement getHandednessMapping() function to pass tests"
+						},
+						{
+							"id": "1.2.7",
+							"description": "Run npm run check and npm run test:unit -- --run to verify all tests pass"
+						}
+					]
+				},
+				{
+					"id": "1.3",
+					"name": "Geometry & Coordinate Utilities",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I need geometry utilities to calculate angles and distances between body landmarks so that I can extract biomechanical metrics accurately.",
+						"acceptance_criteria": [
+							"calculateAngle() computes angle between three points in degrees (0-360)",
+							"calculateDistance() computes Euclidean distance between two 3D points",
+							"normalizeToBodyScale() normalizes distances using shoulder width as reference",
+							"calculateRelativePosition() returns position relative to reference point (e.g., head)",
+							"All edge cases have explicit unit tests"
+						],
+						"edge_cases": [
+							"Collinear points should return 180 degrees for angle",
+							"Identical points should return 0 for distance",
+							"Zero shoulder width should throw error (can't normalize)",
+							"Negative coordinates should work correctly"
+						],
+						"data_model": "Point3D: { x: number, y: number, z: number }. Angles in degrees (0-360 or -180 to 180 as appropriate). Normalized distances are unitless ratios.",
+						"technical_notes": "Use Math.atan2 for angle calculations to handle all quadrants. Shoulder width = distance between landmarks 11 and 12. Consider smoothing utilities for noisy landmark data. TDD approach required."
+					},
+					"subtasks": [
+						{
+							"id": "1.3.1",
+							"description": "Write unit tests for Point3D type and calculateAngle() function including edge cases"
+						},
+						{
+							"id": "1.3.2",
+							"description": "Create src/utils/geometry.ts and implement calculateAngle() to pass tests"
+						},
+						{
+							"id": "1.3.3",
+							"description": "Write unit tests for calculateDistance() and calculateDistance2D() functions"
+						},
+						{
+							"id": "1.3.4",
+							"description": "Implement distance functions to pass tests"
+						},
+						{
+							"id": "1.3.5",
+							"description": "Write unit tests for normalizeToBodyScale() and calculateRelativePosition()"
+						},
+						{
+							"id": "1.3.6",
+							"description": "Create src/utils/coordinates.ts and implement normalization functions to pass tests"
+						},
+						{
+							"id": "1.3.7",
+							"description": "Write unit tests for smoothing functions (moving average)"
+						},
+						{
+							"id": "1.3.8",
+							"description": "Create src/utils/smoothing.ts and implement smoothing to pass tests"
+						},
+						{
+							"id": "1.3.9",
+							"description": "Run npm run check and npm run test:unit -- --run to verify all tests pass"
+						}
+					]
+				},
+				{
+					"id": "1.4",
+					"name": "Feature 1 Validation Gate",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I need to verify that Feature 1 is complete and all tests pass before proceeding to dependent features.",
+						"acceptance_criteria": [
+							"npm run check passes with zero TypeScript errors",
+							"npm run test:unit -- --run passes with zero failures",
+							"All configuration types are properly exported",
+							"All utility functions are properly exported",
+							"Test coverage for Feature 1 files is >80%"
+						],
+						"edge_cases": [],
+						"data_model": "",
+						"technical_notes": "This is a validation gate. Do NOT proceed to Feature 3.0 until this gate passes. Fix any failures before marking complete."
+					},
+					"subtasks": [
+						{
+							"id": "1.4.1",
+							"description": "Run npm run check and fix any TypeScript errors"
+						},
+						{
+							"id": "1.4.2",
+							"description": "Run npm run test:unit -- --run and fix any test failures"
+						},
+						{
+							"id": "1.4.3",
+							"description": "Review test coverage report and add tests if coverage <80%"
+						},
+						{
+							"id": "1.4.4",
+							"description": "Verify all exports in src/index.ts are correct"
+						},
+						{
+							"id": "1.4.5",
+							"description": "Document any known limitations or future improvements"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "2.0",
+			"name": "Video Frame Processing",
+			"status": "pending",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "2.1",
+					"name": "FrameProvider Interface & Types",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to provide video frames to the analyzer so that I can process both recorded clips and live camera feeds using a consistent interface.",
+						"acceptance_criteria": [
+							"FrameProvider interface defines getNextFrame(), getFps(), and getMetadata() methods",
+							"getNextFrame() returns Promise<VideoFrame | null> (null when complete)",
+							"getFps() returns frame rate as number",
+							"getMetadata() returns { width: number, height: number, duration?: number }",
+							"Interface is well-documented with JSDoc comments"
+						],
+						"edge_cases": [
+							"Variable frame rate videos should be handled by normalizing to consistent timing",
+							"Live streams have no duration (undefined)",
+							"Zero fps should throw error"
+						],
+						"data_model": "FrameProvider interface, VideoFrame: { data: ImageData, timestamp: number, frameIndex: number }, FrameMetadata: { width: number, height: number, duration?: number }",
+						"technical_notes": "Interface must work with both video files (Node.js) and live streams (browser). Use abstract interface pattern to allow different implementations."
+					},
+					"subtasks": [
+						{
+							"id": "2.1.1",
+							"description": "Create src/providers/types.ts with FrameProvider interface and VideoFrame type"
+						},
+						{
+							"id": "2.1.2",
+							"description": "Define FrameMetadata type with width, height, and optional duration"
+						},
+						{
+							"id": "2.1.3",
+							"description": "Add JSDoc documentation for all interface methods"
+						},
+						{
+							"id": "2.1.4",
+							"description": "Write type tests to verify interface contracts"
+						},
+						{
+							"id": "2.1.5",
+							"description": "Export types from src/providers/index.ts"
+						},
+						{
+							"id": "2.1.6",
+							"description": "Run npm run check to verify types compile correctly"
+						}
+					]
+				},
+				{
+					"id": "2.2",
+					"name": "Video File Provider Implementation",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to process video files for offline analysis so that I can analyze pre-recorded shooting clips.",
+						"acceptance_criteria": [
+							"createVideoFileProvider(path) returns Promise<FrameProvider>",
+							"Supports common video formats (mp4, mov, webm)",
+							"Extracts frames at correct timestamps",
+							"Returns null from getNextFrame() when video ends",
+							"All public methods have unit tests"
+						],
+						"edge_cases": [
+							"File not found should throw descriptive error",
+							"Corrupted video file should throw error with details",
+							"Corrupted individual frames should be skipped with warning logged",
+							"Empty video (0 frames) should return null immediately"
+						],
+						"data_model": "VideoFileProvider implements FrameProvider. Internal state: currentFrame index, fps, metadata, frame buffer.",
+						"technical_notes": "For Node.js, consider using ffmpeg via fluent-ffmpeg or similar. Frame extraction is CPU-intensive; consider batch extraction. Handle seeking for large files."
+					},
+					"subtasks": [
+						{
+							"id": "2.2.1",
+							"description": "Write unit tests for VideoFileProvider constructor and error cases"
+						},
+						{
+							"id": "2.2.2",
+							"description": "Create src/providers/video-file.ts with VideoFileProvider class skeleton"
+						},
+						{
+							"id": "2.2.3",
+							"description": "Write unit tests for getMetadata() method"
+						},
+						{
+							"id": "2.2.4",
+							"description": "Implement video file loading and metadata extraction to pass tests"
+						},
+						{
+							"id": "2.2.5",
+							"description": "Write unit tests for getNextFrame() with mock video data"
+						},
+						{
+							"id": "2.2.6",
+							"description": "Implement getNextFrame() with frame extraction logic to pass tests"
+						},
+						{
+							"id": "2.2.7",
+							"description": "Write integration test with a real test video file"
+						},
+						{
+							"id": "2.2.8",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "2.3",
+					"name": "MediaStream Provider Implementation",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to process live camera feeds for real-time analysis so that I can provide immediate feedback during practice sessions.",
+						"acceptance_criteria": [
+							"createMediaStreamProvider(stream) returns FrameProvider",
+							"Works with browser MediaStream from getUserMedia()",
+							"Extracts frames at configured frame rate",
+							"Handles stream lifecycle correctly"
+						],
+						"edge_cases": [
+							"Stream ends unexpectedly should handle gracefully",
+							"Low-light/poor quality frames should still be processed (confidence will be low)",
+							"Tab backgrounded may pause stream - should handle resume"
+						],
+						"data_model": "MediaStreamProvider implements FrameProvider. Uses canvas to extract ImageData from video element.",
+						"technical_notes": "Browser-only implementation. Use requestAnimationFrame or setInterval for frame extraction. Consider frame rate limiting to reduce CPU usage."
+					},
+					"subtasks": [
+						{
+							"id": "2.3.1",
+							"description": "Write unit tests for MediaStreamProvider with mocked MediaStream"
+						},
+						{
+							"id": "2.3.2",
+							"description": "Create src/providers/media-stream.ts with MediaStreamProvider class skeleton"
+						},
+						{
+							"id": "2.3.3",
+							"description": "Write unit tests for stream attachment and frame extraction"
+						},
+						{
+							"id": "2.3.4",
+							"description": "Implement stream attachment to hidden video element to pass tests"
+						},
+						{
+							"id": "2.3.5",
+							"description": "Implement canvas-based frame extraction to pass tests"
+						},
+						{
+							"id": "2.3.6",
+							"description": "Write unit tests for frame rate limiting"
+						},
+						{
+							"id": "2.3.7",
+							"description": "Implement frame rate limiting and timestamp tracking to pass tests"
+						},
+						{
+							"id": "2.3.8",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "2.4",
+					"name": "Feature 2 Validation Gate",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I need to verify that Feature 2 is complete and all tests pass before proceeding to dependent features.",
+						"acceptance_criteria": [
+							"npm run check passes with zero TypeScript errors",
+							"npm run test:unit -- --run passes with zero failures",
+							"FrameProvider interface is properly exported",
+							"Both VideoFileProvider and MediaStreamProvider work correctly",
+							"Test coverage for Feature 2 files is >80%"
+						],
+						"edge_cases": [],
+						"data_model": "",
+						"technical_notes": "This is a validation gate. Do NOT proceed to Feature 3.0 until BOTH Feature 1.4 and Feature 2.4 gates pass."
+					},
+					"subtasks": [
+						{
+							"id": "2.4.1",
+							"description": "Run npm run check and fix any TypeScript errors"
+						},
+						{
+							"id": "2.4.2",
+							"description": "Run npm run test:unit -- --run and fix any test failures"
+						},
+						{
+							"id": "2.4.3",
+							"description": "Review test coverage report and add tests if coverage <80%"
+						},
+						{
+							"id": "2.4.4",
+							"description": "Verify all exports in src/providers/index.ts are correct"
+						},
+						{
+							"id": "2.4.5",
+							"description": "Document any known limitations or future improvements"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "3.0",
+			"name": "Pose Detection & Landmark Extraction",
+			"status": "pending",
+			"parallel_group": 2,
+			"tasks": [
+				{
+					"id": "3.1",
+					"name": "PoseDetector Interface & Landmark Types",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to extract body landmarks from each frame so that I can calculate biomechanical metrics using consistent types.",
+						"acceptance_criteria": [
+							"PoseDetector interface defines detect() and close() methods",
+							"PoseLandmarks type includes all 33 MediaPipe landmarks with 3D coordinates",
+							"Each landmark has visibility and confidence scores",
+							"Landmark indices match MediaPipe Pose Landmarker specification",
+							"Type tests verify all landmark indices are accessible"
+						],
+						"edge_cases": [
+							"No pose detected in frame should return null or empty landmarks with 0 confidence",
+							"Partially visible pose should have low visibility scores on occluded landmarks"
+						],
+						"data_model": "PoseLandmarks: { landmarks: Landmark[], poseConfidence: number }. Landmark: { x: number, y: number, z: number, visibility: number, confidence: number }. Key indices: shoulders (11,12), elbows (13,14), wrists (15,16), hips (23,24), knees (25,26), ankles (27,28), index fingers (19,20), nose (0), eyes (1-4), ears (7,8).",
+						"technical_notes": "MediaPipe provides 33 landmarks. Coordinates are normalized 0-1 relative to image dimensions. Z is relative depth. Use enum or const object for landmark indices."
+					},
+					"subtasks": [
+						{
+							"id": "3.1.1",
+							"description": "Create src/pose/types.ts with Landmark and PoseLandmarks types"
+						},
+						{
+							"id": "3.1.2",
+							"description": "Define LANDMARK_INDEX enum/const with all 33 landmark names and indices"
+						},
+						{
+							"id": "3.1.3",
+							"description": "Write type tests to verify all landmark indices are correctly defined"
+						},
+						{
+							"id": "3.1.4",
+							"description": "Create src/pose/detector.ts with PoseDetector interface"
+						},
+						{
+							"id": "3.1.5",
+							"description": "Write unit tests for helper functions to access landmarks by name"
+						},
+						{
+							"id": "3.1.6",
+							"description": "Implement helper functions to pass tests"
+						},
+						{
+							"id": "3.1.7",
+							"description": "Run npm run check to verify types compile"
+						}
+					]
+				},
+				{
+					"id": "3.2",
+					"name": "MediaPipe Node.js Implementation",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to run pose detection in Node.js so that I can analyze video files on a server or CLI.",
+						"acceptance_criteria": [
+							"MediaPipeNodeDetector implements PoseDetector interface",
+							"Uses @mediapipe/tasks-vision package",
+							"Configurable model complexity for speed/accuracy tradeoff",
+							"close() properly releases resources",
+							"Integration tests verify real pose detection works"
+						],
+						"edge_cases": [
+							"Model file not found should throw clear error",
+							"GPU not available should fall back to CPU",
+							"Memory leak prevention with proper cleanup"
+						],
+						"data_model": "MediaPipeNodeDetector class with private poseLandmarker instance. Config: modelComplexity (0-2), minDetectionConfidence, minTrackingConfidence.",
+						"technical_notes": "Use Pose Landmarker (not Pose), full landmark set (33 points). Model file needs to be downloaded/bundled. Consider lazy initialization."
+					},
+					"subtasks": [
+						{
+							"id": "3.2.1",
+							"description": "Write unit tests for MediaPipeNodeDetector constructor and configuration"
+						},
+						{
+							"id": "3.2.2",
+							"description": "Create src/pose/mediapipe-node.ts with MediaPipeNodeDetector class skeleton"
+						},
+						{
+							"id": "3.2.3",
+							"description": "Write unit tests for detect() method with mock MediaPipe"
+						},
+						{
+							"id": "3.2.4",
+							"description": "Implement async initialization with model loading"
+						},
+						{
+							"id": "3.2.5",
+							"description": "Implement detect() method that processes ImageData"
+						},
+						{
+							"id": "3.2.6",
+							"description": "Implement close() method for resource cleanup"
+						},
+						{
+							"id": "3.2.7",
+							"description": "Write integration tests with real model and test image"
+						},
+						{
+							"id": "3.2.8",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "3.3",
+					"name": "MediaPipe Browser Implementation",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to run pose detection in the browser so that I can provide real-time feedback in a web app.",
+						"acceptance_criteria": [
+							"MediaPipeBrowserDetector implements PoseDetector interface",
+							"Uses WASM/WebGL runtime for performance",
+							"Works with both ImageData and HTMLVideoElement",
+							"close() properly releases WebGL resources",
+							"Unit tests verify all methods work correctly"
+						],
+						"edge_cases": [
+							"WebGL not supported should fall back to WASM-only",
+							"Browser tab backgrounded may affect detection",
+							"Mobile browser memory constraints"
+						],
+						"data_model": "MediaPipeBrowserDetector class. Same interface as Node.js version but different runtime.",
+						"technical_notes": "Use MediaPipe Vision tasks web bundle. WebGL delegate preferred for performance. Consider worker thread for non-blocking detection."
+					},
+					"subtasks": [
+						{
+							"id": "3.3.1",
+							"description": "Write unit tests for MediaPipeBrowserDetector with mocked MediaPipe"
+						},
+						{
+							"id": "3.3.2",
+							"description": "Create src/pose/mediapipe-browser.ts with MediaPipeBrowserDetector class skeleton"
+						},
+						{
+							"id": "3.3.3",
+							"description": "Write unit tests for detect() method"
+						},
+						{
+							"id": "3.3.4",
+							"description": "Implement async initialization with WASM/WebGL setup"
+						},
+						{
+							"id": "3.3.5",
+							"description": "Implement detect() method for browser environment"
+						},
+						{
+							"id": "3.3.6",
+							"description": "Add runtime capability detection (WebGL vs WASM)"
+						},
+						{
+							"id": "3.3.7",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "3.4",
+					"name": "Detector Factory & Runtime Selection",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want automatic runtime detection so that the correct pose detector is used without manual configuration.",
+						"acceptance_criteria": [
+							"createPoseDetector(runtime?) returns Promise<PoseDetector>",
+							"Auto-detects runtime if not specified (Node.js vs browser)",
+							"Supports explicit runtime override",
+							"Returns initialized detector ready for use",
+							"Unit tests cover all runtime selection scenarios"
+						],
+						"edge_cases": [
+							"Unknown runtime should throw descriptive error",
+							"Initialization failure should throw with root cause",
+							"Multiple createPoseDetector calls should work (no singleton issues)"
+						],
+						"data_model": "Factory function with optional runtime parameter: 'node' | 'browser' | 'auto'. Returns Promise<PoseDetector>.",
+						"technical_notes": "Use typeof window check for browser detection. Consider lazy loading implementations to reduce bundle size when only one runtime is needed."
+					},
+					"subtasks": [
+						{
+							"id": "3.4.1",
+							"description": "Write unit tests for runtime auto-detection logic"
+						},
+						{
+							"id": "3.4.2",
+							"description": "Create src/pose/factory.ts with createPoseDetector function skeleton"
+						},
+						{
+							"id": "3.4.3",
+							"description": "Write unit tests for explicit runtime selection"
+						},
+						{
+							"id": "3.4.4",
+							"description": "Implement runtime auto-detection logic to pass tests"
+						},
+						{
+							"id": "3.4.5",
+							"description": "Implement configuration options passthrough to implementations"
+						},
+						{
+							"id": "3.4.6",
+							"description": "Export factory from src/pose/index.ts"
+						},
+						{
+							"id": "3.4.7",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "3.5",
+					"name": "Feature 3 Validation Gate",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I need to verify that Feature 3 is complete and all tests pass before proceeding to Shot Detection.",
+						"acceptance_criteria": [
+							"npm run check passes with zero TypeScript errors",
+							"npm run test:unit -- --run passes with zero failures",
+							"Integration tests with real MediaPipe pass",
+							"PoseDetector interface and implementations are properly exported",
+							"Test coverage for Feature 3 files is >80%"
+						],
+						"edge_cases": [],
+						"data_model": "",
+						"technical_notes": "This is a validation gate. Do NOT proceed to Feature 4.0 until this gate passes. Fix any failures before marking complete."
+					},
+					"subtasks": [
+						{
+							"id": "3.5.1",
+							"description": "Run npm run check and fix any TypeScript errors"
+						},
+						{
+							"id": "3.5.2",
+							"description": "Run npm run test:unit -- --run and fix any test failures"
+						},
+						{
+							"id": "3.5.3",
+							"description": "Run integration tests with real MediaPipe and fix any failures"
+						},
+						{
+							"id": "3.5.4",
+							"description": "Review test coverage report and add tests if coverage <80%"
+						},
+						{
+							"id": "3.5.5",
+							"description": "Verify all exports in src/pose/index.ts are correct"
+						},
+						{
+							"id": "3.5.6",
+							"description": "Document any known limitations or future improvements"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "4.0",
+			"name": "Shot Detection & Phase Identification",
+			"status": "pending",
+			"parallel_group": 3,
+			"tasks": [
+				{
+					"id": "4.1",
+					"name": "Shot & Phase Type Definitions",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to automatically detect when shots occur and identify key phases so that I can extract metrics at the right moments.",
+						"acceptance_criteria": [
+							"ShotPhase enum defines: gather, load, rise, setPoint, release, followThrough",
+							"Shot type includes shotIndex, frameRange, and phases object",
+							"PhaseRange type includes startFrame and endFrame",
+							"FrameLabel type associates frame numbers with phase labels",
+							"Type tests verify all type structures are correct"
+						],
+						"edge_cases": [
+							"Some phases may be missing (partial shots)",
+							"Phase boundaries may overlap during detection"
+						],
+						"data_model": "ShotPhase: enum with 6 values. Shot: { shotIndex: number, frameRange: { start: number, end: number }, phases: { [ShotPhase]: PhaseRange } }. PhaseRange: { startFrame: number, endFrame: number }.",
+						"technical_notes": "Phases are sequential but some may be skipped (e.g., no gather if video starts mid-shot). Use optional fields for phases."
+					},
+					"subtasks": [
+						{
+							"id": "4.1.1",
+							"description": "Create src/detection/types.ts with ShotPhase enum"
+						},
+						{
+							"id": "4.1.2",
+							"description": "Define Shot, PhaseRange, and ShotBoundary types"
+						},
+						{
+							"id": "4.1.3",
+							"description": "Define FrameLabel type for frame-to-phase mapping"
+						},
+						{
+							"id": "4.1.4",
+							"description": "Write type tests to verify all type structures"
+						},
+						{
+							"id": "4.1.5",
+							"description": "Export types from src/detection/index.ts"
+						},
+						{
+							"id": "4.1.6",
+							"description": "Run npm run check to verify types compile"
+						}
+					]
+				},
+				{
+					"id": "4.2",
+					"name": "Shot Boundary Detection Logic",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to detect when a shot starts and ends so that I can isolate individual shots in multi-shot videos.",
+						"acceptance_criteria": [
+							"Detects shot start: hands come together, upward wrist motion begins",
+							"Detects shot end: follow-through completes, arm returns down",
+							"Returns array of shot boundaries with frame numbers",
+							"Works with multiple shots in one video",
+							"Unit tests cover all detection scenarios"
+						],
+						"edge_cases": [
+							"Video starts mid-shot: mark as partial shot starting at frame 0",
+							"Video ends mid-shot: mark as partial shot ending at last frame",
+							"Very fast shots may have merged phases",
+							"Fake pump motions should not trigger shot detection"
+						],
+						"data_model": "ShotBoundary: { startFrame: number, endFrame: number, isPartialStart: boolean, isPartialEnd: boolean }. Detection uses hand position velocity and position thresholds.",
+						"technical_notes": "Track wrist vertical velocity (y-coordinate change over time). Shot starts when wrists move upward together. Shot ends when shooting arm returns to neutral. Use smoothing to avoid noise triggering."
+					},
+					"subtasks": [
+						{
+							"id": "4.2.1",
+							"description": "Write unit tests for shot start detection with mock landmark sequences"
+						},
+						{
+							"id": "4.2.2",
+							"description": "Create src/detection/shot-detector.ts with ShotBoundaryDetector class skeleton"
+						},
+						{
+							"id": "4.2.3",
+							"description": "Write unit tests for shot end detection"
+						},
+						{
+							"id": "4.2.4",
+							"description": "Implement hand position tracking over frame sequence"
+						},
+						{
+							"id": "4.2.5",
+							"description": "Implement shot start detection with velocity thresholds to pass tests"
+						},
+						{
+							"id": "4.2.6",
+							"description": "Implement shot end detection with arm return heuristics to pass tests"
+						},
+						{
+							"id": "4.2.7",
+							"description": "Write unit tests for partial shot handling"
+						},
+						{
+							"id": "4.2.8",
+							"description": "Implement partial shot handling to pass tests"
+						},
+						{
+							"id": "4.2.9",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "4.3",
+					"name": "Phase Identification Logic",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to identify shot phases (gather, load, rise, set point, release, follow-through) so that I can extract metrics at the correct moments.",
+						"acceptance_criteria": [
+							"Identifies all 6 phases with frame ranges",
+							"Gather: ball received, preparing to shoot",
+							"Load/Dip: lowering into legs, ball may dip",
+							"Rise: legs extending, ball moving upward",
+							"Set Point: ball at highest point before release",
+							"Release: shooting arm extends, wrist snaps",
+							"Follow-through: arm fully extended, held",
+							"Each phase detection has unit tests"
+						],
+						"edge_cases": [
+							"Quick shooter may skip or abbreviate phases",
+							"Set point may be very brief (Curry-style quick release)",
+							"Partial shots missing early phases"
+						],
+						"data_model": "PhaseDetection result: { gather?: PhaseRange, load?: PhaseRange, rise?: PhaseRange, setPoint?: PhaseRange, release?: PhaseRange, followThrough?: PhaseRange }",
+						"technical_notes": "Phase transitions based on: hip vertical position (load), knee angle (load to rise), wrist height peaks (set point), hand separation velocity (release), arm extension angle (follow-through). Use hysteresis to avoid flickering."
+					},
+					"subtasks": [
+						{
+							"id": "4.3.1",
+							"description": "Write unit tests for gather phase detection"
+						},
+						{
+							"id": "4.3.2",
+							"description": "Create src/detection/phase-detector.ts with PhaseDetector class skeleton"
+						},
+						{
+							"id": "4.3.3",
+							"description": "Implement gather phase detection to pass tests"
+						},
+						{
+							"id": "4.3.4",
+							"description": "Write unit tests for load phase detection"
+						},
+						{
+							"id": "4.3.5",
+							"description": "Implement load phase detection to pass tests"
+						},
+						{
+							"id": "4.3.6",
+							"description": "Write unit tests for rise phase detection"
+						},
+						{
+							"id": "4.3.7",
+							"description": "Implement rise phase detection to pass tests"
+						},
+						{
+							"id": "4.3.8",
+							"description": "Write unit tests for set point detection"
+						},
+						{
+							"id": "4.3.9",
+							"description": "Implement set point detection to pass tests"
+						},
+						{
+							"id": "4.3.10",
+							"description": "Write unit tests for release and follow-through detection"
+						},
+						{
+							"id": "4.3.11",
+							"description": "Implement release and follow-through detection to pass tests"
+						},
+						{
+							"id": "4.3.12",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "4.4",
+					"name": "Shot Detector Integration",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want a unified shot detector that combines boundary and phase detection into a single output structure.",
+						"acceptance_criteria": [
+							"ShotDetector class combines boundary and phase detection",
+							"processFrames() takes landmark sequence, returns Shot[]",
+							"Each Shot includes complete phase breakdown",
+							"Handles reset between shots for continuous processing",
+							"Integration tests verify full detection pipeline"
+						],
+						"edge_cases": [
+							"Empty landmark array returns empty shot array",
+							"Single-frame input should not detect a shot",
+							"Very long videos should not cause memory issues"
+						],
+						"data_model": "ShotDetector class. Input: PoseLandmarks[]. Output: Shot[]. Uses ShotBoundaryDetector and PhaseDetector internally.",
+						"technical_notes": "Stream-friendly design: can process frames incrementally for live video. Maintain state between processFrame calls. finalize() to complete partial shots."
+					},
+					"subtasks": [
+						{
+							"id": "4.4.1",
+							"description": "Write unit tests for ShotDetector constructor and initialization"
+						},
+						{
+							"id": "4.4.2",
+							"description": "Create integrated ShotDetector class combining boundary and phase detection"
+						},
+						{
+							"id": "4.4.3",
+							"description": "Write unit tests for processFrames() batch processing"
+						},
+						{
+							"id": "4.4.4",
+							"description": "Implement processFrames() to pass tests"
+						},
+						{
+							"id": "4.4.5",
+							"description": "Write unit tests for processFrame() incremental processing"
+						},
+						{
+							"id": "4.4.6",
+							"description": "Implement processFrame() for live processing to pass tests"
+						},
+						{
+							"id": "4.4.7",
+							"description": "Write unit tests for finalize()"
+						},
+						{
+							"id": "4.4.8",
+							"description": "Implement finalize() to complete partial shots"
+						},
+						{
+							"id": "4.4.9",
+							"description": "Write integration tests with realistic landmark sequences"
+						},
+						{
+							"id": "4.4.10",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "4.5",
+					"name": "Feature 4 Validation Gate",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I need to verify that Feature 4 is complete and all tests pass before proceeding to Metric Extraction.",
+						"acceptance_criteria": [
+							"npm run check passes with zero TypeScript errors",
+							"npm run test:unit -- --run passes with zero failures",
+							"Integration tests with realistic landmark sequences pass",
+							"Shot detection accuracy meets expectations",
+							"Test coverage for Feature 4 files is >80%"
+						],
+						"edge_cases": [],
+						"data_model": "",
+						"technical_notes": "This is a validation gate. Do NOT proceed to Feature 5.0 until this gate passes. Fix any failures before marking complete."
+					},
+					"subtasks": [
+						{
+							"id": "4.5.1",
+							"description": "Run npm run check and fix any TypeScript errors"
+						},
+						{
+							"id": "4.5.2",
+							"description": "Run npm run test:unit -- --run and fix any test failures"
+						},
+						{
+							"id": "4.5.3",
+							"description": "Run integration tests and fix any failures"
+						},
+						{
+							"id": "4.5.4",
+							"description": "Review test coverage report and add tests if coverage <80%"
+						},
+						{
+							"id": "4.5.5",
+							"description": "Validate shot detection accuracy with test videos"
+						},
+						{
+							"id": "4.5.6",
+							"description": "Document any known limitations or future improvements"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "5.0",
+			"name": "Metric Extraction",
+			"status": "pending",
+			"parallel_group": 4,
+			"tasks": [
+				{
+					"id": "5.1",
+					"name": "Metric Types & Orchestration Interface",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to calculate detailed form metrics for each shot so that I can compare against ideal form profiles using a consistent structure.",
+						"acceptance_criteria": [
+							"MetricValue type includes value, unit, frame, and confidence",
+							"ShotAnalysis type includes shotIndex, frameRange, phases, metrics, and overallConfidence",
+							"AnalysisResult type includes shots array, videoMetadata, and config",
+							"MetricCalculator interface defines calculate() method",
+							"Type tests verify all structures are correct"
+						],
+						"edge_cases": [
+							"Metric calculation fails due to low confidence landmarks",
+							"Some metrics unavailable for certain shots (occluded body parts)"
+						],
+						"data_model": "MetricValue: { value: number | string, unit: string, frame: number, confidence: number }. ShotAnalysis: { shotIndex: number, frameRange: {...}, phases: {...}, metrics: { [name]: MetricValue }, overallConfidence: number }. AnalysisResult: { shots: ShotAnalysis[], videoMetadata: {...}, config: AnalysisConfig }.",
+						"technical_notes": "Use strategy pattern for metric calculators. Each calculator is independent and can be tested in isolation. Metrics are keyed by string name for flexibility."
+					},
+					"subtasks": [
+						{
+							"id": "5.1.1",
+							"description": "Create src/metrics/types.ts with MetricValue and ShotAnalysis types"
+						},
+						{
+							"id": "5.1.2",
+							"description": "Define AnalysisResult type with shots array and metadata"
+						},
+						{
+							"id": "5.1.3",
+							"description": "Define MetricCalculator interface with calculate() method"
+						},
+						{
+							"id": "5.1.4",
+							"description": "Write type tests to verify all type structures"
+						},
+						{
+							"id": "5.1.5",
+							"description": "Write unit tests for MetricOrchestrator class"
+						},
+						{
+							"id": "5.1.6",
+							"description": "Create MetricOrchestrator class to run all calculators on a shot"
+						},
+						{
+							"id": "5.1.7",
+							"description": "Run npm run check to verify types compile"
+						}
+					]
+				},
+				{
+					"id": "5.2",
+					"name": "Shooting Arm Metrics",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to measure shooting arm mechanics so that I can provide feedback on elbow position, extension, and wrist action.",
+						"acceptance_criteria": [
+							"shootingElbowFlare: angle of elbow relative to body plane (degrees) at set point and release",
+							"shootingElbowAngle: bend angle at elbow (degrees) at set point and release",
+							"maxArmExtension: maximum elbow extension achieved (degrees) at follow-through",
+							"wristSnapAngle: wrist flexion from set to release (degrees)",
+							"followThroughHold: duration arm stays extended (% of shot)",
+							"Each metric has unit tests with mock landmark data"
+						],
+						"edge_cases": [
+							"Elbow occluded: return metric with low confidence",
+							"Very quick release may have minimal elbow angle change",
+							"Follow-through not held: duration may be 0"
+						],
+						"data_model": "All metrics return MetricValue. shootingElbowFlare: measure angle between shoulder-elbow-wrist plane and body vertical. shootingElbowAngle: angle at elbow vertex. wristSnapAngle: change in wrist angle between frames.",
+						"technical_notes": "Use handedness mapping to get correct landmark indices. Calculate body plane from shoulders and hips. Elbow flare is deviation from ideal vertical plane."
+					},
+					"subtasks": [
+						{
+							"id": "5.2.1",
+							"description": "Write unit tests for shootingElbowFlare metric with mock landmarks"
+						},
+						{
+							"id": "5.2.2",
+							"description": "Create src/metrics/shooting-arm.ts with ShootingArmCalculator class skeleton"
+						},
+						{
+							"id": "5.2.3",
+							"description": "Implement shootingElbowFlare metric calculation to pass tests"
+						},
+						{
+							"id": "5.2.4",
+							"description": "Write unit tests for shootingElbowAngle metric"
+						},
+						{
+							"id": "5.2.5",
+							"description": "Implement shootingElbowAngle metric calculation to pass tests"
+						},
+						{
+							"id": "5.2.6",
+							"description": "Write unit tests for maxArmExtension metric"
+						},
+						{
+							"id": "5.2.7",
+							"description": "Implement maxArmExtension metric calculation to pass tests"
+						},
+						{
+							"id": "5.2.8",
+							"description": "Write unit tests for wristSnapAngle metric"
+						},
+						{
+							"id": "5.2.9",
+							"description": "Implement wristSnapAngle metric calculation to pass tests"
+						},
+						{
+							"id": "5.2.10",
+							"description": "Write unit tests for followThroughHold metric"
+						},
+						{
+							"id": "5.2.11",
+							"description": "Implement followThroughHold metric calculation to pass tests"
+						},
+						{
+							"id": "5.2.12",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "5.3",
+					"name": "Guide Arm Metrics",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to measure guide arm mechanics so that I can provide feedback on guide hand positioning and timing.",
+						"acceptance_criteria": [
+							"guideElbowFlare: guide arm elbow angle from body (degrees) at set point",
+							"guideHandPosition: position relative to ball/shooting hand (categorical) at set point",
+							"guideHandRelease: when guide hand separates (% of shot) at release",
+							"Each metric has unit tests"
+						],
+						"edge_cases": [
+							"Guide arm occluded on side-view camera",
+							"Guide hand may stay in contact longer for young shooters"
+						],
+						"data_model": "guideElbowFlare: degrees. guideHandPosition: categorical ('side', 'under', 'front', 'thumb-up'). guideHandRelease: percentage of total shot duration.",
+						"technical_notes": "Guide hand position inferred from relative position of guide wrist to shooting wrist. Hand separation detected by distance threshold between index fingers."
+					},
+					"subtasks": [
+						{
+							"id": "5.3.1",
+							"description": "Write unit tests for guideElbowFlare metric with mock landmarks"
+						},
+						{
+							"id": "5.3.2",
+							"description": "Create src/metrics/guide-arm.ts with GuideArmCalculator class skeleton"
+						},
+						{
+							"id": "5.3.3",
+							"description": "Implement guideElbowFlare metric calculation to pass tests"
+						},
+						{
+							"id": "5.3.4",
+							"description": "Write unit tests for guideHandPosition categorical classification"
+						},
+						{
+							"id": "5.3.5",
+							"description": "Implement guideHandPosition to pass tests"
+						},
+						{
+							"id": "5.3.6",
+							"description": "Write unit tests for guideHandRelease timing calculation"
+						},
+						{
+							"id": "5.3.7",
+							"description": "Implement guideHandRelease timing to pass tests"
+						},
+						{
+							"id": "5.3.8",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "5.4",
+					"name": "Ball Position Metrics (Inferred)",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to track inferred ball position so that I can measure set point height, ball path, and release point.",
+						"acceptance_criteria": [
+							"ballDip: how far ball drops before rising (normalized distance)",
+							"ballPath: straightness of path to set point (deviation score)",
+							"setPointHeight: height of set point relative to head (normalized)",
+							"setPointDuration: how long ball stays at set point (ms)",
+							"releasePoint: height/position at release (normalized coords)",
+							"releaseAngle: angle of shooting arm at release (degrees)",
+							"ballBehindHead: furthest back position relative to head (normalized)",
+							"Each metric has unit tests"
+						],
+						"edge_cases": [
+							"Hands separate early: ball position cannot be inferred",
+							"Ball never dips (some shooting styles): dip = 0",
+							"Quick release: set point duration may be <50ms"
+						],
+						"data_model": "Ball center inferred as midpoint of index fingers (landmarks 19, 20) when hands are together. All distances normalized to shoulder width. Heights relative to head (nose landmark 0).",
+						"technical_notes": "Ball position tracking only valid when hands are together. After hands separate (release), ball cannot be tracked. Mark ball metrics with lower confidence than body metrics."
+					},
+					"subtasks": [
+						{
+							"id": "5.4.1",
+							"description": "Write unit tests for ball center inference from index finger positions"
+						},
+						{
+							"id": "5.4.2",
+							"description": "Create src/metrics/ball.ts with BallMetricsCalculator class skeleton"
+						},
+						{
+							"id": "5.4.3",
+							"description": "Implement ball center inference to pass tests"
+						},
+						{
+							"id": "5.4.4",
+							"description": "Write unit tests for ballDip and ballPath metrics"
+						},
+						{
+							"id": "5.4.5",
+							"description": "Implement ballDip and ballPath to pass tests"
+						},
+						{
+							"id": "5.4.6",
+							"description": "Write unit tests for setPointHeight and setPointDuration"
+						},
+						{
+							"id": "5.4.7",
+							"description": "Implement setPointHeight and setPointDuration to pass tests"
+						},
+						{
+							"id": "5.4.8",
+							"description": "Write unit tests for releasePoint and releaseAngle"
+						},
+						{
+							"id": "5.4.9",
+							"description": "Implement releasePoint and releaseAngle to pass tests"
+						},
+						{
+							"id": "5.4.10",
+							"description": "Write unit tests for ballBehindHead"
+						},
+						{
+							"id": "5.4.11",
+							"description": "Implement ballBehindHead to pass tests"
+						},
+						{
+							"id": "5.4.12",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "5.5",
+					"name": "Lower Body Metrics",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to measure lower body mechanics so that I can provide feedback on leg power and timing.",
+						"acceptance_criteria": [
+							"hipDrop: how far hips drop in load phase (normalized distance)",
+							"kneeFlexion: maximum knee bend (degrees) at load",
+							"legExtensionStart: when legs begin extending (% of shot)",
+							"Each metric has unit tests"
+						],
+						"edge_cases": [
+							"Stationary set shot: minimal hip drop",
+							"Jump shot: significant hip drop then explosive extension",
+							"Lower body occluded in some camera angles"
+						],
+						"data_model": "hipDrop: normalized to shoulder width, measured from standing height. kneeFlexion: angle at knee (180 = straight). legExtensionStart: percentage of total shot duration when knee angle starts increasing.",
+						"technical_notes": "Use hip landmarks (23, 24) for hip drop. Knee angle from hip-knee-ankle landmarks. Track knee angle over time to find extension start."
+					},
+					"subtasks": [
+						{
+							"id": "5.5.1",
+							"description": "Write unit tests for hipDrop metric with mock landmarks"
+						},
+						{
+							"id": "5.5.2",
+							"description": "Create src/metrics/lower-body.ts with LowerBodyCalculator class skeleton"
+						},
+						{
+							"id": "5.5.3",
+							"description": "Implement hipDrop metric calculation to pass tests"
+						},
+						{
+							"id": "5.5.4",
+							"description": "Write unit tests for kneeFlexion metric"
+						},
+						{
+							"id": "5.5.5",
+							"description": "Implement kneeFlexion metric calculation to pass tests"
+						},
+						{
+							"id": "5.5.6",
+							"description": "Write unit tests for legExtensionStart timing"
+						},
+						{
+							"id": "5.5.7",
+							"description": "Implement legExtensionStart timing to pass tests"
+						},
+						{
+							"id": "5.5.8",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "5.6",
+					"name": "Posture & Alignment Metrics",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to measure body posture and alignment so that I can provide feedback on form stability.",
+						"acceptance_criteria": [
+							"backPosture: spine angle from vertical (degrees) throughout shot",
+							"headTilt: head angle from neutral (degrees) at release and follow-through",
+							"shoulderAlignment: shoulder rotation relative to target (degrees) at set point",
+							"handCupVsHinge: whether hand cups under or hinges back (categorical/angle) at set point",
+							"Each metric has unit tests"
+						],
+						"edge_cases": [
+							"Significant lean may be intentional (fadeaway)",
+							"Head tracking for the shot may cause tilt"
+						],
+						"data_model": "backPosture: angle from vertical (0 = perfectly upright). headTilt: degrees from neutral. shoulderAlignment: rotation angle (0 = square to target). handCupVsHinge: categorical ('cup', 'hinge', 'neutral') with angle value.",
+						"technical_notes": "Spine angle from hip-shoulder vector. Head tilt from ear-eye landmarks. Shoulder alignment from shoulder landmark positions. Hand position inferred from wrist orientation."
+					},
+					"subtasks": [
+						{
+							"id": "5.6.1",
+							"description": "Write unit tests for backPosture metric with mock landmarks"
+						},
+						{
+							"id": "5.6.2",
+							"description": "Create src/metrics/posture.ts with PostureCalculator class skeleton"
+						},
+						{
+							"id": "5.6.3",
+							"description": "Implement backPosture metric calculation to pass tests"
+						},
+						{
+							"id": "5.6.4",
+							"description": "Write unit tests for headTilt metric"
+						},
+						{
+							"id": "5.6.5",
+							"description": "Implement headTilt metric calculation to pass tests"
+						},
+						{
+							"id": "5.6.6",
+							"description": "Write unit tests for shoulderAlignment metric"
+						},
+						{
+							"id": "5.6.7",
+							"description": "Implement shoulderAlignment metric calculation to pass tests"
+						},
+						{
+							"id": "5.6.8",
+							"description": "Write unit tests for handCupVsHinge classification"
+						},
+						{
+							"id": "5.6.9",
+							"description": "Implement handCupVsHinge classification to pass tests"
+						},
+						{
+							"id": "5.6.10",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "5.7",
+					"name": "Timing & Synchronization Metrics",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to measure shot timing and synchronization so that I can provide feedback on rhythm and coordination.",
+						"acceptance_criteria": [
+							"ballRiseStart: when ball begins upward motion (% of shot)",
+							"legRiseStart: when legs begin extending (% of shot)",
+							"ballLegSync: difference between ball and leg rise (%, negative = ball first)",
+							"releaseStart: when release motion begins (% of shot)",
+							"totalShotDuration: full shot from gather to follow-through (ms)",
+							"Each metric has unit tests"
+						],
+						"edge_cases": [
+							"Ball and legs perfectly synchronized: sync = 0",
+							"Very quick shot: total duration <500ms",
+							"Hesitation or pump fake extends duration"
+						],
+						"data_model": "All timing metrics as percentage except totalShotDuration in milliseconds. Percentages relative to total shot duration from gather to follow-through end.",
+						"technical_notes": "Use fps from frame metadata to convert frames to ms. Detect motion starts using velocity thresholds. Consider smoothing to avoid noise triggering early detection."
+					},
+					"subtasks": [
+						{
+							"id": "5.7.1",
+							"description": "Write unit tests for ballRiseStart detection with mock landmarks"
+						},
+						{
+							"id": "5.7.2",
+							"description": "Create src/metrics/timing.ts with TimingCalculator class skeleton"
+						},
+						{
+							"id": "5.7.3",
+							"description": "Implement ballRiseStart detection to pass tests"
+						},
+						{
+							"id": "5.7.4",
+							"description": "Write unit tests for legRiseStart detection"
+						},
+						{
+							"id": "5.7.5",
+							"description": "Implement legRiseStart detection to pass tests"
+						},
+						{
+							"id": "5.7.6",
+							"description": "Write unit tests for ballLegSync calculation"
+						},
+						{
+							"id": "5.7.7",
+							"description": "Implement ballLegSync calculation to pass tests"
+						},
+						{
+							"id": "5.7.8",
+							"description": "Write unit tests for releaseStart and totalShotDuration"
+						},
+						{
+							"id": "5.7.9",
+							"description": "Implement releaseStart and totalShotDuration to pass tests"
+						},
+						{
+							"id": "5.7.10",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "5.8",
+					"name": "Metric Integration Tests",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want integration tests that verify all metrics work together correctly with realistic shot data.",
+						"acceptance_criteria": [
+							"Integration tests cover MetricOrchestrator running all calculators",
+							"Tests verify metric values are within expected ranges for test shots",
+							"Tests verify confidence scores are calculated correctly",
+							"Tests verify all metrics are returned in correct structure"
+						],
+						"edge_cases": [
+							"Shot with some occluded landmarks should still produce partial metrics",
+							"Shot with very low confidence should affect overall confidence score"
+						],
+						"data_model": "Use realistic mock landmark sequences representing complete shots. Expected values should be pre-calculated for validation.",
+						"technical_notes": "Create test fixtures with annotated expected values. Test both good-form and poor-form shots. Verify metric consistency across multiple runs."
+					},
+					"subtasks": [
+						{
+							"id": "5.8.1",
+							"description": "Create test fixtures with realistic landmark sequences for complete shots"
+						},
+						{
+							"id": "5.8.2",
+							"description": "Manually calculate expected metric values for test fixtures"
+						},
+						{
+							"id": "5.8.3",
+							"description": "Write integration tests for MetricOrchestrator with all calculators"
+						},
+						{
+							"id": "5.8.4",
+							"description": "Write integration tests for good-form shot analysis"
+						},
+						{
+							"id": "5.8.5",
+							"description": "Write integration tests for poor-form shot analysis"
+						},
+						{
+							"id": "5.8.6",
+							"description": "Write integration tests for shots with occlusions"
+						},
+						{
+							"id": "5.8.7",
+							"description": "Run all integration tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "5.9",
+					"name": "Feature 5 Validation Gate",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I need to verify that Feature 5 is complete and all tests pass before proceeding to Profile Comparison.",
+						"acceptance_criteria": [
+							"npm run check passes with zero TypeScript errors",
+							"npm run test:unit -- --run passes with zero failures",
+							"All integration tests pass",
+							"All 25+ metrics are implemented and tested",
+							"Test coverage for Feature 5 files is >80%"
+						],
+						"edge_cases": [],
+						"data_model": "",
+						"technical_notes": "This is a validation gate. Do NOT proceed to Feature 6.0 until this gate passes. This is the largest feature - ensure thorough testing."
+					},
+					"subtasks": [
+						{
+							"id": "5.9.1",
+							"description": "Run npm run check and fix any TypeScript errors"
+						},
+						{
+							"id": "5.9.2",
+							"description": "Run npm run test:unit -- --run and fix any test failures"
+						},
+						{
+							"id": "5.9.3",
+							"description": "Run all integration tests and fix any failures"
+						},
+						{
+							"id": "5.9.4",
+							"description": "Review test coverage report and add tests if coverage <80%"
+						},
+						{
+							"id": "5.9.5",
+							"description": "Verify all 25+ metrics are implemented"
+						},
+						{
+							"id": "5.9.6",
+							"description": "Verify metric accuracy with test data"
+						},
+						{
+							"id": "5.9.7",
+							"description": "Document any known limitations or future improvements"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "6.0",
+			"name": "Form Profile Comparison",
+			"status": "pending",
+			"parallel_group": 5,
+			"tasks": [
+				{
+					"id": "6.1",
+					"name": "Profile Types & Validation",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to compare extracted metrics against target profiles so that I can identify form issues using well-defined profile structures.",
+						"acceptance_criteria": [
+							"FormProfile interface defines name, description, and targets",
+							"Each target has ideal value, acceptable range, priority, and feedback messages",
+							"ProfileComparison output includes status (pass/fail/warning) for each metric",
+							"Zod schema validates profile structure",
+							"All types have validation tests"
+						],
+						"edge_cases": [
+							"Profile with no targets should be valid but useless",
+							"Unknown metric name in profile should warn but not fail",
+							"Missing feedback messages should use defaults"
+						],
+						"data_model": "FormProfile: { name: string, description: string, targets: { [metricName]: { ideal: number|string, acceptable: { min: number, max: number } | string[], priority: 'high'|'medium'|'low', feedback: { tooLow?: string, tooHigh?: string, incorrect?: string } } } }. ProfileComparison: { profile: string, metrics: { [name]: { value, target, status, deviation?, feedback? } }, summary: { passCount, failCount, warningCount, priorityIssues: string[] } }.",
+						"technical_notes": "Use Zod for runtime validation. Support both numeric ranges and categorical acceptable values. Priority helps sort feedback importance."
+					},
+					"subtasks": [
+						{
+							"id": "6.1.1",
+							"description": "Create src/profiles/types.ts with FormProfile interface"
+						},
+						{
+							"id": "6.1.2",
+							"description": "Define ProfileComparison output type"
+						},
+						{
+							"id": "6.1.3",
+							"description": "Write unit tests for profile Zod schema validation"
+						},
+						{
+							"id": "6.1.4",
+							"description": "Create Zod schema for profile validation to pass tests"
+						},
+						{
+							"id": "6.1.5",
+							"description": "Run npm run check to verify types compile"
+						}
+					]
+				},
+				{
+					"id": "6.2",
+					"name": "Built-in Profiles",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want pre-defined form profiles for common skill levels so that I can immediately compare without custom configuration.",
+						"acceptance_criteria": [
+							"youth-fundamentals: age-appropriate targets for developing players (8-12)",
+							"high-school: more refined mechanics expectations (13-18)",
+							"pro-form: elite-level targets",
+							"All profiles include feedback messages for common issues",
+							"All profiles pass validation"
+						],
+						"edge_cases": [
+							"Profile values may need adjustment based on user feedback",
+							"Some metrics may not have meaningful targets for youth"
+						],
+						"data_model": "Each profile is a FormProfile object with targets for relevant metrics. Youth profile has wider acceptable ranges. Pro profile has tighter ranges. All include corrective feedback text.",
+						"technical_notes": "Research typical values for each level. Youth: focus on fundamentals (elbow alignment, follow-through). High school: add timing/rhythm. Pro: precision on all metrics."
+					},
+					"subtasks": [
+						{
+							"id": "6.2.1",
+							"description": "Write unit tests for youth-fundamentals profile validation"
+						},
+						{
+							"id": "6.2.2",
+							"description": "Create src/profiles/youth.ts with youth-fundamentals profile"
+						},
+						{
+							"id": "6.2.3",
+							"description": "Write unit tests for high-school profile validation"
+						},
+						{
+							"id": "6.2.4",
+							"description": "Create src/profiles/high-school.ts with high-school profile"
+						},
+						{
+							"id": "6.2.5",
+							"description": "Write unit tests for pro-form profile validation"
+						},
+						{
+							"id": "6.2.6",
+							"description": "Create src/profiles/pro.ts with pro-form profile"
+						},
+						{
+							"id": "6.2.7",
+							"description": "Add comprehensive feedback messages for each profile"
+						},
+						{
+							"id": "6.2.8",
+							"description": "Export all profiles from src/profiles/index.ts"
+						},
+						{
+							"id": "6.2.9",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "6.3",
+					"name": "Profile Comparison Engine",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As the analyzer, I want to compare shot metrics against a profile so that I can identify form issues and provide feedback.",
+						"acceptance_criteria": [
+							"compareToProfile() compares all metrics against selected profile",
+							"Returns pass/fail/warning status for each metric",
+							"Calculates deviation from ideal value for numeric metrics",
+							"Provides corrective feedback text for failures",
+							"Prioritizes issues by profile-defined priority",
+							"All comparison logic has unit tests"
+						],
+						"edge_cases": [
+							"Metric not in profile: skip comparison",
+							"Metric with low confidence: mark as warning regardless of value",
+							"Categorical metric comparison uses string matching"
+						],
+						"data_model": "Input: ShotAnalysis, FormProfile. Output: ProfileComparison. Status determination: value in acceptable range = pass, outside range but close = warning, far outside = fail.",
+						"technical_notes": "Define 'close' threshold as percentage of acceptable range. Sort priority issues by priority level (high first). Handle both numeric and categorical comparisons."
+					},
+					"subtasks": [
+						{
+							"id": "6.3.1",
+							"description": "Write unit tests for numeric metric comparison with various scenarios"
+						},
+						{
+							"id": "6.3.2",
+							"description": "Create src/profiles/comparison.ts with ProfileComparisonEngine class skeleton"
+						},
+						{
+							"id": "6.3.3",
+							"description": "Implement numeric metric comparison to pass tests"
+						},
+						{
+							"id": "6.3.4",
+							"description": "Write unit tests for categorical metric comparison"
+						},
+						{
+							"id": "6.3.5",
+							"description": "Implement categorical metric comparison to pass tests"
+						},
+						{
+							"id": "6.3.6",
+							"description": "Write unit tests for status determination (pass/fail/warning)"
+						},
+						{
+							"id": "6.3.7",
+							"description": "Implement status determination to pass tests"
+						},
+						{
+							"id": "6.3.8",
+							"description": "Write unit tests for feedback message selection"
+						},
+						{
+							"id": "6.3.9",
+							"description": "Implement feedback message selection to pass tests"
+						},
+						{
+							"id": "6.3.10",
+							"description": "Write unit tests for summary generation"
+						},
+						{
+							"id": "6.3.11",
+							"description": "Implement summary generation with priority sorting to pass tests"
+						},
+						{
+							"id": "6.3.12",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "6.4",
+					"name": "Profile Management & Custom Profiles",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to register custom profiles and list available profiles so that I can extend the system for specific needs.",
+						"acceptance_criteria": [
+							"getProfiles() returns list of available profile names",
+							"registerProfile() adds custom profile to registry",
+							"Custom profiles override built-in profiles with same name",
+							"Invalid profiles throw validation errors",
+							"All registry operations have unit tests"
+						],
+						"edge_cases": [
+							"Registering profile with existing name: override (warn in console)",
+							"Empty profile registry: only built-ins available",
+							"Accessing non-existent profile: throw descriptive error"
+						],
+						"data_model": "ProfileRegistry class with Map<string, FormProfile>. Built-in profiles pre-registered. Methods: register(), get(), list(), has().",
+						"technical_notes": "Use singleton pattern for global registry. Support late registration (profiles can be added after analyzer initialization). Validate profiles on registration."
+					},
+					"subtasks": [
+						{
+							"id": "6.4.1",
+							"description": "Write unit tests for ProfileRegistry constructor and built-in profiles"
+						},
+						{
+							"id": "6.4.2",
+							"description": "Create src/profiles/registry.ts with ProfileRegistry class skeleton"
+						},
+						{
+							"id": "6.4.3",
+							"description": "Write unit tests for registerProfile() with valid and invalid profiles"
+						},
+						{
+							"id": "6.4.4",
+							"description": "Implement registerProfile() with validation to pass tests"
+						},
+						{
+							"id": "6.4.5",
+							"description": "Write unit tests for getProfile() and listProfiles()"
+						},
+						{
+							"id": "6.4.6",
+							"description": "Implement getProfile() and listProfiles() to pass tests"
+						},
+						{
+							"id": "6.4.7",
+							"description": "Pre-register built-in profiles in registry"
+						},
+						{
+							"id": "6.4.8",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "6.5",
+					"name": "Feature 6 Validation Gate",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I need to verify that Feature 6 is complete and all tests pass before proceeding to Main Analyzer Integration.",
+						"acceptance_criteria": [
+							"npm run check passes with zero TypeScript errors",
+							"npm run test:unit -- --run passes with zero failures",
+							"All 3 built-in profiles are valid and complete",
+							"Profile comparison produces correct results for test data",
+							"Test coverage for Feature 6 files is >80%"
+						],
+						"edge_cases": [],
+						"data_model": "",
+						"technical_notes": "This is a validation gate. Do NOT proceed to Feature 7.0 until this gate passes. Fix any failures before marking complete."
+					},
+					"subtasks": [
+						{
+							"id": "6.5.1",
+							"description": "Run npm run check and fix any TypeScript errors"
+						},
+						{
+							"id": "6.5.2",
+							"description": "Run npm run test:unit -- --run and fix any test failures"
+						},
+						{
+							"id": "6.5.3",
+							"description": "Verify all 3 built-in profiles are complete with feedback messages"
+						},
+						{
+							"id": "6.5.4",
+							"description": "Review test coverage report and add tests if coverage <80%"
+						},
+						{
+							"id": "6.5.5",
+							"description": "Test profile comparison with sample shot analysis data"
+						},
+						{
+							"id": "6.5.6",
+							"description": "Document any known limitations or future improvements"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "7.0",
+			"name": "Main Analyzer Integration",
+			"status": "pending",
+			"parallel_group": 6,
+			"tasks": [
+				{
+					"id": "7.1",
+					"name": "ShotAnalyzer Class Structure",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want a single ShotAnalyzer class that orchestrates all analysis components so that I have a clean public API.",
+						"acceptance_criteria": [
+							"ShotAnalyzer constructor accepts AnalysisConfig",
+							"Validates and stores configuration",
+							"Initializes internal components (detector, shot detector, metric calculators)",
+							"Provides getter methods for profiles and configuration",
+							"All public methods have unit tests"
+						],
+						"edge_cases": [
+							"Invalid config: throw during construction",
+							"Missing optional config: use defaults",
+							"Re-initialization: should work cleanly"
+						],
+						"data_model": "ShotAnalyzer class. Private members: config, poseDetector, shotDetector, metricOrchestrator, profileRegistry. Public methods defined in design document.",
+						"technical_notes": "Async initialization for pose detector. Consider factory function createShotAnalyzer() for cleaner async setup. Lazy initialization option for browser bundle size."
+					},
+					"subtasks": [
+						{
+							"id": "7.1.1",
+							"description": "Write unit tests for ShotAnalyzer constructor with valid config"
+						},
+						{
+							"id": "7.1.2",
+							"description": "Create src/analyzer.ts with ShotAnalyzer class skeleton"
+						},
+						{
+							"id": "7.1.3",
+							"description": "Write unit tests for constructor with invalid config"
+						},
+						{
+							"id": "7.1.4",
+							"description": "Implement constructor with config validation to pass tests"
+						},
+						{
+							"id": "7.1.5",
+							"description": "Write unit tests for async initialize() method"
+						},
+						{
+							"id": "7.1.6",
+							"description": "Implement async initialize() method for pose detector"
+						},
+						{
+							"id": "7.1.7",
+							"description": "Write unit tests for getProfiles() and getConfig()"
+						},
+						{
+							"id": "7.1.8",
+							"description": "Implement getter methods to pass tests"
+						},
+						{
+							"id": "7.1.9",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "7.2",
+					"name": "Video Analysis Pipeline",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to analyze a complete video and get all shot metrics so that I can process recorded clips.",
+						"acceptance_criteria": [
+							"analyzeVideo(FrameProvider) returns Promise<AnalysisResult>",
+							"Processes all frames through pose detection",
+							"Detects shots and phases",
+							"Extracts all metrics for each shot",
+							"Returns complete AnalysisResult with all data",
+							"Integration tests verify full pipeline"
+						],
+						"edge_cases": [
+							"Empty video: return empty shots array",
+							"No shots detected: return empty shots array",
+							"Very long video: should not run out of memory",
+							"Low quality video: all metrics will have low confidence"
+						],
+						"data_model": "Pipeline: FrameProvider → Pose Detection → Shot Detection → Metric Extraction → AnalysisResult. Process frames sequentially, batch shot analysis.",
+						"technical_notes": "Stream frames to avoid loading entire video in memory. Batch pose results before shot detection. Report progress for long videos (optional callback)."
+					},
+					"subtasks": [
+						{
+							"id": "7.2.1",
+							"description": "Write unit tests for analyzeVideo() with mock frame provider"
+						},
+						{
+							"id": "7.2.2",
+							"description": "Implement analyzeVideo() method shell to pass basic tests"
+						},
+						{
+							"id": "7.2.3",
+							"description": "Write unit tests for frame processing loop"
+						},
+						{
+							"id": "7.2.4",
+							"description": "Implement frame processing loop with pose detection"
+						},
+						{
+							"id": "7.2.5",
+							"description": "Write unit tests for shot detection integration"
+						},
+						{
+							"id": "7.2.6",
+							"description": "Integrate shot detection on collected landmarks"
+						},
+						{
+							"id": "7.2.7",
+							"description": "Write unit tests for metric extraction integration"
+						},
+						{
+							"id": "7.2.8",
+							"description": "Integrate metric extraction for each detected shot"
+						},
+						{
+							"id": "7.2.9",
+							"description": "Assemble and return AnalysisResult"
+						},
+						{
+							"id": "7.2.10",
+							"description": "Write integration tests with mock frame provider"
+						},
+						{
+							"id": "7.2.11",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "7.3",
+					"name": "Live Session Support & Public API",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to process live video frames incrementally so that I can provide real-time feedback during practice.",
+						"acceptance_criteria": [
+							"processFrame(VideoFrame) returns Promise<FrameAnalysis> with current state",
+							"finalizeLiveSession() completes any partial shots and returns AnalysisResult",
+							"compareToProfile(result, profileName?) returns ProfileComparison[]",
+							"registerProfile(profile) adds custom profile to registry",
+							"All public methods have unit tests"
+						],
+						"edge_cases": [
+							"processFrame called before initialize: throw error",
+							"finalizeLiveSession with no frames: return empty result",
+							"compareToProfile with unknown profile: throw error"
+						],
+						"data_model": "FrameAnalysis: { frameIndex, timestamp, landmarks?, currentPhase?, partialMetrics? }. Maintains internal state between processFrame calls.",
+						"technical_notes": "Live processing needs to be fast (<100ms per frame ideally). Partial metrics updated incrementally. Consider debouncing for real-time feedback display."
+					},
+					"subtasks": [
+						{
+							"id": "7.3.1",
+							"description": "Write unit tests for processFrame() with mock frames"
+						},
+						{
+							"id": "7.3.2",
+							"description": "Implement processFrame() for incremental processing to pass tests"
+						},
+						{
+							"id": "7.3.3",
+							"description": "Write unit tests for internal state management"
+						},
+						{
+							"id": "7.3.4",
+							"description": "Implement internal state management for live sessions"
+						},
+						{
+							"id": "7.3.5",
+							"description": "Write unit tests for finalizeLiveSession()"
+						},
+						{
+							"id": "7.3.6",
+							"description": "Implement finalizeLiveSession() to pass tests"
+						},
+						{
+							"id": "7.3.7",
+							"description": "Write unit tests for compareToProfile()"
+						},
+						{
+							"id": "7.3.8",
+							"description": "Implement compareToProfile() to pass tests"
+						},
+						{
+							"id": "7.3.9",
+							"description": "Write unit tests for registerProfile()"
+						},
+						{
+							"id": "7.3.10",
+							"description": "Implement registerProfile() passthrough to registry"
+						},
+						{
+							"id": "7.3.11",
+							"description": "Update src/index.ts with all public exports"
+						},
+						{
+							"id": "7.3.12",
+							"description": "Run all tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "7.4",
+					"name": "End-to-End Integration Tests",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I need comprehensive E2E tests that verify the complete analysis pipeline works correctly from video input to profile comparison output.",
+						"acceptance_criteria": [
+							"E2E tests cover complete video analysis workflow",
+							"E2E tests cover live session workflow",
+							"E2E tests verify profile comparison with real analysis results",
+							"Tests use real test video files with known expected outputs",
+							"All E2E tests pass reliably"
+						],
+						"edge_cases": [
+							"Video with multiple shots should detect all shots",
+							"Video with poor lighting should produce low confidence metrics",
+							"Live session interruption should handle gracefully"
+						],
+						"data_model": "E2E tests use real FrameProvider implementations with test video files. Expected outputs are pre-calculated for validation.",
+						"technical_notes": "E2E tests may be slower - consider separate test script. Use test video clips with manually verified shot detection. Test both Node.js and browser environments if possible."
+					},
+					"subtasks": [
+						{
+							"id": "7.4.1",
+							"description": "Create tests/e2e/ directory structure"
+						},
+						{
+							"id": "7.4.2",
+							"description": "Add test video files with known shot counts and timings"
+						},
+						{
+							"id": "7.4.3",
+							"description": "Write E2E test for complete video analysis workflow"
+						},
+						{
+							"id": "7.4.4",
+							"description": "Write E2E test for multi-shot video analysis"
+						},
+						{
+							"id": "7.4.5",
+							"description": "Write E2E test for live session workflow"
+						},
+						{
+							"id": "7.4.6",
+							"description": "Write E2E test for profile comparison with analysis results"
+						},
+						{
+							"id": "7.4.7",
+							"description": "Write E2E test for custom profile registration and comparison"
+						},
+						{
+							"id": "7.4.8",
+							"description": "Run all E2E tests and fix any failures"
+						}
+					]
+				},
+				{
+					"id": "7.5",
+					"name": "Final Validation Gate",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I need to verify that the entire module is complete, all tests pass, and the public API works as documented.",
+						"acceptance_criteria": [
+							"npm run check passes with zero TypeScript errors",
+							"npm run test:unit -- --run passes with zero failures",
+							"npm run test:integration -- --run passes with zero failures",
+							"All E2E tests pass",
+							"Public API matches design document specification",
+							"Test coverage across all files is >80%",
+							"Module can be imported and used as documented"
+						],
+						"edge_cases": [],
+						"data_model": "",
+						"technical_notes": "This is the FINAL validation gate. All tests must pass. All TypeScript must compile. The module must be production-ready."
+					},
+					"subtasks": [
+						{
+							"id": "7.5.1",
+							"description": "Run npm run check and fix any TypeScript errors"
+						},
+						{
+							"id": "7.5.2",
+							"description": "Run npm run test:unit -- --run and fix any test failures"
+						},
+						{
+							"id": "7.5.3",
+							"description": "Run npm run test:integration -- --run and fix any test failures"
+						},
+						{
+							"id": "7.5.4",
+							"description": "Run all E2E tests and fix any failures"
+						},
+						{
+							"id": "7.5.5",
+							"description": "Review overall test coverage and add tests if <80%"
+						},
+						{
+							"id": "7.5.6",
+							"description": "Verify all public API methods match design document"
+						},
+						{
+							"id": "7.5.7",
+							"description": "Test module import and basic usage in clean environment"
+						},
+						{
+							"id": "7.5.8",
+							"description": "Document any known limitations or future improvements"
+						},
+						{
+							"id": "7.5.9",
+							"description": "Mark project as complete"
+						}
+					]
+				}
+			]
+		}
+	]
 }
