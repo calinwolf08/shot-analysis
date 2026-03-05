@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T21:43:41.065Z"
+		"updated_at": "2026-03-05T21:47:52.428Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -735,7 +735,7 @@
 		{
 			"id": "4.0",
 			"name": "Shot Detection & Phase Identification",
-			"status": "pending",
+			"status": "complete",
 			"parallel_group": 3,
 			"tasks": [
 				{
@@ -1000,8 +1000,8 @@
 				{
 					"id": "4.5",
 					"name": "Feature 4 Validation Gate",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I need to verify that Feature 4 is complete and all tests pass before proceeding to Metric Extraction.",
@@ -1041,7 +1041,8 @@
 							"id": "4.5.6",
 							"description": "Document any known limitations or future improvements"
 						}
-					]
+					],
+					"commit_hash": "6a4b7867249d659379b77f0c21baf17defa50a4c"
 				}
 			]
 		},
