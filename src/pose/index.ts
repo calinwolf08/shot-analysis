@@ -41,3 +41,14 @@ export {
   DEFAULT_MODEL_PATH,
   MODEL_PATHS,
 } from "./mediapipe-node";
+
+// MediaPipe Browser implementation
+export type { MediaPipeBrowserConfig } from "./mediapipe-browser";
+export {
+  MediaPipeBrowserDetector,
+  WebGLNotAvailableError,
+  WebGLFallbackBehavior,
+  RuntimeDelegate,
+  createMediaPipeBrowserDetector,
+  detectWebGLSupport,
+} from "./mediapipe-browser";

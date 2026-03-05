@@ -11,4 +11,6 @@ export type { PoseDetector } from "./detector";
 export { PoseDetectionError, DetectorClosedError } from "./detector";
 export type { MediaPipeNodeConfig } from "./mediapipe-node";
 export { MediaPipeNodeDetector, ModelNotFoundError, WasmInitializationError, ModelCreationError, createMediaPipeNodeDetector, DEFAULT_MODEL_PATH, MODEL_PATHS, } from "./mediapipe-node";
+export type { MediaPipeBrowserConfig } from "./mediapipe-browser";
+export { MediaPipeBrowserDetector, WebGLNotAvailableError, WebGLFallbackBehavior, RuntimeDelegate, createMediaPipeBrowserDetector, detectWebGLSupport, } from "./mediapipe-browser";
 //# sourceMappingURL=index.d.ts.map

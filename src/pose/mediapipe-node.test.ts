@@ -122,7 +122,9 @@ describe("MediaPipeNodeDetector", () => {
       const calls = vi.mocked(PoseLandmarker.createFromOptions).mock.calls;
       const options = calls[0]?.[1];
       expect(options?.baseOptions?.modelAssetPath).toBe(MODEL_PATHS[0]);
-      expect(options?.baseOptions?.modelAssetPath).toContain("pose_landmarker_lite");
+      expect(options?.baseOptions?.modelAssetPath).toContain(
+        "pose_landmarker_lite",
+      );
     });
 
     it("accepts modelComplexity 1 (full) and selects full model", async () => {
@@ -131,7 +133,9 @@ describe("MediaPipeNodeDetector", () => {
       const calls = vi.mocked(PoseLandmarker.createFromOptions).mock.calls;
       const options = calls[0]?.[1];
       expect(options?.baseOptions?.modelAssetPath).toBe(MODEL_PATHS[1]);
-      expect(options?.baseOptions?.modelAssetPath).toContain("pose_landmarker_full");
+      expect(options?.baseOptions?.modelAssetPath).toContain(
+        "pose_landmarker_full",
+      );
     });
 
     it("accepts modelComplexity 2 (heavy) and selects heavy model", async () => {
@@ -140,7 +144,9 @@ describe("MediaPipeNodeDetector", () => {
       const calls = vi.mocked(PoseLandmarker.createFromOptions).mock.calls;
       const options = calls[0]?.[1];
       expect(options?.baseOptions?.modelAssetPath).toBe(MODEL_PATHS[2]);
-      expect(options?.baseOptions?.modelAssetPath).toContain("pose_landmarker_heavy");
+      expect(options?.baseOptions?.modelAssetPath).toContain(
+        "pose_landmarker_heavy",
+      );
     });
 
     it("custom modelPath overrides modelComplexity", async () => {
@@ -477,7 +483,9 @@ describe("MediaPipeNodeDetector", () => {
 
     it("WasmInitializationError contains original error", async () => {
       const originalError = new Error("WASM loading failed");
-      vi.mocked(FilesetResolver.forVisionTasks).mockRejectedValue(originalError);
+      vi.mocked(FilesetResolver.forVisionTasks).mockRejectedValue(
+        originalError,
+      );
 
       try {
         await createMediaPipeNodeDetector();

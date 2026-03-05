@@ -192,9 +192,7 @@ export class VideoFileProvider implements FrameProvider {
    * @param filePath - Path to the video file
    * @returns Promise with metadata, fps, and frames
    */
-  private static async extractVideoData(
-    filePath: string,
-  ): Promise<{
+  private static async extractVideoData(filePath: string): Promise<{
     metadata: FrameMetadata;
     fps: number;
     frames: MockFrameData[];
