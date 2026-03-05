@@ -11,6 +11,8 @@
 export { DEFAULT_FEEDBACK_MESSAGES, createEmptyComparisonSummary, createEmptyProfileComparison, isNumericTarget, isCategoricalTarget, getFeedbackMessage, } from "./types";
 // Schema exports
 export { metricPrioritySchema, comparisonStatusSchema, numericRangeSchema, metricFeedbackSchema, metricTargetSchema, formProfileSchema, comparisonSummarySchema, metricComparisonResultSchema, profileComparisonSchema, validateProfile, safeValidateProfile, validateComparison, safeValidateComparison, } from "./schemas";
+// Comparison engine exports
+export { ProfileComparisonEngine, } from "./comparison";
 // Built-in profile exports
 export { youthFundamentalsProfile } from "./youth";
 export { highSchoolProfile } from "./high-school";

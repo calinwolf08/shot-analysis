@@ -10,6 +10,7 @@
 export type { MetricFeedback, NumericRange, MetricTarget, FormProfile, MetricComparisonResult, ComparisonSummary, ProfileComparison, ProfileValidationResult, } from "./types";
 export { DEFAULT_FEEDBACK_MESSAGES, createEmptyComparisonSummary, createEmptyProfileComparison, isNumericTarget, isCategoricalTarget, getFeedbackMessage, } from "./types";
 export { metricPrioritySchema, comparisonStatusSchema, numericRangeSchema, metricFeedbackSchema, metricTargetSchema, formProfileSchema, comparisonSummarySchema, metricComparisonResultSchema, profileComparisonSchema, validateProfile, safeValidateProfile, validateComparison, safeValidateComparison, type ValidatedFormProfile, type ValidatedProfileComparison, type SafeValidateProfileResult, type SafeValidateComparisonResult, } from "./schemas";
+export { ProfileComparisonEngine, type ProfileComparisonEngineOptions, } from "./comparison";
 export { youthFundamentalsProfile } from "./youth";
 export { highSchoolProfile } from "./high-school";
 export { proFormProfile } from "./pro";

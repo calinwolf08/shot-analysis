@@ -51,6 +51,12 @@ export {
   type SafeValidateComparisonResult,
 } from "./schemas";
 
+// Comparison engine exports
+export {
+  ProfileComparisonEngine,
+  type ProfileComparisonEngineOptions,
+} from "./comparison";
+
 // Built-in profile exports
 export { youthFundamentalsProfile } from "./youth";
 export { highSchoolProfile } from "./high-school";
