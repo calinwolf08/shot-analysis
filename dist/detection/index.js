@@ -53,4 +53,6 @@ export { createEmptyPhaseRange, createEmptyShot, createNoShotFrameLabel, hasPhas
 export { ShotBoundaryDetector, createShotBoundaryDetector, } from "./shot-detector";
 // Phase detector
 export { PhaseDetector, createPhaseDetector } from "./phase-detector";
+// Integrated shot detector
+export { ShotDetector, createShotDetector } from "./integrated-shot-detector";
 //# sourceMappingURL=index.js.map

@@ -52,4 +52,6 @@ export { ShotBoundaryDetector, createShotBoundaryDetector, } from "./shot-detect
 export type { ShotBoundaryDetectorConfig, DetectedBoundary, DetectedShot, } from "./shot-detector";
 export { PhaseDetector, createPhaseDetector } from "./phase-detector";
 export type { PhaseDetectorConfig, PhaseDetectionResult, } from "./phase-detector";
+export { ShotDetector, createShotDetector } from "./integrated-shot-detector";
+export type { ShotDetectorConfig, FrameAnalysisResult, } from "./integrated-shot-detector";
 //# sourceMappingURL=index.d.ts.map

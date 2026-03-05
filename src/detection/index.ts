@@ -86,3 +86,10 @@ export type {
   PhaseDetectorConfig,
   PhaseDetectionResult,
 } from "./phase-detector";
+
+// Integrated shot detector
+export { ShotDetector, createShotDetector } from "./integrated-shot-detector";
+export type {
+  ShotDetectorConfig,
+  FrameAnalysisResult,
+} from "./integrated-shot-detector";
