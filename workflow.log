@@ -1,0 +1,5 @@
+
+================================================================================
+WORKFLOW LOG - 2026-03-05T00:57:54.333Z
+================================================================================
+{"timestamp":"2026-03-05T00:57:54.998Z","level":"DEBUG","category":"git","message":"git rev-parse --git-dir","data":{"command":"git rev-parse --git-dir","success":false,"error":"git rev-parse --git-dir failed: fatal: not a git repository (or any of the parent directories): .git\n"}}
