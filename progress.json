@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T19:50:05.941Z"
+		"updated_at": "2026-03-05T19:52:11.814Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -22,8 +22,8 @@
 				{
 					"id": "1.1",
 					"name": "Core Types & Configuration Schema",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want to configure the analyzer for shooter handedness and analysis preferences so that the system correctly identifies shooting vs guide hand and applies appropriate landmark mappings.",
@@ -67,7 +67,8 @@
 							"id": "1.1.6",
 							"description": "Run npm run check and npm run test:unit -- --run to verify everything passes"
 						}
-					]
+					],
+					"commit_hash": "93db3a31a9affd21f7c5a557a75ad5bc94c41d34"
 				},
 				{
 					"id": "1.2",
