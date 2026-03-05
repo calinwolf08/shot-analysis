@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T21:35:53.628Z"
+		"updated_at": "2026-03-05T21:43:41.065Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -933,8 +933,8 @@
 				{
 					"id": "4.4",
 					"name": "Shot Detector Integration",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As the analyzer, I want a unified shot detector that combines boundary and phase detection into a single output structure.",
@@ -994,7 +994,8 @@
 							"id": "4.4.10",
 							"description": "Run all tests and fix any failures"
 						}
-					]
+					],
+					"commit_hash": "df7cca03686ec25e7f587317867b69a5c5a2259e"
 				},
 				{
 					"id": "4.5",

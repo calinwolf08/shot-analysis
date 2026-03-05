@@ -10,6 +10,49 @@
  * - State management with reset() for continuous processing
  * - Automatic phase detection for each detected shot
  *
+ * ## Known Limitations
+ *
+ * 1. **Single Shooter Assumption**: The detector assumes a single person is
+ *    in frame performing the shot. Multiple people in view may cause
+ *    incorrect boundary detection.
+ *
+ * 2. **Camera Angle Dependency**: Detection is optimized for front-facing or
+ *    side-profile camera angles. Overhead or severely oblique angles may
+ *    reduce accuracy.
+ *
+ * 3. **Shooting Hand Agnostic**: The current implementation does not differentiate
+ *    between left-handed and right-handed shooters. Phase detection uses
+ *    averaged wrist positions.
+ *
+ * 4. **Minimum Shot Duration**: Very fast shots (< ~15 frames at 30fps) may not
+ *    be detected reliably due to minimum duration thresholds.
+ *
+ * 5. **Partial Shots at Boundaries**: Shots that start before or end after the
+ *    video clip may have incomplete phase detection.
+ *
+ * 6. **MediaPipe Confidence Dependency**: Low-confidence landmarks (occlusion,
+ *    poor lighting) can affect phase transition detection accuracy.
+ *
+ * ## Future Improvements
+ *
+ * 1. **Shooting Hand Detection**: Automatically detect dominant shooting hand
+ *    and use shooting-arm-specific landmarks for more accurate phase detection.
+ *
+ * 2. **Jump Shot vs Set Shot Classification**: Distinguish between jump shots
+ *    and set shots using vertical hip displacement.
+ *
+ * 3. **Multi-Shot Tracking**: Track multiple shooters simultaneously by
+ *    associating landmarks with person IDs.
+ *
+ * 4. **Confidence-Weighted Phase Detection**: Weight phase transitions by
+ *    landmark visibility/confidence scores.
+ *
+ * 5. **Adaptive Thresholds**: Learn optimal thresholds from training data
+ *    rather than using fixed defaults.
+ *
+ * 6. **Ball Detection Integration**: Incorporate ball tracking (when available)
+ *    for more precise release frame detection.
+ *
  * @see Feature 4.4 - Shot Detector Integration
  */
 import { ShotBoundaryDetector, } from "./shot-detector";
