@@ -394,9 +394,9 @@ describe("ShotDetectionResult type", () => {
       expectTypeOf<ShotDetectionResult["frameLabels"]>().toEqualTypeOf<
         readonly FrameLabel[]
       >();
-      expectTypeOf<ShotDetectionResult["totalFrames"]>().toEqualTypeOf<
-        number
-      >();
+      expectTypeOf<
+        ShotDetectionResult["totalFrames"]
+      >().toEqualTypeOf<number>();
     });
   });
 

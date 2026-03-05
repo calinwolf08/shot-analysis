@@ -50,4 +50,6 @@ export type { PhaseRange, ShotBoundary, ShotPhases, Shot, FrameLabel, ShotDetect
 export { createEmptyPhaseRange, createEmptyShot, createNoShotFrameLabel, hasPhase, getPhaseDuration, getShotDuration, } from "./types";
 export { ShotBoundaryDetector, createShotBoundaryDetector, } from "./shot-detector";
 export type { ShotBoundaryDetectorConfig, DetectedBoundary, DetectedShot, } from "./shot-detector";
+export { PhaseDetector, createPhaseDetector } from "./phase-detector";
+export type { PhaseDetectorConfig, PhaseDetectionResult, } from "./phase-detector";
 //# sourceMappingURL=index.d.ts.map

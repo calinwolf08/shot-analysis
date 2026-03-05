@@ -79,3 +79,10 @@ export type {
   DetectedBoundary,
   DetectedShot,
 } from "./shot-detector";
+
+// Phase detector
+export { PhaseDetector, createPhaseDetector } from "./phase-detector";
+export type {
+  PhaseDetectorConfig,
+  PhaseDetectionResult,
+} from "./phase-detector";
