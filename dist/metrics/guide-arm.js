@@ -320,12 +320,18 @@ export class GuideHandReleaseCalculator {
             // Track if hands were ever in contact
             if (distance < HAND_SEPARATION_THRESHOLD) {
                 wasInContact = true;
-                lastValidConfidence = calculateMinConfidence([guideIndex, shootingIndex]);
+                lastValidConfidence = calculateMinConfidence([
+                    guideIndex,
+                    shootingIndex,
+                ]);
             }
             // Detect separation: hands were in contact and now exceed threshold
             if (wasInContact && distance >= HAND_SEPARATION_THRESHOLD) {
                 separationFrame = frameIndex;
-                lastValidConfidence = calculateMinConfidence([guideIndex, shootingIndex]);
+                lastValidConfidence = calculateMinConfidence([
+                    guideIndex,
+                    shootingIndex,
+                ]);
                 break;
             }
         }

@@ -698,7 +698,7 @@ describe("GuideHandReleaseCalculator", () => {
 
       expect(result.value).toBeDefined();
       // Early release - around 20%
-      expect((result.value?.value as number)).toBeLessThan(30);
+      expect(result.value?.value as number).toBeLessThan(30);
     });
 
     it("detects late release (hands stay together longer)", () => {
@@ -736,7 +736,7 @@ describe("GuideHandReleaseCalculator", () => {
 
       expect(result.value).toBeDefined();
       // Late release - around 80%
-      expect((result.value?.value as number)).toBeGreaterThan(70);
+      expect(result.value?.value as number).toBeGreaterThan(70);
     });
   });
 

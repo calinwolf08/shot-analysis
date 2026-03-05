@@ -330,7 +330,11 @@ describe("HipDropCalculator", () => {
       const calculator = new HipDropCalculator();
       const poseLandmarks = [
         createLowerBodyPose(0, { hipVisibility: 0.3 }),
-        createLowerBodyPose(1, { hipVisibility: 0.3, leftHipY: 0.6, rightHipY: 0.6 }),
+        createLowerBodyPose(1, {
+          hipVisibility: 0.3,
+          leftHipY: 0.6,
+          rightHipY: 0.6,
+        }),
       ];
 
       const context: MetricCalculatorContext = {
@@ -676,13 +680,13 @@ describe("LegExtensionStartCalculator", () => {
         createLowerBodyPose(2, {
           leftHipX: 0.45,
           leftHipY: 0.56,
-          leftKneeX: 0.40,
+          leftKneeX: 0.4,
           leftKneeY: 0.71,
           leftAnkleX: 0.32,
           leftAnkleY: 0.8,
           rightHipX: 0.55,
           rightHipY: 0.56,
-          rightKneeX: 0.60,
+          rightKneeX: 0.6,
           rightKneeY: 0.71,
           rightAnkleX: 0.68,
           rightAnkleY: 0.8,

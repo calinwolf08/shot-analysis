@@ -285,7 +285,9 @@ describe("ProfileRegistry", () => {
       registry.register(profile2);
 
       expect(consoleSpy).toHaveBeenCalled();
-      expect(registry.get("my-custom")?.description).toBe("Replacement profile");
+      expect(registry.get("my-custom")?.description).toBe(
+        "Replacement profile",
+      );
     });
 
     it("does not log warning for new profile registration", () => {
@@ -391,9 +393,7 @@ describe("ProfileRegistry", () => {
       registry.register(createTestProfile("youth-fundamentals"));
 
       const names = registry.list();
-      const youthCount = names.filter(
-        (n) => n === "youth-fundamentals",
-      ).length;
+      const youthCount = names.filter((n) => n === "youth-fundamentals").length;
 
       expect(youthCount).toBe(1);
     });

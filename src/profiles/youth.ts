@@ -130,8 +130,7 @@ export const youthFundamentalsProfile: FormProfile = {
       acceptable: { min: 20, max: 80 },
       priority: "medium",
       feedback: {
-        tooLow:
-          "Bend your knees more before you shoot. Get low to get power!",
+        tooLow: "Bend your knees more before you shoot. Get low to get power!",
         tooHigh:
           "You're bending your knees a lot! That's okay, just make sure you can jump up comfortably.",
       },

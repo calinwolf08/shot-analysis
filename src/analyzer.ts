@@ -44,6 +44,7 @@ import { validateConfig } from "./config";
 import type { FormProfile } from "./profiles/types";
 import type { PoseDetector } from "./pose/detector";
 import { createPoseDetector, type PoseDetectorConfig } from "./pose/factory";
+import type { PoseLandmarks as PosePoseLandmarks } from "./pose/types";
 import {
   ShotDetector,
   type ShotDetectorConfig,
@@ -58,6 +59,36 @@ import {
   createTimingCalculators,
 } from "./metrics";
 import { getProfileRegistry, type ProfileRegistry } from "./profiles/registry";
+import type { FrameProvider } from "./providers/types";
+import type { PoseLandmarks as MetricsPoseLandmarks } from "./types";
+import type {
+  AnalysisResult,
+  ShotAnalysis,
+  VideoMetadata,
+} from "./metrics/types";
+
+/**
+ * Converts pose detection PoseLandmarks to metrics PoseLandmarks.
+ *
+ * The pose detection module uses a different landmark format than the metrics module.
+ * This function converts between them to allow the pipeline to work.
+ */
+function convertToMetricsPoseLandmarks(
+  pose: PosePoseLandmarks,
+  frameIndex: number,
+  timestamp: number,
+): MetricsPoseLandmarks {
+  return {
+    landmarks: pose.landmarks.map((l) => ({
+      position: { x: l.x, y: l.y, z: l.z },
+      visibility: l.visibility,
+      presence: l.confidence,
+    })),
+    confidence: pose.poseConfidence,
+    timestamp,
+    frameIndex,
+  };
+}
 
 /**
  * Error thrown when analyzer methods are called before initialization.
@@ -314,6 +345,118 @@ export class ShotAnalyzer {
    */
   getProfileRegistry(): ProfileRegistry {
     return this.profileRegistry;
+  }
+
+  /**
+   * Analyzes a video and returns complete shot analysis results.
+   *
+   * Processes all frames through pose detection, detects shots and phases,
+   * extracts metrics for each shot, and returns a comprehensive AnalysisResult.
+   *
+   * @param frameProvider - Provider for video frames to analyze
+   * @returns Promise resolving to complete analysis results
+   *
+   * @throws {ShotAnalyzerNotInitializedError} If analyzer is not initialized
+   *
+   * @example
+   * ```typescript
+   * const analyzer = await createShotAnalyzer(config);
+   * const frameProvider = new VideoFileProvider('shot.mp4');
+   *
+   * const result = await analyzer.analyzeVideo(frameProvider);
+   * console.log(`Detected ${result.shots.length} shots`);
+   *
+   * for (const shot of result.shots) {
+   *   console.log(`Shot ${shot.shotIndex}: ${shot.overallConfidence * 100}% confidence`);
+   * }
+   * ```
+   */
+  async analyzeVideo(frameProvider: FrameProvider): Promise<AnalysisResult> {
+    if (!this.initialized || !this.poseDetector) {
+      throw new ShotAnalyzerNotInitializedError("analyzeVideo");
+    }
+
+    // Collect video metadata
+    const metadata = frameProvider.getMetadata();
+    const fps = frameProvider.getFps();
+
+    // Process all frames through pose detection
+    // We collect pose landmarks in the format used by the shot detector
+    const allPoseLandmarks: PosePoseLandmarks[] = [];
+    // We also collect converted landmarks for metric extraction
+    const allMetricsLandmarks: MetricsPoseLandmarks[] = [];
+    let totalFrames = 0;
+
+    let frame = await frameProvider.getNextFrame();
+    while (frame !== null) {
+      // Run pose detection on the frame
+      const poseLandmarks = await this.poseDetector.detect(frame);
+      if (poseLandmarks) {
+        allPoseLandmarks.push(poseLandmarks);
+        // Convert to metrics format for later use
+        const metricsLandmarks = convertToMetricsPoseLandmarks(
+          poseLandmarks,
+          frame.frameIndex,
+          frame.timestamp,
+        );
+        allMetricsLandmarks.push(metricsLandmarks);
+      }
+
+      totalFrames++;
+      frame = await frameProvider.getNextFrame();
+    }
+
+    // Build video metadata
+    const videoMetadata: VideoMetadata = {
+      width: metadata.width,
+      height: metadata.height,
+      ...(metadata.duration !== undefined && { duration: metadata.duration }),
+      fps,
+      totalFrames,
+    };
+
+    // Handle empty video or no landmarks
+    if (allPoseLandmarks.length < 2) {
+      return {
+        shots: [],
+        videoMetadata,
+        config: this.config as AnalysisConfig,
+      };
+    }
+
+    // Reset shot detector state for fresh detection
+    this.shotDetector.reset();
+
+    // Detect shots from the landmark sequence
+    const detectedShots = this.shotDetector.processFrames(allPoseLandmarks);
+
+    // Extract metrics for each detected shot
+    const shotAnalyses: ShotAnalysis[] = [];
+
+    for (const shot of detectedShots) {
+      // Get landmarks for this shot's frame range
+      const shotLandmarks = allMetricsLandmarks.slice(
+        shot.frameRange.start,
+        shot.frameRange.end + 1,
+      );
+
+      // Analyze the shot with metric extraction
+      const analysis = this.metricOrchestrator.analyzeShot(
+        shot.shotIndex,
+        shotLandmarks,
+        shot.frameRange,
+        shot.phases,
+        this.config as AnalysisConfig,
+      );
+
+      shotAnalyses.push(analysis);
+    }
+
+    return {
+      shots: shotAnalyses,
+      videoMetadata,
+      config: this.config as AnalysisConfig,
+    };
   }
 }
 

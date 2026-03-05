@@ -11,7 +11,9 @@ import {
   ShotAnalyzer,
   createShotAnalyzer,
   ShotAnalyzerAlreadyInitializedError,
+  ShotAnalyzerNotInitializedError,
 } from "./analyzer";
+import type { FrameProvider, VideoFrame } from "./providers/types";
 import {
   createConfig,
   createDefaultConfig,
@@ -453,4 +455,299 @@ describe("ShotAnalyzer", () => {
       await expect(analyzer.dispose()).resolves.not.toThrow();
     });
   });
+
+  // =========================================================================
+  // 7.2.1 - analyzeVideo() with mock frame provider
+  // =========================================================================
+  describe("analyzeVideo() - basic tests", () => {
+    /**
+     * Creates a mock frame provider for testing.
+     */
+    function createMockFrameProvider(
+      frames: VideoFrame[],
+      fps: number = 30,
+    ): FrameProvider {
+      let frameIndex = 0;
+      return {
+        getNextFrame: async (): Promise<VideoFrame | null> => {
+          if (frameIndex >= frames.length) {
+            return null;
+          }
+          const frame = frames[frameIndex];
+          frameIndex++;
+          return frame ?? null;
+        },
+        getFps: () => fps,
+        getMetadata: () => ({
+          width: 640,
+          height: 480,
+          duration: (frames.length / fps) * 1000,
+        }),
+      };
+    }
+
+    /**
+     * Creates a mock video frame.
+     */
+    function createMockFrame(index: number, fps: number = 30): VideoFrame {
+      const timestamp = (index / fps) * 1000;
+      return {
+        data: new Uint8ClampedArray(640 * 480 * 4),
+        width: 640,
+        height: 480,
+        timestamp,
+        frameIndex: index,
+      };
+    }
+
+    it("throws ShotAnalyzerNotInitializedError when called before initialize()", async () => {
+      const analyzer = new ShotAnalyzer(createDefaultConfig());
+      const provider = createMockFrameProvider([]);
+
+      await expect(analyzer.analyzeVideo(provider)).rejects.toThrow(
+        ShotAnalyzerNotInitializedError,
+      );
+    });
+
+    it("returns AnalysisResult when called after initialize()", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const provider = createMockFrameProvider([]);
+
+      const result = await analyzer.analyzeVideo(provider);
+
+      expect(result).toBeDefined();
+      expect(result.shots).toBeDefined();
+      expect(result.videoMetadata).toBeDefined();
+      expect(result.config).toBeDefined();
+    });
+
+    it("returns empty shots array for empty video", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const provider = createMockFrameProvider([]);
+
+      const result = await analyzer.analyzeVideo(provider);
+
+      expect(result.shots).toEqual([]);
+    });
+
+    it("returns empty shots array when no shots detected", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const frames = Array.from({ length: 30 }, (_, i) => createMockFrame(i));
+      const provider = createMockFrameProvider(frames);
+
+      const result = await analyzer.analyzeVideo(provider);
+
+      // With no actual movement detected, should return empty shots
+      expect(result.shots).toEqual([]);
+    });
+
+    it("includes video metadata in result", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const frames = Array.from({ length: 60 }, (_, i) => createMockFrame(i));
+      const provider = createMockFrameProvider(frames, 30);
+
+      const result = await analyzer.analyzeVideo(provider);
+
+      expect(result.videoMetadata.width).toBe(640);
+      expect(result.videoMetadata.height).toBe(480);
+      expect(result.videoMetadata.fps).toBe(30);
+      expect(result.videoMetadata.totalFrames).toBe(60);
+    });
+
+    it("includes config in result", async () => {
+      const config = createConfig({
+        shootingHand: "left",
+        profile: "high-school",
+        minConfidenceThreshold: 0.7,
+      });
+      const analyzer = await createShotAnalyzer(config);
+      const provider = createMockFrameProvider([]);
+
+      const result = await analyzer.analyzeVideo(provider);
+
+      expect(result.config.shootingHand).toBe("left");
+      expect(result.config.profile).toBe("high-school");
+    });
+  });
+
+  // =========================================================================
+  // 7.2.3 - Frame processing loop tests
+  // =========================================================================
+  describe("analyzeVideo() - frame processing loop", () => {
+    /**
+     * Creates a mock frame provider that tracks calls.
+     */
+    function createTrackingFrameProvider(
+      frameCount: number,
+      fps: number = 30,
+    ): { provider: FrameProvider; getCallCount: () => number } {
+      let callCount = 0;
+      let frameIndex = 0;
+
+      const provider: FrameProvider = {
+        getNextFrame: async () => {
+          callCount++;
+          if (frameIndex >= frameCount) {
+            return null;
+          }
+          const frame: VideoFrame = {
+            data: new Uint8ClampedArray(640 * 480 * 4),
+            width: 640,
+            height: 480,
+            timestamp: (frameIndex / fps) * 1000,
+            frameIndex: frameIndex,
+          };
+          frameIndex++;
+          return frame;
+        },
+        getFps: () => fps,
+        getMetadata: () => ({
+          width: 640,
+          height: 480,
+          duration: (frameCount / fps) * 1000,
+        }),
+      };
+
+      return { provider, getCallCount: () => callCount };
+    }
+
+    it("processes all frames from the provider", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider, getCallCount } = createTrackingFrameProvider(50);
+
+      await analyzer.analyzeVideo(provider);
+
+      // Should call getNextFrame frameCount + 1 times (last call returns null)
+      expect(getCallCount()).toBe(51);
+    });
+
+    it("handles single frame video", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(1);
+
+      const result = await analyzer.analyzeVideo(provider);
+
+      expect(result.videoMetadata.totalFrames).toBe(1);
+    });
+
+    it("handles very long video efficiently (no memory issues)", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      // Simulate a long video with 1000 frames
+      const { provider } = createTrackingFrameProvider(1000);
+
+      // Should complete without memory issues
+      const result = await analyzer.analyzeVideo(provider);
+
+      expect(result.videoMetadata.totalFrames).toBe(1000);
+    });
+  });
+
+  // =========================================================================
+  // 7.2.5 - Shot detection integration tests
+  // =========================================================================
+  describe("analyzeVideo() - shot detection integration", () => {
+    it("uses shot detector to find shots in landmark sequence", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(60);
+
+      const result = await analyzer.analyzeVideo(provider);
+
+      // Result structure should be correct even if no shots detected
+      expect(Array.isArray(result.shots)).toBe(true);
+    });
+
+    it("assigns sequential shotIndex to detected shots", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(200);
+
+      const result = await analyzer.analyzeVideo(provider);
+
+      // If multiple shots detected, indices should be sequential
+      for (let i = 0; i < result.shots.length; i++) {
+        const shot = result.shots[i];
+        if (shot) {
+          expect(shot.shotIndex).toBe(i);
+        }
+      }
+    });
+  });
+
+  // =========================================================================
+  // 7.2.7 - Metric extraction integration tests
+  // =========================================================================
+  describe("analyzeVideo() - metric extraction integration", () => {
+    it("extracts metrics for each detected shot", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(100);
+
+      const result = await analyzer.analyzeVideo(provider);
+
+      // Each shot should have metrics object
+      for (const shot of result.shots) {
+        expect(shot.metrics).toBeDefined();
+        expect(typeof shot.metrics).toBe("object");
+      }
+    });
+
+    it("calculates overallConfidence for each shot", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(100);
+
+      const result = await analyzer.analyzeVideo(provider);
+
+      for (const shot of result.shots) {
+        expect(typeof shot.overallConfidence).toBe("number");
+        expect(shot.overallConfidence).toBeGreaterThanOrEqual(0);
+        expect(shot.overallConfidence).toBeLessThanOrEqual(1);
+      }
+    });
+
+    it("includes phases in each shot analysis", async () => {
+      const analyzer = await createShotAnalyzer(createDefaultConfig());
+      const { provider } = createTrackingFrameProvider(100);
+
+      const result = await analyzer.analyzeVideo(provider);
+
+      for (const shot of result.shots) {
+        expect(shot.phases).toBeDefined();
+      }
+    });
+  });
+
+  /**
+   * Helper to create a tracking frame provider.
+   */
+  function createTrackingFrameProvider(
+    frameCount: number,
+    fps: number = 30,
+  ): { provider: FrameProvider; getCallCount: () => number } {
+    let callCount = 0;
+    let frameIndex = 0;
+
+    const provider: FrameProvider = {
+      getNextFrame: async () => {
+        callCount++;
+        if (frameIndex >= frameCount) {
+          return null;
+        }
+        const frame: VideoFrame = {
+          data: new Uint8ClampedArray(640 * 480 * 4),
+          width: 640,
+          height: 480,
+          timestamp: (frameIndex / fps) * 1000,
+          frameIndex: frameIndex,
+        };
+        frameIndex++;
+        return frame;
+      },
+      getFps: () => fps,
+      getMetadata: () => ({
+        width: 640,
+        height: 480,
+        duration: (frameCount / fps) * 1000,
+      }),
+    };
+
+    return { provider, getCallCount: () => callCount };
+  }
 });

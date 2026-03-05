@@ -44,6 +44,8 @@ import { type PoseDetectorConfig } from "./pose/factory";
 import { ShotDetector, type ShotDetectorConfig } from "./detection/integrated-shot-detector";
 import { MetricOrchestrator } from "./metrics";
 import { type ProfileRegistry } from "./profiles/registry";
+import type { FrameProvider } from "./providers/types";
+import type { AnalysisResult } from "./metrics/types";
 /**
  * Error thrown when analyzer methods are called before initialization.
  */
@@ -205,6 +207,31 @@ export declare class ShotAnalyzer {
      * @internal For testing and advanced use cases only
      */
     getProfileRegistry(): ProfileRegistry;
+    /**
+     * Analyzes a video and returns complete shot analysis results.
+     *
+     * Processes all frames through pose detection, detects shots and phases,
+     * extracts metrics for each shot, and returns a comprehensive AnalysisResult.
+     *
+     * @param frameProvider - Provider for video frames to analyze
+     * @returns Promise resolving to complete analysis results
+     *
+     * @throws {ShotAnalyzerNotInitializedError} If analyzer is not initialized
+     *
+     * @example
+     * ```typescript
+     * const analyzer = await createShotAnalyzer(config);
+     * const frameProvider = new VideoFileProvider('shot.mp4');
+     *
+     * const result = await analyzer.analyzeVideo(frameProvider);
+     * console.log(`Detected ${result.shots.length} shots`);
+     *
+     * for (const shot of result.shots) {
+     *   console.log(`Shot ${shot.shotIndex}: ${shot.overallConfidence * 100}% confidence`);
+     * }
+     * ```
+     */
+    analyzeVideo(frameProvider: FrameProvider): Promise<AnalysisResult>;
 }
 /**
  * Factory function to create and initialize a ShotAnalyzer in one step.

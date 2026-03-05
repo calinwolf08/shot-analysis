@@ -112,7 +112,8 @@ export function inferBallCenter(pose) {
         z: (leftIndex.position.z + rightIndex.position.z) / 2,
     };
     // Confidence is minimum of the two finger visibilities, with penalty
-    const confidence = Math.min(leftIndex.visibility, rightIndex.visibility) * BALL_CONFIDENCE_PENALTY;
+    const confidence = Math.min(leftIndex.visibility, rightIndex.visibility) *
+        BALL_CONFIDENCE_PENALTY;
     return { position, confidence };
 }
 /**
@@ -331,7 +332,9 @@ export class SetPointHeightCalculator {
             const mapping = getHandednessMapping(context.config.shootingHand);
             const wrist = pose.landmarks[mapping.shootingWrist];
             if (!wrist) {
-                return { error: "Cannot infer ball position - hands separated and wrist missing" };
+                return {
+                    error: "Cannot infer ball position - hands separated and wrist missing",
+                };
             }
             ballY = wrist.position.y;
             confidence = wrist.visibility * BALL_CONFIDENCE_PENALTY;
@@ -375,7 +378,9 @@ export class SetPointDurationCalculator {
             durationMs = endPose.timestamp - startPose.timestamp;
             // For single frame, estimate from surrounding frames
             if (durationMs <= 0 && poseLandmarks.length >= 2) {
-                const fps = 1000 / ((poseLandmarks[1]?.timestamp ?? 33.33) - (poseLandmarks[0]?.timestamp ?? 0));
+                const fps = 1000 /
+                    ((poseLandmarks[1]?.timestamp ?? 33.33) -
+                        (poseLandmarks[0]?.timestamp ?? 0));
                 durationMs = (durationFrames / fps) * 1000;
             }
         }
@@ -388,7 +393,9 @@ export class SetPointDurationCalculator {
         // Calculate confidence
         let confidence = 0.8;
         if (startPose && endPose) {
-            confidence = Math.min(startPose.confidence, endPose.confidence) * BALL_CONFIDENCE_PENALTY;
+            confidence =
+                Math.min(startPose.confidence, endPose.confidence) *
+                    BALL_CONFIDENCE_PENALTY;
         }
         const value = {
             value: Math.round(durationMs),

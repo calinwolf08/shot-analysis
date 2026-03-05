@@ -203,14 +203,16 @@ export class GuideElbowFlareCalculator implements MetricCalculator {
     }
 
     // Get pose at set point frame
-    const setPointPose = getPoseAtFrame(poseLandmarks, setPointPhase.startFrame);
+    const setPointPose = getPoseAtFrame(
+      poseLandmarks,
+      setPointPhase.startFrame,
+    );
     if (!setPointPose) {
       return { error: "Pose data missing for set point frame" };
     }
 
     // Get required landmarks for guide arm
-    const guideShoulder =
-      setPointPose.landmarks[mapping.guideShoulder] ?? null;
+    const guideShoulder = setPointPose.landmarks[mapping.guideShoulder] ?? null;
     const guideElbow = setPointPose.landmarks[mapping.guideElbow] ?? null;
     const shootingShoulder =
       setPointPose.landmarks[mapping.shootingShoulder] ?? null;
@@ -291,15 +293,17 @@ export class GuideHandPositionCalculator implements MetricCalculator {
     }
 
     // Get pose at set point frame
-    const setPointPose = getPoseAtFrame(poseLandmarks, setPointPhase.startFrame);
+    const setPointPose = getPoseAtFrame(
+      poseLandmarks,
+      setPointPhase.startFrame,
+    );
     if (!setPointPose) {
       return { error: "Pose data missing for set point frame" };
     }
 
     // Get required landmarks
     const guideWrist = setPointPose.landmarks[mapping.guideWrist] ?? null;
-    const shootingWrist =
-      setPointPose.landmarks[mapping.shootingWrist] ?? null;
+    const shootingWrist = setPointPose.landmarks[mapping.shootingWrist] ?? null;
 
     // Get guide index finger for thumb-up detection
     const guideIndexIdx =
@@ -450,13 +454,19 @@ export class GuideHandReleaseCalculator implements MetricCalculator {
       // Track if hands were ever in contact
       if (distance < HAND_SEPARATION_THRESHOLD) {
         wasInContact = true;
-        lastValidConfidence = calculateMinConfidence([guideIndex, shootingIndex]);
+        lastValidConfidence = calculateMinConfidence([
+          guideIndex,
+          shootingIndex,
+        ]);
       }
 
       // Detect separation: hands were in contact and now exceed threshold
       if (wasInContact && distance >= HAND_SEPARATION_THRESHOLD) {
         separationFrame = frameIndex;
-        lastValidConfidence = calculateMinConfidence([guideIndex, shootingIndex]);
+        lastValidConfidence = calculateMinConfidence([
+          guideIndex,
+          shootingIndex,
+        ]);
         break;
       }
     }

@@ -317,8 +317,8 @@ describe("formProfileSchema", () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(
-          result.error.issues.some(
-            (issue: ZodIssue) => issue.message.includes("empty"),
+          result.error.issues.some((issue: ZodIssue) =>
+            issue.message.includes("empty"),
           ),
         ).toBe(true);
       }

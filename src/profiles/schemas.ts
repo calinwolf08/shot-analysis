@@ -102,7 +102,9 @@ export type ValidatedFormProfile = z.infer<typeof formProfileSchema>;
 /**
  * Type inferred from the ProfileComparison Zod schema.
  */
-export type ValidatedProfileComparison = z.infer<typeof profileComparisonSchema>;
+export type ValidatedProfileComparison = z.infer<
+  typeof profileComparisonSchema
+>;
 
 /**
  * Result type for safe profile validation.
@@ -135,7 +137,9 @@ export function validateProfile(profile: unknown): ValidatedFormProfile {
  * @param profile - The profile to validate
  * @returns A result object with success status and data/error
  */
-export function safeValidateProfile(profile: unknown): SafeValidateProfileResult {
+export function safeValidateProfile(
+  profile: unknown,
+): SafeValidateProfileResult {
   return formProfileSchema.safeParse(profile);
 }
 

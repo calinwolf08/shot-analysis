@@ -251,8 +251,7 @@ export const highSchoolProfile: FormProfile = {
       feedback: {
         tooLow:
           "Release is starting early in your motion. Build more rhythm before releasing.",
-        tooHigh:
-          "Release is delayed. Quicken your release timing slightly.",
+        tooHigh: "Release is delayed. Quicken your release timing slightly.",
       },
     },
   },

@@ -60,10 +60,7 @@ function calculateMinConfidence(landmarks: readonly PoseLandmark[]): number {
 /**
  * Gets the average Y position of both hips.
  */
-function getAverageHipY(
-  leftHip: PoseLandmark,
-  rightHip: PoseLandmark,
-): number {
+function getAverageHipY(leftHip: PoseLandmark, rightHip: PoseLandmark): number {
   return (leftHip.position.y + rightHip.position.y) / 2;
 }
 
@@ -314,8 +311,7 @@ export class KneeFlexionCalculator implements MetricCalculator {
  */
 export class LegExtensionStartCalculator implements MetricCalculator {
   readonly name = "legExtensionStart";
-  readonly description =
-    "When legs begin extending (% of shot duration)";
+  readonly description = "When legs begin extending (% of shot duration)";
   readonly unit = "percent";
 
   calculate(context: MetricCalculatorContext): MetricCalculatorResult {
