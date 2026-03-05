@@ -13,6 +13,8 @@ export { DEFAULT_FEEDBACK_MESSAGES, createEmptyComparisonSummary, createEmptyPro
 export { metricPrioritySchema, comparisonStatusSchema, numericRangeSchema, metricFeedbackSchema, metricTargetSchema, formProfileSchema, comparisonSummarySchema, metricComparisonResultSchema, profileComparisonSchema, validateProfile, safeValidateProfile, validateComparison, safeValidateComparison, } from "./schemas";
 // Comparison engine exports
 export { ProfileComparisonEngine, } from "./comparison";
+// Registry exports
+export { ProfileRegistry, getProfileRegistry } from "./registry";
 // Built-in profile exports
 export { youthFundamentalsProfile } from "./youth";
 export { highSchoolProfile } from "./high-school";

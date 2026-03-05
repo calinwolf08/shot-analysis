@@ -57,6 +57,9 @@ export {
   type ProfileComparisonEngineOptions,
 } from "./comparison";
 
+// Registry exports
+export { ProfileRegistry, getProfileRegistry } from "./registry";
+
 // Built-in profile exports
 export { youthFundamentalsProfile } from "./youth";
 export { highSchoolProfile } from "./high-school";
