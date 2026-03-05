@@ -10,6 +10,7 @@
     "check": "tsc --noEmit",
     "test:unit": "vitest",
     "test:integration": "vitest --config vitest.integration.config.ts",
+    "test:e2e": "vitest --config vitest.e2e.config.ts",
     "test": "vitest run",
     "lint": "prettier --check .",
     "format": "prettier --write ."
