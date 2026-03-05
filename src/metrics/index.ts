@@ -69,3 +69,12 @@ export {
   FollowThroughHoldCalculator,
   createShootingArmCalculators,
 } from "./shooting-arm";
+
+// Guide Arm Calculators
+export {
+  GuideElbowFlareCalculator,
+  GuideHandPositionCalculator,
+  GuideHandReleaseCalculator,
+  createGuideArmCalculators,
+  type GuideHandPositionCategory,
+} from "./guide-arm";

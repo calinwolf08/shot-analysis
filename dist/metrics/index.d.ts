@@ -35,4 +35,5 @@ export type { MetricValue, ShotAnalysis, VideoMetadata, AnalysisResult, MetricCa
 export { createEmptyMetricValue, createEmptyShotAnalysis, createEmptyVideoMetadata, createEmptyAnalysisResult, isSuccessfulMetricResult, getAverageMetricConfidence, filterMetricsByConfidence, } from "./types";
 export { MetricOrchestrator, type MetricsCalculationResult, } from "./metric-orchestrator";
 export { ShootingElbowFlareCalculator, ShootingElbowAngleCalculator, MaxArmExtensionCalculator, WristSnapAngleCalculator, FollowThroughHoldCalculator, createShootingArmCalculators, } from "./shooting-arm";
+export { GuideElbowFlareCalculator, GuideHandPositionCalculator, GuideHandReleaseCalculator, createGuideArmCalculators, type GuideHandPositionCategory, } from "./guide-arm";
 //# sourceMappingURL=index.d.ts.map

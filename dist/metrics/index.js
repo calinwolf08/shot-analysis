@@ -37,4 +37,6 @@ export { createEmptyMetricValue, createEmptyShotAnalysis, createEmptyVideoMetada
 export { MetricOrchestrator, } from "./metric-orchestrator";
 // Shooting Arm Calculators
 export { ShootingElbowFlareCalculator, ShootingElbowAngleCalculator, MaxArmExtensionCalculator, WristSnapAngleCalculator, FollowThroughHoldCalculator, createShootingArmCalculators, } from "./shooting-arm";
+// Guide Arm Calculators
+export { GuideElbowFlareCalculator, GuideHandPositionCalculator, GuideHandReleaseCalculator, createGuideArmCalculators, } from "./guide-arm";
 //# sourceMappingURL=index.js.map
