@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T22:13:30.532Z"
+		"updated_at": "2026-03-05T22:20:16.161Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -1320,8 +1320,8 @@
 				{
 					"id": "5.5",
 					"name": "Lower Body Metrics",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As the analyzer, I want to measure lower body mechanics so that I can provide feedback on leg power and timing.",
@@ -1372,7 +1372,8 @@
 							"id": "5.5.8",
 							"description": "Run all tests and fix any failures"
 						}
-					]
+					],
+					"commit_hash": "95a4e3d55048cb1cbf01cfa128420ad9ed1cc9a8"
 				},
 				{
 					"id": "5.6",

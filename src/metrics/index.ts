@@ -101,3 +101,13 @@ export {
   LegExtensionStartCalculator,
   createLowerBodyCalculators,
 } from "./lower-body";
+
+// Posture & Alignment Calculators
+export {
+  BackPostureCalculator,
+  HeadTiltCalculator,
+  ShoulderAlignmentCalculator,
+  HandCupVsHingeCalculator,
+  createPostureCalculators,
+  type HandPositionCategory,
+} from "./posture";
