@@ -9,4 +9,5 @@ export { LANDMARK_INDEX, TOTAL_LANDMARKS } from "./types";
 // Helper function exports
 export { getLandmarkByIndex, getLandmarkByName, createEmptyLandmark, createEmptyPoseLandmarks, isLandmarkOccluded, } from "./types";
 export { PoseDetectionError, DetectorClosedError } from "./detector";
+export { MediaPipeNodeDetector, ModelNotFoundError, WasmInitializationError, ModelCreationError, createMediaPipeNodeDetector, DEFAULT_MODEL_PATH, MODEL_PATHS, } from "./mediapipe-node";
 //# sourceMappingURL=index.js.map

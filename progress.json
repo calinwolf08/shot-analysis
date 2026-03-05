@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T20:32:47.894Z"
+		"updated_at": "2026-03-05T20:37:43.120Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -463,8 +463,8 @@
 				{
 					"id": "3.1",
 					"name": "PoseDetector Interface & Landmark Types",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As the analyzer, I want to extract body landmarks from each frame so that I can calculate biomechanical metrics using consistent types.",
@@ -511,7 +511,8 @@
 							"id": "3.1.7",
 							"description": "Run npm run check to verify types compile"
 						}
-					]
+					],
+					"commit_hash": "2dde5aee18730f9539e706719afb05dee0289557"
 				},
 				{
 					"id": "3.2",

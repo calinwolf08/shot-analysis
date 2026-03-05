@@ -29,3 +29,15 @@ export {
 // PoseDetector interface and errors
 export type { PoseDetector } from "./detector";
 export { PoseDetectionError, DetectorClosedError } from "./detector";
+
+// MediaPipe Node.js implementation
+export type { MediaPipeNodeConfig } from "./mediapipe-node";
+export {
+  MediaPipeNodeDetector,
+  ModelNotFoundError,
+  WasmInitializationError,
+  ModelCreationError,
+  createMediaPipeNodeDetector,
+  DEFAULT_MODEL_PATH,
+  MODEL_PATHS,
+} from "./mediapipe-node";
