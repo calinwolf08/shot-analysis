@@ -9,7 +9,7 @@
  * - Does not account for perspective foreshortening in z-axis depth values
  */
 
-import type { Point3D } from '../types';
+import type { Point3D } from "../types";
 
 /**
  * Normalizes a distance measurement using shoulder width as a body-scale reference.
@@ -27,12 +27,15 @@ import type { Point3D } from '../types';
  * const normalizedReach = normalizeToBodyScale(armReach, shoulderWidth);
  * ```
  */
-export function normalizeToBodyScale(distance: number, shoulderWidth: number): number {
-	if (shoulderWidth <= 0) {
-		throw new Error('Shoulder width must be greater than zero');
-	}
+export function normalizeToBodyScale(
+  distance: number,
+  shoulderWidth: number,
+): number {
+  if (shoulderWidth <= 0) {
+    throw new Error("Shoulder width must be greater than zero");
+  }
 
-	return distance / shoulderWidth;
+  return distance / shoulderWidth;
 }
 
 /**
@@ -50,10 +53,13 @@ export function normalizeToBodyScale(distance: number, shoulderWidth: number): n
  * // Positive y means wrist is above head, negative means below
  * ```
  */
-export function calculateRelativePosition(point: Point3D, reference: Point3D): Point3D {
-	return {
-		x: point.x - reference.x,
-		y: point.y - reference.y,
-		z: point.z - reference.z
-	};
+export function calculateRelativePosition(
+  point: Point3D,
+  reference: Point3D,
+): Point3D {
+  return {
+    x: point.x - reference.x,
+    y: point.y - reference.y,
+    z: point.z - reference.z,
+  };
 }

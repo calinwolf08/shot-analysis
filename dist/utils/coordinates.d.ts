@@ -8,7 +8,7 @@
  * - No validation that shoulder width value is physiologically reasonable
  * - Does not account for perspective foreshortening in z-axis depth values
  */
-import type { Point3D } from '../types';
+import type { Point3D } from "../types";
 /**
  * Normalizes a distance measurement using shoulder width as a body-scale reference.
  * This allows comparisons across different body sizes and camera distances.

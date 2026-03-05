@@ -9,7 +9,7 @@
  * - All calculations assume Euclidean space; does not account for camera
  *   perspective distortion in 2D projections
  */
-import type { Point3D, Point2D } from '../types';
+import type { Point3D, Point2D } from "../types";
 /**
  * Calculates the angle in degrees formed by three points (a-vertex-c).
  * The angle is measured at the vertex point.

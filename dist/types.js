@@ -39,7 +39,7 @@ export const LANDMARK_INDICES = {
     LEFT_HEEL: 29,
     RIGHT_HEEL: 30,
     LEFT_FOOT_INDEX: 31,
-    RIGHT_FOOT_INDEX: 32
+    RIGHT_FOOT_INDEX: 32,
 };
 /**
  * Number of landmarks in MediaPipe pose detection.

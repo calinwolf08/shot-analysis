@@ -29,7 +29,7 @@ const DEFAULT_WINDOW_SIZE = 3;
  */
 export function movingAverage(values, windowSize) {
     if (windowSize < 1) {
-        throw new Error('Window size must be at least 1');
+        throw new Error("Window size must be at least 1");
     }
     if (values.length === 0) {
         return [];
@@ -66,7 +66,7 @@ export function movingAverage(values, windowSize) {
  */
 export function movingAveragePoint3D(points, windowSize) {
     if (windowSize < 1) {
-        throw new Error('Window size must be at least 1');
+        throw new Error("Window size must be at least 1");
     }
     if (points.length === 0) {
         return [];
@@ -85,7 +85,7 @@ export function movingAveragePoint3D(points, windowSize) {
         result.push({
             x: smoothedX[i],
             y: smoothedY[i],
-            z: smoothedZ[i]
+            z: smoothedZ[i],
         });
     }
     return result;

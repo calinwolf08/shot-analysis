@@ -21,13 +21,10 @@ export type {
   MetricValue,
   ComparisonStatus,
   MetricPriority,
-  LandmarkIndex
-} from './types';
+  LandmarkIndex,
+} from "./types";
 
-export {
-  LANDMARK_INDICES,
-  TOTAL_LANDMARKS
-} from './types';
+export { LANDMARK_INDICES, TOTAL_LANDMARKS } from "./types";
 
 // Configuration exports
 export type {
@@ -36,8 +33,8 @@ export type {
   AnalysisConfig,
   ValidatedAnalysisConfig,
   SafeValidateResult,
-  HandednessMapping
-} from './config';
+  HandednessMapping,
+} from "./config";
 
 export {
   validateConfig,
@@ -52,8 +49,8 @@ export {
   formProfileSchema,
   metricTargetSchema,
   metricPrioritySchema,
-  numericRangeSchema
-} from './config';
+  numericRangeSchema,
+} from "./config";
 
 // Utility exports
 export {
@@ -67,5 +64,5 @@ export {
   // Smoothing utilities
   movingAverage,
   movingAveragePoint3D,
-  smoothLandmarkSequence
-} from './utils';
+  smoothLandmarkSequence,
+} from "./utils";

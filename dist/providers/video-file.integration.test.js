@@ -4,14 +4,14 @@
  * These tests require ffmpeg to be installed and will create/use test video files.
  * Tests are skipped if ffmpeg is not available.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createVideoFileProvider, VideoFileProvider } from './video-file';
-import { spawn } from 'child_process';
-import { mkdir, rm } from 'fs/promises';
-import { join } from 'path';
-const TEST_FIXTURES_DIR = join(process.cwd(), 'test-fixtures');
-const TEST_VIDEO_PATH = join(TEST_FIXTURES_DIR, 'test-video.mp4');
-const TEST_VIDEO_SHORT_PATH = join(TEST_FIXTURES_DIR, 'test-video-short.mp4');
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { createVideoFileProvider, VideoFileProvider } from "./video-file";
+import { spawn } from "child_process";
+import { mkdir, rm } from "fs/promises";
+import { join } from "path";
+const TEST_FIXTURES_DIR = join(process.cwd(), "test-fixtures");
+const TEST_VIDEO_PATH = join(TEST_FIXTURES_DIR, "test-video.mp4");
+const TEST_VIDEO_SHORT_PATH = join(TEST_FIXTURES_DIR, "test-video-short.mp4");
 let ffmpegAvailable = false;
 let testVideoCreated = false;
 /**
@@ -19,9 +19,9 @@ let testVideoCreated = false;
  */
 async function checkFfmpeg() {
     return new Promise((resolve) => {
-        const proc = spawn('ffmpeg', ['-version']);
-        proc.on('error', () => resolve(false));
-        proc.on('close', (code) => resolve(code === 0));
+        const proc = spawn("ffmpeg", ["-version"]);
+        proc.on("error", () => resolve(false));
+        proc.on("close", (code) => resolve(code === 0));
     });
 }
 /**
@@ -36,20 +36,20 @@ async function checkFfmpeg() {
 async function createTestVideo(outputPath, durationSeconds, width, height, fps) {
     return new Promise((resolve, reject) => {
         const args = [
-            '-y', // Overwrite output file
-            '-f',
-            'lavfi',
-            '-i',
+            "-y", // Overwrite output file
+            "-f",
+            "lavfi",
+            "-i",
             `testsrc=duration=${durationSeconds}:size=${width}x${height}:rate=${fps}`,
-            '-c:v',
-            'libx264',
-            '-pix_fmt',
-            'yuv420p',
-            outputPath
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            outputPath,
         ];
-        const proc = spawn('ffmpeg', args, { stdio: 'pipe' });
-        proc.on('error', (err) => reject(err));
-        proc.on('close', (code) => {
+        const proc = spawn("ffmpeg", args, { stdio: "pipe" });
+        proc.on("error", (err) => reject(err));
+        proc.on("close", (code) => {
             if (code === 0) {
                 resolve();
             }
@@ -59,12 +59,12 @@ async function createTestVideo(outputPath, durationSeconds, width, height, fps) 
         });
     });
 }
-describe('VideoFileProvider integration tests', () => {
+describe("VideoFileProvider integration tests", () => {
     beforeAll(async () => {
         // Check if ffmpeg is available
         ffmpegAvailable = await checkFfmpeg();
         if (!ffmpegAvailable) {
-            console.log('ffmpeg not available, skipping integration tests');
+            console.log("ffmpeg not available, skipping integration tests");
             return;
         }
         // Create test fixtures directory if it doesn't exist
@@ -98,8 +98,8 @@ describe('VideoFileProvider integration tests', () => {
             }
         }
     });
-    describe('with real video file', () => {
-        it.skipIf(!ffmpegAvailable || !testVideoCreated)('loads video file and extracts correct metadata', async () => {
+    describe("with real video file", () => {
+        it.skipIf(!ffmpegAvailable || !testVideoCreated)("loads video file and extracts correct metadata", async () => {
             const provider = await createVideoFileProvider(TEST_VIDEO_PATH);
             const metadata = provider.getMetadata();
             expect(metadata.width).toBe(100);
@@ -108,12 +108,12 @@ describe('VideoFileProvider integration tests', () => {
             expect(metadata.duration).toBeGreaterThan(900);
             expect(metadata.duration).toBeLessThan(1100);
         });
-        it.skipIf(!ffmpegAvailable || !testVideoCreated)('returns correct fps', async () => {
+        it.skipIf(!ffmpegAvailable || !testVideoCreated)("returns correct fps", async () => {
             const provider = await createVideoFileProvider(TEST_VIDEO_PATH);
             const fps = provider.getFps();
             expect(fps).toBeCloseTo(30, 0);
         });
-        it.skipIf(!ffmpegAvailable || !testVideoCreated)('extracts frames with correct dimensions', async () => {
+        it.skipIf(!ffmpegAvailable || !testVideoCreated)("extracts frames with correct dimensions", async () => {
             const provider = await createVideoFileProvider(TEST_VIDEO_PATH);
             const frame = await provider.getNextFrame();
             expect(frame).not.toBeNull();
@@ -121,7 +121,7 @@ describe('VideoFileProvider integration tests', () => {
             expect(frame.height).toBe(100);
             expect(frame.data.length).toBe(100 * 100 * 4); // RGBA
         });
-        it.skipIf(!ffmpegAvailable || !testVideoCreated)('extracts frames with incrementing frame index', async () => {
+        it.skipIf(!ffmpegAvailable || !testVideoCreated)("extracts frames with incrementing frame index", async () => {
             const provider = await createVideoFileProvider(TEST_VIDEO_PATH);
             const frame0 = await provider.getNextFrame();
             const frame1 = await provider.getNextFrame();
@@ -130,7 +130,7 @@ describe('VideoFileProvider integration tests', () => {
             expect(frame1.frameIndex).toBe(1);
             expect(frame2.frameIndex).toBe(2);
         });
-        it.skipIf(!ffmpegAvailable || !testVideoCreated)('extracts frames with increasing timestamps', async () => {
+        it.skipIf(!ffmpegAvailable || !testVideoCreated)("extracts frames with increasing timestamps", async () => {
             const provider = await createVideoFileProvider(TEST_VIDEO_PATH);
             const frame0 = await provider.getNextFrame();
             const frame1 = await provider.getNextFrame();
@@ -141,7 +141,7 @@ describe('VideoFileProvider integration tests', () => {
             // At 30fps, frames should be ~33ms apart
             expect(frame1.timestamp - frame0.timestamp).toBeCloseTo(1000 / 30, 1);
         });
-        it.skipIf(!ffmpegAvailable || !testVideoCreated)('returns null after all frames consumed', async () => {
+        it.skipIf(!ffmpegAvailable || !testVideoCreated)("returns null after all frames consumed", async () => {
             const provider = await createVideoFileProvider(TEST_VIDEO_SHORT_PATH);
             // Read all frames
             const frames = [];
@@ -156,7 +156,7 @@ describe('VideoFileProvider integration tests', () => {
             expect(await provider.getNextFrame()).toBeNull();
             expect(await provider.getNextFrame()).toBeNull();
         });
-        it.skipIf(!ffmpegAvailable || !testVideoCreated)('can iterate through all frames in a video', async () => {
+        it.skipIf(!ffmpegAvailable || !testVideoCreated)("can iterate through all frames in a video", async () => {
             const provider = await createVideoFileProvider(TEST_VIDEO_PATH);
             const fps = provider.getFps();
             const metadata = provider.getMetadata();
@@ -176,30 +176,30 @@ describe('VideoFileProvider integration tests', () => {
             });
         });
     });
-    describe('error handling', () => {
-        it('throws VideoFileNotFoundError for nonexistent file', async () => {
-            const { VideoFileNotFoundError } = await import('./video-file');
-            await expect(createVideoFileProvider('/nonexistent/video.mp4')).rejects.toThrow(VideoFileNotFoundError);
+    describe("error handling", () => {
+        it("throws VideoFileNotFoundError for nonexistent file", async () => {
+            const { VideoFileNotFoundError } = await import("./video-file");
+            await expect(createVideoFileProvider("/nonexistent/video.mp4")).rejects.toThrow(VideoFileNotFoundError);
         });
-        it('throws UnsupportedVideoFormatError for unsupported format', async () => {
-            const { UnsupportedVideoFormatError } = await import('./video-file');
-            await expect(createVideoFileProvider('/some/video.avi')).rejects.toThrow(UnsupportedVideoFormatError);
+        it("throws UnsupportedVideoFormatError for unsupported format", async () => {
+            const { UnsupportedVideoFormatError } = await import("./video-file");
+            await expect(createVideoFileProvider("/some/video.avi")).rejects.toThrow(UnsupportedVideoFormatError);
         });
     });
-    describe('supported formats', () => {
-        it('accepts .mp4 extension', () => {
-            expect(VideoFileProvider.isSupportedFormat('video.mp4')).toBe(true);
+    describe("supported formats", () => {
+        it("accepts .mp4 extension", () => {
+            expect(VideoFileProvider.isSupportedFormat("video.mp4")).toBe(true);
         });
-        it('accepts .mov extension', () => {
-            expect(VideoFileProvider.isSupportedFormat('video.mov')).toBe(true);
+        it("accepts .mov extension", () => {
+            expect(VideoFileProvider.isSupportedFormat("video.mov")).toBe(true);
         });
-        it('accepts .webm extension', () => {
-            expect(VideoFileProvider.isSupportedFormat('video.webm')).toBe(true);
+        it("accepts .webm extension", () => {
+            expect(VideoFileProvider.isSupportedFormat("video.webm")).toBe(true);
         });
-        it('rejects unsupported extensions', () => {
-            expect(VideoFileProvider.isSupportedFormat('video.avi')).toBe(false);
-            expect(VideoFileProvider.isSupportedFormat('video.wmv')).toBe(false);
-            expect(VideoFileProvider.isSupportedFormat('video')).toBe(false);
+        it("rejects unsupported extensions", () => {
+            expect(VideoFileProvider.isSupportedFormat("video.avi")).toBe(false);
+            expect(VideoFileProvider.isSupportedFormat("video.wmv")).toBe(false);
+            expect(VideoFileProvider.isSupportedFormat("video")).toBe(false);
         });
     });
 });

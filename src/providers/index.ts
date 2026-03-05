@@ -5,8 +5,8 @@
  * for abstracting video frame sources.
  */
 
-export type { VideoFrame, FrameMetadata, FrameProvider } from './types';
-export { InvalidFpsError } from './types';
+export type { VideoFrame, FrameMetadata, FrameProvider } from "./types";
+export { InvalidFpsError } from "./types";
 
 // Video file provider exports
 export {
@@ -14,5 +14,15 @@ export {
   createVideoFileProvider,
   VideoFileNotFoundError,
   VideoFileCorruptedError,
-  UnsupportedVideoFormatError
-} from './video-file';
+  UnsupportedVideoFormatError,
+} from "./video-file";
+
+// Media stream provider exports (browser-only)
+export {
+  MediaStreamProvider,
+  createMediaStreamProvider,
+  MediaStreamEndedError,
+  MediaStreamInactiveError,
+  NoVideoTrackError,
+} from "./media-stream";
+export type { MediaStreamProviderOptions } from "./media-stream";

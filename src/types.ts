@@ -38,12 +38,12 @@ export interface FrameMetadata {
 /**
  * Handedness configuration for the shooter.
  */
-export type ShootingHand = 'left' | 'right';
+export type ShootingHand = "left" | "right";
 
 /**
  * Unit for timing outputs.
  */
-export type TimingUnit = 'frames' | 'ms' | 'percent';
+export type TimingUnit = "frames" | "ms" | "percent";
 
 /**
  * Range specification with optional min/max bounds.
@@ -119,7 +119,7 @@ export const LANDMARK_INDICES = {
   LEFT_HEEL: 29,
   RIGHT_HEEL: 30,
   LEFT_FOOT_INDEX: 31,
-  RIGHT_FOOT_INDEX: 32
+  RIGHT_FOOT_INDEX: 32,
 } as const;
 
 /**
@@ -130,7 +130,8 @@ export const TOTAL_LANDMARKS = 33;
 /**
  * Landmark index type for type-safe landmark access.
  */
-export type LandmarkIndex = (typeof LANDMARK_INDICES)[keyof typeof LANDMARK_INDICES];
+export type LandmarkIndex =
+  (typeof LANDMARK_INDICES)[keyof typeof LANDMARK_INDICES];
 
 /**
  * Full pose landmarks for a single frame.
@@ -150,12 +151,12 @@ export interface PoseLandmarks {
  * Shot phase enumeration.
  */
 export type ShotPhase =
-  | 'gather'
-  | 'load'
-  | 'rise'
-  | 'setPoint'
-  | 'release'
-  | 'followThrough';
+  | "gather"
+  | "load"
+  | "rise"
+  | "setPoint"
+  | "release"
+  | "followThrough";
 
 /**
  * Frame range for a phase or shot.
@@ -182,9 +183,9 @@ export interface MetricValue {
 /**
  * Comparison status for a metric against a profile target.
  */
-export type ComparisonStatus = 'pass' | 'fail' | 'warning';
+export type ComparisonStatus = "pass" | "fail" | "warning";
 
 /**
  * Priority level for metrics in a profile.
  */
-export type MetricPriority = 'high' | 'medium' | 'low';
+export type MetricPriority = "high" | "medium" | "low";

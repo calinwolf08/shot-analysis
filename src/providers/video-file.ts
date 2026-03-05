@@ -7,12 +7,12 @@
  * Supports common video formats: mp4, mov, webm
  */
 
-import type { FrameProvider, VideoFrame, FrameMetadata } from './types';
+import type { FrameProvider, VideoFrame, FrameMetadata } from "./types";
 
 /**
  * Supported video file extensions (case-insensitive).
  */
-const SUPPORTED_EXTENSIONS = ['.mp4', '.mov', '.webm'] as const;
+const SUPPORTED_EXTENSIONS = [".mp4", ".mov", ".webm"] as const;
 
 /**
  * Error thrown when a video file is not found at the specified path.
@@ -22,7 +22,7 @@ export class VideoFileNotFoundError extends Error {
 
   constructor(filePath: string) {
     super(`Video file not found: ${filePath}`);
-    this.name = 'VideoFileNotFoundError';
+    this.name = "VideoFileNotFoundError";
     this.filePath = filePath;
   }
 }
@@ -36,7 +36,7 @@ export class VideoFileCorruptedError extends Error {
 
   constructor(filePath: string, details: string) {
     super(`Video file corrupted: ${filePath}. Details: ${details}`);
-    this.name = 'VideoFileCorruptedError';
+    this.name = "VideoFileCorruptedError";
     this.filePath = filePath;
     this.details = details;
   }
@@ -52,9 +52,9 @@ export class UnsupportedVideoFormatError extends Error {
   constructor(filePath: string, format: string) {
     super(
       `Unsupported video format: ${format} for file ${filePath}. ` +
-        `Supported formats: mp4, mov, webm`
+        `Supported formats: mp4, mov, webm`,
     );
-    this.name = 'UnsupportedVideoFormatError';
+    this.name = "UnsupportedVideoFormatError";
     this.filePath = filePath;
     this.format = format;
   }
@@ -104,7 +104,11 @@ export class VideoFileProvider implements FrameProvider {
   /**
    * Private constructor. Use createVideoFileProvider() factory or createWithMockData() for tests.
    */
-  private constructor(metadata: FrameMetadata, fps: number, frames: MockFrameData[]) {
+  private constructor(
+    metadata: FrameMetadata,
+    fps: number,
+    frames: MockFrameData[],
+  ) {
     this.metadata = metadata;
     this.fps = fps;
     this.frames = frames;
@@ -117,8 +121,12 @@ export class VideoFileProvider implements FrameProvider {
    * @returns true if the file extension is supported, false otherwise
    */
   static isSupportedFormat(filePath: string): boolean {
-    const extension = filePath.substring(filePath.lastIndexOf('.')).toLowerCase();
-    return SUPPORTED_EXTENSIONS.includes(extension as (typeof SUPPORTED_EXTENSIONS)[number]);
+    const extension = filePath
+      .substring(filePath.lastIndexOf("."))
+      .toLowerCase();
+    return SUPPORTED_EXTENSIONS.includes(
+      extension as (typeof SUPPORTED_EXTENSIONS)[number],
+    );
   }
 
   /**
@@ -144,12 +152,14 @@ export class VideoFileProvider implements FrameProvider {
   static async create(filePath: string): Promise<VideoFileProvider> {
     // Check if format is supported
     if (!VideoFileProvider.isSupportedFormat(filePath)) {
-      const extension = filePath.substring(filePath.lastIndexOf('.') + 1).toLowerCase();
+      const extension = filePath
+        .substring(filePath.lastIndexOf(".") + 1)
+        .toLowerCase();
       throw new UnsupportedVideoFormatError(filePath, extension);
     }
 
     // Check if file exists using fs
-    const fs = await import('fs/promises');
+    const fs = await import("fs/promises");
     try {
       await fs.access(filePath);
     } catch {
@@ -157,7 +167,8 @@ export class VideoFileProvider implements FrameProvider {
     }
 
     // Extract metadata and frames using ffmpeg
-    const { metadata, fps, frames } = await VideoFileProvider.extractVideoData(filePath);
+    const { metadata, fps, frames } =
+      await VideoFileProvider.extractVideoData(filePath);
 
     return new VideoFileProvider(metadata, fps, frames);
   }
@@ -169,19 +180,29 @@ export class VideoFileProvider implements FrameProvider {
    * @returns Promise with metadata, fps, and frames
    */
   private static async extractVideoData(
-    filePath: string
-  ): Promise<{ metadata: FrameMetadata; fps: number; frames: MockFrameData[] }> {
+    filePath: string,
+  ): Promise<{
+    metadata: FrameMetadata;
+    fps: number;
+    frames: MockFrameData[];
+  }> {
     // Use fluent-ffmpeg to probe video and extract frames
     const ffprobePromise = VideoFileProvider.probeVideo(filePath);
     const { width, height, duration, fps } = await ffprobePromise;
 
     // Extract all frames
-    const frames = await VideoFileProvider.extractFrames(filePath, width, height, fps, duration);
+    const frames = await VideoFileProvider.extractFrames(
+      filePath,
+      width,
+      height,
+      fps,
+      duration,
+    );
 
     const metadata: FrameMetadata = {
       width,
       height,
-      duration
+      duration,
     };
 
     return { metadata, fps, frames };
@@ -191,39 +212,41 @@ export class VideoFileProvider implements FrameProvider {
    * Probes video file to get metadata.
    */
   private static async probeVideo(
-    filePath: string
+    filePath: string,
   ): Promise<{ width: number; height: number; duration: number; fps: number }> {
-    const { spawn } = await import('child_process');
+    const { spawn } = await import("child_process");
 
     return new Promise((resolve, reject) => {
-      const ffprobe = spawn('ffprobe', [
-        '-v',
-        'error',
-        '-select_streams',
-        'v:0',
-        '-show_entries',
-        'stream=width,height,r_frame_rate,duration',
-        '-show_entries',
-        'format=duration',
-        '-of',
-        'json',
-        filePath
+      const ffprobe = spawn("ffprobe", [
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=width,height,r_frame_rate,duration",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "json",
+        filePath,
       ]);
 
-      let stdout = '';
-      let stderr = '';
+      let stdout = "";
+      let stderr = "";
 
-      ffprobe.stdout.on('data', (data) => {
+      ffprobe.stdout.on("data", (data) => {
         stdout += data.toString();
       });
 
-      ffprobe.stderr.on('data', (data) => {
+      ffprobe.stderr.on("data", (data) => {
         stderr += data.toString();
       });
 
-      ffprobe.on('close', (code) => {
+      ffprobe.on("close", (code) => {
         if (code !== 0) {
-          reject(new VideoFileCorruptedError(filePath, stderr || 'ffprobe failed'));
+          reject(
+            new VideoFileCorruptedError(filePath, stderr || "ffprobe failed"),
+          );
           return;
         }
 
@@ -232,7 +255,9 @@ export class VideoFileProvider implements FrameProvider {
           const stream = result.streams?.[0];
 
           if (!stream) {
-            reject(new VideoFileCorruptedError(filePath, 'No video stream found'));
+            reject(
+              new VideoFileCorruptedError(filePath, "No video stream found"),
+            );
             return;
           }
 
@@ -240,21 +265,33 @@ export class VideoFileProvider implements FrameProvider {
           const height = stream.height;
 
           // Parse frame rate (can be "30/1" or "30000/1001")
-          const [num, den] = stream.r_frame_rate.split('/').map(Number);
+          const [num, den] = stream.r_frame_rate.split("/").map(Number);
           const fps = num / den;
 
           // Get duration in milliseconds
-          const durationSeconds = parseFloat(stream.duration || result.format?.duration || '0');
+          const durationSeconds = parseFloat(
+            stream.duration || result.format?.duration || "0",
+          );
           const duration = Math.round(durationSeconds * 1000);
 
           resolve({ width, height, duration, fps });
         } catch (e) {
-          reject(new VideoFileCorruptedError(filePath, `Failed to parse metadata: ${e}`));
+          reject(
+            new VideoFileCorruptedError(
+              filePath,
+              `Failed to parse metadata: ${e}`,
+            ),
+          );
         }
       });
 
-      ffprobe.on('error', (err) => {
-        reject(new VideoFileCorruptedError(filePath, `ffprobe error: ${err.message}`));
+      ffprobe.on("error", (err) => {
+        reject(
+          new VideoFileCorruptedError(
+            filePath,
+            `ffprobe error: ${err.message}`,
+          ),
+        );
       });
     });
   }
@@ -267,9 +304,9 @@ export class VideoFileProvider implements FrameProvider {
     width: number,
     height: number,
     fps: number,
-    duration: number
+    duration: number,
   ): Promise<MockFrameData[]> {
-    const { spawn } = await import('child_process');
+    const { spawn } = await import("child_process");
     const frames: MockFrameData[] = [];
     const totalFrames = Math.floor((duration / 1000) * fps);
 
@@ -280,23 +317,23 @@ export class VideoFileProvider implements FrameProvider {
 
     return new Promise((resolve, reject) => {
       // Use ffmpeg to extract raw RGBA frames
-      const ffmpeg = spawn('ffmpeg', [
-        '-i',
+      const ffmpeg = spawn("ffmpeg", [
+        "-i",
         filePath,
-        '-f',
-        'rawvideo',
-        '-pix_fmt',
-        'rgba',
-        '-vsync',
-        '0',
-        '-'
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgba",
+        "-vsync",
+        "0",
+        "-",
       ]);
 
       const frameSize = width * height * 4;
       let buffer = Buffer.alloc(0);
       let frameIndex = 0;
 
-      ffmpeg.stdout.on('data', (data: Buffer) => {
+      ffmpeg.stdout.on("data", (data: Buffer) => {
         buffer = Buffer.concat([buffer, data]);
 
         // Process complete frames
@@ -312,28 +349,34 @@ export class VideoFileProvider implements FrameProvider {
         }
       });
 
-      ffmpeg.stderr.on('data', (data) => {
+      ffmpeg.stderr.on("data", (data) => {
         // ffmpeg writes progress to stderr, we can ignore it
         const message = data.toString();
         // Log corruption warnings but don't fail
         if (
-          message.includes('error') &&
-          !message.includes('Error while decoding') // Skip individual frame decode errors
+          message.includes("error") &&
+          !message.includes("Error while decoding") // Skip individual frame decode errors
         ) {
-          console.warn(`VideoFileProvider: Warning during frame extraction: ${message}`);
+          console.warn(
+            `VideoFileProvider: Warning during frame extraction: ${message}`,
+          );
         }
       });
 
-      ffmpeg.on('close', (code) => {
+      ffmpeg.on("close", (code) => {
         if (code !== 0 && frames.length === 0) {
-          reject(new VideoFileCorruptedError(filePath, 'Failed to extract frames'));
+          reject(
+            new VideoFileCorruptedError(filePath, "Failed to extract frames"),
+          );
           return;
         }
         resolve(frames);
       });
 
-      ffmpeg.on('error', (err) => {
-        reject(new VideoFileCorruptedError(filePath, `ffmpeg error: ${err.message}`));
+      ffmpeg.on("error", (err) => {
+        reject(
+          new VideoFileCorruptedError(filePath, `ffmpeg error: ${err.message}`),
+        );
       });
     });
   }
@@ -354,7 +397,7 @@ export class VideoFileProvider implements FrameProvider {
       width: this.metadata.width,
       height: this.metadata.height,
       timestamp: frameData.timestamp,
-      frameIndex: this.currentFrameIndex
+      frameIndex: this.currentFrameIndex,
     };
 
     this.currentFrameIndex++;
@@ -401,6 +444,8 @@ export class VideoFileProvider implements FrameProvider {
  * }
  * ```
  */
-export async function createVideoFileProvider(filePath: string): Promise<FrameProvider> {
+export async function createVideoFileProvider(
+  filePath: string,
+): Promise<FrameProvider> {
   return VideoFileProvider.create(filePath);
 }

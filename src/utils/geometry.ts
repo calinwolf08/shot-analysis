@@ -10,7 +10,7 @@
  *   perspective distortion in 2D projections
  */
 
-import type { Point3D, Point2D } from '../types';
+import type { Point3D, Point2D } from "../types";
 
 /**
  * Calculates the angle in degrees formed by three points (a-vertex-c).
@@ -29,41 +29,48 @@ import type { Point3D, Point2D } from '../types';
  * const angle = calculateAngle(shoulder, elbow, wrist);
  * ```
  */
-export function calculateAngle(a: Point3D, vertex: Point3D, c: Point3D): number {
-	// Calculate vectors from vertex to a and c
-	const va = {
-		x: a.x - vertex.x,
-		y: a.y - vertex.y,
-		z: a.z - vertex.z
-	};
+export function calculateAngle(
+  a: Point3D,
+  vertex: Point3D,
+  c: Point3D,
+): number {
+  // Calculate vectors from vertex to a and c
+  const va = {
+    x: a.x - vertex.x,
+    y: a.y - vertex.y,
+    z: a.z - vertex.z,
+  };
 
-	const vc = {
-		x: c.x - vertex.x,
-		y: c.y - vertex.y,
-		z: c.z - vertex.z
-	};
+  const vc = {
+    x: c.x - vertex.x,
+    y: c.y - vertex.y,
+    z: c.z - vertex.z,
+  };
 
-	// Calculate magnitudes
-	const magnitudeVa = Math.sqrt(va.x * va.x + va.y * va.y + va.z * va.z);
-	const magnitudeVc = Math.sqrt(vc.x * vc.x + vc.y * vc.y + vc.z * vc.z);
+  // Calculate magnitudes
+  const magnitudeVa = Math.sqrt(va.x * va.x + va.y * va.y + va.z * va.z);
+  const magnitudeVc = Math.sqrt(vc.x * vc.x + vc.y * vc.y + vc.z * vc.z);
 
-	// If either vector has zero magnitude, the angle is undefined (return 0)
-	if (magnitudeVa === 0 || magnitudeVc === 0) {
-		return 0;
-	}
+  // If either vector has zero magnitude, the angle is undefined (return 0)
+  if (magnitudeVa === 0 || magnitudeVc === 0) {
+    return 0;
+  }
 
-	// Calculate dot product
-	const dotProduct = va.x * vc.x + va.y * vc.y + va.z * vc.z;
+  // Calculate dot product
+  const dotProduct = va.x * vc.x + va.y * vc.y + va.z * vc.z;
 
-	// Calculate cosine of the angle
-	// Clamp to [-1, 1] to handle floating point errors
-	const cosAngle = Math.max(-1, Math.min(1, dotProduct / (magnitudeVa * magnitudeVc)));
+  // Calculate cosine of the angle
+  // Clamp to [-1, 1] to handle floating point errors
+  const cosAngle = Math.max(
+    -1,
+    Math.min(1, dotProduct / (magnitudeVa * magnitudeVc)),
+  );
 
-	// Convert to degrees
-	const angleRadians = Math.acos(cosAngle);
-	const angleDegrees = angleRadians * (180 / Math.PI);
+  // Convert to degrees
+  const angleRadians = Math.acos(cosAngle);
+  const angleDegrees = angleRadians * (180 / Math.PI);
 
-	return angleDegrees;
+  return angleDegrees;
 }
 
 /**
@@ -80,11 +87,11 @@ export function calculateAngle(a: Point3D, vertex: Point3D, c: Point3D): number 
  * ```
  */
 export function calculateDistance(a: Point3D, b: Point3D): number {
-	const dx = b.x - a.x;
-	const dy = b.y - a.y;
-	const dz = b.z - a.z;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const dz = b.z - a.z;
 
-	return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 /**
@@ -102,8 +109,8 @@ export function calculateDistance(a: Point3D, b: Point3D): number {
  * ```
  */
 export function calculateDistance2D(a: Point2D, b: Point2D): number {
-	const dx = b.x - a.x;
-	const dy = b.y - a.y;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
 
-	return Math.sqrt(dx * dx + dy * dy);
+  return Math.sqrt(dx * dx + dy * dy);
 }

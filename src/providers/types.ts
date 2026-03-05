@@ -44,8 +44,10 @@ export interface FrameMetadata {
  */
 export class InvalidFpsError extends Error {
   constructor(fps: number) {
-    super(`Invalid fps value: ${fps}. FPS must be a positive number greater than zero.`);
-    this.name = 'InvalidFpsError';
+    super(
+      `Invalid fps value: ${fps}. FPS must be a positive number greater than zero.`,
+    );
+    this.name = "InvalidFpsError";
   }
 }
 

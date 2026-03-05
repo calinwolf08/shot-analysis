@@ -35,11 +35,11 @@ export interface FrameMetadata {
 /**
  * Handedness configuration for the shooter.
  */
-export type ShootingHand = 'left' | 'right';
+export type ShootingHand = "left" | "right";
 /**
  * Unit for timing outputs.
  */
-export type TimingUnit = 'frames' | 'ms' | 'percent';
+export type TimingUnit = "frames" | "ms" | "percent";
 /**
  * Range specification with optional min/max bounds.
  */
@@ -136,7 +136,7 @@ export interface PoseLandmarks {
 /**
  * Shot phase enumeration.
  */
-export type ShotPhase = 'gather' | 'load' | 'rise' | 'setPoint' | 'release' | 'followThrough';
+export type ShotPhase = "gather" | "load" | "rise" | "setPoint" | "release" | "followThrough";
 /**
  * Frame range for a phase or shot.
  */
@@ -160,9 +160,9 @@ export interface MetricValue {
 /**
  * Comparison status for a metric against a profile target.
  */
-export type ComparisonStatus = 'pass' | 'fail' | 'warning';
+export type ComparisonStatus = "pass" | "fail" | "warning";
 /**
  * Priority level for metrics in a profile.
  */
-export type MetricPriority = 'high' | 'medium' | 'low';
+export type MetricPriority = "high" | "medium" | "low";
 //# sourceMappingURL=types.d.ts.map

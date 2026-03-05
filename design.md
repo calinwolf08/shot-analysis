@@ -17,13 +17,16 @@ Young basketball players need objective feedback on their shooting form to impro
 ## Features
 
 ### Feature 1: Video Frame Processing
+
 **Priority**: High
 **Dependencies**: None
 
 #### User Story
+
 As a developer, I want to provide video frames to the analyzer so that I can process both recorded clips and live camera feeds.
 
 #### Interface Design
+
 ```typescript
 interface FrameProvider {
   getNextFrame(): Promise<VideoFrame | null>;
@@ -33,35 +36,42 @@ interface FrameProvider {
 ```
 
 #### Acceptance Criteria
+
 - [ ] Abstract interface works with both video files and live streams
 - [ ] Provides frame timing information (fps, frame index)
 - [ ] Returns null when no more frames available
 - [ ] Handles common video formats via implementation
 
 #### Edge Cases
+
 - Low quality/resolution frames: Process anyway, confidence scores will reflect quality
 - Variable frame rate: Normalize to consistent timing
 - Corrupted frames: Skip and continue, log warning
 
 ### Feature 2: Pose Detection & Landmark Extraction
+
 **Priority**: High
 **Dependencies**: Feature 1
 
 #### User Story
+
 As the analyzer, I want to extract body landmarks from each frame so that I can calculate biomechanical metrics.
 
 #### Technical Approach
+
 - Use MediaPipe Pose Landmarker (33 landmarks)
 - Support both Node.js (@mediapipe/tasks-vision) and browser (WASM/WebGL) runtimes
 - Extract 3D coordinates with visibility/confidence scores
 
 #### Acceptance Criteria
+
 - [ ] Detects all 33 pose landmarks per frame
 - [ ] Works in both Node.js and browser environments
 - [ ] Provides confidence scores for each landmark
 - [ ] Handles frames with no detected pose gracefully
 
 #### Key Landmarks for Analysis
+
 - Shoulders (11, 12)
 - Elbows (13, 14)
 - Wrists (15, 16)
@@ -72,13 +82,16 @@ As the analyzer, I want to extract body landmarks from each frame so that I can 
 - Nose (0), Eyes (1-4), Ears (7, 8) - for head position
 
 ### Feature 3: Shot Detection & Phase Identification
+
 **Priority**: High
 **Dependencies**: Feature 2
 
 #### User Story
+
 As the analyzer, I want to automatically detect when shots occur and identify key phases so that I can extract metrics at the right moments.
 
 #### Shot Phases
+
 1. **Gather**: Ball received/caught, preparing to shoot
 2. **Load/Dip**: Lowering into legs, ball may dip
 3. **Rise**: Legs extending, ball moving upward
@@ -87,22 +100,26 @@ As the analyzer, I want to automatically detect when shots occur and identify ke
 6. **Follow-through**: Arm fully extended, held position
 
 #### Detection Logic
+
 - Identify shot start: Hands come together, upward wrist motion begins
 - Track vertical hand position to find phases
 - Detect release: Rapid hand separation, shooting hand velocity spike
 - Multiple shots: Reset detection after follow-through completes
 
 #### Acceptance Criteria
+
 - [ ] Correctly identifies shot boundaries in multi-shot videos
 - [ ] Labels frames with current phase
 - [ ] Returns array of detected shots with frame ranges
 - [ ] Handles partial shots (video starts mid-shot) gracefully
 
 ### Feature 4: Metric Extraction
+
 **Priority**: High
 **Dependencies**: Feature 3
 
 #### User Story
+
 As the analyzer, I want to calculate detailed form metrics for each shot so that I can compare against ideal form profiles.
 
 #### Metrics Categories
@@ -163,6 +180,7 @@ As the analyzer, I want to calculate detailed form metrics for each shot so that
 | `handCupVsHinge` | Whether hand cups under or hinges back | categorical/angle | set point |
 
 #### Output Structure
+
 ```typescript
 interface ShotAnalysis {
   shotIndex: number;
@@ -194,19 +212,23 @@ interface AnalysisResult {
 ```
 
 #### Acceptance Criteria
+
 - [ ] Extracts all listed metrics for each detected shot
 - [ ] Includes confidence score for each metric
 - [ ] References specific frame number for each measurement
 - [ ] Handles occluded/low-confidence landmarks gracefully
 
 ### Feature 5: Form Profile Comparison
+
 **Priority**: High
 **Dependencies**: Feature 4
 
 #### User Story
+
 As a developer, I want to compare extracted metrics against target profiles so that I can identify form issues.
 
 #### Profile Structure
+
 ```typescript
 interface FormProfile {
   name: string;
@@ -215,7 +237,7 @@ interface FormProfile {
     [metricName: string]: {
       ideal: number | string;
       acceptable: { min: number; max: number } | string[];
-      priority: 'high' | 'medium' | 'low';
+      priority: "high" | "medium" | "low";
       feedback: {
         tooLow?: string;
         tooHigh?: string;
@@ -227,12 +249,14 @@ interface FormProfile {
 ```
 
 #### Built-in Profiles
+
 - `youth-fundamentals`: Age-appropriate targets for developing players
 - `high-school`: More refined mechanics expectations
 - `pro-form`: Elite-level targets
 - `curry-style`: Quick release, specific set point (example custom)
 
 #### Comparison Output
+
 ```typescript
 interface ProfileComparison {
   profile: string;
@@ -240,7 +264,7 @@ interface ProfileComparison {
     [metricName: string]: {
       value: number | string;
       target: number | string;
-      status: 'pass' | 'fail' | 'warning';
+      status: "pass" | "fail" | "warning";
       deviation?: number;
       feedback?: string;
     };
@@ -255,6 +279,7 @@ interface ProfileComparison {
 ```
 
 #### Acceptance Criteria
+
 - [ ] Compares all metrics against selected profile
 - [ ] Returns pass/fail/warning status for each
 - [ ] Provides corrective feedback text for failures
@@ -262,24 +287,28 @@ interface ProfileComparison {
 - [ ] Supports custom profile injection
 
 ### Feature 6: Configuration & Handedness
+
 **Priority**: Medium
 **Dependencies**: None
 
 #### User Story
+
 As a developer, I want to configure the analyzer for shooter handedness and analysis preferences.
 
 #### Configuration
+
 ```typescript
 interface AnalysisConfig {
-  shootingHand: 'left' | 'right';
+  shootingHand: "left" | "right";
   profile: string; // Profile name
   customProfile?: FormProfile; // Override built-in
   minConfidenceThreshold: number; // Skip low-confidence frames
-  outputTimingUnit: 'frames' | 'ms' | 'percent'; // Primary timing unit
+  outputTimingUnit: "frames" | "ms" | "percent"; // Primary timing unit
 }
 ```
 
 #### Acceptance Criteria
+
 - [ ] Correctly identifies shooting vs guide hand based on config
 - [ ] Applies appropriate landmark mappings for handedness
 - [ ] Validates configuration on initialization
@@ -287,17 +316,20 @@ interface AnalysisConfig {
 ## Technical Decisions
 
 ### Stack
+
 - **Language**: TypeScript (strict mode)
 - **Pose Detection**: MediaPipe Pose Landmarker
 - **Runtime**: Universal (Node.js + Browser)
 - **Build**: ESM module, bundled for browser compatibility
 
 ### MediaPipe Integration
+
 - Use `@mediapipe/tasks-vision` package
 - Pose Landmarker model with full landmark set (33 points)
 - Support model complexity configuration for speed/accuracy tradeoff
 
 ### Universal Runtime Strategy
+
 ```typescript
 // Abstract MediaPipe initialization
 interface PoseDetector {
@@ -306,17 +338,20 @@ interface PoseDetector {
 }
 
 // Factory creates appropriate implementation
-function createPoseDetector(runtime: 'node' | 'browser'): Promise<PoseDetector>;
+function createPoseDetector(runtime: "node" | "browser"): Promise<PoseDetector>;
 ```
 
 ### Coordinate System
+
 - Normalize all positions to body-relative coordinates
 - Use shoulder width as reference scale for "normalized distance"
 - Angles in degrees (0-360 or -180 to 180 as appropriate)
 - Head position as reference for "relative to head" measurements
 
 ### Ball Position Inference
+
 Since MediaPipe doesn't track objects:
+
 - When hands are together: ball center = midpoint of index fingers
 - Track this inferred position through shot phases
 - Mark confidence as lower for ball-related metrics
@@ -341,7 +376,7 @@ export class ShotAnalyzer {
   // Compare against profile
   compareToProfile(
     result: AnalysisResult,
-    profileName?: string
+    profileName?: string,
   ): ProfileComparison[];
 
   // Get available profiles
@@ -373,6 +408,7 @@ Feature 6: Configuration (standalone, used by all)
 ```
 
 ### Implementation Order
+
 1. **Group 1** (parallel): Configuration (F6), Frame Processing interface (F1)
 2. **Group 2**: Pose Detection (F2) - requires F1
 3. **Group 3**: Shot Detection (F3) - requires F2
@@ -421,17 +457,20 @@ src/
 ## Testing Strategy
 
 ### Unit Tests
+
 - Geometry utilities (angle calculations)
 - Coordinate normalization
 - Profile validation
 - Individual metric calculations with mock landmarks
 
 ### Integration Tests
+
 - Full pipeline with test video clips
 - Verify shot detection accuracy
 - Validate metric extraction against manually measured values
 
 ### Test Data
+
 - Use provided kid shooting clips
 - Manually annotate expected values for validation
 - Create synthetic landmark data for edge cases
@@ -447,5 +486,6 @@ src/
 ## Next Steps
 
 After reviewing this design:
+
 1. Make any corrections or additions
 2. Run `/clear` then `/split` to create the implementation plan with individual tasks

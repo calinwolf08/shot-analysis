@@ -11,7 +11,7 @@
 export class InvalidFpsError extends Error {
     constructor(fps) {
         super(`Invalid fps value: ${fps}. FPS must be a positive number greater than zero.`);
-        this.name = 'InvalidFpsError';
+        this.name = "InvalidFpsError";
     }
 }
 //# sourceMappingURL=types.js.map

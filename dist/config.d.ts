@@ -9,8 +9,8 @@
  * - Default profile 'youth-fundamentals' must exist when referenced;
  *   built-in profiles are implemented in Feature 6.0
  */
-import { z } from 'zod';
-import type { ShootingHand, TimingUnit, NumericRange, MetricPriority } from './types';
+import { z } from "zod";
+import type { ShootingHand, TimingUnit, NumericRange, MetricPriority } from "./types";
 /**
  * Target specification for a single metric in a form profile.
  */

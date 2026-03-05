@@ -9,7 +9,7 @@
  *   for more responsive smoothing in live processing scenarios
  * - No built-in outlier rejection; spikes in data are averaged rather than filtered
  */
-import type { Point3D } from '../types';
+import type { Point3D } from "../types";
 /**
  * Applies a moving average filter to a sequence of numeric values.
  * Uses a backward-looking window (current and previous values).

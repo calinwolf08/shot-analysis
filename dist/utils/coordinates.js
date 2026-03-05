@@ -26,7 +26,7 @@
  */
 export function normalizeToBodyScale(distance, shoulderWidth) {
     if (shoulderWidth <= 0) {
-        throw new Error('Shoulder width must be greater than zero');
+        throw new Error("Shoulder width must be greater than zero");
     }
     return distance / shoulderWidth;
 }
@@ -49,7 +49,7 @@ export function calculateRelativePosition(point, reference) {
     return {
         x: point.x - reference.x,
         y: point.y - reference.y,
-        z: point.z - reference.z
+        z: point.z - reference.z,
     };
 }
 //# sourceMappingURL=coordinates.js.map

@@ -10,7 +10,7 @@
  * - No built-in outlier rejection; spikes in data are averaged rather than filtered
  */
 
-import type { Point3D } from '../types';
+import type { Point3D } from "../types";
 
 /** Default window size for smoothing operations */
 const DEFAULT_WINDOW_SIZE = 3;
@@ -32,32 +32,32 @@ const DEFAULT_WINDOW_SIZE = 3;
  * ```
  */
 export function movingAverage(values: number[], windowSize: number): number[] {
-	if (windowSize < 1) {
-		throw new Error('Window size must be at least 1');
-	}
+  if (windowSize < 1) {
+    throw new Error("Window size must be at least 1");
+  }
 
-	if (values.length === 0) {
-		return [];
-	}
+  if (values.length === 0) {
+    return [];
+  }
 
-	const result: number[] = [];
+  const result: number[] = [];
 
-	for (let i = 0; i < values.length; i++) {
-		// Determine the start of the window (can't go below 0)
-		const windowStart = Math.max(0, i - windowSize + 1);
-		const actualWindowSize = i - windowStart + 1;
+  for (let i = 0; i < values.length; i++) {
+    // Determine the start of the window (can't go below 0)
+    const windowStart = Math.max(0, i - windowSize + 1);
+    const actualWindowSize = i - windowStart + 1;
 
-		// Calculate sum of values in window
-		let sum = 0;
-		for (let j = windowStart; j <= i; j++) {
-			sum += values[j]!;
-		}
+    // Calculate sum of values in window
+    let sum = 0;
+    for (let j = windowStart; j <= i; j++) {
+      sum += values[j]!;
+    }
 
-		// Calculate average
-		result.push(sum / actualWindowSize);
-	}
+    // Calculate average
+    result.push(sum / actualWindowSize);
+  }
 
-	return result;
+  return result;
 }
 
 /**
@@ -75,36 +75,39 @@ export function movingAverage(values: number[], windowSize: number): number[] {
  * const smoothed = movingAveragePoint3D(noisyLandmarks, 3);
  * ```
  */
-export function movingAveragePoint3D(points: Point3D[], windowSize: number): Point3D[] {
-	if (windowSize < 1) {
-		throw new Error('Window size must be at least 1');
-	}
+export function movingAveragePoint3D(
+  points: Point3D[],
+  windowSize: number,
+): Point3D[] {
+  if (windowSize < 1) {
+    throw new Error("Window size must be at least 1");
+  }
 
-	if (points.length === 0) {
-		return [];
-	}
+  if (points.length === 0) {
+    return [];
+  }
 
-	// Extract x, y, z arrays
-	const xValues = points.map((p) => p.x);
-	const yValues = points.map((p) => p.y);
-	const zValues = points.map((p) => p.z);
+  // Extract x, y, z arrays
+  const xValues = points.map((p) => p.x);
+  const yValues = points.map((p) => p.y);
+  const zValues = points.map((p) => p.z);
 
-	// Smooth each coordinate independently
-	const smoothedX = movingAverage(xValues, windowSize);
-	const smoothedY = movingAverage(yValues, windowSize);
-	const smoothedZ = movingAverage(zValues, windowSize);
+  // Smooth each coordinate independently
+  const smoothedX = movingAverage(xValues, windowSize);
+  const smoothedY = movingAverage(yValues, windowSize);
+  const smoothedZ = movingAverage(zValues, windowSize);
 
-	// Reconstruct Point3D array
-	const result: Point3D[] = [];
-	for (let i = 0; i < points.length; i++) {
-		result.push({
-			x: smoothedX[i]!,
-			y: smoothedY[i]!,
-			z: smoothedZ[i]!
-		});
-	}
+  // Reconstruct Point3D array
+  const result: Point3D[] = [];
+  for (let i = 0; i < points.length; i++) {
+    result.push({
+      x: smoothedX[i]!,
+      y: smoothedY[i]!,
+      z: smoothedZ[i]!,
+    });
+  }
 
-	return result;
+  return result;
 }
 
 /**
@@ -124,8 +127,8 @@ export function movingAveragePoint3D(points: Point3D[], windowSize: number): Poi
  * ```
  */
 export function smoothLandmarkSequence(
-	sequence: Point3D[],
-	windowSize: number = DEFAULT_WINDOW_SIZE
+  sequence: Point3D[],
+  windowSize: number = DEFAULT_WINDOW_SIZE,
 ): Point3D[] {
-	return movingAveragePoint3D(sequence, windowSize);
+  return movingAveragePoint3D(sequence, windowSize);
 }

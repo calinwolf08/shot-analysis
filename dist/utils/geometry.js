@@ -31,12 +31,12 @@ export function calculateAngle(a, vertex, c) {
     const va = {
         x: a.x - vertex.x,
         y: a.y - vertex.y,
-        z: a.z - vertex.z
+        z: a.z - vertex.z,
     };
     const vc = {
         x: c.x - vertex.x,
         y: c.y - vertex.y,
-        z: c.z - vertex.z
+        z: c.z - vertex.z,
     };
     // Calculate magnitudes
     const magnitudeVa = Math.sqrt(va.x * va.x + va.y * va.y + va.z * va.z);

@@ -9,7 +9,7 @@
 /**
  * Supported video file extensions (case-insensitive).
  */
-const SUPPORTED_EXTENSIONS = ['.mp4', '.mov', '.webm'];
+const SUPPORTED_EXTENSIONS = [".mp4", ".mov", ".webm"];
 /**
  * Error thrown when a video file is not found at the specified path.
  */
@@ -17,7 +17,7 @@ export class VideoFileNotFoundError extends Error {
     filePath;
     constructor(filePath) {
         super(`Video file not found: ${filePath}`);
-        this.name = 'VideoFileNotFoundError';
+        this.name = "VideoFileNotFoundError";
         this.filePath = filePath;
     }
 }
@@ -29,7 +29,7 @@ export class VideoFileCorruptedError extends Error {
     details;
     constructor(filePath, details) {
         super(`Video file corrupted: ${filePath}. Details: ${details}`);
-        this.name = 'VideoFileCorruptedError';
+        this.name = "VideoFileCorruptedError";
         this.filePath = filePath;
         this.details = details;
     }
@@ -43,7 +43,7 @@ export class UnsupportedVideoFormatError extends Error {
     constructor(filePath, format) {
         super(`Unsupported video format: ${format} for file ${filePath}. ` +
             `Supported formats: mp4, mov, webm`);
-        this.name = 'UnsupportedVideoFormatError';
+        this.name = "UnsupportedVideoFormatError";
         this.filePath = filePath;
         this.format = format;
     }
@@ -86,7 +86,9 @@ export class VideoFileProvider {
      * @returns true if the file extension is supported, false otherwise
      */
     static isSupportedFormat(filePath) {
-        const extension = filePath.substring(filePath.lastIndexOf('.')).toLowerCase();
+        const extension = filePath
+            .substring(filePath.lastIndexOf("."))
+            .toLowerCase();
         return SUPPORTED_EXTENSIONS.includes(extension);
     }
     /**
@@ -111,11 +113,13 @@ export class VideoFileProvider {
     static async create(filePath) {
         // Check if format is supported
         if (!VideoFileProvider.isSupportedFormat(filePath)) {
-            const extension = filePath.substring(filePath.lastIndexOf('.') + 1).toLowerCase();
+            const extension = filePath
+                .substring(filePath.lastIndexOf(".") + 1)
+                .toLowerCase();
             throw new UnsupportedVideoFormatError(filePath, extension);
         }
         // Check if file exists using fs
-        const fs = await import('fs/promises');
+        const fs = await import("fs/promises");
         try {
             await fs.access(filePath);
         }
@@ -141,7 +145,7 @@ export class VideoFileProvider {
         const metadata = {
             width,
             height,
-            duration
+            duration,
         };
         return { metadata, fps, frames };
     }
@@ -149,48 +153,48 @@ export class VideoFileProvider {
      * Probes video file to get metadata.
      */
     static async probeVideo(filePath) {
-        const { spawn } = await import('child_process');
+        const { spawn } = await import("child_process");
         return new Promise((resolve, reject) => {
-            const ffprobe = spawn('ffprobe', [
-                '-v',
-                'error',
-                '-select_streams',
-                'v:0',
-                '-show_entries',
-                'stream=width,height,r_frame_rate,duration',
-                '-show_entries',
-                'format=duration',
-                '-of',
-                'json',
-                filePath
+            const ffprobe = spawn("ffprobe", [
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height,r_frame_rate,duration",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                filePath,
             ]);
-            let stdout = '';
-            let stderr = '';
-            ffprobe.stdout.on('data', (data) => {
+            let stdout = "";
+            let stderr = "";
+            ffprobe.stdout.on("data", (data) => {
                 stdout += data.toString();
             });
-            ffprobe.stderr.on('data', (data) => {
+            ffprobe.stderr.on("data", (data) => {
                 stderr += data.toString();
             });
-            ffprobe.on('close', (code) => {
+            ffprobe.on("close", (code) => {
                 if (code !== 0) {
-                    reject(new VideoFileCorruptedError(filePath, stderr || 'ffprobe failed'));
+                    reject(new VideoFileCorruptedError(filePath, stderr || "ffprobe failed"));
                     return;
                 }
                 try {
                     const result = JSON.parse(stdout);
                     const stream = result.streams?.[0];
                     if (!stream) {
-                        reject(new VideoFileCorruptedError(filePath, 'No video stream found'));
+                        reject(new VideoFileCorruptedError(filePath, "No video stream found"));
                         return;
                     }
                     const width = stream.width;
                     const height = stream.height;
                     // Parse frame rate (can be "30/1" or "30000/1001")
-                    const [num, den] = stream.r_frame_rate.split('/').map(Number);
+                    const [num, den] = stream.r_frame_rate.split("/").map(Number);
                     const fps = num / den;
                     // Get duration in milliseconds
-                    const durationSeconds = parseFloat(stream.duration || result.format?.duration || '0');
+                    const durationSeconds = parseFloat(stream.duration || result.format?.duration || "0");
                     const duration = Math.round(durationSeconds * 1000);
                     resolve({ width, height, duration, fps });
                 }
@@ -198,7 +202,7 @@ export class VideoFileProvider {
                     reject(new VideoFileCorruptedError(filePath, `Failed to parse metadata: ${e}`));
                 }
             });
-            ffprobe.on('error', (err) => {
+            ffprobe.on("error", (err) => {
                 reject(new VideoFileCorruptedError(filePath, `ffprobe error: ${err.message}`));
             });
         });
@@ -207,7 +211,7 @@ export class VideoFileProvider {
      * Extracts all frames from the video file.
      */
     static async extractFrames(filePath, width, height, fps, duration) {
-        const { spawn } = await import('child_process');
+        const { spawn } = await import("child_process");
         const frames = [];
         const totalFrames = Math.floor((duration / 1000) * fps);
         // Skip extraction if video is empty
@@ -216,21 +220,21 @@ export class VideoFileProvider {
         }
         return new Promise((resolve, reject) => {
             // Use ffmpeg to extract raw RGBA frames
-            const ffmpeg = spawn('ffmpeg', [
-                '-i',
+            const ffmpeg = spawn("ffmpeg", [
+                "-i",
                 filePath,
-                '-f',
-                'rawvideo',
-                '-pix_fmt',
-                'rgba',
-                '-vsync',
-                '0',
-                '-'
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgba",
+                "-vsync",
+                "0",
+                "-",
             ]);
             const frameSize = width * height * 4;
             let buffer = Buffer.alloc(0);
             let frameIndex = 0;
-            ffmpeg.stdout.on('data', (data) => {
+            ffmpeg.stdout.on("data", (data) => {
                 buffer = Buffer.concat([buffer, data]);
                 // Process complete frames
                 while (buffer.length >= frameSize) {
@@ -242,24 +246,24 @@ export class VideoFileProvider {
                     frameIndex++;
                 }
             });
-            ffmpeg.stderr.on('data', (data) => {
+            ffmpeg.stderr.on("data", (data) => {
                 // ffmpeg writes progress to stderr, we can ignore it
                 const message = data.toString();
                 // Log corruption warnings but don't fail
-                if (message.includes('error') &&
-                    !message.includes('Error while decoding') // Skip individual frame decode errors
+                if (message.includes("error") &&
+                    !message.includes("Error while decoding") // Skip individual frame decode errors
                 ) {
                     console.warn(`VideoFileProvider: Warning during frame extraction: ${message}`);
                 }
             });
-            ffmpeg.on('close', (code) => {
+            ffmpeg.on("close", (code) => {
                 if (code !== 0 && frames.length === 0) {
-                    reject(new VideoFileCorruptedError(filePath, 'Failed to extract frames'));
+                    reject(new VideoFileCorruptedError(filePath, "Failed to extract frames"));
                     return;
                 }
                 resolve(frames);
             });
-            ffmpeg.on('error', (err) => {
+            ffmpeg.on("error", (err) => {
                 reject(new VideoFileCorruptedError(filePath, `ffmpeg error: ${err.message}`));
             });
         });
@@ -279,7 +283,7 @@ export class VideoFileProvider {
             width: this.metadata.width,
             height: this.metadata.height,
             timestamp: frameData.timestamp,
-            frameIndex: this.currentFrameIndex
+            frameIndex: this.currentFrameIndex,
         };
         this.currentFrameIndex++;
         return frame;

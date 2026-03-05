@@ -6,7 +6,7 @@
  *
  * Supports common video formats: mp4, mov, webm
  */
-import type { FrameProvider, VideoFrame, FrameMetadata } from './types';
+import type { FrameProvider, VideoFrame, FrameMetadata } from "./types";
 /**
  * Error thrown when a video file is not found at the specified path.
  */

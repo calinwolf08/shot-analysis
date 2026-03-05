@@ -4,15 +4,15 @@
  */
 
 export {
-	calculateAngle,
-	calculateDistance,
-	calculateDistance2D
-} from './geometry';
+  calculateAngle,
+  calculateDistance,
+  calculateDistance2D,
+} from "./geometry";
 
-export { normalizeToBodyScale, calculateRelativePosition } from './coordinates';
+export { normalizeToBodyScale, calculateRelativePosition } from "./coordinates";
 
 export {
-	movingAverage,
-	movingAveragePoint3D,
-	smoothLandmarkSequence
-} from './smoothing';
+  movingAverage,
+  movingAveragePoint3D,
+  smoothLandmarkSequence,
+} from "./smoothing";
