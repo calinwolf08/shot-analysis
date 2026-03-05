@@ -1,0 +1,1 @@
+{"version":3,"file":"coordinates.d.ts","sourceRoot":"","sources":["../../src/utils/coordinates.ts"],"names":[],"mappings":"AAAA;;;GAGG;AAEH,OAAO,KAAK,EAAE,OAAO,EAAE,MAAM,UAAU,CAAC;AAExC;;;;;;;;;;;;;;;GAeG;AACH,wBAAgB,oBAAoB,CAAC,QAAQ,EAAE,MAAM,EAAE,aAAa,EAAE,MAAM,GAAG,MAAM,CAMpF;AAED;;;;;;;;;;;;;;GAcG;AACH,wBAAgB,yBAAyB,CAAC,KAAK,EAAE,OAAO,EAAE,SAAS,EAAE,OAAO,GAAG,OAAO,CAMrF"}

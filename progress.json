@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-05T19:52:11.814Z"
+		"updated_at": "2026-03-05T19:54:58.335Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -73,8 +73,8 @@
 				{
 					"id": "1.2",
 					"name": "Configuration Validation & Defaults",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want sensible default configuration values and clear validation errors so that I can quickly set up the analyzer without specifying every option.",
@@ -122,7 +122,8 @@
 							"id": "1.2.7",
 							"description": "Run npm run check and npm run test:unit -- --run to verify all tests pass"
 						}
-					]
+					],
+					"commit_hash": "9579da2a12587f7a027703ddb4bca02667791fa8"
 				},
 				{
 					"id": "1.3",

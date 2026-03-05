@@ -54,3 +54,18 @@ export {
   metricPrioritySchema,
   numericRangeSchema
 } from './config';
+
+// Utility exports
+export {
+  // Geometry utilities
+  calculateAngle,
+  calculateDistance,
+  calculateDistance2D,
+  // Coordinate normalization utilities
+  normalizeToBodyScale,
+  calculateRelativePosition,
+  // Smoothing utilities
+  movingAverage,
+  movingAveragePoint3D,
+  smoothLandmarkSequence
+} from './utils';
