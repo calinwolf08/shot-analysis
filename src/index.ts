@@ -66,3 +66,22 @@ export {
   movingAveragePoint3D,
   smoothLandmarkSequence,
 } from "./utils";
+
+// Frame provider exports
+export type { FrameProvider, MediaStreamProviderOptions } from "./providers";
+export {
+  // Video file provider (Node.js)
+  VideoFileProvider,
+  createVideoFileProvider,
+  VideoFileNotFoundError,
+  VideoFileCorruptedError,
+  UnsupportedVideoFormatError,
+  // Media stream provider (browser)
+  MediaStreamProvider,
+  createMediaStreamProvider,
+  MediaStreamEndedError,
+  MediaStreamInactiveError,
+  NoVideoTrackError,
+  // Shared errors
+  InvalidFpsError,
+} from "./providers";

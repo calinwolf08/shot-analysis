@@ -3,37 +3,10 @@
  * These types are shared across all features.
  */
 
-/**
- * Represents a single video frame with associated metadata.
- */
-export interface VideoFrame {
-  /** Raw image data in RGBA format */
-  readonly data: Uint8ClampedArray;
-  /** Frame width in pixels */
-  readonly width: number;
-  /** Frame height in pixels */
-  readonly height: number;
-  /** Timestamp of the frame in milliseconds from video start */
-  readonly timestamp: number;
-  /** Zero-based frame index */
-  readonly frameIndex: number;
-}
-
-/**
- * Metadata about the video source.
- */
-export interface FrameMetadata {
-  /** Frame width in pixels */
-  readonly width: number;
-  /** Frame height in pixels */
-  readonly height: number;
-  /** Total duration of the video in milliseconds (undefined for live streams) */
-  readonly duration?: number;
-  /** Frames per second */
-  readonly fps: number;
-  /** Total number of frames (undefined for live streams) */
-  readonly totalFrames?: number;
-}
+// Re-export VideoFrame and FrameMetadata from providers for consistency
+// The provider types are canonical - FrameMetadata doesn't include fps
+// because FPS is available via the FrameProvider.getFps() method
+export type { VideoFrame, FrameMetadata } from "./providers/types";
 
 /**
  * Handedness configuration for the shooter.

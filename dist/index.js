@@ -14,4 +14,11 @@ calculateAngle, calculateDistance, calculateDistance2D,
 normalizeToBodyScale, calculateRelativePosition, 
 // Smoothing utilities
 movingAverage, movingAveragePoint3D, smoothLandmarkSequence, } from "./utils";
+export { 
+// Video file provider (Node.js)
+VideoFileProvider, createVideoFileProvider, VideoFileNotFoundError, VideoFileCorruptedError, UnsupportedVideoFormatError, 
+// Media stream provider (browser)
+MediaStreamProvider, createMediaStreamProvider, MediaStreamEndedError, MediaStreamInactiveError, NoVideoTrackError, 
+// Shared errors
+InvalidFpsError, } from "./providers";
 //# sourceMappingURL=index.js.map

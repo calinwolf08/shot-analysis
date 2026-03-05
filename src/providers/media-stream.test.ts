@@ -470,4 +470,53 @@ describe("MediaStreamProvider", () => {
       expect(frame).toBeNull();
     });
   });
+
+  describe("edge cases", () => {
+    it("throws Error when canvas.getContext returns null", async () => {
+      // Mock getContext to return null
+      mockCanvas.getContext = vi.fn().mockReturnValue(null);
+
+      const stream = createMockMediaStream();
+
+      await expect(createMediaStreamProvider(stream)).rejects.toThrow(
+        "Failed to get 2D rendering context",
+      );
+
+      // Reset mock for other tests
+      mockCanvas.getContext = vi.fn().mockReturnValue(mockCanvasContext);
+    });
+
+    it("returns null when getVideoTracks returns empty array during getNextFrame", async () => {
+      // Create a stream that initially has tracks
+      const mockTrack = {
+        getSettings: () => ({ width: 640, height: 480, frameRate: 30 }),
+        readyState: "live" as MediaStreamTrackState,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      };
+
+      let trackArray = [mockTrack];
+
+      const stream = {
+        active: true,
+        getVideoTracks: () => trackArray,
+        getTracks: () => trackArray,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      } as unknown as MediaStream;
+
+      const provider = await createMediaStreamProvider(stream);
+
+      // Verify first frame works
+      const frame1 = await provider.getNextFrame();
+      expect(frame1).not.toBeNull();
+
+      // Remove tracks to simulate track loss
+      trackArray = [];
+
+      // Should return null when no video tracks
+      const frame2 = await provider.getNextFrame();
+      expect(frame2).toBeNull();
+    });
+  });
 });

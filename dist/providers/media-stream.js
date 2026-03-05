@@ -5,6 +5,18 @@
  * from live MediaStream sources (browser camera feeds).
  *
  * Browser-only implementation using canvas for frame extraction.
+ *
+ * ## Known Limitations
+ *
+ * - Requires browser environment with HTMLVideoElement and Canvas2D support
+ * - Frame rate limiting is approximate due to browser event loop timing
+ * - Memory management relies on garbage collection of canvas ImageData objects
+ *
+ * ## Future Improvements
+ *
+ * - Add OffscreenCanvas support for web worker frame extraction
+ * - Implement adaptive frame rate based on processing speed
+ * - Add WebCodecs API support for more efficient video decoding
  */
 /**
  * Error thrown when the media stream has ended unexpectedly.

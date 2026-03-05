@@ -5,6 +5,19 @@
  * from video files using ffmpeg for frame extraction.
  *
  * Supports common video formats: mp4, mov, webm
+ *
+ * ## Known Limitations
+ *
+ * - Requires ffmpeg and ffprobe to be installed on the system
+ * - Video frames are loaded into memory; large videos may consume significant RAM
+ * - Variable frame rate (VFR) videos are normalized to constant frame rate
+ *
+ * ## Testing
+ *
+ * Unit tests use mock data via `createWithMockData()` to test the FrameProvider
+ * interface implementation without requiring ffmpeg. Integration tests in
+ * `video-file.integration.test.ts` test the real ffmpeg integration when
+ * ffmpeg is available on the system.
  */
 import type { FrameProvider, VideoFrame, FrameMetadata } from "./types";
 /**
