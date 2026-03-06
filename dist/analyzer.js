@@ -31,10 +31,27 @@
  * 1. **Single Shooter**: The analyzer assumes a single person is shooting in the frame.
  *    Multiple people may cause incorrect landmark associations.
  *
- * 2. **Async Initialization**: The pose detector requires async initialization.
+ * 2. **Camera Angle**: Best results with side-view camera angle. Other angles may
+ *    produce less accurate metrics, especially for depth-dependent measurements.
+ *
+ * 3. **Stationary Shooter**: The analyzer assumes the shooter is relatively stationary
+ *    during the shot. Significant lateral movement may affect metric accuracy.
+ *
+ * 4. **Ball Position Inference**: Since MediaPipe doesn't track objects, ball position
+ *    is inferred from hand positions. After release, ball tracking is not available.
+ *    Ball-related metrics have lower confidence scores.
+ *
+ * 5. **Async Initialization**: The pose detector requires async initialization.
  *    Use `initialize()` or the factory function before calling analysis methods.
  *
- * 3. **Resource Management**: Call `dispose()` when done to release MediaPipe resources.
+ * 6. **Resource Management**: Call `dispose()` when done to release MediaPipe resources.
+ *
+ * ## Future Improvements
+ *
+ * - Camera angle detection to auto-adjust analysis parameters
+ * - Ball tracking model for post-release ball flight analysis
+ * - Multi-person support with shooter identification
+ * - Support for additional camera angles (front, back, overhead)
  *
  * @see Feature 7.0 - Main Analyzer Integration
  */
