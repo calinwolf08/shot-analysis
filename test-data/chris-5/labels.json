@@ -1,0 +1,13 @@
+{
+  "video": "chris 5.mp4",
+  "labeledBy": "human",
+  "labeledAt": "2026-03-07T22:27:18.046Z",
+  "orientation": "side-right",
+  "shots": [
+    {
+      "shotNumber": 1,
+      "startFrame": 58,
+      "endFrame": 87
+    }
+  ]
+}
