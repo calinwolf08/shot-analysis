@@ -178,6 +178,12 @@ export declare const poseDataSchema: z.ZodObject<{
         }[];
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
+    video: string;
+    fps: number;
+    totalFrames: number;
+    width: number;
+    height: number;
+    extractedAt: string;
     frames: {
         frameIndex: number;
         timestamp: number;
@@ -189,13 +195,13 @@ export declare const poseDataSchema: z.ZodObject<{
             visibility: number;
         }[];
     }[];
-    video: string;
-    totalFrames: number;
-    width: number;
-    height: number;
-    fps: number;
-    extractedAt: string;
 }, {
+    video: string;
+    fps: number;
+    totalFrames: number;
+    width: number;
+    height: number;
+    extractedAt: string;
     frames: {
         frameIndex: number;
         timestamp: number;
@@ -207,12 +213,6 @@ export declare const poseDataSchema: z.ZodObject<{
             visibility: number;
         }[];
     }[];
-    video: string;
-    totalFrames: number;
-    width: number;
-    height: number;
-    fps: number;
-    extractedAt: string;
 }>;
 /**
  * A labeled shot from ground truth data.

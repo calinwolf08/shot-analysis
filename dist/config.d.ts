@@ -343,7 +343,7 @@ export declare const analysisConfigSchema: z.ZodObject<{
     minConfidenceThreshold: z.ZodNumber;
     outputTimingUnit: z.ZodEnum<["frames", "ms", "percent"]>;
 }, "strip", z.ZodTypeAny, {
-    shootingHand: "left" | "right";
+    shootingHand: "right" | "left";
     profile: string;
     minConfidenceThreshold: number;
     outputTimingUnit: "frames" | "ms" | "percent";
@@ -365,7 +365,7 @@ export declare const analysisConfigSchema: z.ZodObject<{
         }>;
     } | undefined;
 }, {
-    shootingHand: "left" | "right";
+    shootingHand: "right" | "left";
     profile: string;
     minConfidenceThreshold: number;
     outputTimingUnit: "frames" | "ms" | "percent";

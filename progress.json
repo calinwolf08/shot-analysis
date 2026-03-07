@@ -3,7 +3,7 @@
 		"name": "manual-labeling-workflow",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-07T12:00:00Z",
-		"updated_at": "2026-03-07T23:25:54.049Z"
+		"updated_at": "2026-03-07T23:29:31.255Z"
 	},
 	"status": "in_progress",
 	"features": [
@@ -211,7 +211,7 @@
 		{
 			"id": "3.0",
 			"name": "Export Poses On-Demand",
-			"status": "pending",
+			"status": "complete",
 			"parallel_group": 1,
 			"tasks": [
 				{
@@ -266,8 +266,8 @@
 				{
 					"id": "3.2",
 					"name": "Modify exportPoses and update button state",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a user, I want the Export Poses button to be enabled after loading a video, and when I click it, it should run pose detection automatically if needed before saving.",
@@ -309,22 +309,23 @@
 							"id": "3.2.5",
 							"description": "Test: Export Poses after Analyze Video exports immediately (no re-detection)"
 						}
-					]
+					],
+					"commit_hash": "21e708a69de0e2e75b88a3a9b40c6e92b668d394"
 				}
 			]
 		},
 		{
 			"id": "4.0",
 			"name": "Verify Existing Analyze Video Unchanged",
-			"status": "pending",
+			"status": "complete",
 			"parallel_group": 1,
 			"tasks": [
 				{
 					"id": "4.1",
 					"name": "Verify Analyze Video regression tests",
-					"status": "pending",
-					"phase": "pending",
-					"attempts": 0,
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 1,
 					"context": {
 						"user_story": "As a user, I want the existing 'Analyze Video' button to work exactly as before, so I can still use automatic shot detection and metrics when needed.",
 						"acceptance_criteria": [

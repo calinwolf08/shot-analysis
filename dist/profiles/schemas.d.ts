@@ -453,13 +453,6 @@ export declare const profileComparisonSchema: z.ZodObject<{
         priorityIssues: readonly string[];
     }>;
 }, "strip", z.ZodTypeAny, {
-    profile: string;
-    summary: {
-        passCount: number;
-        failCount: number;
-        warningCount: number;
-        priorityIssues: readonly string[];
-    };
     metrics: Record<string, {
         value: string | number;
         status: "pass" | "fail" | "warning";
@@ -479,14 +472,14 @@ export declare const profileComparisonSchema: z.ZodObject<{
         feedback?: string | undefined;
         deviation?: number | undefined;
     }>;
+    profile: string;
+    summary: {
+        passCount: number;
+        failCount: number;
+        warningCount: number;
+        priorityIssues: readonly string[];
+    };
 }, {
-    profile: string;
-    summary: {
-        passCount: number;
-        failCount: number;
-        warningCount: number;
-        priorityIssues: readonly string[];
-    };
     metrics: Record<string, {
         value: string | number;
         status: "pass" | "fail" | "warning";
@@ -506,6 +499,13 @@ export declare const profileComparisonSchema: z.ZodObject<{
         feedback?: string | undefined;
         deviation?: number | undefined;
     }>;
+    profile: string;
+    summary: {
+        passCount: number;
+        failCount: number;
+        warningCount: number;
+        priorityIssues: readonly string[];
+    };
 }>;
 /**
  * Type inferred from the FormProfile Zod schema.
