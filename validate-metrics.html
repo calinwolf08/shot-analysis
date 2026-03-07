@@ -2381,6 +2381,144 @@
       }
 
       /**
+       * Runs pose detection on the loaded video without full shot analysis.
+       * Creates a frame provider from the video element, runs MediaPipe pose detection
+       * frame by frame, and returns pose data in the same format as analyzer.analyzeVideo().
+       *
+       * @returns {Promise<Object>} Pose data matching appState.poseData structure
+       * @throws {Error} If video is not loaded or pose detection fails
+       */
+      async function runPoseDetection() {
+        if (!appState.videoLoaded || !appState.videoFile) {
+          throw new Error("No video loaded");
+        }
+
+        const file = appState.videoFile;
+        const { createPoseDetector, createVideoElementProvider } =
+          window.ShotAnalysis;
+
+        // Show progress
+        elements.progressSection.classList.remove("hidden");
+        updateProgress("Initializing pose detector...", 5);
+
+        let detector = null;
+        let frameProvider = null;
+
+        try {
+          // Initialize MediaPipe pose detector (browser version)
+          detector = await createPoseDetector({
+            runtime: "browser",
+            runningMode: "IMAGE",
+            delegate: "GPU",
+          });
+
+          updateProgress("Loading video for pose detection...", 10);
+
+          // Create frame provider from the video file
+          frameProvider = await createVideoElementProvider(file, {
+            fps: appState.fps,
+          });
+
+          const totalFrames = frameProvider.getTotalFrames();
+          const metadata = frameProvider.getMetadata();
+          const fps = frameProvider.getFps();
+
+          console.log(
+            "[runPoseDetection] Starting pose detection on",
+            totalFrames,
+            "frames",
+          );
+
+          // Process frames and collect pose data
+          const frames = [];
+          let frameCount = 0;
+          let lastProgressUpdate = Date.now();
+
+          let frame = await frameProvider.getNextFrame();
+          while (frame !== null) {
+            try {
+              // Run pose detection on this frame
+              const poseResult = await detector.detect(frame);
+
+              // Store frame data (null landmarks if no pose detected)
+              frames.push({
+                frameIndex: frame.frameIndex,
+                timestamp: frame.timestamp,
+                poseConfidence: poseResult ? poseResult.poseConfidence : 0,
+                landmarks: poseResult ? [...poseResult.landmarks] : null,
+              });
+            } catch (frameErr) {
+              // Handle pose detection failure on individual frames
+              console.warn(
+                `[runPoseDetection] Frame ${frame.frameIndex} detection failed:`,
+                frameErr.message,
+              );
+              frames.push({
+                frameIndex: frame.frameIndex,
+                timestamp: frame.timestamp,
+                poseConfidence: 0,
+                landmarks: null,
+              });
+            }
+
+            frameCount++;
+
+            // Update progress every 10 frames or 100ms
+            const now = Date.now();
+            if (frameCount % 10 === 0 || now - lastProgressUpdate >= 100) {
+              const percent = Math.round(
+                10 + (frameCount / totalFrames) * 85,
+              );
+              updateProgress(
+                `Detecting poses: ${frameCount} / ${totalFrames} (${Math.round((frameCount / totalFrames) * 100)}%)`,
+                percent,
+              );
+              lastProgressUpdate = now;
+            }
+
+            // Get next frame
+            frame = await frameProvider.getNextFrame();
+          }
+
+          updateProgress("Finalizing pose data...", 98);
+
+          // Build pose data in expected format
+          const poseData = {
+            video: file.name,
+            fps: fps,
+            totalFrames: totalFrames,
+            width: metadata.width,
+            height: metadata.height,
+            extractedAt: new Date().toISOString(),
+            frames: frames,
+          };
+
+          console.log(
+            "[runPoseDetection] Completed. Frames with pose:",
+            frames.filter((f) => f.landmarks !== null).length,
+            "/",
+            frames.length,
+          );
+
+          updateProgress("Pose detection complete", 100);
+
+          return poseData;
+        } catch (err) {
+          console.error("[runPoseDetection] Error:", err);
+          throw new Error(`Pose detection failed: ${err.message}`);
+        } finally {
+          // Cleanup resources
+          if (frameProvider) {
+            frameProvider.dispose();
+          }
+          if (detector) {
+            await detector.close();
+          }
+          elements.progressSection.classList.add("hidden");
+        }
+      }
+
+      /**
        * Exports pose data to server
        */
       async function exportPoses() {

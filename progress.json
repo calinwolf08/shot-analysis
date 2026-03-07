@@ -3,7 +3,7 @@
 		"name": "manual-labeling-workflow",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-07T12:00:00Z",
-		"updated_at": "2026-03-07T23:09:17.526Z"
+		"updated_at": "2026-03-07T23:21:31.695Z"
 	},
 	"status": "in_progress",
 	"features": [
@@ -111,7 +111,7 @@
 		{
 			"id": "2.0",
 			"name": "Enable Labeling UI After Video Loads",
-			"status": "pending",
+			"status": "complete",
 			"parallel_group": 1,
 			"tasks": [
 				{
@@ -159,8 +159,8 @@
 				{
 					"id": "2.2",
 					"name": "Add labeling panel visibility and test manual labeling flow",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a user, I want to see the labeling panel after loading a video, add shots manually, set start/end frames with S/E keys, and set orientation for each shot.",
@@ -203,7 +203,8 @@
 							"id": "2.2.5",
 							"description": "Test Export Labels with manually created shots"
 						}
-					]
+					],
+					"commit_hash": "35ddd4459a682897d3763a911d1884315759845f"
 				}
 			]
 		},
