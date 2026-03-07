@@ -474,12 +474,16 @@ export class ShotAnalyzer {
       totalFrames++;
       // Log progress every 30 frames
       if (totalFrames % 30 === 0) {
-        console.log(`[Analyzer] Processed ${totalFrames} frames, poses detected: ${framesWithPose}`);
+        console.log(
+          `[Analyzer] Processed ${totalFrames} frames, poses detected: ${framesWithPose}`,
+        );
       }
       frame = await frameProvider.getNextFrame();
     }
 
-    console.log(`[Analyzer] Total frames: ${totalFrames}, with pose: ${framesWithPose}, without pose: ${framesWithoutPose}`);
+    console.log(
+      `[Analyzer] Total frames: ${totalFrames}, with pose: ${framesWithPose}, without pose: ${framesWithoutPose}`,
+    );
 
     // Build video metadata
     const videoMetadata: VideoMetadata = {
@@ -502,12 +506,16 @@ export class ShotAnalyzer {
     // Reset shot detector state for fresh detection
     this.shotDetector.reset();
 
-    console.log(`[Analyzer] Running shot detection on ${allPoseLandmarks.length} pose frames...`);
+    console.log(
+      `[Analyzer] Running shot detection on ${allPoseLandmarks.length} pose frames...`,
+    );
 
     // Detect shots from the landmark sequence
     const detectedShots = this.shotDetector.processFrames(allPoseLandmarks);
 
-    console.log(`[Analyzer] Shot detection complete, found ${detectedShots.length} shots`);
+    console.log(
+      `[Analyzer] Shot detection complete, found ${detectedShots.length} shots`,
+    );
 
     // Extract metrics for each detected shot
     const shotAnalyses: ShotAnalysis[] = [];

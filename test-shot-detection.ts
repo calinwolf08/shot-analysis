@@ -4,9 +4,9 @@
  * This simulates the wrist motion patterns from the labeled video.
  */
 
-import { ShotBoundaryDetector } from './src/detection/shot-detector';
-import type { PoseLandmarks } from './src/pose/types';
-import { LANDMARK_INDEX } from './src/pose/types';
+import { ShotBoundaryDetector } from "./src/detection/shot-detector";
+import type { PoseLandmarks } from "./src/pose/types";
+import { LANDMARK_INDEX } from "./src/pose/types";
 
 // Based on chris 5_labels.json:
 // - legs_start_bending: 55
@@ -15,7 +15,10 @@ import { LANDMARK_INDEX } from './src/pose/types';
 // - arms_fully_extended: 76
 // - feet_land: 80
 
-function createMockLandmarks(wristY: number, shoulderY: number = 0.4): PoseLandmarks {
+function createMockLandmarks(
+  wristY: number,
+  shoulderY: number = 0.4,
+): PoseLandmarks {
   // Create a minimal landmarks array with just the landmarks we need
   const landmarks = new Array(33).fill(null).map(() => ({
     x: 0.5,
@@ -25,12 +28,32 @@ function createMockLandmarks(wristY: number, shoulderY: number = 0.4): PoseLandm
   }));
 
   // Set wrist positions (both left and right to same Y for simplicity)
-  landmarks[LANDMARK_INDEX.LEFT_WRIST] = { x: 0.4, y: wristY, z: 0, visibility: 0.9 };
-  landmarks[LANDMARK_INDEX.RIGHT_WRIST] = { x: 0.6, y: wristY, z: 0, visibility: 0.9 };
+  landmarks[LANDMARK_INDEX.LEFT_WRIST] = {
+    x: 0.4,
+    y: wristY,
+    z: 0,
+    visibility: 0.9,
+  };
+  landmarks[LANDMARK_INDEX.RIGHT_WRIST] = {
+    x: 0.6,
+    y: wristY,
+    z: 0,
+    visibility: 0.9,
+  };
 
   // Set shoulder positions
-  landmarks[LANDMARK_INDEX.LEFT_SHOULDER] = { x: 0.35, y: shoulderY, z: 0, visibility: 0.9 };
-  landmarks[LANDMARK_INDEX.RIGHT_SHOULDER] = { x: 0.65, y: shoulderY, z: 0, visibility: 0.9 };
+  landmarks[LANDMARK_INDEX.LEFT_SHOULDER] = {
+    x: 0.35,
+    y: shoulderY,
+    z: 0,
+    visibility: 0.9,
+  };
+  landmarks[LANDMARK_INDEX.RIGHT_SHOULDER] = {
+    x: 0.65,
+    y: shoulderY,
+    z: 0,
+    visibility: 0.9,
+  };
 
   return {
     landmarks,
@@ -64,7 +87,7 @@ function generateShotSequence(totalFrames: number): PoseLandmarks[] {
     } else if (i < 70) {
       // Ball rises - wrists go up (Y decreases)
       const t = (i - 60) / 10;
-      wristY = 0.55 - t * 0.30; // Goes from 0.55 to 0.25
+      wristY = 0.55 - t * 0.3; // Goes from 0.55 to 0.25
     } else if (i < 76) {
       // Extension - wrists at highest
       const t = (i - 70) / 6;
@@ -76,7 +99,7 @@ function generateShotSequence(totalFrames: number): PoseLandmarks[] {
     } else {
       // Recovery
       const t = Math.min(1, (i - 85) / 15);
-      wristY = 0.40 + t * 0.10; // Goes back to 0.5
+      wristY = 0.4 + t * 0.1; // Goes back to 0.5
     }
 
     const landmarks = createMockLandmarks(wristY);
@@ -89,22 +112,26 @@ function generateShotSequence(totalFrames: number): PoseLandmarks[] {
 }
 
 // Run the test
-console.log('=== Shot Detection Test with Synthetic Data ===\n');
+console.log("=== Shot Detection Test with Synthetic Data ===\n");
 
 const detector = new ShotBoundaryDetector();
 const sequence = generateShotSequence(124);
 
 // Log wrist positions for frames 50-90
-console.log('Wrist Y positions for frames 50-90:');
+console.log("Wrist Y positions for frames 50-90:");
 for (let i = 50; i < 90 && i < sequence.length; i++) {
   const wristY = sequence[i]!.landmarks[LANDMARK_INDEX.LEFT_WRIST]!.y;
-  const prevWristY = i > 0 ? sequence[i - 1]!.landmarks[LANDMARK_INDEX.LEFT_WRIST]!.y : wristY;
+  const prevWristY =
+    i > 0 ? sequence[i - 1]!.landmarks[LANDMARK_INDEX.LEFT_WRIST]!.y : wristY;
   const velocity = wristY - prevWristY;
-  const marker = velocity < -0.015 ? ' <-- UPWARD' : velocity > 0.015 ? ' <-- DOWNWARD' : '';
-  console.log(`  Frame ${i}: wristY=${wristY.toFixed(3)}, velocity=${velocity.toFixed(4)}${marker}`);
+  const marker =
+    velocity < -0.015 ? " <-- UPWARD" : velocity > 0.015 ? " <-- DOWNWARD" : "";
+  console.log(
+    `  Frame ${i}: wristY=${wristY.toFixed(3)}, velocity=${velocity.toFixed(4)}${marker}`,
+  );
 }
 
-console.log('\nRunning shot detection...\n');
+console.log("\nRunning shot detection...\n");
 
 const shots = detector.detectShots(sequence);
 
@@ -112,17 +139,21 @@ console.log(`\nDetected ${shots.length} shot(s)`);
 
 if (shots.length > 0) {
   for (const shot of shots) {
-    console.log(`  Shot: frames ${shot.start.frameIndex} - ${shot.end.frameIndex}`);
+    console.log(
+      `  Shot: frames ${shot.start.frameIndex} - ${shot.end.frameIndex}`,
+    );
     console.log(`    Start confidence: ${shot.start.confidence.toFixed(2)}`);
     console.log(`    End confidence: ${shot.end.confidence.toFixed(2)}`);
   }
 } else {
-  console.log('\nNo shots detected. Checking detector internals...');
+  console.log("\nNo shots detected. Checking detector internals...");
 
   // Run detectBoundaries to see what's happening
   const boundaries = detector.detectBoundaries(sequence);
   console.log(`Boundaries found: ${boundaries.length}`);
   for (const b of boundaries) {
-    console.log(`  ${b.type} at frame ${b.frameIndex}, confidence: ${b.confidence.toFixed(2)}`);
+    console.log(
+      `  ${b.type} at frame ${b.frameIndex}, confidence: ${b.confidence.toFixed(2)}`,
+    );
   }
 }

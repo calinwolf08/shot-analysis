@@ -159,22 +159,35 @@ export class ShotBoundaryDetector {
     this.calculateVelocities(frameData);
 
     // Debug: Log velocity statistics
-    const velocities = frameData.map(f => f.wristVelocity);
+    const velocities = frameData.map((f) => f.wristVelocity);
     const minVel = Math.min(...velocities);
     const maxVel = Math.max(...velocities);
     const avgVel = velocities.reduce((a, b) => a + b, 0) / velocities.length;
-    const upwardFrames = velocities.filter(v => v < -this.config.velocityThreshold).length;
-    console.log(`[ShotDetector] Velocity stats: min=${minVel.toFixed(4)}, max=${maxVel.toFixed(4)}, avg=${avgVel.toFixed(4)}`);
-    console.log(`[ShotDetector] Threshold: ${this.config.velocityThreshold}, frames exceeding: ${upwardFrames}`);
-    console.log(`[ShotDetector] Wrist Y range: ${Math.min(...frameData.map(f => f.avgWristY)).toFixed(3)} - ${Math.max(...frameData.map(f => f.avgWristY)).toFixed(3)}`);
+    const upwardFrames = velocities.filter(
+      (v) => v < -this.config.velocityThreshold,
+    ).length;
+    console.log(
+      `[ShotDetector] Velocity stats: min=${minVel.toFixed(4)}, max=${maxVel.toFixed(4)}, avg=${avgVel.toFixed(4)}`,
+    );
+    console.log(
+      `[ShotDetector] Threshold: ${this.config.velocityThreshold}, frames exceeding: ${upwardFrames}`,
+    );
+    console.log(
+      `[ShotDetector] Wrist Y range: ${Math.min(...frameData.map((f) => f.avgWristY)).toFixed(3)} - ${Math.max(...frameData.map((f) => f.avgWristY)).toFixed(3)}`,
+    );
 
     // Debug: Log frames 50-85 (expected shot range based on labels)
-    console.log(`[ShotDetector] Frame-by-frame analysis for shot region (50-85):`);
+    console.log(
+      `[ShotDetector] Frame-by-frame analysis for shot region (50-85):`,
+    );
     for (let i = 50; i < Math.min(85, frameData.length); i++) {
       const f = frameData[i];
       if (f) {
-        const marker = f.wristVelocity < -this.config.velocityThreshold ? ' <-- UPWARD' : '';
-        console.log(`  Frame ${i}: wristY=${f.avgWristY.toFixed(3)}, velocity=${f.wristVelocity.toFixed(4)}${marker}`);
+        const marker =
+          f.wristVelocity < -this.config.velocityThreshold ? " <-- UPWARD" : "";
+        console.log(
+          `  Frame ${i}: wristY=${f.avgWristY.toFixed(3)}, velocity=${f.wristVelocity.toFixed(4)}${marker}`,
+        );
       }
     }
 
@@ -286,7 +299,9 @@ export class ShotBoundaryDetector {
         if (isUpward) {
           consecutiveUpwardFrames++;
           if (debugLogCount < 5) {
-            console.log(`[ShotDetector] Frame ${i}: upward velocity=${frame.wristVelocity.toFixed(4)}, consecutive=${consecutiveUpwardFrames}`);
+            console.log(
+              `[ShotDetector] Frame ${i}: upward velocity=${frame.wristVelocity.toFixed(4)}, consecutive=${consecutiveUpwardFrames}`,
+            );
             debugLogCount++;
           }
           if (
@@ -295,13 +310,17 @@ export class ShotBoundaryDetector {
           ) {
             // Start of potential shot
             shotStartFrame = Math.max(0, i - this.config.minUpwardFrames + 1);
-            console.log(`[ShotDetector] Potential shot start at frame ${shotStartFrame}`);
+            console.log(
+              `[ShotDetector] Potential shot start at frame ${shotStartFrame}`,
+            );
           }
         } else {
           if (shotStartFrame !== -1) {
             // Had a potential start but movement stopped - check if sustained
             const duration = i - shotStartFrame;
-            console.log(`[ShotDetector] Upward motion stopped at frame ${i}, duration=${duration}, minRequired=${this.config.minShotDuration / 2}`);
+            console.log(
+              `[ShotDetector] Upward motion stopped at frame ${i}, duration=${duration}, minRequired=${this.config.minShotDuration / 2}`,
+            );
             if (duration >= this.config.minShotDuration / 2) {
               // Confirmed shot start
               inShot = true;
@@ -317,10 +336,14 @@ export class ShotBoundaryDetector {
                 ),
                 isPartial: shotStartFrame === 0,
               });
-              console.log(`[ShotDetector] Confirmed shot start at frame ${shotStartFrame}`);
+              console.log(
+                `[ShotDetector] Confirmed shot start at frame ${shotStartFrame}`,
+              );
             } else {
               // Too short, reset (pump fake filter)
-              console.log(`[ShotDetector] Rejected as pump fake (duration ${duration} < ${this.config.minShotDuration / 2})`);
+              console.log(
+                `[ShotDetector] Rejected as pump fake (duration ${duration} < ${this.config.minShotDuration / 2})`,
+              );
               shotStartFrame = -1;
             }
           }

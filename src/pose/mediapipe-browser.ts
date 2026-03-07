@@ -300,7 +300,10 @@ export class MediaPipeBrowserDetector implements PoseDetector {
         // Use detectForVideo for VIDEO mode which requires timestamp
         // Prefer canvas if available (browser), otherwise create ImageData
         if (frame.canvas) {
-          result = this.landmarker.detectForVideo(frame.canvas, frame.timestamp);
+          result = this.landmarker.detectForVideo(
+            frame.canvas,
+            frame.timestamp,
+          );
         } else {
           // Fallback to ImageData for non-browser frames
           const imageData = new ImageData(

@@ -61,20 +61,20 @@ export class ShotBoundaryDetector {
         // Calculate velocities
         this.calculateVelocities(frameData);
         // Debug: Log velocity statistics
-        const velocities = frameData.map(f => f.wristVelocity);
+        const velocities = frameData.map((f) => f.wristVelocity);
         const minVel = Math.min(...velocities);
         const maxVel = Math.max(...velocities);
         const avgVel = velocities.reduce((a, b) => a + b, 0) / velocities.length;
-        const upwardFrames = velocities.filter(v => v < -this.config.velocityThreshold).length;
+        const upwardFrames = velocities.filter((v) => v < -this.config.velocityThreshold).length;
         console.log(`[ShotDetector] Velocity stats: min=${minVel.toFixed(4)}, max=${maxVel.toFixed(4)}, avg=${avgVel.toFixed(4)}`);
         console.log(`[ShotDetector] Threshold: ${this.config.velocityThreshold}, frames exceeding: ${upwardFrames}`);
-        console.log(`[ShotDetector] Wrist Y range: ${Math.min(...frameData.map(f => f.avgWristY)).toFixed(3)} - ${Math.max(...frameData.map(f => f.avgWristY)).toFixed(3)}`);
+        console.log(`[ShotDetector] Wrist Y range: ${Math.min(...frameData.map((f) => f.avgWristY)).toFixed(3)} - ${Math.max(...frameData.map((f) => f.avgWristY)).toFixed(3)}`);
         // Debug: Log frames 50-85 (expected shot range based on labels)
         console.log(`[ShotDetector] Frame-by-frame analysis for shot region (50-85):`);
         for (let i = 50; i < Math.min(85, frameData.length); i++) {
             const f = frameData[i];
             if (f) {
-                const marker = f.wristVelocity < -this.config.velocityThreshold ? ' <-- UPWARD' : '';
+                const marker = f.wristVelocity < -this.config.velocityThreshold ? " <-- UPWARD" : "";
                 console.log(`  Frame ${i}: wristY=${f.avgWristY.toFixed(3)}, velocity=${f.wristVelocity.toFixed(4)}${marker}`);
             }
         }

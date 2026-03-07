@@ -1,64 +1,64 @@
 {
-	"note": "This task is deferred until after manual labeling. Add back to progress.json feature 10.0 tasks array after labeling is complete.",
-	"task": {
-		"id": "10.2",
-		"name": "Pass All Test Videos (Incremental)",
-		"status": "pending",
-		"phase": "pending",
-		"attempts": 0,
-		"context": {
-			"user_story": "As a developer, I want the shot detection algorithm to pass all test videos incrementally, adding one video at a time, so that regressions are caught immediately and the algorithm generalizes properly.",
-			"acceptance_criteria": [
-				"Discover all test videos from test-data/ directory (sorted alphabetically)",
-				"For each video N: run iterative fix loop on videos 1 through N until all pass",
-				"Each 'level' (videos 1..N) has its own max attempts counter that resets when level passes",
-				"Shot start detected within ±3 frames (expandable to ±5 if within 4)",
-				"Shot end detected within ±3 frames (expandable to ±5 if within 4)",
-				"Orientation matches exactly for each video",
-				"algorithm-learnings.md updated after each fix attempt",
-				"Final state: all videos pass with consistent algorithm"
-			],
-			"edge_cases": [
-				"Adding video N breaks previously passing videos 1..N-1 - must fix regression before proceeding",
-				"Max attempts reached at any level - stop and report to user with detailed analysis",
-				"No test videos found - report and exit successfully"
-			],
-			"data_model": "algorithm-learnings.md sections: What Works, What Doesn't Work, Key Observations, Current Algorithm Summary, History. Track current level (N) and attempts at each level.",
-			"technical_notes": "INCREMENTAL PROCESS: (1) Create algorithm-learnings.md. (2) Discover videos [v1, v2, v3, ...] from test-data/. (3) LEVEL 1: Run test-runner on v1 only. If fail, analyze and fix (up to max attempts). Reset attempts when v1 passes. (4) LEVEL 2: Run test-runner on v1+v2. If fail, analyze and fix. If fix breaks v1, fix regression first. Reset attempts when both pass. (5) LEVEL 3: Run on v1+v2+v3. Continue pattern. (6) Stop when all videos pass OR max attempts reached at any level. ANALYSIS PROCESS: When test fails, examine labeled frames (±threshold) in poses.json - what makes them correct? Examine detected frames - why incorrectly chosen? Update algorithm. Update learnings. CREATIVE FREEDOM: Algorithm can be redesigned. May detect shot end first. May combine signals. Goal is consistent calculation."
-		},
-		"subtasks": [
-			{
-				"id": "10.2.1",
-				"description": "Create initial algorithm-learnings.md with empty sections"
-			},
-			{
-				"id": "10.2.2",
-				"description": "Discover and sort all test videos from test-data/ directory"
-			},
-			{
-				"id": "10.2.3",
-				"description": "LEVEL 1: Iterative fix loop on video 1 only (max attempts, reset on pass)"
-			},
-			{
-				"id": "10.2.4",
-				"description": "LEVEL 2: Iterative fix loop on videos 1+2 (max attempts, fix regressions first, reset on pass)"
-			},
-			{
-				"id": "10.2.5",
-				"description": "LEVEL N: Continue pattern for each additional video in test-data/"
-			},
-			{
-				"id": "10.2.6",
-				"description": "On each failure: analyze pose data for labeled vs detected frames, identify why incorrect"
-			},
-			{
-				"id": "10.2.7",
-				"description": "Update algorithm-learnings.md with insights after each fix attempt"
-			},
-			{
-				"id": "10.2.8",
-				"description": "Document final working algorithm when all videos pass"
-			}
-		]
-	}
+  "note": "This task is deferred until after manual labeling. Add back to progress.json feature 10.0 tasks array after labeling is complete.",
+  "task": {
+    "id": "10.2",
+    "name": "Pass All Test Videos (Incremental)",
+    "status": "pending",
+    "phase": "pending",
+    "attempts": 0,
+    "context": {
+      "user_story": "As a developer, I want the shot detection algorithm to pass all test videos incrementally, adding one video at a time, so that regressions are caught immediately and the algorithm generalizes properly.",
+      "acceptance_criteria": [
+        "Discover all test videos from test-data/ directory (sorted alphabetically)",
+        "For each video N: run iterative fix loop on videos 1 through N until all pass",
+        "Each 'level' (videos 1..N) has its own max attempts counter that resets when level passes",
+        "Shot start detected within ±3 frames (expandable to ±5 if within 4)",
+        "Shot end detected within ±3 frames (expandable to ±5 if within 4)",
+        "Orientation matches exactly for each video",
+        "algorithm-learnings.md updated after each fix attempt",
+        "Final state: all videos pass with consistent algorithm"
+      ],
+      "edge_cases": [
+        "Adding video N breaks previously passing videos 1..N-1 - must fix regression before proceeding",
+        "Max attempts reached at any level - stop and report to user with detailed analysis",
+        "No test videos found - report and exit successfully"
+      ],
+      "data_model": "algorithm-learnings.md sections: What Works, What Doesn't Work, Key Observations, Current Algorithm Summary, History. Track current level (N) and attempts at each level.",
+      "technical_notes": "INCREMENTAL PROCESS: (1) Create algorithm-learnings.md. (2) Discover videos [v1, v2, v3, ...] from test-data/. (3) LEVEL 1: Run test-runner on v1 only. If fail, analyze and fix (up to max attempts). Reset attempts when v1 passes. (4) LEVEL 2: Run test-runner on v1+v2. If fail, analyze and fix. If fix breaks v1, fix regression first. Reset attempts when both pass. (5) LEVEL 3: Run on v1+v2+v3. Continue pattern. (6) Stop when all videos pass OR max attempts reached at any level. ANALYSIS PROCESS: When test fails, examine labeled frames (±threshold) in poses.json - what makes them correct? Examine detected frames - why incorrectly chosen? Update algorithm. Update learnings. CREATIVE FREEDOM: Algorithm can be redesigned. May detect shot end first. May combine signals. Goal is consistent calculation."
+    },
+    "subtasks": [
+      {
+        "id": "10.2.1",
+        "description": "Create initial algorithm-learnings.md with empty sections"
+      },
+      {
+        "id": "10.2.2",
+        "description": "Discover and sort all test videos from test-data/ directory"
+      },
+      {
+        "id": "10.2.3",
+        "description": "LEVEL 1: Iterative fix loop on video 1 only (max attempts, reset on pass)"
+      },
+      {
+        "id": "10.2.4",
+        "description": "LEVEL 2: Iterative fix loop on videos 1+2 (max attempts, fix regressions first, reset on pass)"
+      },
+      {
+        "id": "10.2.5",
+        "description": "LEVEL N: Continue pattern for each additional video in test-data/"
+      },
+      {
+        "id": "10.2.6",
+        "description": "On each failure: analyze pose data for labeled vs detected frames, identify why incorrect"
+      },
+      {
+        "id": "10.2.7",
+        "description": "Update algorithm-learnings.md with insights after each fix attempt"
+      },
+      {
+        "id": "10.2.8",
+        "description": "Document final working algorithm when all videos pass"
+      }
+    ]
+  }
 }

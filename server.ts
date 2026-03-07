@@ -73,7 +73,10 @@ async function saveLabels(data: unknown, videoName: string): Promise<string> {
   return filePath;
 }
 
-async function saveValidation(data: unknown, filename: string): Promise<string> {
+async function saveValidation(
+  data: unknown,
+  filename: string,
+): Promise<string> {
   const safeName = filename.replace(/[^a-zA-Z0-9_-]/g, "_");
   const filePath = path.join(VALIDATIONS_DIR, `${safeName}.json`);
   await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
@@ -83,13 +86,15 @@ async function saveValidation(data: unknown, filename: string): Promise<string> 
 
 async function listValidations(): Promise<string[]> {
   const files = await fs.readdir(VALIDATIONS_DIR);
-  return files.filter(f => f.endsWith(".json"));
+  return files.filter((f) => f.endsWith(".json"));
 }
 
 async function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let body = "";
-    req.on("data", chunk => { body += chunk.toString(); });
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
     req.on("end", () => resolve(body));
     req.on("error", reject);
   });
@@ -107,13 +112,19 @@ function sendError(res: http.ServerResponse, message: string, status = 500) {
 
 // Check if browser bundle exists
 const bundlePath = path.join(process.cwd(), "dist", "shot-analysis.browser.js");
-const bundleMapPath = path.join(process.cwd(), "dist", "shot-analysis.browser.js.map");
+const bundleMapPath = path.join(
+  process.cwd(),
+  "dist",
+  "shot-analysis.browser.js.map",
+);
 
 try {
   await fs.access(bundlePath);
 } catch {
   console.error("Browser bundle not found at:", bundlePath);
-  console.error("Run 'npm run build:browser' first, or use 'npm run validate' to build and start.");
+  console.error(
+    "Run 'npm run build:browser' first, or use 'npm run validate' to build and start.",
+  );
   process.exit(1);
 }
 
@@ -145,7 +156,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     // Serve browser bundle
-    if (req.method === "GET" && url.pathname === "/dist/shot-analysis.browser.js") {
+    if (
+      req.method === "GET" &&
+      url.pathname === "/dist/shot-analysis.browser.js"
+    ) {
       const content = await fs.readFile(bundlePath, "utf-8");
       res.writeHead(200, { "Content-Type": "application/javascript" });
       res.end(content);
@@ -153,7 +167,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     // Serve source map
-    if (req.method === "GET" && url.pathname === "/dist/shot-analysis.browser.js.map") {
+    if (
+      req.method === "GET" &&
+      url.pathname === "/dist/shot-analysis.browser.js.map"
+    ) {
       try {
         const content = await fs.readFile(bundleMapPath, "utf-8");
         res.writeHead(200, { "Content-Type": "application/json" });

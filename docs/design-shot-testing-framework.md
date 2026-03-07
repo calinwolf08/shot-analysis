@@ -14,16 +14,19 @@ A testing framework that validates shot detection metrics against human-labeled 
 ## Core Metrics to Test
 
 ### Shot Start Frame
+
 - **Definition**: Frame when legs start bending (beginning of shooting motion)
 - **Detection approach**: Knee angle decrease AND hip drop (algorithm can be creative)
 - **Tolerance**: ±3 frames initially, expandable to ±5 if within 4 frames
 
 ### Shot End Frame
+
 - **Definition**: Frame when arms reach max extension AND legs start bending again (landing)
 - **Detection approach**: Wrist height peak + knee angle decrease (algorithm can be creative)
 - **Tolerance**: ±3 frames initially, expandable to ±5 if within 4 frames
 
 ### Camera Orientation
+
 - **Categories**: front, side-left, side-right, front-left, front-right
 - **Detection approach**: Hip-to-shoulder alignment analysis
 - **Tolerance**: Exact match required
@@ -43,6 +46,7 @@ test-data/
 ```
 
 ### poses.json Format
+
 ```json
 {
   "video": "chris 5.mp4",
@@ -66,6 +70,7 @@ test-data/
 ```
 
 ### labels.json Format
+
 ```json
 {
   "video": "chris 5.mp4",
@@ -92,6 +97,7 @@ test-data/
 ### 1. Labeling UI Extension (validate-metrics.html)
 
 Add to existing validator:
+
 - **Shot List Panel**: Display detected shots, allow adding/editing labels
 - **Frame Navigation**: Step through frames with keyboard (arrow keys)
 - **Label Controls**:
@@ -107,6 +113,7 @@ Add to existing validator:
 ### 2. Test Runner (test-runner.ts)
 
 Node.js CLI that:
+
 1. Loads poses.json and labels.json from test-data/
 2. Runs shot detection algorithm on poses
 3. Compares detected shots with labeled shots
@@ -290,22 +297,27 @@ The current shot detection uses wrist velocity. For this testing framework:
    # Shot Detection Algorithm Learnings
 
    ## What Works
+
    - [Approaches that successfully detect shots]
    - [Threshold values that are reliable]
 
    ## What Doesn't Work
+
    - [Approaches that caused false positives/negatives]
    - [Why they failed]
 
    ## Key Observations
+
    - [Patterns discovered in pose data]
    - [Differences between orientations]
 
    ## Current Algorithm Summary
+
    - [Brief description of current detection logic]
    - [Key thresholds and their values]
 
    ## History
+
    - [Date]: [Change made] - [Result]
    ```
 
@@ -328,6 +340,7 @@ The current shot detection uses wrist velocity. For this testing framework:
 ## Server Integration
 
 The existing server.ts needs endpoints for saving labels:
+
 - `POST /api/save-poses` - saves poses.json to test-data/<video>/
 - `POST /api/save-labels` - saves labels.json to test-data/<video>/
 

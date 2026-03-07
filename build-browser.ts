@@ -58,7 +58,7 @@ async function build() {
 
   console.log("Browser bundle created: dist/shot-analysis.browser.js");
   console.log(
-    "Include in HTML: <script src=\"dist/shot-analysis.browser.js\"></script>",
+    'Include in HTML: <script src="dist/shot-analysis.browser.js"></script>',
   );
   console.log("Access via: window.ShotAnalysis");
 }

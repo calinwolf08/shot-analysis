@@ -15,7 +15,11 @@
  *   npx tsx analyze-video.ts ./videos/shot1.mp4 --hand right --pretty
  */
 
-import { createShotAnalyzer, createConfig, createVideoFileProvider } from "./src/index";
+import {
+  createShotAnalyzer,
+  createConfig,
+  createVideoFileProvider,
+} from "./src/index";
 import type { MetricValue } from "./src/metrics/types";
 import type { ShotPhases } from "./src/detection/types";
 import * as fs from "fs/promises";
@@ -41,12 +45,15 @@ interface ValidationExport {
     shotIndex: number;
     frameRange: { start: number; end: number };
     phases: Record<string, { startFrame: number; endFrame: number }>;
-    metrics: Record<string, {
-      value: number | string;
-      unit: string;
-      frame: number;
-      confidence: number;
-    }>;
+    metrics: Record<
+      string,
+      {
+        value: number | string;
+        unit: string;
+        frame: number;
+        confidence: number;
+      }
+    >;
     overallConfidence: number;
   }>;
 }
@@ -58,13 +65,15 @@ function parseArgs(args: string[]): {
   output: string | null;
   pretty: boolean;
 } {
-  const videoPath = args.find(a => !a.startsWith("--"));
+  const videoPath = args.find((a) => !a.startsWith("--"));
   if (!videoPath) {
     console.error("Error: Video path is required");
     console.error("\nUsage: npx tsx analyze-video.ts <video-path> [options]");
     console.error("\nOptions:");
     console.error("  --hand <left|right>     Shooting hand (default: right)");
-    console.error("  --profile <name>        Profile name (default: youth-fundamentals)");
+    console.error(
+      "  --profile <name>        Profile name (default: youth-fundamentals)",
+    );
     console.error("  --output <path>         Output JSON path");
     console.error("  --pretty                Pretty-print JSON output");
     process.exit(1);
@@ -98,7 +107,9 @@ function parseArgs(args: string[]): {
   return { videoPath, hand, profile, output, pretty };
 }
 
-function convertPhasesToExport(phases: ShotPhases): Record<string, { startFrame: number; endFrame: number }> {
+function convertPhasesToExport(
+  phases: ShotPhases,
+): Record<string, { startFrame: number; endFrame: number }> {
   const result: Record<string, { startFrame: number; endFrame: number }> = {};
   for (const [phaseName, range] of Object.entries(phases)) {
     if (range) {
@@ -111,18 +122,24 @@ function convertPhasesToExport(phases: ShotPhases): Record<string, { startFrame:
   return result;
 }
 
-function convertMetricsToExport(metrics: Record<string, MetricValue>): Record<string, {
-  value: number | string;
-  unit: string;
-  frame: number;
-  confidence: number;
-}> {
-  const result: Record<string, {
+function convertMetricsToExport(metrics: Record<string, MetricValue>): Record<
+  string,
+  {
     value: number | string;
     unit: string;
     frame: number;
     confidence: number;
-  }> = {};
+  }
+> {
+  const result: Record<
+    string,
+    {
+      value: number | string;
+      unit: string;
+      frame: number;
+      confidence: number;
+    }
+  > = {};
   for (const [name, metric] of Object.entries(metrics)) {
     result[name] = {
       value: metric.value,
@@ -160,7 +177,7 @@ async function main() {
     createConfig({
       shootingHand: hand,
       profile,
-    })
+    }),
   );
 
   // Load video
@@ -188,9 +205,15 @@ async function main() {
     console.log("=== Shot Summary ===");
     for (const shot of result.shots) {
       console.log(`\nShot ${shot.shotIndex + 1}:`);
-      console.log(`  Frames: ${shot.frameRange.start} - ${shot.frameRange.end}`);
-      console.log(`  Confidence: ${(shot.overallConfidence * 100).toFixed(1)}%`);
-      console.log(`  Phases detected: ${Object.keys(shot.phases).join(", ") || "none"}`);
+      console.log(
+        `  Frames: ${shot.frameRange.start} - ${shot.frameRange.end}`,
+      );
+      console.log(
+        `  Confidence: ${(shot.overallConfidence * 100).toFixed(1)}%`,
+      );
+      console.log(
+        `  Phases detected: ${Object.keys(shot.phases).join(", ") || "none"}`,
+      );
       console.log(`  Metrics calculated: ${Object.keys(shot.metrics).length}`);
 
       // Show metrics summary
@@ -199,8 +222,11 @@ async function main() {
         console.log("  Metrics:");
         for (const name of metricNames) {
           const m = shot.metrics[name];
-          const valueStr = typeof m.value === "number" ? m.value.toFixed(2) : m.value;
-          console.log(`    - ${name}: ${valueStr} ${m.unit} (frame ${m.frame}, ${(m.confidence * 100).toFixed(0)}% conf)`);
+          const valueStr =
+            typeof m.value === "number" ? m.value.toFixed(2) : m.value;
+          console.log(
+            `    - ${name}: ${valueStr} ${m.unit} (frame ${m.frame}, ${(m.confidence * 100).toFixed(0)}% conf)`,
+          );
         }
       }
     }
@@ -218,23 +244,28 @@ async function main() {
       height: result.videoMetadata.height,
       fps: result.videoMetadata.fps,
       totalFrames: result.videoMetadata.totalFrames,
-      ...(result.videoMetadata.duration !== undefined && { duration: result.videoMetadata.duration }),
+      ...(result.videoMetadata.duration !== undefined && {
+        duration: result.videoMetadata.duration,
+      }),
     },
     config: {
       shootingHand: hand,
       profile,
     },
-    shots: result.shots.map(shot => ({
+    shots: result.shots.map((shot) => ({
       shotIndex: shot.shotIndex,
       frameRange: { start: shot.frameRange.start, end: shot.frameRange.end },
       phases: convertPhasesToExport(shot.phases),
-      metrics: convertMetricsToExport(shot.metrics as Record<string, MetricValue>),
+      metrics: convertMetricsToExport(
+        shot.metrics as Record<string, MetricValue>,
+      ),
       overallConfidence: shot.overallConfidence,
     })),
   };
 
   // Determine output path
-  const outputPath = output ?? absoluteVideoPath.replace(/\.[^.]+$/, "_analysis.json");
+  const outputPath =
+    output ?? absoluteVideoPath.replace(/\.[^.]+$/, "_analysis.json");
 
   // Write JSON
   const jsonContent = pretty
