@@ -3,14 +3,14 @@
 		"name": "manual-labeling-workflow",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-07T12:00:00Z",
-		"updated_at": "2026-03-07T22:59:48.407Z"
+		"updated_at": "2026-03-07T23:03:55.190Z"
 	},
 	"status": "in_progress",
 	"features": [
 		{
 			"id": "1.0",
 			"name": "Load Video on File Selection",
-			"status": "pending",
+			"status": "complete",
 			"parallel_group": 1,
 			"tasks": [
 				{
@@ -65,8 +65,8 @@
 				{
 					"id": "1.2",
 					"name": "Wire up file input and enable navigation controls",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a user, I want frame navigation controls (step forward/back, timeline) to be enabled after I select a video, so that I can navigate to specific frames for labeling.",
@@ -103,7 +103,8 @@
 							"id": "1.2.4",
 							"description": "Write manual test: select video, step through frames with arrow keys"
 						}
-					]
+					],
+					"commit_hash": "68a067db7e14aae3b841e1b4b43f76cf8e99c0d9"
 				}
 			]
 		},

@@ -1117,7 +1117,7 @@
             <div class="shot-labeling-header">
               <span class="shot-labeling-title">Shot Labels</span>
               <div class="shot-labeling-actions">
-                <button id="addShotBtn" class="secondary">+ Add Shot</button>
+                <button id="addShotBtn" class="secondary" disabled>+ Add Shot</button>
                 <button id="removeShotBtn" class="danger" disabled>
                   Remove Shot
                 </button>
@@ -1443,6 +1443,9 @@
           // Enable navigation controls
           enableControls();
 
+          // Enable Add Shot button now that video is loaded
+          updateAddShotButtonState();
+
           // Update frame display to show initial frame info
           updateFrameDisplay();
         };
@@ -1488,6 +1491,8 @@
         elements.videoPlaceholder.classList.remove("hidden");
         // Disable navigation controls to prevent use with invalid/missing video
         disableControls();
+        // Disable Add Shot button when video is not loaded
+        updateAddShotButtonState();
       }
 
       function enableControls() {
@@ -2790,6 +2795,13 @@
       function updateRemoveButtonState() {
         elements.removeShotBtn.disabled =
           labelingState.selectedShotIndex === null;
+      }
+
+      /**
+       * Updates the Add Shot button state based on video loaded state
+       */
+      function updateAddShotButtonState() {
+        elements.addShotBtn.disabled = !appState.videoLoaded;
       }
 
       /**
