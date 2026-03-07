@@ -1,368 +1,369 @@
 {
-  "project": {
-    "name": "manual-labeling-workflow",
-    "root_path": "/home/calin/projects/shot-analysis",
-    "created_at": "2026-03-07T12:00:00Z",
-    "updated_at": "2026-03-07T12:00:00Z"
-  },
-  "status": "pending",
-  "features": [
-    {
-      "id": "1.0",
-      "name": "Load Video on File Selection",
-      "status": "pending",
-      "parallel_group": 1,
-      "tasks": [
-        {
-          "id": "1.1",
-          "name": "Implement loadVideoIntoPlayer function",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a user, I want the video to load into the player immediately when I select a file, so that I can start navigating frames and labeling shots without clicking 'Analyze Video'.",
-            "acceptance_criteria": [
-              "Video loads into HTML video element when file is selected",
-              "Video metadata is extracted: duration, calculated frame count",
-              "FPS defaults to 30 (HTML5 video doesn't expose native FPS)",
-              "appState.videoLoaded is set to true after loading",
-              "appState.fps and appState.totalFrames are populated",
-              "Frame display is updated to show '0 / totalFrames'"
-            ],
-            "edge_cases": [
-              "Handle invalid video files gracefully (show error message)",
-              "Handle video load errors (network issues, corrupted file)",
-              "Clean up previous video URL object if user selects new file",
-              "Handle very short videos (< 1 second)"
-            ],
-            "data_model": "appState object fields: videoLoaded (boolean), fps (number, default 30), totalFrames (number, calculated as duration * fps). Video element uses URL.createObjectURL(file) as src.",
-            "technical_notes": "Use URL.createObjectURL(file) to create blob URL for video. Wait for 'loadedmetadata' event before extracting duration. Call URL.revokeObjectURL() on previous URL when loading new video to prevent memory leaks. HTML5 video doesn't expose native FPS, so default to 30fps per design doc recommendation."
-          },
-          "subtasks": [
-            {
-              "id": "1.1.1",
-              "description": "Create loadVideoIntoPlayer(file) function that sets video.src to blob URL"
-            },
-            {
-              "id": "1.1.2",
-              "description": "Add loadedmetadata event handler to extract duration and calculate totalFrames"
-            },
-            {
-              "id": "1.1.3",
-              "description": "Set appState.videoLoaded, appState.fps, appState.totalFrames"
-            },
-            {
-              "id": "1.1.4",
-              "description": "Call updateFrameDisplay() to show initial frame info"
-            },
-            {
-              "id": "1.1.5",
-              "description": "Add error handling for invalid/corrupted video files"
-            }
-          ]
-        },
-        {
-          "id": "1.2",
-          "name": "Wire up file input and enable navigation controls",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a user, I want frame navigation controls (step forward/back, timeline) to be enabled after I select a video, so that I can navigate to specific frames for labeling.",
-            "acceptance_criteria": [
-              "File input onchange calls loadVideoIntoPlayer()",
-              "Frame navigation buttons enabled after video loads",
-              "Arrow keys work for frame stepping after video loads",
-              "Timeline slider works after video loads",
-              "Frame jump input works after video loads",
-              "Can step through frames using keyboard after video selection (no analysis needed)"
-            ],
-            "edge_cases": [
-              "Selecting a new file while previous video is loaded should work cleanly",
-              "Navigation controls should be disabled if video fails to load",
-              "Keyboard shortcuts should only work when video element or document is focused"
-            ],
-            "data_model": "elements.videoFileInput is the file input element. Navigation buttons: prevFrameBtn, nextFrameBtn, prev10Btn, next10Btn, frameJumpBtn. Timeline slider: elements.timeline.",
-            "technical_notes": "Add onchange handler to elements.videoFileInput. The existing stepFrame(delta), seekToFrame(frame), and keyboard handlers should already work once appState.videoLoaded is true - verify they check videoLoaded not analysisData. Navigation controls may already be enabled by default, need to verify current disabled states."
-          },
-          "subtasks": [
-            {
-              "id": "1.2.1",
-              "description": "Add elements.videoFileInput.onchange handler that calls loadVideoIntoPlayer(file)"
-            },
-            {
-              "id": "1.2.2",
-              "description": "Verify navigation buttons check appState.videoLoaded (not analysisData)"
-            },
-            {
-              "id": "1.2.3",
-              "description": "Verify keyboard shortcuts for frame stepping work after video loads"
-            },
-            {
-              "id": "1.2.4",
-              "description": "Write manual test: select video, step through frames with arrow keys"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "2.0",
-      "name": "Enable Labeling UI After Video Loads",
-      "status": "pending",
-      "parallel_group": 1,
-      "tasks": [
-        {
-          "id": "2.1",
-          "name": "Update Add Shot button enable logic",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a user, I want the 'Add Shot' button to be enabled after I select a video (without running analysis), so that I can manually create shot labels.",
-            "acceptance_criteria": [
-              "Add Shot button is enabled when appState.videoLoaded is true",
-              "Add Shot button is disabled when no video is loaded",
-              "Add Shot button does NOT require appState.analysisData",
-              "Clicking Add Shot creates a new shot entry in the list",
-              "New shots have null startFrame and endFrame initially"
-            ],
-            "edge_cases": [
-              "If video load fails, Add Shot should remain disabled",
-              "Loading a new video should not clear existing manually added shots (TBD - may need user confirmation)"
-            ],
-            "data_model": "Button enable condition changes from: elements.addShotBtn.disabled = !appState.analysisData to: elements.addShotBtn.disabled = !appState.videoLoaded. Shot data structure: { shotNumber, startFrame, endFrame } stored in labelingState.shots array.",
-            "technical_notes": "Find where Add Shot button disabled state is set (likely in a state update function or after analysis). Change the condition. The addShot() function that creates new shots should already work - just need to enable the button earlier."
-          },
-          "subtasks": [
-            {
-              "id": "2.1.1",
-              "description": "Find Add Shot button enable/disable logic in validate-metrics.html"
-            },
-            {
-              "id": "2.1.2",
-              "description": "Change enable condition from analysisData to videoLoaded"
-            },
-            {
-              "id": "2.1.3",
-              "description": "Add updateAddShotButtonState() call after video loads"
-            },
-            {
-              "id": "2.1.4",
-              "description": "Write test: verify Add Shot enabled after video load, disabled before"
-            }
-          ]
-        },
-        {
-          "id": "2.2",
-          "name": "Add labeling panel visibility and test manual labeling flow",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a user, I want to see the labeling panel after loading a video, add shots manually, set start/end frames with S/E keys, and set orientation for each shot.",
-            "acceptance_criteria": [
-              "Labeling panel/section visible when video is loaded",
-              "S key sets startFrame for selected shot to current frame",
-              "E key sets endFrame for selected shot to current frame",
-              "Orientation dropdown shows options: Front, Side Left, Side Right, Front Left, Front Right",
-              "Shot validation works: end > start, no overlapping shots",
-              "Export Labels works with manually created shots",
-              "Left/Right orientation is relative to shooter (documented in UI)"
-            ],
-            "edge_cases": [
-              "S/E keys should only work when a shot is selected",
-              "Setting start frame after end frame should show validation error",
-              "Overlapping shots should show validation error",
-              "Empty shots (no start/end) should be handled gracefully in export"
-            ],
-            "data_model": "Orientation options: 'front', 'side-left', 'side-right', 'front-left', 'front-right'. Shot structure includes orientation field. labelingState.selectedShot indicates which shot is selected for editing.",
-            "technical_notes": "Labeling panel may already exist but be hidden. Check if there's a visibility condition tied to analysisData. S/E key handlers likely exist - verify they work without analysisData. Orientation dropdown should already exist from current implementation."
-          },
-          "subtasks": [
-            {
-              "id": "2.2.1",
-              "description": "Verify/add labeling panel visibility when videoLoaded is true"
-            },
-            {
-              "id": "2.2.2",
-              "description": "Verify S/E key handlers work without analysisData"
-            },
-            {
-              "id": "2.2.3",
-              "description": "Verify orientation dropdown exists and works for manual shots"
-            },
-            {
-              "id": "2.2.4",
-              "description": "Test full manual labeling flow: add shot, set frames, set orientation"
-            },
-            {
-              "id": "2.2.5",
-              "description": "Test Export Labels with manually created shots"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "3.0",
-      "name": "Export Poses On-Demand",
-      "status": "pending",
-      "parallel_group": 1,
-      "tasks": [
-        {
-          "id": "3.1",
-          "name": "Create runPoseDetection function",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a user, I want to click Export Poses and have the system automatically run pose detection on the video if it hasn't been analyzed yet, so I can get pose data without running full analysis.",
-            "acceptance_criteria": [
-              "runPoseDetection() creates MediaPipe pose detector (browser version)",
-              "Processes entire video frame by frame",
-              "Shows progress indicator: 'Detecting poses: X / Y (Z%)'",
-              "Returns pose data in same format as analyzer.analyzeVideo()",
-              "Progress updates every 10 frames or 100ms",
-              "Pose data includes: frameIndex, timestamp, confidence, landmarks (33 points)"
-            ],
-            "edge_cases": [
-              "Handle pose detection failure on individual frames (continue with null landmarks)",
-              "Handle MediaPipe initialization failure",
-              "Allow cancellation of long-running detection (optional)",
-              "Handle memory for long videos (process frame by frame, don't store video frames)"
-            ],
-            "data_model": "Pose data format: { video, fps, totalFrames, width, height, extractedAt, frames: [{ frameIndex, timestamp, poseConfidence, landmarks: [{x, y, z, visibility}...33 points] }] }. Must match existing appState.poseData format used by savePosesToServer().",
-            "technical_notes": "Use existing createPoseDetector() from browser bundle. Use createVideoElementProvider or similar to extract frames. Seek video to each frame using seekToFrame() logic, capture frame, run detection. MediaPipe returns 33 body landmarks per frame. Progress indicator can use existing progress display UI if available, or create simple status text."
-          },
-          "subtasks": [
-            {
-              "id": "3.1.1",
-              "description": "Create runPoseDetection() async function skeleton"
-            },
-            {
-              "id": "3.1.2",
-              "description": "Initialize MediaPipe pose detector using existing browser API"
-            },
-            {
-              "id": "3.1.3",
-              "description": "Implement frame-by-frame iteration through video"
-            },
-            {
-              "id": "3.1.4",
-              "description": "Add progress indicator display (update every 10 frames)"
-            },
-            {
-              "id": "3.1.5",
-              "description": "Return pose data in expected format matching appState.poseData structure"
-            }
-          ]
-        },
-        {
-          "id": "3.2",
-          "name": "Modify exportPoses and update button state",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a user, I want the Export Poses button to be enabled after loading a video, and when I click it, it should run pose detection automatically if needed before saving.",
-            "acceptance_criteria": [
-              "Export Poses button enabled when appState.videoLoaded is true",
-              "Export Poses button does NOT require appState.poseData to be enabled",
-              "Clicking Export Poses without poseData triggers runPoseDetection() first",
-              "After detection completes, poses are saved to /test-data/{video-name}/poses.json",
-              "If poseData already exists (from Analyze Video), exports immediately without re-detection",
-              "Progress shown during detection, success message after save"
-            ],
-            "edge_cases": [
-              "Handle detection failure (show error, don't save invalid data)",
-              "Handle server save failure (show error message)",
-              "Disable button during detection/save to prevent double-clicks",
-              "If user clicks during detection, should not start another detection"
-            ],
-            "data_model": "Button enable condition changes from: !appState.poseData to: !appState.videoLoaded. exportPoses() function modified to check if appState.poseData exists, if not call runPoseDetection() first.",
-            "technical_notes": "Modify updateExportPosesButtonState() to check videoLoaded instead of poseData. Modify exportPoses() to: 1) check if poseData exists, 2) if not, await runPoseDetection() and store in appState.poseData, 3) then call existing savePosesToServer(). Add button disable during operation to prevent double-clicks."
-          },
-          "subtasks": [
-            {
-              "id": "3.2.1",
-              "description": "Change updateExportPosesButtonState() to enable on videoLoaded"
-            },
-            {
-              "id": "3.2.2",
-              "description": "Modify exportPoses() to call runPoseDetection() if no poseData"
-            },
-            {
-              "id": "3.2.3",
-              "description": "Add button disable during detection/save operation"
-            },
-            {
-              "id": "3.2.4",
-              "description": "Test: Export Poses without prior analysis triggers detection and saves"
-            },
-            {
-              "id": "3.2.5",
-              "description": "Test: Export Poses after Analyze Video exports immediately (no re-detection)"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "4.0",
-      "name": "Verify Existing Analyze Video Unchanged",
-      "status": "pending",
-      "parallel_group": 1,
-      "tasks": [
-        {
-          "id": "4.1",
-          "name": "Verify Analyze Video regression tests",
-          "status": "pending",
-          "phase": "pending",
-          "attempts": 0,
-          "context": {
-            "user_story": "As a user, I want the existing 'Analyze Video' button to work exactly as before, so I can still use automatic shot detection and metrics when needed.",
-            "acceptance_criteria": [
-              "Analyze Video button still works after all changes",
-              "Full analysis pipeline runs: pose detection + shot detection + metrics",
-              "Auto-detected shots appear in shot list",
-              "Metrics are calculated and displayed for each shot",
-              "appState.poseData is populated after analysis",
-              "appState.analysisData is populated after analysis",
-              "Can switch between viewing auto-detected shots and their metrics"
-            ],
-            "edge_cases": [
-              "Running Analyze Video after manually adding shots (what happens to manual shots?)",
-              "Running Analyze Video twice on same video",
-              "Switching between manual and auto shots after analysis"
-            ],
-            "data_model": "No changes to data model - verification only. analysisData and poseData should be populated exactly as before.",
-            "technical_notes": "This is a regression test task - no code changes, only verification. Run through the existing Analyze Video flow and confirm all functionality still works. Document any issues found."
-          },
-          "subtasks": [
-            {
-              "id": "4.1.1",
-              "description": "Test: Select video, click Analyze Video, verify shots detected"
-            },
-            {
-              "id": "4.1.2",
-              "description": "Test: Verify metrics displayed for auto-detected shots"
-            },
-            {
-              "id": "4.1.3",
-              "description": "Test: Verify poseData populated after analysis"
-            },
-            {
-              "id": "4.1.4",
-              "description": "Test: Export Poses after Analyze Video (should export immediately)"
-            },
-            {
-              "id": "4.1.5",
-              "description": "Document any regression issues found"
-            }
-          ]
-        }
-      ]
-    }
-  ]
+	"project": {
+		"name": "manual-labeling-workflow",
+		"root_path": "/home/calin/projects/shot-analysis",
+		"created_at": "2026-03-07T12:00:00Z",
+		"updated_at": "2026-03-07T22:59:48.407Z"
+	},
+	"status": "in_progress",
+	"features": [
+		{
+			"id": "1.0",
+			"name": "Load Video on File Selection",
+			"status": "pending",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "1.1",
+					"name": "Implement loadVideoIntoPlayer function",
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a user, I want the video to load into the player immediately when I select a file, so that I can start navigating frames and labeling shots without clicking 'Analyze Video'.",
+						"acceptance_criteria": [
+							"Video loads into HTML video element when file is selected",
+							"Video metadata is extracted: duration, calculated frame count",
+							"FPS defaults to 30 (HTML5 video doesn't expose native FPS)",
+							"appState.videoLoaded is set to true after loading",
+							"appState.fps and appState.totalFrames are populated",
+							"Frame display is updated to show '0 / totalFrames'"
+						],
+						"edge_cases": [
+							"Handle invalid video files gracefully (show error message)",
+							"Handle video load errors (network issues, corrupted file)",
+							"Clean up previous video URL object if user selects new file",
+							"Handle very short videos (< 1 second)"
+						],
+						"data_model": "appState object fields: videoLoaded (boolean), fps (number, default 30), totalFrames (number, calculated as duration * fps). Video element uses URL.createObjectURL(file) as src.",
+						"technical_notes": "Use URL.createObjectURL(file) to create blob URL for video. Wait for 'loadedmetadata' event before extracting duration. Call URL.revokeObjectURL() on previous URL when loading new video to prevent memory leaks. HTML5 video doesn't expose native FPS, so default to 30fps per design doc recommendation."
+					},
+					"subtasks": [
+						{
+							"id": "1.1.1",
+							"description": "Create loadVideoIntoPlayer(file) function that sets video.src to blob URL"
+						},
+						{
+							"id": "1.1.2",
+							"description": "Add loadedmetadata event handler to extract duration and calculate totalFrames"
+						},
+						{
+							"id": "1.1.3",
+							"description": "Set appState.videoLoaded, appState.fps, appState.totalFrames"
+						},
+						{
+							"id": "1.1.4",
+							"description": "Call updateFrameDisplay() to show initial frame info"
+						},
+						{
+							"id": "1.1.5",
+							"description": "Add error handling for invalid/corrupted video files"
+						}
+					],
+					"commit_hash": "cfe5a33ca8128e8af97033d43e98d27e169e1400"
+				},
+				{
+					"id": "1.2",
+					"name": "Wire up file input and enable navigation controls",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a user, I want frame navigation controls (step forward/back, timeline) to be enabled after I select a video, so that I can navigate to specific frames for labeling.",
+						"acceptance_criteria": [
+							"File input onchange calls loadVideoIntoPlayer()",
+							"Frame navigation buttons enabled after video loads",
+							"Arrow keys work for frame stepping after video loads",
+							"Timeline slider works after video loads",
+							"Frame jump input works after video loads",
+							"Can step through frames using keyboard after video selection (no analysis needed)"
+						],
+						"edge_cases": [
+							"Selecting a new file while previous video is loaded should work cleanly",
+							"Navigation controls should be disabled if video fails to load",
+							"Keyboard shortcuts should only work when video element or document is focused"
+						],
+						"data_model": "elements.videoFileInput is the file input element. Navigation buttons: prevFrameBtn, nextFrameBtn, prev10Btn, next10Btn, frameJumpBtn. Timeline slider: elements.timeline.",
+						"technical_notes": "Add onchange handler to elements.videoFileInput. The existing stepFrame(delta), seekToFrame(frame), and keyboard handlers should already work once appState.videoLoaded is true - verify they check videoLoaded not analysisData. Navigation controls may already be enabled by default, need to verify current disabled states."
+					},
+					"subtasks": [
+						{
+							"id": "1.2.1",
+							"description": "Add elements.videoFileInput.onchange handler that calls loadVideoIntoPlayer(file)"
+						},
+						{
+							"id": "1.2.2",
+							"description": "Verify navigation buttons check appState.videoLoaded (not analysisData)"
+						},
+						{
+							"id": "1.2.3",
+							"description": "Verify keyboard shortcuts for frame stepping work after video loads"
+						},
+						{
+							"id": "1.2.4",
+							"description": "Write manual test: select video, step through frames with arrow keys"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "2.0",
+			"name": "Enable Labeling UI After Video Loads",
+			"status": "pending",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "2.1",
+					"name": "Update Add Shot button enable logic",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a user, I want the 'Add Shot' button to be enabled after I select a video (without running analysis), so that I can manually create shot labels.",
+						"acceptance_criteria": [
+							"Add Shot button is enabled when appState.videoLoaded is true",
+							"Add Shot button is disabled when no video is loaded",
+							"Add Shot button does NOT require appState.analysisData",
+							"Clicking Add Shot creates a new shot entry in the list",
+							"New shots have null startFrame and endFrame initially"
+						],
+						"edge_cases": [
+							"If video load fails, Add Shot should remain disabled",
+							"Loading a new video should not clear existing manually added shots (TBD - may need user confirmation)"
+						],
+						"data_model": "Button enable condition changes from: elements.addShotBtn.disabled = !appState.analysisData to: elements.addShotBtn.disabled = !appState.videoLoaded. Shot data structure: { shotNumber, startFrame, endFrame } stored in labelingState.shots array.",
+						"technical_notes": "Find where Add Shot button disabled state is set (likely in a state update function or after analysis). Change the condition. The addShot() function that creates new shots should already work - just need to enable the button earlier."
+					},
+					"subtasks": [
+						{
+							"id": "2.1.1",
+							"description": "Find Add Shot button enable/disable logic in validate-metrics.html"
+						},
+						{
+							"id": "2.1.2",
+							"description": "Change enable condition from analysisData to videoLoaded"
+						},
+						{
+							"id": "2.1.3",
+							"description": "Add updateAddShotButtonState() call after video loads"
+						},
+						{
+							"id": "2.1.4",
+							"description": "Write test: verify Add Shot enabled after video load, disabled before"
+						}
+					]
+				},
+				{
+					"id": "2.2",
+					"name": "Add labeling panel visibility and test manual labeling flow",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a user, I want to see the labeling panel after loading a video, add shots manually, set start/end frames with S/E keys, and set orientation for each shot.",
+						"acceptance_criteria": [
+							"Labeling panel/section visible when video is loaded",
+							"S key sets startFrame for selected shot to current frame",
+							"E key sets endFrame for selected shot to current frame",
+							"Orientation dropdown shows options: Front, Side Left, Side Right, Front Left, Front Right",
+							"Shot validation works: end > start, no overlapping shots",
+							"Export Labels works with manually created shots",
+							"Left/Right orientation is relative to shooter (documented in UI)"
+						],
+						"edge_cases": [
+							"S/E keys should only work when a shot is selected",
+							"Setting start frame after end frame should show validation error",
+							"Overlapping shots should show validation error",
+							"Empty shots (no start/end) should be handled gracefully in export"
+						],
+						"data_model": "Orientation options: 'front', 'side-left', 'side-right', 'front-left', 'front-right'. Shot structure includes orientation field. labelingState.selectedShot indicates which shot is selected for editing.",
+						"technical_notes": "Labeling panel may already exist but be hidden. Check if there's a visibility condition tied to analysisData. S/E key handlers likely exist - verify they work without analysisData. Orientation dropdown should already exist from current implementation."
+					},
+					"subtasks": [
+						{
+							"id": "2.2.1",
+							"description": "Verify/add labeling panel visibility when videoLoaded is true"
+						},
+						{
+							"id": "2.2.2",
+							"description": "Verify S/E key handlers work without analysisData"
+						},
+						{
+							"id": "2.2.3",
+							"description": "Verify orientation dropdown exists and works for manual shots"
+						},
+						{
+							"id": "2.2.4",
+							"description": "Test full manual labeling flow: add shot, set frames, set orientation"
+						},
+						{
+							"id": "2.2.5",
+							"description": "Test Export Labels with manually created shots"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "3.0",
+			"name": "Export Poses On-Demand",
+			"status": "pending",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "3.1",
+					"name": "Create runPoseDetection function",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a user, I want to click Export Poses and have the system automatically run pose detection on the video if it hasn't been analyzed yet, so I can get pose data without running full analysis.",
+						"acceptance_criteria": [
+							"runPoseDetection() creates MediaPipe pose detector (browser version)",
+							"Processes entire video frame by frame",
+							"Shows progress indicator: 'Detecting poses: X / Y (Z%)'",
+							"Returns pose data in same format as analyzer.analyzeVideo()",
+							"Progress updates every 10 frames or 100ms",
+							"Pose data includes: frameIndex, timestamp, confidence, landmarks (33 points)"
+						],
+						"edge_cases": [
+							"Handle pose detection failure on individual frames (continue with null landmarks)",
+							"Handle MediaPipe initialization failure",
+							"Allow cancellation of long-running detection (optional)",
+							"Handle memory for long videos (process frame by frame, don't store video frames)"
+						],
+						"data_model": "Pose data format: { video, fps, totalFrames, width, height, extractedAt, frames: [{ frameIndex, timestamp, poseConfidence, landmarks: [{x, y, z, visibility}...33 points] }] }. Must match existing appState.poseData format used by savePosesToServer().",
+						"technical_notes": "Use existing createPoseDetector() from browser bundle. Use createVideoElementProvider or similar to extract frames. Seek video to each frame using seekToFrame() logic, capture frame, run detection. MediaPipe returns 33 body landmarks per frame. Progress indicator can use existing progress display UI if available, or create simple status text."
+					},
+					"subtasks": [
+						{
+							"id": "3.1.1",
+							"description": "Create runPoseDetection() async function skeleton"
+						},
+						{
+							"id": "3.1.2",
+							"description": "Initialize MediaPipe pose detector using existing browser API"
+						},
+						{
+							"id": "3.1.3",
+							"description": "Implement frame-by-frame iteration through video"
+						},
+						{
+							"id": "3.1.4",
+							"description": "Add progress indicator display (update every 10 frames)"
+						},
+						{
+							"id": "3.1.5",
+							"description": "Return pose data in expected format matching appState.poseData structure"
+						}
+					]
+				},
+				{
+					"id": "3.2",
+					"name": "Modify exportPoses and update button state",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a user, I want the Export Poses button to be enabled after loading a video, and when I click it, it should run pose detection automatically if needed before saving.",
+						"acceptance_criteria": [
+							"Export Poses button enabled when appState.videoLoaded is true",
+							"Export Poses button does NOT require appState.poseData to be enabled",
+							"Clicking Export Poses without poseData triggers runPoseDetection() first",
+							"After detection completes, poses are saved to /test-data/{video-name}/poses.json",
+							"If poseData already exists (from Analyze Video), exports immediately without re-detection",
+							"Progress shown during detection, success message after save"
+						],
+						"edge_cases": [
+							"Handle detection failure (show error, don't save invalid data)",
+							"Handle server save failure (show error message)",
+							"Disable button during detection/save to prevent double-clicks",
+							"If user clicks during detection, should not start another detection"
+						],
+						"data_model": "Button enable condition changes from: !appState.poseData to: !appState.videoLoaded. exportPoses() function modified to check if appState.poseData exists, if not call runPoseDetection() first.",
+						"technical_notes": "Modify updateExportPosesButtonState() to check videoLoaded instead of poseData. Modify exportPoses() to: 1) check if poseData exists, 2) if not, await runPoseDetection() and store in appState.poseData, 3) then call existing savePosesToServer(). Add button disable during operation to prevent double-clicks."
+					},
+					"subtasks": [
+						{
+							"id": "3.2.1",
+							"description": "Change updateExportPosesButtonState() to enable on videoLoaded"
+						},
+						{
+							"id": "3.2.2",
+							"description": "Modify exportPoses() to call runPoseDetection() if no poseData"
+						},
+						{
+							"id": "3.2.3",
+							"description": "Add button disable during detection/save operation"
+						},
+						{
+							"id": "3.2.4",
+							"description": "Test: Export Poses without prior analysis triggers detection and saves"
+						},
+						{
+							"id": "3.2.5",
+							"description": "Test: Export Poses after Analyze Video exports immediately (no re-detection)"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "4.0",
+			"name": "Verify Existing Analyze Video Unchanged",
+			"status": "pending",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "4.1",
+					"name": "Verify Analyze Video regression tests",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a user, I want the existing 'Analyze Video' button to work exactly as before, so I can still use automatic shot detection and metrics when needed.",
+						"acceptance_criteria": [
+							"Analyze Video button still works after all changes",
+							"Full analysis pipeline runs: pose detection + shot detection + metrics",
+							"Auto-detected shots appear in shot list",
+							"Metrics are calculated and displayed for each shot",
+							"appState.poseData is populated after analysis",
+							"appState.analysisData is populated after analysis",
+							"Can switch between viewing auto-detected shots and their metrics"
+						],
+						"edge_cases": [
+							"Running Analyze Video after manually adding shots (what happens to manual shots?)",
+							"Running Analyze Video twice on same video",
+							"Switching between manual and auto shots after analysis"
+						],
+						"data_model": "No changes to data model - verification only. analysisData and poseData should be populated exactly as before.",
+						"technical_notes": "This is a regression test task - no code changes, only verification. Run through the existing Analyze Video flow and confirm all functionality still works. Document any issues found."
+					},
+					"subtasks": [
+						{
+							"id": "4.1.1",
+							"description": "Test: Select video, click Analyze Video, verify shots detected"
+						},
+						{
+							"id": "4.1.2",
+							"description": "Test: Verify metrics displayed for auto-detected shots"
+						},
+						{
+							"id": "4.1.3",
+							"description": "Test: Verify poseData populated after analysis"
+						},
+						{
+							"id": "4.1.4",
+							"description": "Test: Export Poses after Analyze Video (should export immediately)"
+						},
+						{
+							"id": "4.1.5",
+							"description": "Document any regression issues found"
+						}
+					]
+				}
+			]
+		}
+	]
 }
