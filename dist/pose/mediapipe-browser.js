@@ -173,20 +173,23 @@ export class MediaPipeBrowserDetector {
         if (this.closed) {
             throw new DetectorClosedError();
         }
-        // Create ImageData-like object for MediaPipe
-        const imageData = {
-            data: frame.data,
-            width: frame.width,
-            height: frame.height,
-        };
         let result;
         try {
             if (this.runningMode === "VIDEO") {
                 // Use detectForVideo for VIDEO mode which requires timestamp
-                result = this.landmarker.detectForVideo(imageData, frame.timestamp);
+                // Prefer canvas if available (browser), otherwise create ImageData
+                if (frame.canvas) {
+                    result = this.landmarker.detectForVideo(frame.canvas, frame.timestamp);
+                }
+                else {
+                    // Fallback to ImageData for non-browser frames
+                    const imageData = new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height);
+                    result = this.landmarker.detectForVideo(imageData, frame.timestamp);
+                }
             }
             else {
-                // Use detect for IMAGE mode
+                // Use detect for IMAGE mode - ImageData works here
+                const imageData = new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height);
                 result = this.landmarker.detect(imageData);
             }
         }

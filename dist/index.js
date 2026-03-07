@@ -19,6 +19,8 @@ export {
 VideoFileProvider, createVideoFileProvider, VideoFileNotFoundError, VideoFileCorruptedError, UnsupportedVideoFormatError, 
 // Media stream provider (browser)
 MediaStreamProvider, createMediaStreamProvider, MediaStreamEndedError, MediaStreamInactiveError, NoVideoTrackError, 
+// Video element provider (browser - for file uploads)
+VideoElementProvider, createVideoElementProvider, VideoLoadError, 
 // Shared errors
 InvalidFpsError, } from "./providers";
 export { ShotAnalyzer, createShotAnalyzer, ShotAnalyzerNotInitializedError, ShotAnalyzerAlreadyInitializedError, } from "./analyzer";

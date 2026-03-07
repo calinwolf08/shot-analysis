@@ -4,6 +4,30 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { DetectorClosedError, PoseDetectionError } from "./detector";
 import { TOTAL_LANDMARKS } from "./types";
+// Mock ImageData for Node.js environment (browser API not available in tests)
+class MockImageData {
+    data;
+    width;
+    height;
+    colorSpace = "srgb";
+    constructor(dataOrWidth, widthOrHeight, height) {
+        if (typeof dataOrWidth === "number") {
+            // Constructor: new ImageData(width, height)
+            this.width = dataOrWidth;
+            this.height = widthOrHeight;
+            this.data = new Uint8ClampedArray(this.width * this.height * 4);
+        }
+        else {
+            // Constructor: new ImageData(data, width, height?)
+            this.data = dataOrWidth;
+            this.width = widthOrHeight;
+            this.height = height ?? dataOrWidth.length / (widthOrHeight * 4);
+        }
+    }
+}
+// Set up global ImageData mock before any imports that might use it
+globalThis.ImageData =
+    MockImageData;
 // Mock @mediapipe/tasks-vision
 vi.mock("@mediapipe/tasks-vision", () => {
     const mockLandmarker = {

@@ -7,6 +7,36 @@ import { DetectorClosedError, PoseDetectionError } from "./detector";
 import type { VideoFrame } from "../providers/types";
 import { TOTAL_LANDMARKS } from "./types";
 
+// Mock ImageData for Node.js environment (browser API not available in tests)
+class MockImageData {
+  readonly data: Uint8ClampedArray;
+  readonly width: number;
+  readonly height: number;
+  readonly colorSpace: PredefinedColorSpace = "srgb";
+
+  constructor(
+    dataOrWidth: Uint8ClampedArray | number,
+    widthOrHeight: number,
+    height?: number,
+  ) {
+    if (typeof dataOrWidth === "number") {
+      // Constructor: new ImageData(width, height)
+      this.width = dataOrWidth;
+      this.height = widthOrHeight;
+      this.data = new Uint8ClampedArray(this.width * this.height * 4);
+    } else {
+      // Constructor: new ImageData(data, width, height?)
+      this.data = dataOrWidth;
+      this.width = widthOrHeight;
+      this.height = height ?? dataOrWidth.length / (widthOrHeight * 4);
+    }
+  }
+}
+
+// Set up global ImageData mock before any imports that might use it
+(globalThis as unknown as { ImageData: typeof MockImageData }).ImageData =
+  MockImageData;
+
 // Mock @mediapipe/tasks-vision
 vi.mock("@mediapipe/tasks-vision", () => {
   const mockLandmarker = {

@@ -68,7 +68,11 @@ export {
 } from "./utils";
 
 // Frame provider exports
-export type { FrameProvider, MediaStreamProviderOptions } from "./providers";
+export type {
+  FrameProvider,
+  MediaStreamProviderOptions,
+  VideoElementProviderOptions,
+} from "./providers";
 export {
   // Video file provider (Node.js)
   VideoFileProvider,
@@ -82,6 +86,10 @@ export {
   MediaStreamEndedError,
   MediaStreamInactiveError,
   NoVideoTrackError,
+  // Video element provider (browser - for file uploads)
+  VideoElementProvider,
+  createVideoElementProvider,
+  VideoLoadError,
   // Shared errors
   InvalidFpsError,
 } from "./providers";

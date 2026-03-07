@@ -1,0 +1,1895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shot Analysis Metrics Validator</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      color: #fff;
+    }
+
+    /* Analysis Section */
+    .analysis-section {
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .analysis-form {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .form-group.path-input {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .form-group label {
+      font-size: 0.85rem;
+      color: #9ca3af;
+    }
+
+    .form-group input, .form-group select {
+      padding: 10px 14px;
+      background: #374151;
+      border: 1px solid #4b5563;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    .form-group input::placeholder {
+      color: #6b7280;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+
+    button:hover:not(:disabled) {
+      background: #1d4ed8;
+    }
+
+    button:disabled {
+      background: #374151;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    button.secondary {
+      background: #374151;
+    }
+
+    button.secondary:hover:not(:disabled) {
+      background: #4b5563;
+    }
+
+    button.success {
+      background: #16a34a;
+    }
+
+    button.success:hover:not(:disabled) {
+      background: #15803d;
+    }
+
+    button.danger {
+      background: #dc2626;
+    }
+
+    button.danger:hover:not(:disabled) {
+      background: #b91c1c;
+    }
+
+    .analyze-btn {
+      padding: 10px 30px;
+      font-size: 15px;
+    }
+
+    .analyze-btn.loading {
+      background: #4b5563;
+      cursor: wait;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #374151;
+      flex-wrap: wrap;
+    }
+
+    .main-layout {
+      display: grid;
+      grid-template-columns: 1fr 450px;
+      gap: 20px;
+    }
+
+    @media (max-width: 1200px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .video-section {
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 15px;
+    }
+
+    .video-container {
+      position: relative;
+      background: #000;
+      border-radius: 6px;
+      overflow: hidden;
+      aspect-ratio: 16/9;
+      margin-bottom: 15px;
+    }
+
+    .video-container video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .video-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #888;
+      gap: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .video-placeholder.hidden {
+      display: none;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #374151;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .control-group button {
+      padding: 8px 12px;
+    }
+
+    .frame-display {
+      background: #1a1a1a;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 14px;
+      min-width: 280px;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .frame-display .frame-info {
+      color: #60a5fa;
+    }
+
+    .frame-display .time-info {
+      color: #4ade80;
+    }
+
+    .frame-display .separator {
+      color: #4b5563;
+    }
+
+    .timeline {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .timeline input[type="range"] {
+      width: 100%;
+      height: 8px;
+      -webkit-appearance: none;
+      background: #374151;
+      border-radius: 4px;
+      outline: none;
+    }
+
+    .timeline input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #2563eb;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .metrics-panel {
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 15px;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #374151;
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .shot-tabs {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    .shot-tab {
+      padding: 8px 16px;
+      background: #374151;
+      border: none;
+      border-radius: 6px;
+      color: #e0e0e0;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .shot-tab.active {
+      background: #2563eb;
+      color: white;
+    }
+
+    .shot-tab:hover:not(.active) {
+      background: #4b5563;
+    }
+
+    .shot-info {
+      background: #1a1a1a;
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 0.9rem;
+    }
+
+    .shot-info .label {
+      color: #9ca3af;
+    }
+
+    .shot-info .value {
+      color: #fff;
+      font-weight: 500;
+    }
+
+    .phase-section {
+      margin-bottom: 15px;
+    }
+
+    .section-header {
+      font-size: 0.85rem;
+      color: #9ca3af;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-header::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #374151;
+    }
+
+    .phase-list {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 15px;
+    }
+
+    .phase-chip {
+      padding: 6px 12px;
+      background: #374151;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .phase-chip:hover {
+      background: #4b5563;
+      border-color: #2563eb;
+    }
+
+    .phase-chip.at-frame {
+      background: #1e3a5f;
+      border-color: #2563eb;
+    }
+
+    .phase-chip .name {
+      color: #60a5fa;
+      font-weight: 500;
+    }
+
+    .phase-chip .frames {
+      color: #9ca3af;
+      font-size: 0.8rem;
+      margin-left: 6px;
+    }
+
+    .metric-card {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 10px;
+      border-left: 4px solid #374151;
+      transition: all 0.2s;
+    }
+
+    .metric-card.at-frame {
+      border-left-color: #2563eb;
+      background: #1e293b;
+    }
+
+    .metric-card.incorrect {
+      border-left-color: #dc2626;
+    }
+
+    .metric-card.corrected {
+      border-left-color: #16a34a;
+    }
+
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .metric-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #fff;
+    }
+
+    .metric-frame-btn {
+      font-size: 0.8rem;
+      color: #9ca3af;
+      cursor: pointer;
+      padding: 3px 8px;
+      background: #374151;
+      border-radius: 4px;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .metric-frame-btn:hover {
+      background: #2563eb;
+      color: #fff;
+    }
+
+    .metric-value {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .metric-value .value {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .metric-value .unit {
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+
+    .metric-confidence {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+
+    .metric-confidence .high { color: #4ade80; }
+    .metric-confidence .medium { color: #facc15; }
+    .metric-confidence .low { color: #f87171; }
+
+    .metric-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .metric-actions button {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    .correction-form {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #374151;
+    }
+
+    .correction-form .form-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .correction-form .form-row .form-group {
+      flex: 1;
+    }
+
+    .correction-form label {
+      display: block;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      margin-bottom: 4px;
+    }
+
+    .correction-form input {
+      width: 100%;
+      padding: 8px 10px;
+      background: #374151;
+      border: 1px solid #4b5563;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 13px;
+    }
+
+    .correction-form input:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    .correction-form .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .correction-note {
+      font-size: 0.85rem;
+      padding: 10px 12px;
+      background: #374151;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+
+    .correction-note.incorrect {
+      background: rgba(220, 38, 38, 0.15);
+      border: 1px solid rgba(220, 38, 38, 0.3);
+    }
+
+    .correction-note.corrected {
+      background: rgba(22, 163, 74, 0.15);
+      border: 1px solid rgba(22, 163, 74, 0.3);
+    }
+
+    .correction-note strong {
+      color: #fff;
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 40px 20px;
+      color: #6b7280;
+    }
+
+    .no-data p {
+      margin-bottom: 10px;
+    }
+
+    .status-bar {
+      margin-top: 20px;
+      padding: 12px 15px;
+      background: #2a2a2a;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    .status-bar .stats {
+      display: flex;
+      gap: 25px;
+      flex-wrap: wrap;
+    }
+
+    .status-bar .stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-bar .stat-label {
+      color: #9ca3af;
+    }
+
+    .status-bar .stat-value {
+      font-weight: 600;
+      color: #e0e0e0;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .badge.incorrect {
+      background: rgba(220, 38, 38, 0.2);
+      color: #f87171;
+    }
+
+    .badge.corrected {
+      background: rgba(22, 163, 74, 0.2);
+      color: #4ade80;
+    }
+
+    .keyboard-hint {
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin-top: 12px;
+    }
+
+    .keyboard-hint kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      background: #374151;
+      border-radius: 3px;
+      font-family: monospace;
+      margin: 0 2px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Toast notifications */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      background: #374151;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+    }
+
+    .toast.success { background: #16a34a; }
+    .toast.error { background: #dc2626; }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal {
+      background: #2a2a2a;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal h2 {
+      margin-bottom: 15px;
+      font-size: 1.2rem;
+    }
+
+    .modal pre {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      justify-content: flex-end;
+    }
+
+    /* Category sections */
+    .category-section {
+      margin-bottom: 20px;
+    }
+
+    .category-header {
+      font-size: 0.8rem;
+      color: #60a5fa;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #374151;
+    }
+
+    /* Progress bar */
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: #374151;
+      border-radius: 4px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: #2563eb;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Shot Analysis Metrics Validator</h1>
+
+    <!-- Analysis Section -->
+    <div class="analysis-section">
+      <div class="analysis-form">
+        <div class="form-group">
+          <label>Video File</label>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button id="selectVideoBtn" class="secondary" style="white-space: nowrap;">Select Video</button>
+            <input type="file" id="videoFileInput" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" style="display: none;">
+            <span id="selectedFileName" style="color: #9ca3af; font-size: 0.9rem;">No file selected</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Shooting Hand</label>
+          <select id="shootingHand">
+            <option value="right">Right</option>
+            <option value="left">Left</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Profile</label>
+          <select id="profile">
+            <option value="youth-fundamentals">Youth Fundamentals</option>
+            <option value="high-school">High School</option>
+            <option value="pro-form">Pro Form</option>
+          </select>
+        </div>
+        <button id="analyzeBtn" class="analyze-btn" disabled>Analyze Video</button>
+      </div>
+
+      <div id="progressSection" class="hidden" style="margin-top: 15px;">
+        <p id="progressText" style="font-size: 0.9rem; color: #9ca3af;">Initializing analyzer...</p>
+        <div class="progress-bar-container">
+          <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="toolbar hidden" id="toolbar">
+        <button id="saveProgressBtn" class="secondary">Save Progress</button>
+        <button id="loadProgressBtn" class="secondary">Load Progress</button>
+        <input type="file" id="progressInput" accept=".json" style="display: none;">
+        <button id="exportBtn" class="success">Export Validation</button>
+      </div>
+    </div>
+
+    <div class="main-layout">
+      <!-- Video Section -->
+      <div class="video-section">
+        <div class="video-container">
+          <video id="video"></video>
+          <div class="video-placeholder" id="videoPlaceholder">
+            <p>Select a video file and click "Analyze Video"</p>
+            <p style="font-size: 0.85rem; color: #6b7280;">
+              Supports .mp4, .mov, .webm formats
+            </p>
+          </div>
+          <div class="video-placeholder hidden" id="loadingPlaceholder">
+            <div class="loading-spinner"></div>
+            <p id="loadingText">Analyzing video...</p>
+            <p style="font-size: 0.85rem; color: #6b7280;">
+              This may take a moment for longer videos
+            </p>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div class="control-group">
+            <button id="playPauseBtn" disabled>Play</button>
+            <button id="prevFrameBtn" disabled title="Previous frame (Left Arrow)">&lt;</button>
+            <button id="nextFrameBtn" disabled title="Next frame (Right Arrow)">&gt;</button>
+            <button id="prev10Btn" disabled title="Back 10 frames (Shift+Left)">&lt;&lt;</button>
+            <button id="next10Btn" disabled title="Forward 10 frames (Shift+Right)">&gt;&gt;</button>
+          </div>
+          <div class="timeline">
+            <input type="range" id="timeline" min="0" max="100" value="0" step="0.001" disabled>
+          </div>
+          <div class="frame-display" id="frameDisplay">
+            <span class="frame-info" id="frameInfo">Frame: -- / --</span>
+            <span class="separator">|</span>
+            <span class="time-info" id="timeInfo">--s</span>
+          </div>
+          <div class="control-group" style="margin-left: 10px;">
+            <input type="number" id="frameJumpInput" placeholder="Go to frame"
+                   style="width: 100px; padding: 6px 8px; background: #374151; border: 1px solid #4b5563; border-radius: 4px; color: #fff; font-size: 13px;"
+                   disabled>
+            <button id="frameJumpBtn" class="secondary" disabled>Go</button>
+          </div>
+        </div>
+
+        <div class="keyboard-hint">
+          <kbd>Space</kbd> Play/Pause &nbsp;
+          <kbd>&larr;</kbd> Prev frame &nbsp;
+          <kbd>&rarr;</kbd> Next frame &nbsp;
+          <kbd>Shift+&larr;</kbd> -10 frames &nbsp;
+          <kbd>Shift+&rarr;</kbd> +10 frames
+        </div>
+      </div>
+
+      <!-- Metrics Panel -->
+      <div class="metrics-panel" id="metricsPanel">
+        <div class="panel-header">
+          <span class="panel-title">Metrics</span>
+          <span id="metricsCount"></span>
+        </div>
+
+        <div class="no-data" id="noDataMessage">
+          <p>No analysis loaded yet.</p>
+          <p style="font-size: 0.9rem;">
+            Select a video file and click "Analyze Video" to begin.
+          </p>
+        </div>
+
+        <div id="metricsContent" class="hidden">
+          <div class="shot-tabs" id="shotTabs"></div>
+          <div class="shot-info" id="shotInfo"></div>
+          <div id="phasesSection"></div>
+          <div id="metricsList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-label">Video:</span>
+          <span class="stat-value" id="statVideo">Not loaded</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Shots:</span>
+          <span class="stat-value" id="statShots">--</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Metrics:</span>
+          <span class="stat-value" id="statMetrics">--</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Marked Incorrect:</span>
+          <span class="stat-value" id="statIncorrect">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Corrected:</span>
+          <span class="stat-value" id="statCorrected">0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Modal -->
+  <div class="modal-overlay hidden" id="exportModal">
+    <div class="modal">
+      <h2>Export Validation Results</h2>
+      <p style="margin-bottom: 15px; color: #9ca3af;">
+        This will save the validation results to the <code>validations/</code> folder.
+      </p>
+      <pre id="exportPreview"></pre>
+      <div class="modal-actions">
+        <button class="secondary" id="cancelExportBtn">Cancel</button>
+        <button class="success" id="confirmExportBtn">Save to Server</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load the browser bundle -->
+  <script src="/dist/shot-analysis.browser.js"></script>
+
+  <script>
+    // =========================================================================
+    // Application State
+    // =========================================================================
+
+    // VideoState: tracks current video playback state
+    // { currentFrame: number, totalFrames: number, fps: number, isPlaying: boolean }
+    const videoState = {
+      currentFrame: 0,
+      totalFrames: 0,
+      fps: 30,
+      isPlaying: false,
+    };
+
+    const appState = {
+      videoFile: null,
+      videoBlobUrl: null,
+      videoLoaded: false,
+      analysisData: null,
+      currentShot: 0,
+      fps: 30,
+      totalFrames: 0,
+      validations: {},
+      analyzer: null,
+    };
+
+    // =========================================================================
+    // DOM Elements
+    // =========================================================================
+    const $ = (id) => document.getElementById(id);
+
+    const elements = {
+      selectVideoBtn: $('selectVideoBtn'),
+      videoFileInput: $('videoFileInput'),
+      selectedFileName: $('selectedFileName'),
+      shootingHand: $('shootingHand'),
+      profile: $('profile'),
+      analyzeBtn: $('analyzeBtn'),
+      progressSection: $('progressSection'),
+      progressText: $('progressText'),
+      progressBar: $('progressBar'),
+      toolbar: $('toolbar'),
+      video: $('video'),
+      videoPlaceholder: $('videoPlaceholder'),
+      loadingPlaceholder: $('loadingPlaceholder'),
+      loadingText: $('loadingText'),
+      playPauseBtn: $('playPauseBtn'),
+      prevFrameBtn: $('prevFrameBtn'),
+      nextFrameBtn: $('nextFrameBtn'),
+      prev10Btn: $('prev10Btn'),
+      next10Btn: $('next10Btn'),
+      timeline: $('timeline'),
+      frameDisplay: $('frameDisplay'),
+      frameInfo: $('frameInfo'),
+      timeInfo: $('timeInfo'),
+      frameJumpInput: $('frameJumpInput'),
+      frameJumpBtn: $('frameJumpBtn'),
+      noDataMessage: $('noDataMessage'),
+      metricsContent: $('metricsContent'),
+      shotTabs: $('shotTabs'),
+      shotInfo: $('shotInfo'),
+      phasesSection: $('phasesSection'),
+      metricsList: $('metricsList'),
+      metricsCount: $('metricsCount'),
+      saveProgressBtn: $('saveProgressBtn'),
+      loadProgressBtn: $('loadProgressBtn'),
+      progressInput: $('progressInput'),
+      exportBtn: $('exportBtn'),
+      exportModal: $('exportModal'),
+      exportPreview: $('exportPreview'),
+      cancelExportBtn: $('cancelExportBtn'),
+      confirmExportBtn: $('confirmExportBtn'),
+      statVideo: $('statVideo'),
+      statShots: $('statShots'),
+      statMetrics: $('statMetrics'),
+      statIncorrect: $('statIncorrect'),
+      statCorrected: $('statCorrected'),
+    };
+
+    // =========================================================================
+    // Toast Notifications
+    // =========================================================================
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // =========================================================================
+    // API Calls
+    // =========================================================================
+    async function saveValidationToServer(data, filename) {
+      const response = await fetch('/api/save-validation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, filename }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Save failed');
+      }
+
+      return response.json();
+    }
+
+    // =========================================================================
+    // Video Loading & Playback
+    // =========================================================================
+    function loadVideoFromFile(file) {
+      // Create blob URL from the selected file
+      if (appState.videoBlobUrl) {
+        URL.revokeObjectURL(appState.videoBlobUrl);
+      }
+      const blobUrl = URL.createObjectURL(file);
+      appState.videoBlobUrl = blobUrl;
+      appState.videoFile = file;
+
+      elements.video.src = blobUrl;
+
+      elements.video.onloadedmetadata = () => {
+        const duration = elements.video.duration;
+        appState.totalFrames = Math.floor(duration * appState.fps);
+        elements.timeline.max = duration;
+        elements.timeline.disabled = false;
+        elements.videoPlaceholder.classList.add('hidden');
+        elements.loadingPlaceholder.classList.add('hidden');
+        appState.videoLoaded = true;
+        enableControls();
+        updateFrameDisplay();
+      };
+
+      elements.video.onerror = () => {
+        showToast('Failed to load video for playback', 'error');
+        elements.loadingPlaceholder.classList.add('hidden');
+        elements.videoPlaceholder.classList.remove('hidden');
+      };
+    }
+
+    function enableControls() {
+      elements.playPauseBtn.disabled = false;
+      elements.prevFrameBtn.disabled = false;
+      elements.nextFrameBtn.disabled = false;
+      elements.prev10Btn.disabled = false;
+      elements.next10Btn.disabled = false;
+      elements.frameJumpInput.disabled = false;
+      elements.frameJumpBtn.disabled = false;
+    }
+
+    function jumpToFrameFromInput() {
+      const frameNum = parseInt(elements.frameJumpInput.value);
+      if (!isNaN(frameNum)) {
+        seekToFrame(frameNum);
+        elements.frameJumpInput.value = '';
+      }
+    }
+
+    function togglePlayPause() {
+      if (elements.video.paused) {
+        elements.video.play();
+        elements.playPauseBtn.textContent = 'Pause';
+      } else {
+        elements.video.pause();
+        elements.playPauseBtn.textContent = 'Play';
+      }
+    }
+
+    function stepFrame(delta) {
+      if (!appState.videoLoaded) return;
+
+      // Pause if playing
+      if (!elements.video.paused) {
+        elements.video.pause();
+        elements.playPauseBtn.textContent = 'Play';
+      }
+
+      // Calculate the target frame with boundary checks
+      const currentFrame = getCurrentFrame();
+      const targetFrame = currentFrame + delta;
+
+      // Boundary checks: don't go below 0 or above totalFrames - 1
+      const clampedFrame = Math.max(0, Math.min(appState.totalFrames - 1, targetFrame));
+
+      // Only update if the frame actually changed
+      if (clampedFrame !== currentFrame) {
+        seekToFrame(clampedFrame);
+      }
+    }
+
+    function seekToFrame(frame) {
+      if (!appState.videoLoaded) return;
+
+      // Clamp frame to valid range
+      const clampedFrame = Math.max(0, Math.min(appState.totalFrames - 1, frame));
+
+      // Calculate the exact time for this frame
+      // Adding a small offset (half frame duration) helps with precision
+      // by targeting the middle of the frame interval
+      const frameTime = clampedFrame / appState.fps;
+      elements.video.currentTime = frameTime;
+
+      // Pause if playing
+      if (!elements.video.paused) {
+        elements.video.pause();
+        elements.playPauseBtn.textContent = 'Play';
+      }
+
+      updateFrameDisplay();
+      highlightCurrentFrame();
+    }
+
+    function getCurrentFrame() {
+      return Math.floor(elements.video.currentTime * appState.fps);
+    }
+
+    function updateVideoState() {
+      videoState.currentFrame = getCurrentFrame();
+      videoState.totalFrames = appState.totalFrames;
+      videoState.fps = appState.fps;
+      videoState.isPlaying = !elements.video.paused;
+    }
+
+    function getVideoState() {
+      updateVideoState();
+      return { ...videoState };
+    }
+
+    function updateFrameDisplay() {
+      const frame = getCurrentFrame();
+      const time = elements.video.currentTime || 0;
+      const totalTime = elements.video.duration || 0;
+
+      // Update VideoState
+      updateVideoState();
+
+      // Update frame info: "Frame: X / Y"
+      elements.frameInfo.textContent = `Frame: ${frame} / ${appState.totalFrames}`;
+
+      // Update time info: "X.XXs / Y.YYs" for seconds display
+      elements.timeInfo.textContent = `${time.toFixed(2)}s / ${totalTime.toFixed(2)}s`;
+    }
+
+    // =========================================================================
+    // Browser-Based Analysis
+    // =========================================================================
+    function updateProgress(text, percent) {
+      elements.progressText.textContent = text;
+      elements.progressBar.style.width = `${percent}%`;
+    }
+
+    async function runAnalysis() {
+      const file = elements.videoFileInput.files[0];
+      if (!file) {
+        showToast('Please select a video file', 'error');
+        return;
+      }
+
+      const shootingHand = elements.shootingHand.value;
+      const profile = elements.profile.value;
+
+      // Show loading state
+      elements.analyzeBtn.disabled = true;
+      elements.analyzeBtn.textContent = 'Analyzing...';
+      elements.videoPlaceholder.classList.add('hidden');
+      elements.progressSection.classList.remove('hidden');
+      updateProgress('Initializing analyzer...', 5);
+
+      try {
+        // Access the ShotAnalysis library from the browser bundle
+        const { createShotAnalyzer, createConfig, createVideoElementProvider } = window.ShotAnalysis;
+
+        // Create config
+        updateProgress('Creating configuration...', 10);
+        const config = createConfig({
+          shootingHand,
+          profile,
+        });
+
+        // Create analyzer
+        updateProgress('Loading MediaPipe pose model...', 15);
+        const analyzer = await createShotAnalyzer(config);
+        appState.analyzer = analyzer;
+
+        // Create video element provider from the file
+        updateProgress('Loading video file...', 25);
+        const frameProvider = await createVideoElementProvider(file);
+        const metadata = frameProvider.getMetadata();
+        appState.fps = frameProvider.getFps();
+
+        console.log('[DEBUG] Video metadata:', metadata);
+        console.log('[DEBUG] FPS:', frameProvider.getFps());
+        console.log('[DEBUG] Total frames:', frameProvider.getTotalFrames());
+
+        // Debug: test single frame extraction and pose detection
+        updateProgress('Testing frame extraction...', 28);
+        const testFrame = await frameProvider.getNextFrame();
+        if (testFrame) {
+          console.log('[DEBUG] Test frame extracted:', {
+            width: testFrame.width,
+            height: testFrame.height,
+            timestamp: testFrame.timestamp,
+            frameIndex: testFrame.frameIndex,
+            hasCanvas: !!testFrame.canvas,
+            dataLength: testFrame.data?.length,
+          });
+
+          // Try to detect pose on this single frame
+          try {
+            // We need to access the detector directly - let's use a workaround
+            // by processing just a few frames manually
+            console.log('[DEBUG] Testing pose detection on first frame...');
+          } catch (e) {
+            console.error('[DEBUG] Pose detection test failed:', e);
+          }
+        } else {
+          console.error('[DEBUG] Failed to extract test frame!');
+        }
+
+        // Reset provider for full analysis
+        await frameProvider.reset();
+
+        updateProgress('Running pose detection...', 30);
+
+        // Run analysis with debug logging - track frame processing
+        console.log('[DEBUG] Starting full analysis...');
+        let frameCount = 0;
+        const startTime = Date.now();
+        const result = await analyzer.analyzeVideo(frameProvider);
+        const elapsed = Date.now() - startTime;
+
+        console.log('[DEBUG] Analysis complete in', elapsed, 'ms');
+        console.log('[DEBUG] Video metadata from result:', result.videoMetadata);
+        console.log('[DEBUG] Frames processed:', result.videoMetadata?.totalFrames);
+        console.log('[DEBUG] Number of shots detected:', result.shots?.length || 0);
+        if (result.shots?.length === 0) {
+          console.log('[DEBUG] No shots - this could mean:');
+          console.log('[DEBUG]   1. No poses were detected in frames');
+          console.log('[DEBUG]   2. Poses detected but no shooting motion found');
+          console.log('[DEBUG]   3. Video too short or wrong content');
+        }
+        console.log('[DEBUG] Full result:', result);
+
+        updateProgress('Processing results...', 95);
+
+        if (!result.shots || result.shots.length === 0) {
+          console.warn('[DEBUG] No shots detected - check console for details');
+          showToast('No shots detected in video', 'error');
+          elements.progressSection.classList.add('hidden');
+          elements.videoPlaceholder.classList.remove('hidden');
+          return;
+        }
+
+        // Convert to validation export format
+        const exportData = {
+          version: '1.0',
+          exportedAt: new Date().toISOString(),
+          video: {
+            filename: file.name,
+            width: result.videoMetadata.width,
+            height: result.videoMetadata.height,
+            fps: result.videoMetadata.fps,
+            totalFrames: result.videoMetadata.totalFrames,
+            duration: result.videoMetadata.duration,
+          },
+          config: {
+            shootingHand,
+            profile,
+          },
+          shots: result.shots.map(shot => ({
+            shotIndex: shot.shotIndex,
+            frameRange: { start: shot.frameRange.start, end: shot.frameRange.end },
+            phases: convertPhasesToExport(shot.phases),
+            metrics: convertMetricsToExport(shot.metrics),
+            overallConfidence: shot.overallConfidence,
+          })),
+        };
+
+        // Load the analysis data
+        loadAnalysisData(exportData);
+
+        // Load video for playback
+        updateProgress('Loading video player...', 98);
+        loadVideoFromFile(file);
+
+        elements.progressSection.classList.add('hidden');
+        showToast(`Detected ${result.shots.length} shot(s) for validation`, 'success');
+
+        // Cleanup
+        frameProvider.dispose();
+        await analyzer.dispose();
+        appState.analyzer = null;
+
+      } catch (err) {
+        console.error('Analysis error:', err);
+        showToast('Error: ' + err.message, 'error');
+        elements.progressSection.classList.add('hidden');
+        elements.videoPlaceholder.classList.remove('hidden');
+      } finally {
+        elements.analyzeBtn.disabled = false;
+        elements.analyzeBtn.textContent = 'Analyze Video';
+      }
+    }
+
+    function convertPhasesToExport(phases) {
+      const result = {};
+      for (const [phaseName, range] of Object.entries(phases || {})) {
+        if (range) {
+          result[phaseName] = {
+            startFrame: range.startFrame,
+            endFrame: range.endFrame,
+          };
+        }
+      }
+      return result;
+    }
+
+    function convertMetricsToExport(metrics) {
+      const result = {};
+      for (const [name, metric] of Object.entries(metrics || {})) {
+        result[name] = {
+          value: metric.value,
+          unit: metric.unit,
+          frame: metric.frame,
+          confidence: metric.confidence,
+        };
+      }
+      return result;
+    }
+
+    // =========================================================================
+    // Analysis Loading
+    // =========================================================================
+    function loadAnalysisData(data) {
+      appState.analysisData = data;
+      appState.fps = data.video?.fps || 30;
+      appState.currentShot = 0;
+
+      // Initialize validation state
+      appState.validations = {};
+      if (data.shots) {
+        data.shots.forEach((shot, shotIndex) => {
+          appState.validations[shotIndex] = {};
+          Object.keys(shot.metrics || {}).forEach(metricName => {
+            appState.validations[shotIndex][metricName] = {
+              incorrect: false,
+              correctedValue: null,
+              correctedFrame: null,
+              notes: '',
+            };
+          });
+        });
+      }
+
+      // Show UI
+      elements.noDataMessage.classList.add('hidden');
+      elements.metricsContent.classList.remove('hidden');
+      elements.toolbar.classList.remove('hidden');
+
+      renderShotTabs();
+      renderCurrentShot();
+      updateStats();
+    }
+
+    // =========================================================================
+    // Rendering
+    // =========================================================================
+    function renderShotTabs() {
+      const shots = appState.analysisData?.shots || [];
+      elements.shotTabs.innerHTML = '';
+
+      shots.forEach((shot, index) => {
+        const tab = document.createElement('button');
+        tab.className = `shot-tab ${index === appState.currentShot ? 'active' : ''}`;
+        tab.textContent = `Shot ${index + 1}`;
+        tab.onclick = () => switchToShot(index);
+        elements.shotTabs.appendChild(tab);
+      });
+    }
+
+    function switchToShot(index) {
+      appState.currentShot = index;
+      document.querySelectorAll('.shot-tab').forEach((tab, i) => {
+        tab.classList.toggle('active', i === index);
+      });
+      renderCurrentShot();
+
+      // Jump to start of shot
+      const shot = appState.analysisData?.shots?.[index];
+      if (shot && appState.videoLoaded) {
+        seekToFrame(shot.frameRange.start);
+      }
+    }
+
+    function renderCurrentShot() {
+      const shots = appState.analysisData?.shots || [];
+      const shot = shots[appState.currentShot];
+      if (!shot) return;
+
+      // Shot info
+      const frameCount = shot.frameRange.end - shot.frameRange.start + 1;
+      const duration = (frameCount / appState.fps).toFixed(2);
+      elements.shotInfo.innerHTML = `
+        <span class="label">Frames:</span> <span class="value">${shot.frameRange.start} - ${shot.frameRange.end}</span>
+        &nbsp;|&nbsp;
+        <span class="label">Duration:</span> <span class="value">${duration}s (${frameCount} frames)</span>
+        &nbsp;|&nbsp;
+        <span class="label">Confidence:</span> <span class="value">${(shot.overallConfidence * 100).toFixed(0)}%</span>
+      `;
+
+      // Phases
+      renderPhases(shot);
+
+      // Metrics
+      renderMetrics(shot);
+
+      elements.metricsCount.textContent = `${Object.keys(shot.metrics || {}).length} metrics`;
+    }
+
+    function renderPhases(shot) {
+      const phases = shot.phases || {};
+      const phaseOrder = ['gather', 'load', 'rise', 'setPoint', 'release', 'followThrough'];
+      const phaseNames = {
+        gather: 'Gather',
+        load: 'Load',
+        rise: 'Rise',
+        setPoint: 'Set Point',
+        release: 'Release',
+        followThrough: 'Follow Through',
+      };
+
+      let html = '<div class="section-header">Phases</div><div class="phase-list">';
+
+      phaseOrder.forEach(phaseName => {
+        const phase = phases[phaseName];
+        if (phase) {
+          html += `
+            <div class="phase-chip" data-start="${phase.startFrame}" data-end="${phase.endFrame}" onclick="seekToFrame(${phase.startFrame})">
+              <span class="name">${phaseNames[phaseName]}</span>
+              <span class="frames">${phase.startFrame}-${phase.endFrame}</span>
+            </div>
+          `;
+        }
+      });
+
+      html += '</div>';
+      elements.phasesSection.innerHTML = html;
+    }
+
+    function renderMetrics(shot) {
+      const metrics = shot.metrics || {};
+      const validations = appState.validations[appState.currentShot] || {};
+
+      elements.metricsList.innerHTML = '';
+
+      // Group metrics by category
+      const categories = {
+        'Shooting Arm': ['shootingElbowFlare', 'shootingElbowAngle', 'maxArmExtension', 'wristSnapAngle', 'followThroughHold'],
+        'Guide Arm': ['guideElbowFlare', 'guideHandPosition', 'guideHandRelease'],
+        'Ball Position': ['ballDip', 'ballPath', 'setPointHeight', 'setPointDuration', 'releasePoint', 'releaseAngle', 'ballBehindHead'],
+        'Lower Body': ['hipDrop', 'kneeFlexion', 'legExtensionStart'],
+        'Posture': ['backPosture', 'headTilt', 'shoulderAlignment', 'handCupVsHinge'],
+        'Timing': ['ballRiseStart', 'legRiseStart', 'ballLegSync', 'releaseStart', 'totalShotDuration'],
+      };
+
+      // Find uncategorized metrics
+      const categorizedMetrics = new Set(Object.values(categories).flat());
+      const uncategorized = Object.keys(metrics).filter(m => !categorizedMetrics.has(m));
+      if (uncategorized.length > 0) {
+        categories['Other'] = uncategorized;
+      }
+
+      for (const [category, metricNames] of Object.entries(categories)) {
+        const categoryMetrics = metricNames.filter(name => metrics[name]);
+        if (categoryMetrics.length === 0) continue;
+
+        const section = document.createElement('div');
+        section.className = 'category-section';
+        section.innerHTML = `<div class="category-header">${category}</div>`;
+
+        categoryMetrics.forEach(metricName => {
+          const metric = metrics[metricName];
+          const validation = validations[metricName] || {};
+          section.appendChild(createMetricCard(metricName, metric, validation));
+        });
+
+        elements.metricsList.appendChild(section);
+      }
+
+      highlightCurrentFrame();
+    }
+
+    function createMetricCard(metricName, metric, validation) {
+      const card = document.createElement('div');
+      card.className = 'metric-card';
+      card.dataset.metricName = metricName;
+      card.dataset.frame = metric.frame;
+
+      if (validation.incorrect && validation.correctedValue !== null) {
+        card.classList.add('corrected');
+      } else if (validation.incorrect) {
+        card.classList.add('incorrect');
+      }
+
+      const valueStr = typeof metric.value === 'number' ? metric.value.toFixed(2) : metric.value;
+      const confidenceClass = metric.confidence >= 0.8 ? 'high' : metric.confidence >= 0.5 ? 'medium' : 'low';
+
+      let statusBadge = '';
+      if (validation.incorrect && validation.correctedValue !== null) {
+        statusBadge = '<span class="badge corrected">Corrected</span>';
+      } else if (validation.incorrect) {
+        statusBadge = '<span class="badge incorrect">Incorrect</span>';
+      }
+
+      card.innerHTML = `
+        <div class="metric-header">
+          <div>
+            <span class="metric-name">${formatMetricName(metricName)}</span>
+            ${statusBadge}
+          </div>
+          <button class="metric-frame-btn" onclick="seekToFrame(${metric.frame})">Frame ${metric.frame}</button>
+        </div>
+        <div class="metric-value">
+          <span class="value">${valueStr}</span>
+          <span class="unit">${metric.unit}</span>
+        </div>
+        <div class="metric-confidence">
+          Confidence: <span class="${confidenceClass}">${(metric.confidence * 100).toFixed(0)}%</span>
+        </div>
+        <div class="metric-actions">
+          <button class="secondary mark-btn">${validation.incorrect ? 'Unmark' : 'Mark Incorrect'}</button>
+          ${validation.incorrect ? '<button class="secondary correct-btn">Set Correct Value</button>' : ''}
+        </div>
+        ${validation.incorrect ? renderCorrectionNote(validation) : ''}
+        <div class="correction-form hidden">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Correct Value</label>
+              <input type="text" class="corr-value" placeholder="Enter correct value" value="${validation.correctedValue || ''}">
+            </div>
+            <div class="form-group">
+              <label>Correct Frame</label>
+              <input type="number" class="corr-frame" placeholder="Frame #" value="${validation.correctedFrame || metric.frame}">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <input type="text" class="corr-notes" placeholder="Optional notes" value="${validation.notes || ''}">
+          </div>
+          <div class="btn-row">
+            <button class="success save-btn">Save Correction</button>
+            <button class="secondary cancel-btn">Cancel</button>
+          </div>
+        </div>
+      `;
+
+      // Event listeners
+      const markBtn = card.querySelector('.mark-btn');
+      markBtn.onclick = () => {
+        toggleIncorrect(metricName);
+      };
+
+      const correctBtn = card.querySelector('.correct-btn');
+      if (correctBtn) {
+        correctBtn.onclick = () => {
+          card.querySelector('.correction-form').classList.remove('hidden');
+        };
+      }
+
+      const saveBtn = card.querySelector('.save-btn');
+      saveBtn.onclick = () => {
+        const v = appState.validations[appState.currentShot][metricName];
+        v.correctedValue = card.querySelector('.corr-value').value || null;
+        v.correctedFrame = parseInt(card.querySelector('.corr-frame').value) || null;
+        v.notes = card.querySelector('.corr-notes').value || '';
+        renderCurrentShot();
+        updateStats();
+      };
+
+      const cancelBtn = card.querySelector('.cancel-btn');
+      cancelBtn.onclick = () => {
+        card.querySelector('.correction-form').classList.add('hidden');
+      };
+
+      return card;
+    }
+
+    function renderCorrectionNote(validation) {
+      if (validation.correctedValue !== null) {
+        return `
+          <div class="correction-note corrected">
+            <strong>Corrected:</strong> ${validation.correctedValue} at frame ${validation.correctedFrame}
+            ${validation.notes ? `<br><em>${validation.notes}</em>` : ''}
+          </div>
+        `;
+      } else {
+        return `
+          <div class="correction-note incorrect">
+            <strong>Marked as incorrect</strong>
+            ${validation.notes ? `<br><em>${validation.notes}</em>` : ''}
+          </div>
+        `;
+      }
+    }
+
+    function highlightCurrentFrame() {
+      if (!appState.videoLoaded) return;
+      const currentFrame = getCurrentFrame();
+
+      // Highlight metric cards
+      document.querySelectorAll('.metric-card').forEach(card => {
+        const metricFrame = parseInt(card.dataset.frame);
+        card.classList.toggle('at-frame', metricFrame === currentFrame);
+      });
+
+      // Highlight phase chips
+      document.querySelectorAll('.phase-chip').forEach(chip => {
+        const start = parseInt(chip.dataset.start);
+        const end = parseInt(chip.dataset.end);
+        chip.classList.toggle('at-frame', currentFrame >= start && currentFrame <= end);
+      });
+    }
+
+    // =========================================================================
+    // Validation Actions
+    // =========================================================================
+    function toggleIncorrect(metricName) {
+      const v = appState.validations[appState.currentShot][metricName];
+      v.incorrect = !v.incorrect;
+      if (!v.incorrect) {
+        v.correctedValue = null;
+        v.correctedFrame = null;
+        v.notes = '';
+      }
+      renderCurrentShot();
+      updateStats();
+    }
+
+    // =========================================================================
+    // Stats & Export
+    // =========================================================================
+    function updateStats() {
+      elements.statVideo.textContent = appState.analysisData?.video?.filename || 'Not loaded';
+      elements.statShots.textContent = appState.analysisData?.shots?.length || '--';
+
+      let totalMetrics = 0;
+      let incorrectCount = 0;
+      let correctedCount = 0;
+
+      for (const shotValidations of Object.values(appState.validations)) {
+        for (const validation of Object.values(shotValidations)) {
+          totalMetrics++;
+          if (validation.incorrect) {
+            incorrectCount++;
+            if (validation.correctedValue !== null) {
+              correctedCount++;
+            }
+          }
+        }
+      }
+
+      elements.statMetrics.textContent = totalMetrics;
+      elements.statIncorrect.textContent = incorrectCount - correctedCount;
+      elements.statCorrected.textContent = correctedCount;
+    }
+
+    function generateExport() {
+      if (!appState.analysisData) return null;
+
+      return {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        video: appState.analysisData.video,
+        config: appState.analysisData.config,
+        shots: appState.analysisData.shots.map((shot, shotIndex) => {
+          const validations = appState.validations[shotIndex] || {};
+          const metricsWithValidation = {};
+
+          for (const [metricName, metric] of Object.entries(shot.metrics)) {
+            const v = validations[metricName] || {};
+            metricsWithValidation[metricName] = {
+              original: metric,
+              validation: {
+                reviewed: v.incorrect || false,
+                incorrect: v.incorrect || false,
+                correctedValue: v.correctedValue,
+                correctedFrame: v.correctedFrame,
+                notes: v.notes || null,
+              },
+            };
+          }
+
+          return {
+            shotIndex: shot.shotIndex,
+            frameRange: shot.frameRange,
+            phases: shot.phases,
+            metrics: metricsWithValidation,
+            overallConfidence: shot.overallConfidence,
+          };
+        }),
+        summary: {
+          totalMetrics: Object.values(appState.validations).reduce(
+            (sum, v) => sum + Object.keys(v).length, 0
+          ),
+          incorrectCount: Object.values(appState.validations).reduce(
+            (sum, v) => sum + Object.values(v).filter(m => m.incorrect).length, 0
+          ),
+          correctedCount: Object.values(appState.validations).reduce(
+            (sum, v) => sum + Object.values(v).filter(m => m.incorrect && m.correctedValue !== null).length, 0
+          ),
+        },
+      };
+    }
+
+    function showExportModal() {
+      const exportData = generateExport();
+      if (!exportData) return;
+
+      elements.exportPreview.textContent = JSON.stringify(exportData, null, 2);
+      elements.exportModal.classList.remove('hidden');
+    }
+
+    function hideExportModal() {
+      elements.exportModal.classList.add('hidden');
+    }
+
+    async function saveExport() {
+      const exportData = generateExport();
+      if (!exportData) return;
+
+      const filename = appState.analysisData?.video?.filename?.replace(/\.[^.]+$/, '') || 'validation';
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const fullFilename = `${filename}_validation_${timestamp}`;
+
+      try {
+        const result = await saveValidationToServer(exportData, fullFilename);
+        showToast(`Saved to: ${result.path}`, 'success');
+        hideExportModal();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function saveProgress() {
+      const progressData = {
+        analysisData: appState.analysisData,
+        currentShot: appState.currentShot,
+        validations: appState.validations,
+        savedAt: new Date().toISOString(),
+      };
+
+      const filename = appState.analysisData?.video?.filename?.replace(/\.[^.]+$/, '') || 'progress';
+      const blob = new Blob([JSON.stringify(progressData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filename}_progress.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Progress saved', 'success');
+    }
+
+    function loadProgress(data) {
+      if (data.analysisData) {
+        loadAnalysisData(data.analysisData);
+      }
+
+      if (data.validations) {
+        appState.validations = data.validations;
+      }
+
+      if (typeof data.currentShot === 'number') {
+        switchToShot(data.currentShot);
+      }
+
+      renderCurrentShot();
+      updateStats();
+      showToast('Progress loaded - Select the video file to enable playback', 'success');
+    }
+
+    // =========================================================================
+    // Utility Functions
+    // =========================================================================
+    function formatMetricName(name) {
+      return name
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^./, s => s.toUpperCase())
+        .trim();
+    }
+
+    // Make seekToFrame global for onclick handlers
+    window.seekToFrame = seekToFrame;
+
+    // =========================================================================
+    // Event Listeners
+    // =========================================================================
+    function updateAnalyzeButtonState() {
+      const hasVideo = elements.videoFileInput.files.length > 0;
+      elements.analyzeBtn.disabled = !hasVideo;
+    }
+
+    elements.selectVideoBtn.onclick = () => elements.videoFileInput.click();
+
+    elements.videoFileInput.onchange = () => {
+      const file = elements.videoFileInput.files[0];
+      if (file) {
+        elements.selectedFileName.textContent = file.name;
+      } else {
+        elements.selectedFileName.textContent = 'No file selected';
+      }
+      updateAnalyzeButtonState();
+    };
+
+    elements.analyzeBtn.onclick = runAnalysis;
+
+    elements.saveProgressBtn.onclick = saveProgress;
+    elements.loadProgressBtn.onclick = () => elements.progressInput.click();
+    elements.progressInput.onchange = (e) => {
+      if (e.target.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            loadProgress(JSON.parse(event.target.result));
+          } catch (err) {
+            showToast('Error loading progress: ' + err.message, 'error');
+          }
+        };
+        reader.readAsText(e.target.files[0]);
+        e.target.value = '';
+      }
+    };
+
+    elements.exportBtn.onclick = showExportModal;
+    elements.cancelExportBtn.onclick = hideExportModal;
+    elements.confirmExportBtn.onclick = saveExport;
+
+    elements.playPauseBtn.onclick = togglePlayPause;
+    elements.prevFrameBtn.onclick = () => stepFrame(-1);
+    elements.nextFrameBtn.onclick = () => stepFrame(1);
+    elements.prev10Btn.onclick = () => stepFrame(-10);
+    elements.next10Btn.onclick = () => stepFrame(10);
+
+    // Frame jump input handlers
+    elements.frameJumpBtn.onclick = jumpToFrameFromInput;
+    elements.frameJumpInput.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        jumpToFrameFromInput();
+      }
+    };
+
+    elements.timeline.oninput = () => {
+      elements.video.currentTime = parseFloat(elements.timeline.value);
+      updateFrameDisplay();
+      highlightCurrentFrame();
+    };
+
+    elements.video.ontimeupdate = () => {
+      if (!elements.timeline.matches(':active')) {
+        elements.timeline.value = elements.video.currentTime;
+      }
+      updateFrameDisplay();
+      highlightCurrentFrame();
+    };
+
+    elements.video.onplay = () => elements.playPauseBtn.textContent = 'Pause';
+    elements.video.onpause = () => elements.playPauseBtn.textContent = 'Play';
+
+    // Keyboard shortcuts
+    document.onkeydown = (e) => {
+      if (e.target.tagName === 'INPUT') return;
+
+      switch (e.key) {
+        case ' ':
+          e.preventDefault();
+          if (appState.videoLoaded) togglePlayPause();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (appState.videoLoaded) stepFrame(e.shiftKey ? -10 : -1);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          if (appState.videoLoaded) stepFrame(e.shiftKey ? 10 : 1);
+          break;
+        case 'Escape':
+          hideExportModal();
+          break;
+      }
+    };
+
+    elements.exportModal.onclick = (e) => {
+      if (e.target === elements.exportModal) hideExportModal();
+    };
+  </script>
+</body>
+</html>

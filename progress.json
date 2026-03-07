@@ -3,9 +3,9 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-06T00:08:47.000Z"
+		"updated_at": "2026-03-06T00:13:24.946Z"
 	},
-	"status": "complete",
+	"status": "in_progress",
 	"validation_commands": {
 		"typescript": "npm run check",
 		"unit_tests": "npm run test:unit -- --run",
@@ -2247,6 +2247,380 @@
 						{
 							"id": "7.5.9",
 							"description": "Mark project as complete"
+						}
+					],
+					"commit_hash": "21b4a25805e23279caa1eb218d70b9c70c00bece"
+				}
+			]
+		},
+		{
+			"id": "8.0",
+			"name": "Labeling UI Extension",
+			"status": "pending",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "8.1",
+					"name": "Frame Navigation & Video Controls",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a tester, I want to navigate through video frames precisely using keyboard controls so I can identify exact shot boundary frames for labeling.",
+						"acceptance_criteria": [
+							"Left/right arrow keys step backward/forward one frame",
+							"Frame counter displays current frame number and total frames",
+							"Video timestamp displays current time in seconds",
+							"Can click on video timeline to jump to specific frame",
+							"Frame stepping is precise (no drift or skipping)"
+						],
+						"edge_cases": [
+							"Arrow key at frame 0 should not go negative",
+							"Arrow key at last frame should not exceed total",
+							"Rapid key presses should queue correctly"
+						],
+						"data_model": "VideoState: { currentFrame: number, totalFrames: number, fps: number, isPlaying: boolean }",
+						"technical_notes": "Extend existing validate-metrics.html. Use video.currentTime = frameIndex / fps for seeking. Canvas already captures frames. Add keyboard event listeners for arrow keys."
+					},
+					"subtasks": [
+						{
+							"id": "8.1.1",
+							"description": "Add frame counter display showing current/total frames"
+						},
+						{
+							"id": "8.1.2",
+							"description": "Implement left/right arrow key handlers for frame stepping"
+						},
+						{
+							"id": "8.1.3",
+							"description": "Add timestamp display showing current time in seconds"
+						},
+						{
+							"id": "8.1.4",
+							"description": "Create seekToFrame() function using video.currentTime"
+						},
+						{
+							"id": "8.1.5",
+							"description": "Test frame navigation at video boundaries"
+						}
+					]
+				},
+				{
+					"id": "8.2",
+					"name": "Shot Labeling Controls",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a tester, I want to mark shot start and end frames and select camera orientation so I can create ground truth labels for each shot in the video.",
+						"acceptance_criteria": [
+							"Shot list panel displays all labeled shots with start/end frames",
+							"'s' key marks current frame as shot start for selected shot",
+							"'e' key marks current frame as shot end for selected shot",
+							"Add Shot button creates new shot entry",
+							"Remove Shot button deletes selected shot",
+							"Orientation dropdown with 5 options: front, side-left, side-right, front-left, front-right",
+							"Can click on shot in list to select it and jump to its start frame"
+						],
+						"edge_cases": [
+							"Cannot set end frame before start frame",
+							"Cannot add shot without both start and end frames set",
+							"Deleting only shot should clear selection",
+							"Multiple shots should not have overlapping frames"
+						],
+						"data_model": "Shot: { shotNumber: number, startFrame: number | null, endFrame: number | null }. Orientation: 'front' | 'side-left' | 'side-right' | 'front-left' | 'front-right'",
+						"technical_notes": "Store shots array in component state. Orientation is per-video (not per-shot). Use visual highlighting to show selected shot. Consider color-coding shots on timeline."
+					},
+					"subtasks": [
+						{
+							"id": "8.2.1",
+							"description": "Create shot list panel HTML structure with shot entries"
+						},
+						{
+							"id": "8.2.2",
+							"description": "Implement 's' and 'e' key handlers for marking start/end frames"
+						},
+						{
+							"id": "8.2.3",
+							"description": "Add 'Add Shot' and 'Remove Shot' buttons with handlers"
+						},
+						{
+							"id": "8.2.4",
+							"description": "Create orientation dropdown with 5 options"
+						},
+						{
+							"id": "8.2.5",
+							"description": "Implement shot selection and jump-to-frame on click"
+						},
+						{
+							"id": "8.2.6",
+							"description": "Add validation for overlapping shots and invalid frame ranges"
+						}
+					]
+				},
+				{
+					"id": "8.3",
+					"name": "Server API & Export",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a tester, I want to export pose data and labels to files so they can be used by the automated test runner without needing the browser.",
+						"acceptance_criteria": [
+							"POST /api/save-poses endpoint saves poses.json to test-data/<video-name>/",
+							"POST /api/save-labels endpoint saves labels.json to test-data/<video-name>/",
+							"Export Poses button sends all extracted pose data to server",
+							"Export Labels button sends shot labels and orientation to server",
+							"Video name is sanitized for use as directory name (spaces to hyphens, lowercase)",
+							"Success/error feedback shown to user after export"
+						],
+						"edge_cases": [
+							"Directory doesn't exist - should create it",
+							"File already exists - should overwrite with confirmation or auto-overwrite",
+							"Network error during save - show error message",
+							"No poses extracted yet - disable Export Poses button"
+						],
+						"data_model": "poses.json: { video: string, fps: number, totalFrames: number, width: number, height: number, extractedAt: string, frames: Array<{ frameIndex: number, timestamp: number, poseConfidence: number, landmarks: Array<{x,y,z,visibility}> }> }. labels.json: { video: string, labeledBy: 'human', labeledAt: string, orientation: string, shots: Array<{ shotNumber: number, startFrame: number, endFrame: number }> }",
+						"technical_notes": "Server.ts already exists - add new routes. Use fs.mkdirSync with recursive:true for directory creation. Sanitize video name: replace spaces with hyphens, remove special chars, lowercase. Include timestamps in saved files."
+					},
+					"subtasks": [
+						{
+							"id": "8.3.1",
+							"description": "Add POST /api/save-poses route to server.ts"
+						},
+						{
+							"id": "8.3.2",
+							"description": "Add POST /api/save-labels route to server.ts"
+						},
+						{
+							"id": "8.3.3",
+							"description": "Create sanitizeVideoName() function for directory naming"
+						},
+						{
+							"id": "8.3.4",
+							"description": "Add Export Poses button with fetch to /api/save-poses"
+						},
+						{
+							"id": "8.3.5",
+							"description": "Add Export Labels button with fetch to /api/save-labels"
+						},
+						{
+							"id": "8.3.6",
+							"description": "Add success/error toast notifications for export operations"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "9.0",
+			"name": "Test Runner Infrastructure",
+			"status": "pending",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "9.1",
+					"name": "Test Discovery & Data Loading",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want the test runner to automatically discover all test cases from the test-data directory so I don't need to manually configure which videos to test.",
+						"acceptance_criteria": [
+							"Scans test-data/ for subdirectories",
+							"Identifies valid test cases (folders with both poses.json AND labels.json)",
+							"Skips folders missing either file",
+							"Loads and parses poses.json into typed structure",
+							"Loads and parses labels.json into typed structure",
+							"Reports which test cases were discovered"
+						],
+						"edge_cases": [
+							"test-data/ directory doesn't exist - create it or error gracefully",
+							"No test cases found - report and exit with code 0",
+							"Malformed JSON in poses.json or labels.json - report error, skip test case",
+							"Empty frames array in poses.json - report warning"
+						],
+						"data_model": "PoseData: { video: string, fps: number, totalFrames: number, width: number, height: number, extractedAt: string, frames: Frame[] }. Frame: { frameIndex: number, timestamp: number, poseConfidence: number, landmarks: Landmark[] }. Landmark: { x: number, y: number, z: number, visibility: number }. LabelData: { video: string, labeledBy: string, labeledAt: string, orientation: Orientation, shots: Shot[] }. Shot: { shotNumber: number, startFrame: number, endFrame: number }. Orientation: 'front' | 'side-left' | 'side-right' | 'front-left' | 'front-right'",
+						"technical_notes": "Create test-runner.ts in project root. Use fs.readdirSync to scan directories. Use path.join for cross-platform paths. Create src/testing/types.ts for shared types. Consider Zod for JSON validation."
+					},
+					"subtasks": [
+						{
+							"id": "9.1.1",
+							"description": "Create src/testing/types.ts with PoseData, LabelData, Frame, Shot types"
+						},
+						{
+							"id": "9.1.2",
+							"description": "Create discoverTestCases() function to scan test-data/ directory"
+						},
+						{
+							"id": "9.1.3",
+							"description": "Create loadPoseData() function to parse poses.json"
+						},
+						{
+							"id": "9.1.4",
+							"description": "Create loadLabelData() function to parse labels.json"
+						},
+						{
+							"id": "9.1.5",
+							"description": "Add error handling for missing/malformed files"
+						}
+					]
+				},
+				{
+					"id": "9.2",
+					"name": "Detection Execution & Comparison",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want the test runner to execute shot detection on pose data and compare results against labels so I can validate the algorithm's accuracy.",
+						"acceptance_criteria": [
+							"Runs shot detection algorithm on loaded pose frames",
+							"Detects shot start and end frames for each shot",
+							"Detects camera orientation from pose data",
+							"Compares detected values against labeled values",
+							"Calculates frame difference for start and end",
+							"Applies tolerance rules: ±3 initial, expandable to ±5 if within 4",
+							"Determines pass/fail for each shot and overall test case"
+						],
+						"edge_cases": [
+							"Algorithm detects different number of shots than labeled - fail with mismatch count",
+							"Algorithm detects no shots - fail with 'no shots detected'",
+							"Orientation detection fails - use 'unknown' and fail orientation check",
+							"Tolerance expansion: if diff is 4, can expand to ±5 and still pass"
+						],
+						"data_model": "DetectionResult: { shots: DetectedShot[], orientation: Orientation }. DetectedShot: { startFrame: number, endFrame: number }. ComparisonResult: { video: string, status: 'pass' | 'fail', orientation: { detected: string, expected: string, match: boolean }, shots: ShotComparison[] }. ShotComparison: { shotNumber: number, startFrame: { detected: number, expected: number, diff: number, pass: boolean }, endFrame: { detected: number, expected: number, diff: number, pass: boolean } }",
+						"technical_notes": "Import shot detection from src/detection/shot-detector.ts. May need to create adapter to run detection on PoseData format. Orientation detection needs to be implemented (hip-to-shoulder alignment). Tolerance logic: pass if |diff| <= 3, or if |diff| <= 5 and all diffs are <= 4."
+					},
+					"subtasks": [
+						{
+							"id": "9.2.1",
+							"description": "Create adapter to convert PoseData frames to shot detector input format"
+						},
+						{
+							"id": "9.2.2",
+							"description": "Implement runDetection() function that returns DetectionResult"
+						},
+						{
+							"id": "9.2.3",
+							"description": "Implement compareResults() function that compares detection vs labels"
+						},
+						{
+							"id": "9.2.4",
+							"description": "Implement tolerance logic with ±3 base and ±5 expansion rules"
+						},
+						{
+							"id": "9.2.5",
+							"description": "Create orientation detection from hip-shoulder alignment"
+						}
+					]
+				},
+				{
+					"id": "9.3",
+					"name": "Reporting & CLI",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want clear console output and a JSON report so I can quickly see which tests passed or failed and investigate failures.",
+						"acceptance_criteria": [
+							"Console output shows pass/fail status for each test case",
+							"Console shows frame differences for each shot (detected vs expected)",
+							"Console highlights failures with clear indicators",
+							"JSON report saved to test-data/test-results.json",
+							"JSON report includes all comparison details",
+							"CLI accepts --video flag to run single test",
+							"Exit code 0 if all pass, 1 if any fail"
+						],
+						"edge_cases": [
+							"No test cases found - exit 0 with message",
+							"All tests pass - show success summary",
+							"Some tests fail - show failure details prominently",
+							"--video flag with non-existent video - error message"
+						],
+						"data_model": "TestReport: { runAt: string, summary: { total: number, passed: number, failed: number }, tolerance: { frames: number, expandedTo: number }, results: ComparisonResult[] }",
+						"technical_notes": "Use console colors for pass (green) / fail (red). Format: checkmark or X, video name, PASS/FAIL. For failures, indent and show each shot's frame diffs. JSON report should be pretty-printed. Parse process.argv for --video flag."
+					},
+					"subtasks": [
+						{
+							"id": "9.3.1",
+							"description": "Create formatConsoleOutput() function with colored pass/fail"
+						},
+						{
+							"id": "9.3.2",
+							"description": "Create formatFailureDetails() function showing frame diffs"
+						},
+						{
+							"id": "9.3.3",
+							"description": "Create saveJsonReport() function to write test-results.json"
+						},
+						{
+							"id": "9.3.4",
+							"description": "Add CLI argument parsing for --video flag"
+						},
+						{
+							"id": "9.3.5",
+							"description": "Implement exit code logic (0 for all pass, 1 for any fail)"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "10.0",
+			"name": "Algorithm Iteration",
+			"status": "pending",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "10.1",
+					"name": "Shot Boundary Detection Algorithm",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want a shot detection algorithm that identifies shot start and end frames from pose landmarks so the test runner can validate against labeled data.",
+						"acceptance_criteria": [
+							"Detects shot start frame using knee bend + hip drop signals",
+							"Detects shot end frame using arm extension + landing signals",
+							"Detects camera orientation from hip-to-shoulder alignment",
+							"Works with PoseData format from poses.json",
+							"Returns structured results matching DetectionResult type",
+							"Handles videos with multiple shots"
+						],
+						"edge_cases": [
+							"No clear shot motion - return empty shots array",
+							"Partial shot (starts but doesn't end) - skip incomplete",
+							"Very fast shot - ensure minimum duration check",
+							"Poor pose confidence - skip low-confidence frames"
+						],
+						"data_model": "Input: PoseData with frames containing 33 MediaPipe landmarks. Output: DetectionResult with shots array and orientation. MediaPipe indices: left_hip=23, right_hip=24, left_shoulder=11, right_shoulder=12, left_knee=25, right_knee=26, left_wrist=15, right_wrist=16",
+						"technical_notes": "Starting approach: (1) Shot start = frame where knee angle decreases AND hip y-position drops. (2) Shot end = frame where wrists reach max height AND knees start bending again (landing). (3) Orientation = calculate angle from hip midpoint to shoulder midpoint. Algorithm can be creatively redesigned based on test failures. May need to detect release point first and work backwards."
+					},
+					"subtasks": [
+						{
+							"id": "10.1.1",
+							"description": "Create src/detection/pose-shot-detector.ts for pose-based detection"
+						},
+						{
+							"id": "10.1.2",
+							"description": "Implement calculateKneeAngle() helper from hip-knee-ankle landmarks"
+						},
+						{
+							"id": "10.1.3",
+							"description": "Implement detectShotStart() using knee bend + hip drop"
+						},
+						{
+							"id": "10.1.4",
+							"description": "Implement detectShotEnd() using arm extension + landing"
+						},
+						{
+							"id": "10.1.5",
+							"description": "Implement detectOrientation() from hip-shoulder alignment"
+						},
+						{
+							"id": "10.1.6",
+							"description": "Create main detectShots() function combining all signals"
 						}
 					]
 				}

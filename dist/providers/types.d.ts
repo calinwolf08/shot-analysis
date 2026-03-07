@@ -20,6 +20,11 @@ export interface VideoFrame {
     readonly timestamp: number;
     /** Zero-based frame index */
     readonly frameIndex: number;
+    /**
+     * Optional canvas element containing the frame (browser only).
+     * When available, this can be used directly by MediaPipe for better performance.
+     */
+    readonly canvas?: HTMLCanvasElement;
 }
 /**
  * Metadata about the video source.

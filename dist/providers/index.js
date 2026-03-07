@@ -9,4 +9,6 @@ export { InvalidFpsError } from "./types";
 export { VideoFileProvider, createVideoFileProvider, VideoFileNotFoundError, VideoFileCorruptedError, UnsupportedVideoFormatError, } from "./video-file";
 // Media stream provider exports (browser-only)
 export { MediaStreamProvider, createMediaStreamProvider, MediaStreamEndedError, MediaStreamInactiveError, NoVideoTrackError, } from "./media-stream";
+// Video element provider exports (browser-only)
+export { VideoElementProvider, createVideoElementProvider, VideoLoadError, } from "./video-element";
 //# sourceMappingURL=index.js.map

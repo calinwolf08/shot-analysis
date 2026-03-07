@@ -26,3 +26,11 @@ export {
   NoVideoTrackError,
 } from "./media-stream";
 export type { MediaStreamProviderOptions } from "./media-stream";
+
+// Video element provider exports (browser-only)
+export {
+  VideoElementProvider,
+  createVideoElementProvider,
+  VideoLoadError,
+} from "./video-element";
+export type { VideoElementProviderOptions } from "./video-element";

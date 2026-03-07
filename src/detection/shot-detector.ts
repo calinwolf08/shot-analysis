@@ -61,9 +61,9 @@ export interface ShotBoundaryDetectorConfig {
  * Default configuration values.
  */
 const DEFAULT_CONFIG: Required<ShotBoundaryDetectorConfig> = {
-  velocityThreshold: 0.015,
+  velocityThreshold: 0.012, // Lowered from 0.015 to catch more subtle upward motion
   smoothingWindowSize: 3,
-  minShotDuration: 20,
+  minShotDuration: 15, // Lowered from 20 (check becomes >= 7.5 frames instead of 10)
   minUpwardFrames: 3,
   armReturnThreshold: 1.0,
   confirmationWindow: 3,
@@ -158,8 +158,30 @@ export class ShotBoundaryDetector {
     // Calculate velocities
     this.calculateVelocities(frameData);
 
+    // Debug: Log velocity statistics
+    const velocities = frameData.map(f => f.wristVelocity);
+    const minVel = Math.min(...velocities);
+    const maxVel = Math.max(...velocities);
+    const avgVel = velocities.reduce((a, b) => a + b, 0) / velocities.length;
+    const upwardFrames = velocities.filter(v => v < -this.config.velocityThreshold).length;
+    console.log(`[ShotDetector] Velocity stats: min=${minVel.toFixed(4)}, max=${maxVel.toFixed(4)}, avg=${avgVel.toFixed(4)}`);
+    console.log(`[ShotDetector] Threshold: ${this.config.velocityThreshold}, frames exceeding: ${upwardFrames}`);
+    console.log(`[ShotDetector] Wrist Y range: ${Math.min(...frameData.map(f => f.avgWristY)).toFixed(3)} - ${Math.max(...frameData.map(f => f.avgWristY)).toFixed(3)}`);
+
+    // Debug: Log frames 50-85 (expected shot range based on labels)
+    console.log(`[ShotDetector] Frame-by-frame analysis for shot region (50-85):`);
+    for (let i = 50; i < Math.min(85, frameData.length); i++) {
+      const f = frameData[i];
+      if (f) {
+        const marker = f.wristVelocity < -this.config.velocityThreshold ? ' <-- UPWARD' : '';
+        console.log(`  Frame ${i}: wristY=${f.avgWristY.toFixed(3)}, velocity=${f.wristVelocity.toFixed(4)}${marker}`);
+      }
+    }
+
     // Detect shot starts and ends
     const boundaries = this.findBoundaries(frameData, sequence.length);
+
+    console.log(`[ShotDetector] Found ${boundaries.length} boundaries`);
 
     return boundaries;
   }
@@ -254,6 +276,7 @@ export class ShotBoundaryDetector {
       consecutiveUpwardFrames = this.config.minUpwardFrames;
     }
 
+    let debugLogCount = 0;
     for (let i = 0; i < frameData.length; i++) {
       const frame = frameData[i]!;
       const isUpward = frame.wristVelocity < -this.config.velocityThreshold;
@@ -262,17 +285,23 @@ export class ShotBoundaryDetector {
         // Looking for shot start
         if (isUpward) {
           consecutiveUpwardFrames++;
+          if (debugLogCount < 5) {
+            console.log(`[ShotDetector] Frame ${i}: upward velocity=${frame.wristVelocity.toFixed(4)}, consecutive=${consecutiveUpwardFrames}`);
+            debugLogCount++;
+          }
           if (
             consecutiveUpwardFrames >= this.config.minUpwardFrames &&
             shotStartFrame === -1
           ) {
             // Start of potential shot
             shotStartFrame = Math.max(0, i - this.config.minUpwardFrames + 1);
+            console.log(`[ShotDetector] Potential shot start at frame ${shotStartFrame}`);
           }
         } else {
           if (shotStartFrame !== -1) {
             // Had a potential start but movement stopped - check if sustained
             const duration = i - shotStartFrame;
+            console.log(`[ShotDetector] Upward motion stopped at frame ${i}, duration=${duration}, minRequired=${this.config.minShotDuration / 2}`);
             if (duration >= this.config.minShotDuration / 2) {
               // Confirmed shot start
               inShot = true;
@@ -288,8 +317,10 @@ export class ShotBoundaryDetector {
                 ),
                 isPartial: shotStartFrame === 0,
               });
+              console.log(`[ShotDetector] Confirmed shot start at frame ${shotStartFrame}`);
             } else {
               // Too short, reset (pump fake filter)
+              console.log(`[ShotDetector] Rejected as pump fake (duration ${duration} < ${this.config.minShotDuration / 2})`);
               shotStartFrame = -1;
             }
           }
