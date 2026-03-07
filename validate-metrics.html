@@ -708,6 +708,189 @@
       border-bottom: 1px solid #374151;
     }
 
+    /* Shot Labeling Panel */
+    .shot-labeling-panel {
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+
+    .shot-labeling-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #374151;
+    }
+
+    .shot-labeling-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .shot-labeling-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .shot-labeling-actions button {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    .orientation-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+      padding: 10px 12px;
+      background: #1a1a1a;
+      border-radius: 6px;
+    }
+
+    .orientation-group label {
+      color: #9ca3af;
+      font-size: 0.9rem;
+    }
+
+    .orientation-group select {
+      padding: 6px 10px;
+      background: #374151;
+      border: 1px solid #4b5563;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 13px;
+      min-width: 140px;
+    }
+
+    .orientation-group select:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    .shot-list {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .shot-entry {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #1a1a1a;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 2px solid transparent;
+    }
+
+    .shot-entry:hover {
+      background: #252525;
+    }
+
+    .shot-entry.selected {
+      border-color: #2563eb;
+      background: #1e293b;
+    }
+
+    .shot-entry.invalid {
+      border-color: #dc2626;
+    }
+
+    .shot-entry.complete {
+      border-color: #16a34a;
+    }
+
+    .shot-entry-number {
+      font-weight: 600;
+      color: #60a5fa;
+      min-width: 60px;
+    }
+
+    .shot-entry-frames {
+      flex: 1;
+      display: flex;
+      gap: 15px;
+      font-size: 0.9rem;
+    }
+
+    .shot-entry-frames .frame-label {
+      color: #9ca3af;
+    }
+
+    .shot-entry-frames .frame-value {
+      color: #fff;
+      font-family: monospace;
+    }
+
+    .shot-entry-frames .frame-value.unset {
+      color: #6b7280;
+      font-style: italic;
+    }
+
+    .shot-entry-status {
+      font-size: 0.8rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .shot-entry-status.incomplete {
+      background: rgba(250, 204, 21, 0.2);
+      color: #facc15;
+    }
+
+    .shot-entry-status.complete {
+      background: rgba(22, 163, 74, 0.2);
+      color: #4ade80;
+    }
+
+    .shot-entry-status.error {
+      background: rgba(220, 38, 38, 0.2);
+      color: #f87171;
+    }
+
+    .shot-labeling-hint {
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin-top: 12px;
+      padding: 10px;
+      background: #1a1a1a;
+      border-radius: 6px;
+    }
+
+    .shot-labeling-hint kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      background: #374151;
+      border-radius: 3px;
+      font-family: monospace;
+      margin: 0 2px;
+    }
+
+    .shot-labeling-empty {
+      text-align: center;
+      padding: 30px 20px;
+      color: #6b7280;
+    }
+
+    .shot-labeling-empty p {
+      margin-bottom: 10px;
+    }
+
+    .validation-error {
+      color: #f87171;
+      font-size: 0.85rem;
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: rgba(220, 38, 38, 0.1);
+      border-radius: 4px;
+      border-left: 3px solid #dc2626;
+    }
+
     /* Progress bar */
     .progress-bar-container {
       width: 100%;
@@ -825,6 +1008,43 @@
           <kbd>Shift+&larr;</kbd> -10 frames &nbsp;
           <kbd>Shift+&rarr;</kbd> +10 frames
         </div>
+
+        <!-- Shot Labeling Panel -->
+        <div class="shot-labeling-panel" id="shotLabelingPanel">
+          <div class="shot-labeling-header">
+            <span class="shot-labeling-title">Shot Labels</span>
+            <div class="shot-labeling-actions">
+              <button id="addShotBtn" class="secondary">+ Add Shot</button>
+              <button id="removeShotBtn" class="danger" disabled>Remove Shot</button>
+            </div>
+          </div>
+
+          <div class="orientation-group">
+            <label for="cameraOrientation">Camera Orientation:</label>
+            <select id="cameraOrientation">
+              <option value="front">Front</option>
+              <option value="side-left">Side Left</option>
+              <option value="side-right">Side Right</option>
+              <option value="front-left">Front Left</option>
+              <option value="front-right">Front Right</option>
+            </select>
+          </div>
+
+          <div class="shot-list" id="shotList">
+            <div class="shot-labeling-empty" id="shotLabelingEmpty">
+              <p>No shots labeled yet.</p>
+              <p style="font-size: 0.85rem;">Click "Add Shot" to begin labeling.</p>
+            </div>
+          </div>
+
+          <div id="shotValidationError" class="validation-error hidden"></div>
+
+          <div class="shot-labeling-hint">
+            <kbd>s</kbd> Set start frame &nbsp;
+            <kbd>e</kbd> Set end frame &nbsp;
+            Click a shot to select it and jump to its start frame.
+          </div>
+        </div>
       </div>
 
       <!-- Metrics Panel -->
@@ -921,6 +1141,15 @@
       analyzer: null,
     };
 
+    // Shot labeling state
+    // Shot: { shotNumber: number, startFrame: number | null, endFrame: number | null }
+    // Orientation: 'front' | 'side-left' | 'side-right' | 'front-left' | 'front-right'
+    const labelingState = {
+      shots: [],
+      selectedShotIndex: null,
+      cameraOrientation: 'front',
+    };
+
     // =========================================================================
     // DOM Elements
     // =========================================================================
@@ -972,6 +1201,14 @@
       statMetrics: $('statMetrics'),
       statIncorrect: $('statIncorrect'),
       statCorrected: $('statCorrected'),
+      // Shot labeling elements
+      shotLabelingPanel: $('shotLabelingPanel'),
+      addShotBtn: $('addShotBtn'),
+      removeShotBtn: $('removeShotBtn'),
+      cameraOrientation: $('cameraOrientation'),
+      shotList: $('shotList'),
+      shotLabelingEmpty: $('shotLabelingEmpty'),
+      shotValidationError: $('shotValidationError'),
     };
 
     // =========================================================================
@@ -1707,6 +1944,7 @@
             (sum, v) => sum + Object.values(v).filter(m => m.incorrect && m.correctedValue !== null).length, 0
           ),
         },
+        labeling: getLabelingData(),
       };
     }
 
@@ -1744,6 +1982,7 @@
         analysisData: appState.analysisData,
         currentShot: appState.currentShot,
         validations: appState.validations,
+        labelingData: getLabelingData(),
         savedAt: new Date().toISOString(),
       };
 
@@ -1771,6 +2010,11 @@
         switchToShot(data.currentShot);
       }
 
+      // Load labeling data if present
+      if (data.labelingData) {
+        loadLabelingData(data.labelingData);
+      }
+
       renderCurrentShot();
       updateStats();
       showToast('Progress loaded - Select the video file to enable playback', 'success');
@@ -1788,6 +2032,313 @@
 
     // Make seekToFrame global for onclick handlers
     window.seekToFrame = seekToFrame;
+
+    // =========================================================================
+    // Shot Labeling Functions
+    // =========================================================================
+
+    /**
+     * Validates that shots don't overlap and have valid frame ranges
+     * @returns {{ valid: boolean, errors: string[] }}
+     */
+    function validateShots() {
+      const errors = [];
+      const shots = labelingState.shots;
+
+      for (let i = 0; i < shots.length; i++) {
+        const shot = shots[i];
+
+        // Check for invalid frame range (end before start)
+        if (shot.startFrame !== null && shot.endFrame !== null) {
+          if (shot.endFrame < shot.startFrame) {
+            errors.push(`Shot ${shot.shotNumber}: End frame (${shot.endFrame}) cannot be before start frame (${shot.startFrame})`);
+          }
+        }
+
+        // Check for overlapping shots
+        for (let j = i + 1; j < shots.length; j++) {
+          const otherShot = shots[j];
+
+          // Skip if either shot is incomplete
+          if (shot.startFrame === null || shot.endFrame === null ||
+              otherShot.startFrame === null || otherShot.endFrame === null) {
+            continue;
+          }
+
+          // Check for overlap: ranges overlap if one starts before the other ends
+          const overlap = shot.startFrame <= otherShot.endFrame && otherShot.startFrame <= shot.endFrame;
+          if (overlap) {
+            errors.push(`Shot ${shot.shotNumber} (frames ${shot.startFrame}-${shot.endFrame}) overlaps with Shot ${otherShot.shotNumber} (frames ${otherShot.startFrame}-${otherShot.endFrame})`);
+          }
+        }
+      }
+
+      return { valid: errors.length === 0, errors };
+    }
+
+    /**
+     * Displays validation errors in the UI
+     */
+    function showValidationErrors(errors) {
+      if (errors.length === 0) {
+        elements.shotValidationError.classList.add('hidden');
+        elements.shotValidationError.textContent = '';
+      } else {
+        elements.shotValidationError.classList.remove('hidden');
+        elements.shotValidationError.innerHTML = errors.map(e => `<div>${e}</div>`).join('');
+      }
+    }
+
+    /**
+     * Adds a new shot to the labeling list
+     */
+    function addShot() {
+      const nextShotNumber = labelingState.shots.length > 0
+        ? Math.max(...labelingState.shots.map(s => s.shotNumber)) + 1
+        : 1;
+
+      const newShot = {
+        shotNumber: nextShotNumber,
+        startFrame: null,
+        endFrame: null,
+      };
+
+      labelingState.shots.push(newShot);
+      labelingState.selectedShotIndex = labelingState.shots.length - 1;
+
+      renderShotList();
+      updateRemoveButtonState();
+    }
+
+    /**
+     * Removes the selected shot from the list
+     */
+    function removeShot() {
+      if (labelingState.selectedShotIndex === null) return;
+      if (labelingState.shots.length === 0) return;
+
+      // Remove the selected shot
+      labelingState.shots.splice(labelingState.selectedShotIndex, 1);
+
+      // Renumber remaining shots
+      labelingState.shots.forEach((shot, index) => {
+        shot.shotNumber = index + 1;
+      });
+
+      // Update selection
+      if (labelingState.shots.length === 0) {
+        labelingState.selectedShotIndex = null;
+      } else if (labelingState.selectedShotIndex >= labelingState.shots.length) {
+        labelingState.selectedShotIndex = labelingState.shots.length - 1;
+      }
+
+      renderShotList();
+      updateRemoveButtonState();
+
+      // Re-validate after removal
+      const validation = validateShots();
+      showValidationErrors(validation.errors);
+    }
+
+    /**
+     * Selects a shot and jumps to its start frame
+     */
+    function selectShot(index) {
+      if (index < 0 || index >= labelingState.shots.length) return;
+
+      labelingState.selectedShotIndex = index;
+      renderShotList();
+      updateRemoveButtonState();
+
+      // Jump to start frame if set and video is loaded
+      const shot = labelingState.shots[index];
+      if (shot.startFrame !== null && appState.videoLoaded) {
+        seekToFrame(shot.startFrame);
+      }
+    }
+
+    /**
+     * Sets the start frame for the selected shot
+     */
+    function setStartFrame() {
+      if (labelingState.selectedShotIndex === null) {
+        showToast('Select a shot first', 'error');
+        return;
+      }
+      if (!appState.videoLoaded) {
+        showToast('Load a video first', 'error');
+        return;
+      }
+
+      const currentFrame = getCurrentFrame();
+      labelingState.shots[labelingState.selectedShotIndex].startFrame = currentFrame;
+
+      renderShotList();
+
+      // Validate and show any errors
+      const validation = validateShots();
+      showValidationErrors(validation.errors);
+
+      showToast(`Shot ${labelingState.shots[labelingState.selectedShotIndex].shotNumber}: Start frame set to ${currentFrame}`, 'success');
+    }
+
+    /**
+     * Sets the end frame for the selected shot
+     */
+    function setEndFrame() {
+      if (labelingState.selectedShotIndex === null) {
+        showToast('Select a shot first', 'error');
+        return;
+      }
+      if (!appState.videoLoaded) {
+        showToast('Load a video first', 'error');
+        return;
+      }
+
+      const currentFrame = getCurrentFrame();
+      labelingState.shots[labelingState.selectedShotIndex].endFrame = currentFrame;
+
+      renderShotList();
+
+      // Validate and show any errors
+      const validation = validateShots();
+      showValidationErrors(validation.errors);
+
+      showToast(`Shot ${labelingState.shots[labelingState.selectedShotIndex].shotNumber}: End frame set to ${currentFrame}`, 'success');
+    }
+
+    /**
+     * Gets the status of a shot (complete, incomplete, or error)
+     */
+    function getShotStatus(shot) {
+      const hasStart = shot.startFrame !== null;
+      const hasEnd = shot.endFrame !== null;
+
+      if (!hasStart && !hasEnd) {
+        return { status: 'incomplete', label: 'No frames' };
+      }
+      if (!hasStart) {
+        return { status: 'incomplete', label: 'No start' };
+      }
+      if (!hasEnd) {
+        return { status: 'incomplete', label: 'No end' };
+      }
+      if (shot.endFrame < shot.startFrame) {
+        return { status: 'error', label: 'Invalid range' };
+      }
+
+      // Check for overlap with other shots
+      const validation = validateShots();
+      const hasOverlap = validation.errors.some(e => e.includes(`Shot ${shot.shotNumber}`));
+      if (hasOverlap) {
+        return { status: 'error', label: 'Overlapping' };
+      }
+
+      return { status: 'complete', label: 'Complete' };
+    }
+
+    /**
+     * Renders the shot list in the UI
+     */
+    function renderShotList() {
+      if (labelingState.shots.length === 0) {
+        elements.shotLabelingEmpty.classList.remove('hidden');
+        elements.shotList.innerHTML = '';
+        elements.shotList.appendChild(elements.shotLabelingEmpty);
+        return;
+      }
+
+      elements.shotLabelingEmpty.classList.add('hidden');
+      elements.shotList.innerHTML = '';
+
+      labelingState.shots.forEach((shot, index) => {
+        const entry = document.createElement('div');
+        entry.className = 'shot-entry';
+        entry.dataset.index = index;
+
+        // Add selection state
+        if (index === labelingState.selectedShotIndex) {
+          entry.classList.add('selected');
+        }
+
+        // Get status
+        const { status, label } = getShotStatus(shot);
+        if (status === 'error') {
+          entry.classList.add('invalid');
+        } else if (status === 'complete') {
+          entry.classList.add('complete');
+        }
+
+        // Format frame values
+        const startFrameStr = shot.startFrame !== null ? shot.startFrame : '--';
+        const endFrameStr = shot.endFrame !== null ? shot.endFrame : '--';
+        const startClass = shot.startFrame !== null ? '' : 'unset';
+        const endClass = shot.endFrame !== null ? '' : 'unset';
+
+        entry.innerHTML = `
+          <span class="shot-entry-number">Shot ${shot.shotNumber}</span>
+          <div class="shot-entry-frames">
+            <span><span class="frame-label">Start:</span> <span class="frame-value ${startClass}">${startFrameStr}</span></span>
+            <span><span class="frame-label">End:</span> <span class="frame-value ${endClass}">${endFrameStr}</span></span>
+          </div>
+          <span class="shot-entry-status ${status}">${label}</span>
+        `;
+
+        entry.onclick = () => selectShot(index);
+        elements.shotList.appendChild(entry);
+      });
+    }
+
+    /**
+     * Updates the remove button state based on selection
+     */
+    function updateRemoveButtonState() {
+      elements.removeShotBtn.disabled = labelingState.selectedShotIndex === null;
+    }
+
+    /**
+     * Updates camera orientation state
+     */
+    function updateCameraOrientation(value) {
+      labelingState.cameraOrientation = value;
+    }
+
+    /**
+     * Gets the current labeling data for export
+     */
+    function getLabelingData() {
+      return {
+        cameraOrientation: labelingState.cameraOrientation,
+        shots: labelingState.shots.map(shot => ({
+          shotNumber: shot.shotNumber,
+          startFrame: shot.startFrame,
+          endFrame: shot.endFrame,
+        })),
+      };
+    }
+
+    /**
+     * Loads labeling data (for restoring from saved progress)
+     */
+    function loadLabelingData(data) {
+      if (data.cameraOrientation) {
+        labelingState.cameraOrientation = data.cameraOrientation;
+        elements.cameraOrientation.value = data.cameraOrientation;
+      }
+      if (data.shots && Array.isArray(data.shots)) {
+        labelingState.shots = data.shots.map(shot => ({
+          shotNumber: shot.shotNumber,
+          startFrame: shot.startFrame,
+          endFrame: shot.endFrame,
+        }));
+        labelingState.selectedShotIndex = labelingState.shots.length > 0 ? 0 : null;
+      }
+      renderShotList();
+      updateRemoveButtonState();
+
+      const validation = validateShots();
+      showValidationErrors(validation.errors);
+    }
 
     // =========================================================================
     // Event Listeners
@@ -1866,7 +2417,7 @@
 
     // Keyboard shortcuts
     document.onkeydown = (e) => {
-      if (e.target.tagName === 'INPUT') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
 
       switch (e.key) {
         case ' ':
@@ -1881,6 +2432,16 @@
           e.preventDefault();
           if (appState.videoLoaded) stepFrame(e.shiftKey ? 10 : 1);
           break;
+        case 's':
+        case 'S':
+          e.preventDefault();
+          setStartFrame();
+          break;
+        case 'e':
+        case 'E':
+          e.preventDefault();
+          setEndFrame();
+          break;
         case 'Escape':
           hideExportModal();
           break;
@@ -1890,6 +2451,11 @@
     elements.exportModal.onclick = (e) => {
       if (e.target === elements.exportModal) hideExportModal();
     };
+
+    // Shot labeling event listeners
+    elements.addShotBtn.onclick = addShot;
+    elements.removeShotBtn.onclick = removeShot;
+    elements.cameraOrientation.onchange = (e) => updateCameraOrientation(e.target.value);
   </script>
 </body>
 </html>

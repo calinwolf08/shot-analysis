@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-06T00:13:24.946Z"
+		"updated_at": "2026-03-07T19:04:02.161Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -2262,8 +2262,8 @@
 				{
 					"id": "8.1",
 					"name": "Frame Navigation & Video Controls",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a tester, I want to navigate through video frames precisely using keyboard controls so I can identify exact shot boundary frames for labeling.",
@@ -2303,7 +2303,8 @@
 							"id": "8.1.5",
 							"description": "Test frame navigation at video boundaries"
 						}
-					]
+					],
+					"commit_hash": "b2bffc8cf0b600659fbc3fd23e1fb1b70ea7f2cc"
 				},
 				{
 					"id": "8.2",
