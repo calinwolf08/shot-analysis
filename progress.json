@@ -3,7 +3,7 @@
 		"name": "manual-labeling-workflow",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-07T12:00:00Z",
-		"updated_at": "2026-03-07T23:21:31.695Z"
+		"updated_at": "2026-03-07T23:25:54.049Z"
 	},
 	"status": "in_progress",
 	"features": [
@@ -217,8 +217,8 @@
 				{
 					"id": "3.1",
 					"name": "Create runPoseDetection function",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a user, I want to click Export Poses and have the system automatically run pose detection on the video if it hasn't been analyzed yet, so I can get pose data without running full analysis.",
@@ -260,7 +260,8 @@
 							"id": "3.1.5",
 							"description": "Return pose data in expected format matching appState.poseData structure"
 						}
-					]
+					],
+					"commit_hash": "3d71958a147020581503e8e799c4862649140077"
 				},
 				{
 					"id": "3.2",

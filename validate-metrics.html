@@ -1453,6 +1453,9 @@
           // Enable Add Shot button now that video is loaded
           updateAddShotButtonState();
 
+          // Enable Export Poses button now that video is loaded
+          updateExportPosesButtonState();
+
           // Update frame display to show initial frame info
           updateFrameDisplay();
         };
@@ -2519,12 +2522,12 @@
       }
 
       /**
-       * Exports pose data to server
+       * Exports pose data to server.
+       * If no pose data exists, runs pose detection first.
        */
       async function exportPoses() {
-        const posesData = generatePosesExport();
-        if (!posesData) {
-          showToast("No pose data available. Run analysis first.", "error");
+        // Prevent double-clicks while operation is in progress
+        if (elements.exportPosesBtn.disabled) {
           return;
         }
 
@@ -2535,11 +2538,29 @@
           return;
         }
 
+        // Disable button during operation
+        elements.exportPosesBtn.disabled = true;
+
         try {
+          // Run pose detection if no pose data exists
+          if (!appState.poseData) {
+            showToast("Running pose detection...", "info");
+            appState.poseData = await runPoseDetection();
+          }
+
+          const posesData = generatePosesExport();
+          if (!posesData) {
+            showToast("No pose data available after detection.", "error");
+            return;
+          }
+
           const result = await savePosesToServer(posesData, videoName);
           showToast(`Poses saved to: ${result.path}`, "success");
         } catch (err) {
-          showToast(`Failed to save poses: ${err.message}`, "error");
+          showToast(`Failed to export poses: ${err.message}`, "error");
+        } finally {
+          // Re-enable button (still based on videoLoaded state)
+          updateExportPosesButtonState();
         }
       }
 
@@ -2583,10 +2604,10 @@
       }
 
       /**
-       * Updates the Export Poses button state based on whether pose data is available
+       * Updates the Export Poses button state based on whether video is loaded
        */
       function updateExportPosesButtonState() {
-        elements.exportPosesBtn.disabled = !appState.poseData;
+        elements.exportPosesBtn.disabled = !appState.videoLoaded;
       }
 
       function saveProgress() {

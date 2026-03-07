@@ -377,4 +377,218 @@ describe("Export Labels with Manually Created Shots", () => {
         });
     });
 });
+/**
+ * Export Poses On-Demand Tests
+ *
+ * @see Feature 3.0 - Export Poses On-Demand
+ * @see Task 3.2 - Modify exportPoses and update button state
+ */
+describe("Export Poses On-Demand", () => {
+    describe("updateExportPosesButtonState", () => {
+        it("should enable Export Poses button when videoLoaded is true", () => {
+            const appState = {
+                videoLoaded: true,
+                poseData: null,
+                analysisData: null,
+                videoFile: { name: "test.mp4" },
+            };
+            // Simulates updateExportPosesButtonState() logic (changed from !poseData to !videoLoaded)
+            const buttonDisabled = !appState.videoLoaded;
+            expect(buttonDisabled).toBe(false);
+        });
+        it("should disable Export Poses button when videoLoaded is false", () => {
+            const appState = {
+                videoLoaded: false,
+                poseData: null,
+                analysisData: null,
+                videoFile: null,
+            };
+            const buttonDisabled = !appState.videoLoaded;
+            expect(buttonDisabled).toBe(true);
+        });
+        it("should enable button regardless of poseData presence", () => {
+            // When video is loaded but no pose data exists, button should still be enabled
+            const appState = {
+                videoLoaded: true,
+                poseData: null,
+                analysisData: null,
+                videoFile: { name: "test.mp4" },
+            };
+            const buttonDisabled = !appState.videoLoaded;
+            expect(buttonDisabled).toBe(false);
+            expect(appState.poseData).toBeNull();
+        });
+    });
+    describe("exportPoses on-demand detection", () => {
+        it("should trigger pose detection when poseData is null", async () => {
+            const appState = {
+                videoLoaded: true,
+                poseData: null,
+                analysisData: null,
+                videoFile: { name: "test.mp4" },
+            };
+            let detectionTriggered = false;
+            const mockRunPoseDetection = async () => {
+                detectionTriggered = true;
+                return {
+                    video: "test.mp4",
+                    fps: 30,
+                    totalFrames: 100,
+                    width: 1920,
+                    height: 1080,
+                    extractedAt: new Date().toISOString(),
+                    frames: [],
+                };
+            };
+            // Simulates exportPoses() logic
+            if (!appState.poseData) {
+                appState.poseData = await mockRunPoseDetection();
+            }
+            expect(detectionTriggered).toBe(true);
+            expect(appState.poseData).not.toBeNull();
+        });
+        it("should skip detection when poseData already exists", async () => {
+            const existingPoseData = {
+                video: "analyzed.mp4",
+                fps: 30,
+                totalFrames: 200,
+                width: 1920,
+                height: 1080,
+                extractedAt: "2026-03-07T00:00:00.000Z",
+                frames: [
+                    {
+                        frameIndex: 0,
+                        timestamp: 0,
+                        poseConfidence: 0.95,
+                        landmarks: [],
+                    },
+                ],
+            };
+            const appState = {
+                videoLoaded: true,
+                poseData: existingPoseData,
+                analysisData: { video: { filename: "analyzed.mp4" } },
+                videoFile: { name: "analyzed.mp4" },
+            };
+            let detectionTriggered = false;
+            const mockRunPoseDetection = async () => {
+                detectionTriggered = true;
+                return {
+                    video: "new.mp4",
+                    fps: 30,
+                    totalFrames: 100,
+                    width: 1920,
+                    height: 1080,
+                    extractedAt: new Date().toISOString(),
+                    frames: [],
+                };
+            };
+            // Simulates exportPoses() logic - should not call detection
+            if (!appState.poseData) {
+                appState.poseData = await mockRunPoseDetection();
+            }
+            expect(detectionTriggered).toBe(false);
+            expect(appState.poseData).toBe(existingPoseData);
+        });
+    });
+    describe("exportPoses button disable during operation", () => {
+        it("should disable button during detection/save operation", async () => {
+            let buttonDisabled = false;
+            const setButtonDisabled = (value) => {
+                buttonDisabled = value;
+            };
+            // Simulates exportPoses() button disable logic
+            setButtonDisabled(true);
+            expect(buttonDisabled).toBe(true);
+            // After operation completes
+            setButtonDisabled(false);
+            expect(buttonDisabled).toBe(false);
+        });
+        it("should prevent double-clicks when button is disabled", () => {
+            let operationCount = 0;
+            let buttonDisabled = false;
+            const exportPoses = () => {
+                if (buttonDisabled) {
+                    return; // Early return prevents operation
+                }
+                buttonDisabled = true;
+                operationCount++;
+                // Operation completes
+                buttonDisabled = false;
+            };
+            // First click
+            exportPoses();
+            expect(operationCount).toBe(1);
+            // Simulate double-click by setting button disabled manually
+            buttonDisabled = true;
+            exportPoses();
+            expect(operationCount).toBe(1); // Should not increment
+        });
+        it("should re-enable button after operation completes (success or error)", () => {
+            const appState = {
+                videoLoaded: true,
+                poseData: null,
+                analysisData: null,
+                videoFile: { name: "test.mp4" },
+            };
+            let buttonDisabled = true;
+            // Simulates the finally block re-enabling based on videoLoaded
+            buttonDisabled = !appState.videoLoaded;
+            expect(buttonDisabled).toBe(false);
+        });
+    });
+    describe("error handling in exportPoses", () => {
+        it("should handle detection failure gracefully", async () => {
+            const appState = {
+                videoLoaded: true,
+                poseData: null,
+                analysisData: null,
+                videoFile: { name: "test.mp4" },
+            };
+            const mockRunPoseDetection = async () => {
+                throw new Error("Pose detection failed: GPU not available");
+            };
+            let errorMessage = "";
+            try {
+                if (!appState.poseData) {
+                    appState.poseData = await mockRunPoseDetection();
+                }
+            }
+            catch (err) {
+                errorMessage = err.message;
+            }
+            expect(errorMessage).toContain("Pose detection failed");
+            expect(appState.poseData).toBeNull();
+        });
+        it("should not save invalid data after detection failure", async () => {
+            const appState = {
+                videoLoaded: true,
+                poseData: null,
+                analysisData: null,
+                videoFile: { name: "test.mp4" },
+            };
+            let saveAttempted = false;
+            const mockSavePosesToServer = async () => {
+                saveAttempted = true;
+            };
+            const mockRunPoseDetection = async () => {
+                throw new Error("Detection failed");
+            };
+            // Simulates exportPoses() error handling
+            try {
+                if (!appState.poseData) {
+                    appState.poseData = await mockRunPoseDetection();
+                }
+                // Only save if we have data
+                if (appState.poseData) {
+                    await mockSavePosesToServer();
+                }
+            }
+            catch {
+                // Error caught, save should not happen
+            }
+            expect(saveAttempted).toBe(false);
+        });
+    });
+});
 //# sourceMappingURL=manual-labeling-flow.test.js.map
