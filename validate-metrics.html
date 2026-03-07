@@ -1384,34 +1384,110 @@
       // =========================================================================
       // Video Loading & Playback
       // =========================================================================
-      function loadVideoFromFile(file) {
-        // Create blob URL from the selected file
+      function loadVideoIntoPlayer(file) {
+        // Validate file input
+        if (!file) {
+          showToast("No file provided", "error");
+          return;
+        }
+
+        // Validate file is a video
+        if (!file.type.startsWith("video/")) {
+          showToast("Invalid file type. Please select a video file.", "error");
+          return;
+        }
+
+        // Clean up previous video URL to prevent memory leaks
         if (appState.videoBlobUrl) {
           URL.revokeObjectURL(appState.videoBlobUrl);
         }
+
+        // Reset video-related state when loading new video
+        appState.videoLoaded = false;
+        appState.totalFrames = 0;
+        appState.fps = 30; // Default FPS (HTML5 video doesn't expose native FPS)
+
+        // Create blob URL from the selected file
         const blobUrl = URL.createObjectURL(file);
         appState.videoBlobUrl = blobUrl;
         appState.videoFile = file;
 
+        // Set video source
         elements.video.src = blobUrl;
 
+        // Handle loadedmetadata event to extract duration and calculate frames
         elements.video.onloadedmetadata = () => {
           const duration = elements.video.duration;
+
+          // Handle very short videos (< 1 second) - still valid, just few frames
+          if (duration <= 0) {
+            showToast("Video has invalid duration", "error");
+            resetVideoState();
+            return;
+          }
+
+          // Calculate total frames (duration * fps)
           appState.totalFrames = Math.floor(duration * appState.fps);
+
+          // Update timeline
           elements.timeline.max = duration;
           elements.timeline.disabled = false;
+
+          // Hide placeholders, show video
           elements.videoPlaceholder.classList.add("hidden");
           elements.loadingPlaceholder.classList.add("hidden");
+
+          // Mark video as loaded
           appState.videoLoaded = true;
+
+          // Enable navigation controls
           enableControls();
+
+          // Update frame display to show initial frame info
           updateFrameDisplay();
         };
 
-        elements.video.onerror = () => {
-          showToast("Failed to load video for playback", "error");
-          elements.loadingPlaceholder.classList.add("hidden");
-          elements.videoPlaceholder.classList.remove("hidden");
+        // Handle video load errors (invalid/corrupted files)
+        elements.video.onerror = (e) => {
+          const error = elements.video.error;
+          let errorMessage = "Failed to load video";
+
+          if (error) {
+            switch (error.code) {
+              case MediaError.MEDIA_ERR_ABORTED:
+                errorMessage = "Video loading was aborted";
+                break;
+              case MediaError.MEDIA_ERR_NETWORK:
+                errorMessage = "Network error while loading video";
+                break;
+              case MediaError.MEDIA_ERR_DECODE:
+                errorMessage = "Video file is corrupted or uses an unsupported format";
+                break;
+              case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                errorMessage = "Video format is not supported by your browser";
+                break;
+            }
+          }
+
+          showToast(errorMessage, "error");
+          resetVideoState();
         };
+      }
+
+      // Reset video state when loading fails
+      function resetVideoState() {
+        appState.videoLoaded = false;
+        appState.totalFrames = 0;
+        appState.fps = 30; // Reset to default FPS
+        if (appState.videoBlobUrl) {
+          URL.revokeObjectURL(appState.videoBlobUrl);
+          appState.videoBlobUrl = null;
+        }
+        appState.videoFile = null;
+        elements.loadingPlaceholder.classList.add("hidden");
+        elements.videoPlaceholder.classList.remove("hidden");
+        // Disable navigation controls to prevent use with invalid/missing video
+        disableControls();
       }
 
       function enableControls() {
@@ -1422,6 +1498,18 @@
         elements.next10Btn.disabled = false;
         elements.frameJumpInput.disabled = false;
         elements.frameJumpBtn.disabled = false;
+        elements.timeline.disabled = false;
+      }
+
+      function disableControls() {
+        elements.playPauseBtn.disabled = true;
+        elements.prevFrameBtn.disabled = true;
+        elements.nextFrameBtn.disabled = true;
+        elements.prev10Btn.disabled = true;
+        elements.next10Btn.disabled = true;
+        elements.frameJumpInput.disabled = true;
+        elements.frameJumpBtn.disabled = true;
+        elements.timeline.disabled = true;
       }
 
       function jumpToFrameFromInput() {
@@ -1712,7 +1800,7 @@
 
           // Load video for playback
           updateProgress("Loading video player...", 98);
-          loadVideoFromFile(file);
+          loadVideoIntoPlayer(file);
 
           elements.progressSection.classList.add("hidden");
           showToast(
@@ -2763,6 +2851,7 @@
         const file = elements.videoFileInput.files[0];
         if (file) {
           elements.selectedFileName.textContent = file.name;
+          loadVideoIntoPlayer(file);
         } else {
           elements.selectedFileName.textContent = "No file selected";
         }
