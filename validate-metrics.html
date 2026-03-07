@@ -954,6 +954,8 @@
         <button id="loadProgressBtn" class="secondary">Load Progress</button>
         <input type="file" id="progressInput" accept=".json" style="display: none;">
         <button id="exportBtn" class="success">Export Validation</button>
+        <button id="exportPosesBtn" class="secondary" disabled title="Export extracted pose data to server">Export Poses</button>
+        <button id="exportLabelsBtn" class="secondary" title="Export shot labels to server">Export Labels</button>
       </div>
     </div>
 
@@ -1139,6 +1141,8 @@
       totalFrames: 0,
       validations: {},
       analyzer: null,
+      // Pose data for export - populated during analysis
+      poseData: null,
     };
 
     // Shot labeling state
@@ -1192,6 +1196,8 @@
       loadProgressBtn: $('loadProgressBtn'),
       progressInput: $('progressInput'),
       exportBtn: $('exportBtn'),
+      exportPosesBtn: $('exportPosesBtn'),
+      exportLabelsBtn: $('exportLabelsBtn'),
       exportModal: $('exportModal'),
       exportPreview: $('exportPreview'),
       cancelExportBtn: $('cancelExportBtn'),
@@ -1235,6 +1241,36 @@
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Save failed');
+      }
+
+      return response.json();
+    }
+
+    async function savePosesToServer(data, videoName) {
+      const response = await fetch('/api/save-poses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, videoName }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Save poses failed');
+      }
+
+      return response.json();
+    }
+
+    async function saveLabelsToServer(data, videoName) {
+      const response = await fetch('/api/save-labels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, videoName }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Save labels failed');
       }
 
       return response.json();
@@ -1510,6 +1546,31 @@
             overallConfidence: shot.overallConfidence,
           })),
         };
+
+        // Build pose data from analysis result (if available)
+        // The poseHistory contains frame-level pose data from the analysis
+        if (result.poseHistory && Array.isArray(result.poseHistory)) {
+          appState.poseData = {
+            video: file.name,
+            fps: result.videoMetadata.fps,
+            totalFrames: result.videoMetadata.totalFrames,
+            width: result.videoMetadata.width,
+            height: result.videoMetadata.height,
+            extractedAt: new Date().toISOString(),
+            frames: result.poseHistory.map(frame => ({
+              frameIndex: frame.frameIndex,
+              timestamp: frame.timestamp,
+              poseConfidence: frame.confidence || 0,
+              landmarks: frame.landmarks || [],
+            })),
+          };
+          console.log('[DEBUG] Pose data captured:', appState.poseData.frames.length, 'frames');
+        } else {
+          // No raw pose data available - set to null
+          console.log('[DEBUG] No raw pose history available in result');
+          appState.poseData = null;
+        }
+        updateExportPosesButtonState();
 
         // Load the analysis data
         loadAnalysisData(exportData);
@@ -1977,6 +2038,100 @@
       }
     }
 
+    /**
+     * Generates poses.json export data
+     * Format: { video, fps, totalFrames, width, height, extractedAt, frames }
+     */
+    function generatePosesExport() {
+      if (!appState.poseData) return null;
+      return appState.poseData;
+    }
+
+    /**
+     * Generates labels.json export data
+     * Format: { video, labeledBy, labeledAt, orientation, shots }
+     */
+    function generateLabelsExport() {
+      const videoName = appState.analysisData?.video?.filename || appState.videoFile?.name || 'unknown';
+      const labeling = getLabelingData();
+
+      return {
+        video: videoName,
+        labeledBy: 'human',
+        labeledAt: new Date().toISOString(),
+        orientation: labeling.cameraOrientation,
+        shots: labeling.shots.map(shot => ({
+          shotNumber: shot.shotNumber,
+          startFrame: shot.startFrame,
+          endFrame: shot.endFrame,
+        })),
+      };
+    }
+
+    /**
+     * Exports pose data to server
+     */
+    async function exportPoses() {
+      const posesData = generatePosesExport();
+      if (!posesData) {
+        showToast('No pose data available. Run analysis first.', 'error');
+        return;
+      }
+
+      const videoName = appState.analysisData?.video?.filename || appState.videoFile?.name;
+      if (!videoName) {
+        showToast('No video name available', 'error');
+        return;
+      }
+
+      try {
+        const result = await savePosesToServer(posesData, videoName);
+        showToast(`Poses saved to: ${result.path}`, 'success');
+      } catch (err) {
+        showToast(`Failed to save poses: ${err.message}`, 'error');
+      }
+    }
+
+    /**
+     * Exports labels to server
+     */
+    async function exportLabels() {
+      const labelsData = generateLabelsExport();
+
+      // Validate that we have at least one complete shot
+      const validation = validateShots();
+      if (!validation.valid) {
+        showToast('Fix validation errors before exporting labels', 'error');
+        return;
+      }
+
+      const completedShots = labelsData.shots.filter(s => s.startFrame !== null && s.endFrame !== null);
+      if (completedShots.length === 0) {
+        showToast('Add at least one complete shot label before exporting', 'error');
+        return;
+      }
+
+      const videoName = appState.analysisData?.video?.filename || appState.videoFile?.name;
+      if (!videoName) {
+        showToast('No video name available. Load a video first.', 'error');
+        return;
+      }
+
+      try {
+        const result = await saveLabelsToServer(labelsData, videoName);
+        showToast(`Labels saved to: ${result.path}`, 'success');
+      } catch (err) {
+        showToast(`Failed to save labels: ${err.message}`, 'error');
+      }
+    }
+
+    /**
+     * Updates the Export Poses button state based on whether pose data is available
+     */
+    function updateExportPosesButtonState() {
+      elements.exportPosesBtn.disabled = !appState.poseData;
+    }
+
     function saveProgress() {
       const progressData = {
         analysisData: appState.analysisData,
@@ -2382,6 +2537,8 @@
     elements.exportBtn.onclick = showExportModal;
     elements.cancelExportBtn.onclick = hideExportModal;
     elements.confirmExportBtn.onclick = saveExport;
+    elements.exportPosesBtn.onclick = exportPoses;
+    elements.exportLabelsBtn.onclick = exportLabels;
 
     elements.playPauseBtn.onclick = togglePlayPause;
     elements.prevFrameBtn.onclick = () => stepFrame(-1);

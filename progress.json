@@ -3,7 +3,7 @@
 		"name": "basketball-shot-analysis",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-04T00:00:00.000Z",
-		"updated_at": "2026-03-07T19:04:02.161Z"
+		"updated_at": "2026-03-07T19:10:29.226Z"
 	},
 	"status": "in_progress",
 	"validation_commands": {
@@ -2309,8 +2309,8 @@
 				{
 					"id": "8.2",
 					"name": "Shot Labeling Controls",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a tester, I want to mark shot start and end frames and select camera orientation so I can create ground truth labels for each shot in the video.",
@@ -2357,7 +2357,8 @@
 							"id": "8.2.6",
 							"description": "Add validation for overlapping shots and invalid frame ranges"
 						}
-					]
+					],
+					"commit_hash": "e4a6f131773dfc7be40af8d67e30e50eafd8055a"
 				},
 				{
 					"id": "8.3",

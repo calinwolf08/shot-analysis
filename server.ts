@@ -17,6 +17,8 @@
  *   GET  /dist/*               - Serves the browser bundle
  *   POST /api/save-validation  - Saves validation results
  *   GET  /api/validations      - Lists saved validations
+ *   POST /api/save-poses       - Saves pose data to test-data/<video-name>/poses.json
+ *   POST /api/save-labels      - Saves labels to test-data/<video-name>/labels.json
  */
 
 import * as http from "http";
@@ -25,9 +27,51 @@ import * as path from "path";
 
 const PORT = parseInt(process.argv[2] || "3000", 10);
 const VALIDATIONS_DIR = path.join(process.cwd(), "validations");
+const TEST_DATA_DIR = path.join(process.cwd(), "test-data");
 
 // Ensure validations directory exists
 await fs.mkdir(VALIDATIONS_DIR, { recursive: true });
+
+/**
+ * Sanitizes a video filename for use as a directory name.
+ * - Removes file extension
+ * - Replaces spaces with hyphens
+ * - Removes special characters (keeps alphanumeric, hyphens, underscores)
+ * - Converts to lowercase
+ */
+function sanitizeVideoName(videoName: string): string {
+  return videoName
+    .replace(/\.[^.]+$/, "") // Remove file extension
+    .replace(/\s+/g, "-") // Replace spaces with hyphens
+    .replace(/[^a-zA-Z0-9_-]/g, "") // Remove special characters
+    .toLowerCase();
+}
+
+async function savePoses(data: unknown, videoName: string): Promise<string> {
+  const sanitizedName = sanitizeVideoName(videoName);
+  const videoDir = path.join(TEST_DATA_DIR, sanitizedName);
+
+  // Create directory if it doesn't exist
+  await fs.mkdir(videoDir, { recursive: true });
+
+  const filePath = path.join(videoDir, "poses.json");
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+  console.log(`[Save] Poses saved to: ${filePath}`);
+  return filePath;
+}
+
+async function saveLabels(data: unknown, videoName: string): Promise<string> {
+  const sanitizedName = sanitizeVideoName(videoName);
+  const videoDir = path.join(TEST_DATA_DIR, sanitizedName);
+
+  // Create directory if it doesn't exist
+  await fs.mkdir(videoDir, { recursive: true });
+
+  const filePath = path.join(videoDir, "labels.json");
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+  console.log(`[Save] Labels saved to: ${filePath}`);
+  return filePath;
+}
 
 async function saveValidation(data: unknown, filename: string): Promise<string> {
   const safeName = filename.replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -139,6 +183,36 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/validations") {
       const files = await listValidations();
       sendJson(res, { files });
+      return;
+    }
+
+    // Save poses
+    if (req.method === "POST" && url.pathname === "/api/save-poses") {
+      const body = await readBody(req);
+      const { data, videoName } = JSON.parse(body);
+
+      if (!data || !videoName) {
+        sendError(res, "data and videoName are required", 400);
+        return;
+      }
+
+      const filePath = await savePoses(data, videoName);
+      sendJson(res, { success: true, path: filePath });
+      return;
+    }
+
+    // Save labels
+    if (req.method === "POST" && url.pathname === "/api/save-labels") {
+      const body = await readBody(req);
+      const { data, videoName } = JSON.parse(body);
+
+      if (!data || !videoName) {
+        sendError(res, "data and videoName are required", 400);
+        return;
+      }
+
+      const filePath = await saveLabels(data, videoName);
+      sendJson(res, { success: true, path: filePath });
       return;
     }
 
