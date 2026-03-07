@@ -12,4 +12,6 @@ export type { LoadPoseDataResult, LoadLabelDataResult, DiscoverTestCasesOptions,
 export { loadPoseData, loadLabelData, discoverTestCases, reportDiscoveryResults, } from "./loader";
 export type { DetectedShotResult, DetectionResult, FrameComparison, ShotComparison, ComparisonResult, } from "./detection";
 export { adaptPoseDataToDetector, detectOrientation, runDetection, compareResults, runAndCompare, } from "./detection";
+export type { TestSummary, ToleranceConfig, TestReport, CliArgs, } from "./reporting";
+export { formatConsoleOutput, formatFailureDetails, createTestReport, saveJsonReport, parseCliArgs, getHelpText, getExitCode, } from "./reporting";
 //# sourceMappingURL=index.d.ts.map

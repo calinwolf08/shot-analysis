@@ -64,3 +64,22 @@ export {
   compareResults,
   runAndCompare,
 } from "./detection";
+
+// Re-export reporting types
+export type {
+  TestSummary,
+  ToleranceConfig,
+  TestReport,
+  CliArgs,
+} from "./reporting";
+
+// Re-export reporting functions
+export {
+  formatConsoleOutput,
+  formatFailureDetails,
+  createTestReport,
+  saveJsonReport,
+  parseCliArgs,
+  getHelpText,
+  getExitCode,
+} from "./reporting";

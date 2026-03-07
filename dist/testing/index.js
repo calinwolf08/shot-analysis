@@ -11,4 +11,6 @@ export { orientationSchema, testLandmarkSchema, frameSchema, poseDataSchema, lab
 export { loadPoseData, loadLabelData, discoverTestCases, reportDiscoveryResults, } from "./loader";
 // Re-export detection functions
 export { adaptPoseDataToDetector, detectOrientation, runDetection, compareResults, runAndCompare, } from "./detection";
+// Re-export reporting functions
+export { formatConsoleOutput, formatFailureDetails, createTestReport, saveJsonReport, parseCliArgs, getHelpText, getExitCode, } from "./reporting";
 //# sourceMappingURL=index.js.map
