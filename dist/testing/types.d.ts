@@ -39,15 +39,15 @@ export declare const testLandmarkSchema: z.ZodObject<{
     z: z.ZodNumber;
     visibility: z.ZodNumber;
 }, "strip", z.ZodTypeAny, {
-    visibility: number;
     x: number;
     y: number;
     z: number;
+    visibility: number;
 }, {
-    visibility: number;
     x: number;
     y: number;
     z: number;
+    visibility: number;
 }>;
 /**
  * A single frame from the extracted pose data.
@@ -75,36 +75,36 @@ export declare const frameSchema: z.ZodObject<{
         z: z.ZodNumber;
         visibility: z.ZodNumber;
     }, "strip", z.ZodTypeAny, {
-        visibility: number;
         x: number;
         y: number;
         z: number;
+        visibility: number;
     }, {
-        visibility: number;
         x: number;
         y: number;
         z: number;
+        visibility: number;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     frameIndex: number;
+    timestamp: number;
+    poseConfidence: number;
     landmarks: {
-        visibility: number;
         x: number;
         y: number;
         z: number;
+        visibility: number;
     }[];
-    poseConfidence: number;
-    timestamp: number;
 }, {
     frameIndex: number;
+    timestamp: number;
+    poseConfidence: number;
     landmarks: {
-        visibility: number;
         x: number;
         y: number;
         z: number;
+        visibility: number;
     }[];
-    poseConfidence: number;
-    timestamp: number;
 }>;
 /**
  * Complete pose data extracted from a video file.
@@ -146,48 +146,48 @@ export declare const poseDataSchema: z.ZodObject<{
             z: z.ZodNumber;
             visibility: z.ZodNumber;
         }, "strip", z.ZodTypeAny, {
-            visibility: number;
             x: number;
             y: number;
             z: number;
+            visibility: number;
         }, {
-            visibility: number;
             x: number;
             y: number;
             z: number;
+            visibility: number;
         }>, "many">;
     }, "strip", z.ZodTypeAny, {
         frameIndex: number;
+        timestamp: number;
+        poseConfidence: number;
         landmarks: {
-            visibility: number;
             x: number;
             y: number;
             z: number;
+            visibility: number;
         }[];
-        poseConfidence: number;
-        timestamp: number;
     }, {
         frameIndex: number;
+        timestamp: number;
+        poseConfidence: number;
         landmarks: {
-            visibility: number;
             x: number;
             y: number;
             z: number;
+            visibility: number;
         }[];
-        poseConfidence: number;
-        timestamp: number;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     frames: {
         frameIndex: number;
+        timestamp: number;
+        poseConfidence: number;
         landmarks: {
-            visibility: number;
             x: number;
             y: number;
             z: number;
+            visibility: number;
         }[];
-        poseConfidence: number;
-        timestamp: number;
     }[];
     video: string;
     totalFrames: number;
@@ -198,14 +198,14 @@ export declare const poseDataSchema: z.ZodObject<{
 }, {
     frames: {
         frameIndex: number;
+        timestamp: number;
+        poseConfidence: number;
         landmarks: {
-            visibility: number;
             x: number;
             y: number;
             z: number;
+            visibility: number;
         }[];
-        poseConfidence: number;
-        timestamp: number;
     }[];
     video: string;
     totalFrames: number;
@@ -233,13 +233,13 @@ export declare const labeledShotSchema: z.ZodObject<{
     startFrame: z.ZodNumber;
     endFrame: z.ZodNumber;
 }, "strip", z.ZodTypeAny, {
+    shotNumber: number;
     startFrame: number;
     endFrame: number;
-    shotNumber: number;
 }, {
+    shotNumber: number;
     startFrame: number;
     endFrame: number;
-    shotNumber: number;
 }>;
 /**
  * Ground truth label data for a video.
@@ -270,20 +270,20 @@ export declare const labelDataSchema: z.ZodObject<{
         startFrame: z.ZodNumber;
         endFrame: z.ZodNumber;
     }, "strip", z.ZodTypeAny, {
+        shotNumber: number;
         startFrame: number;
         endFrame: number;
-        shotNumber: number;
     }, {
+        shotNumber: number;
         startFrame: number;
         endFrame: number;
-        shotNumber: number;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     video: string;
     shots: {
+        shotNumber: number;
         startFrame: number;
         endFrame: number;
-        shotNumber: number;
     }[];
     labeledBy: string;
     labeledAt: string;
@@ -291,9 +291,9 @@ export declare const labelDataSchema: z.ZodObject<{
 }, {
     video: string;
     shots: {
+        shotNumber: number;
         startFrame: number;
         endFrame: number;
-        shotNumber: number;
     }[];
     labeledBy: string;
     labeledAt: string;
