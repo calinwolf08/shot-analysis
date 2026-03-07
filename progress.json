@@ -3,7 +3,7 @@
 		"name": "manual-labeling-workflow",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-07T12:00:00Z",
-		"updated_at": "2026-03-07T23:03:55.190Z"
+		"updated_at": "2026-03-07T23:09:17.526Z"
 	},
 	"status": "in_progress",
 	"features": [
@@ -117,8 +117,8 @@
 				{
 					"id": "2.1",
 					"name": "Update Add Shot button enable logic",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a user, I want the 'Add Shot' button to be enabled after I select a video (without running analysis), so that I can manually create shot labels.",
@@ -153,7 +153,8 @@
 							"id": "2.1.4",
 							"description": "Write test: verify Add Shot enabled after video load, disabled before"
 						}
-					]
+					],
+					"commit_hash": "c698b5a4f7090988f868abce9899c42e1a33cd0d"
 				},
 				{
 					"id": "2.2",
