@@ -10,4 +10,6 @@ export type { Orientation, TestLandmark, Frame, PoseData, LabeledShot, LabelData
 export { orientationSchema, testLandmarkSchema, frameSchema, poseDataSchema, labeledShotSchema, labelDataSchema, isPoseData, isLabelData, } from "./types";
 export type { LoadPoseDataResult, LoadLabelDataResult, DiscoverTestCasesOptions, } from "./loader";
 export { loadPoseData, loadLabelData, discoverTestCases, reportDiscoveryResults, } from "./loader";
+export type { DetectedShotResult, DetectionResult, FrameComparison, ShotComparison, ComparisonResult, } from "./detection";
+export { adaptPoseDataToDetector, detectOrientation, runDetection, compareResults, runAndCompare, } from "./detection";
 //# sourceMappingURL=index.d.ts.map

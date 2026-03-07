@@ -46,3 +46,21 @@ export {
   discoverTestCases,
   reportDiscoveryResults,
 } from "./loader";
+
+// Re-export detection types
+export type {
+  DetectedShotResult,
+  DetectionResult,
+  FrameComparison,
+  ShotComparison,
+  ComparisonResult,
+} from "./detection";
+
+// Re-export detection functions
+export {
+  adaptPoseDataToDetector,
+  detectOrientation,
+  runDetection,
+  compareResults,
+  runAndCompare,
+} from "./detection";

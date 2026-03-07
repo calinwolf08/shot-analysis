@@ -9,4 +9,6 @@
 // Re-export schemas
 export { orientationSchema, testLandmarkSchema, frameSchema, poseDataSchema, labeledShotSchema, labelDataSchema, isPoseData, isLabelData, } from "./types";
 export { loadPoseData, loadLabelData, discoverTestCases, reportDiscoveryResults, } from "./loader";
+// Re-export detection functions
+export { adaptPoseDataToDetector, detectOrientation, runDetection, compareResults, runAndCompare, } from "./detection";
 //# sourceMappingURL=index.js.map
