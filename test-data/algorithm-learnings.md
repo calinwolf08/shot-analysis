@@ -170,6 +170,27 @@ The orientation detection uses shoulder and hip X positions plus Z-depth to clas
     - Frame timing at boundary: start +8, end -7 (both within ±8 tolerance)
     - Orientation correctly detected as side-right using new CASE 2b logic
 
+**2026-03-09 - Video chris-5 Testing (Level 8)**
+
+26. **CASE 4 Side Detection with isBackView**: Extended CASE 4 to handle side-right/side-left when isBackView:
+    - chris-5 has avgShoulderDiffX=0.045 (positive, meaning isBackView in MediaPipe convention)
+    - But shoulderSeparation is small (0.045 < sideThreshold of 0.05)
+    - Z-depth is moderate negative (avgZDiff=-0.374, in range 0.30-0.45)
+    - Hip Z follows shoulder Z direction (avgHipZDiff=-0.243, same sign)
+    - This pattern indicates a side view, not a back view
+    - Previously fell through CASE 4 isBackView branch and returned "behind" (wrong)
+    - Fix: Added explicit check in CASE 4 isBackView for side views when:
+      * Small shoulder separation (< sideThreshold of 0.05)
+      * Moderate Z-depth (0.30-0.45)
+      * Hip Z follows shoulder Z direction (same sign, absHipZ > 0.15)
+    - Z sign determines side: negative Z = right side closer = side-right, positive Z = side-left
+
+27. **Different Video Source Characteristics**: chris-5 is from a different video source than previous videos (20181219-20201212 series):
+    - Similar pose quality with clear landmarks
+    - Orientation detection required adjustment in CASE 4 but no changes to shot boundary detection
+    - Frame timing well within tolerance: start +3, end -5 (±8 tolerance)
+    - This demonstrates the algorithm generalizes to different video sources with minimal tuning
+
 ---
 
 ## Shot Boundary Detection
@@ -283,6 +304,7 @@ Parameter adjustments that improved results:
 | bestWristAboveShoulderDelta tracking | peakFrame only | Throughout motion | Track best (most negative) wrist-shoulder delta during entire upward phase, not just at peak; handles jump shots where shooter rises significantly | 20200606_111929 (shot 5) |
 | frontAngleThreshold | 0.35 | 0.25 | Lower threshold for front-right detection; handles moderate Z-depth cases without breaking front views | 20200606_111929 (shots 4,5) |
 | CASE 2b near-pure side | N/A | shoulderSep<0.03, absZDiff>0.40 | Detect side views when shoulder separation is small but Z-depth is moderate-high (0.40-0.45); fills gap between CASE 2 (Z>0.45) and CASE 4 | 20201212_134104 (shot 1) |
+| CASE 4 isBackView side detection | N/A | isBackView + shoulderSep<0.05 + Z in 0.30-0.45 + hipZ follows shoulderZ | Detect side views when isBackView (positive shoulderDiffX) but small shoulder separation with moderate Z-depth and consistent hip Z; determines side-left/side-right by Z sign | chris-5 (shot 1) |
 
 ---
 
@@ -301,3 +323,4 @@ Parameter adjustments that improved results:
 | 2026-03-09 | 20181219-20190818 (5 videos) | 5 | 0 | Level 5 (final): All 5 videos pass. V5 shot 2 fixed by targeted dip detection (distanceToDip === 9). Start diff reduced from +17 to +8, within tolerance. |
 | 2026-03-09 | 20181219-20200606 (6 videos) | 6 | 0 | Level 6: All 6 videos pass. V6: 5 shots (3 side-right, 2 front-right). Key fixes: (1) Track best wrist-above-shoulder delta throughout upward motion rather than just at peak frame - fixes shot 5 detection. (2) Lowered frontAngleThreshold from 0.35 to 0.25 - fixes front-right orientation for shots 4 & 5. |
 | 2026-03-09 | 20181219-20201212 (7 videos) | 7 | 0 | Level 7: All 7 videos pass. V7: 1 shot (side-right, single-shot video). Key fix: Added CASE 2b for near-pure side views with moderate-high Z-depth. |
+| 2026-03-09 | 20181219-chris-5 (8 videos) | 8 | 0 | Level 8: All 8 videos pass. chris-5: 1 shot (side-right, frames 60-83). Key fix: Added side-right/side-left detection in CASE 4 when isBackView with small shoulder separation and moderate Z-depth. |

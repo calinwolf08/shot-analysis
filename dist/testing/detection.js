@@ -356,6 +356,27 @@ export function detectOrientationFromFrames(frames) {
                 // Very small shoulder separation + minimal hip separation = likely front view
                 return "front";
             }
+            // Check for side views with isBackView but moderate Z-depth (0.30-0.45)
+            // When shoulders appear "reversed" (isBackView) but with small shoulder separation
+            // and moderate Z-depth, this indicates a side view, not a back view.
+            // Key indicators:
+            // - Small shoulder separation (< sideThreshold of 0.05)
+            // - Moderate Z-depth (0.30-0.45)
+            // - Hip Z follows shoulder Z direction
+            const moderateZForSide = absZDiff > 0.30 && absZDiff < sideViewZThreshold;
+            const smallShoulderSep = shoulderSeparation < sideThreshold;
+            const hipFollowsShoulderZ = Math.sign(avgHipZDiff) === Math.sign(avgZDiff) && absHipZDiff > 0.15;
+            if (moderateZForSide && smallShoulderSep && hipFollowsShoulderZ) {
+                // Side view detected - determine left or right based on Z sign
+                // Negative Z = right side closer to camera = camera on right = side-right
+                // Positive Z = left side closer to camera = camera on left = side-left
+                if (avgZDiff > 0) {
+                    return "side-left";
+                }
+                else {
+                    return "side-right";
+                }
+            }
             if (avgZDiff > behindAngleThreshold) {
                 return "behind-left";
             }

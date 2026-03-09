@@ -1,8 +1,8 @@
 {
-  "runAt": "2026-03-09T20:41:45.693Z",
+  "runAt": "2026-03-09T20:46:54.913Z",
   "summary": {
-    "total": 7,
-    "passed": 7,
+    "total": 8,
+    "passed": 8,
     "failed": 0
   },
   "tolerance": {
@@ -562,6 +562,32 @@
             "detected": 104,
             "expected": 111,
             "diff": 7,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-right",
+            "expected": "side-right",
+            "match": true
+          }
+        }
+      ]
+    },
+    {
+      "video": "chris 5.mp4",
+      "status": "pass",
+      "shots": [
+        {
+          "shotNumber": 1,
+          "startFrame": {
+            "detected": 63,
+            "expected": 60,
+            "diff": 3,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 78,
+            "expected": 83,
+            "diff": 5,
             "pass": true
           },
           "orientation": {
