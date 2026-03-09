@@ -257,8 +257,13 @@ export function detectOrientationFromFrames(
 
   // Thresholds for determining orientation
   const frontBackThreshold = 0.15; // Shoulders clearly separated in X - front/back view
-  const sideThreshold = 0.05; // Shoulders very close in X - pure side view
-  const angleThreshold = 0.40; // Z-depth needs to be very significant to add left/right qualifier
+  const pureSideShoulderThreshold = 0.02; // True side view when shoulders nearly overlap
+  const sideThreshold = 0.05; // Moderate side threshold for side views with some separation
+  // Z-depth thresholds for left/right qualifier - different for front vs behind
+  // Front views: lower threshold as the Z-depth is more visible in the pose
+  // Behind views: higher threshold since we're seeing the back of the person
+  const frontAngleThreshold = 0.35;
+  const behindAngleThreshold = 0.40;
 
   // Absolute shoulder separation for front/back vs side determination
   const shoulderSeparation = Math.abs(avgShoulderDiffX);
@@ -266,50 +271,80 @@ export function detectOrientationFromFrames(
   const avgSeparation = (shoulderSeparation + hipSeparation) / 2;
 
   // Use Z-depth magnitude to help distinguish side vs angled views
-  // Large Z-depth (one shoulder much closer) suggests more of a side view
   const absZDiff = Math.abs(avgZDiff);
-  const sideViewZThreshold = 0.45; // If Z-depth is very large, it's more side-like
+  const sideViewZThreshold = 0.45; // Very large Z-depth indicates side-like view
 
+  // CASE 1: Good shoulder separation - clear frontal or back view
   if (avgSeparation > frontBackThreshold) {
-    // Good shoulder separation - frontal or back view
     if (isFrontView) {
       // Front-facing orientations
-      if (avgZDiff > angleThreshold) {
+      if (avgZDiff > frontAngleThreshold) {
         return "front-left";
-      } else if (avgZDiff < -angleThreshold) {
+      } else if (avgZDiff < -frontAngleThreshold) {
         return "front-right";
       }
       return "front";
     } else if (isBackView) {
       // Back-facing orientations (shoulders appear reversed)
-      // Z-depth interpretation is also reversed for back views
-      if (avgZDiff > angleThreshold) {
+      if (avgZDiff > behindAngleThreshold) {
         return "behind-left";
-      } else if (avgZDiff < -angleThreshold) {
+      } else if (avgZDiff < -behindAngleThreshold) {
         return "behind-right";
       }
       return "behind";
     }
-  } else if (avgSeparation < sideThreshold || absZDiff > sideViewZThreshold) {
-    // Shoulders very close in X OR very large Z-depth difference -> side view
+  }
+  // CASE 2: Pure side view - very small shoulder X separation (< 0.02) with large Z-depth
+  else if (
+    shoulderSeparation < pureSideShoulderThreshold &&
+    absZDiff > sideViewZThreshold
+  ) {
     if (avgZDiff > 0) {
       return "side-left";
     } else {
       return "side-right";
     }
-  } else {
-    // In between - angled view (front-left, front-right, behind-left, behind-right)
+  }
+  // CASE 3: Large Z-depth (> 0.45) with moderate shoulder separation
+  // When Z-depth is extreme, it could be:
+  // - A true side view (shoulders overlapping in X, one closer to camera)
+  // - A front view with body/shoulder rotation during shooting motion
+  // Key insight: if hip separation is very small (< 0.03), the person's body is facing camera
+  // even if shoulders show rotation due to shooting form.
+  else if (absZDiff > sideViewZThreshold) {
+    // Special case: very small hip separation means body is facing camera
+    // This indicates front view with shoulder rotation, not a true side view
+    // DON'T add left/right qualifier since the Z-depth is from shooting form rotation,
+    // not actual camera angle offset.
+    if (hipSeparation < 0.03 && shoulderSeparation < sideThreshold) {
+      // Front view - no left/right qualifier despite large Z-depth
+      return "front";
+    }
+    // Otherwise, large Z-depth with moderate separation = side view
+    if (avgZDiff > 0) {
+      return "side-left";
+    } else {
+      return "side-right";
+    }
+  }
+  // CASE 4: Angled view (moderate separation, moderate Z)
+  else {
     if (isFrontView) {
-      if (avgZDiff > 0) {
+      if (avgZDiff > frontAngleThreshold) {
         return "front-left";
-      } else if (avgZDiff < 0) {
+      } else if (avgZDiff < -frontAngleThreshold) {
         return "front-right";
       }
       return "front";
     } else if (isBackView) {
-      if (avgZDiff > 0) {
+      // Check if this is actually a front view with shoulder rotation
+      if (shoulderSeparation < sideThreshold && hipSeparation < 0.02) {
+        // Very small shoulder separation + minimal hip separation = likely front view
+        return "front";
+      }
+      if (avgZDiff > behindAngleThreshold) {
         return "behind-left";
-      } else if (avgZDiff < 0) {
+      } else if (avgZDiff < -behindAngleThreshold) {
         return "behind-right";
       }
       return "behind";

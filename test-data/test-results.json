@@ -1,8 +1,8 @@
 {
-  "runAt": "2026-03-09T18:20:02.105Z",
+  "runAt": "2026-03-09T18:43:28.397Z",
   "summary": {
-    "total": 1,
-    "passed": 1,
+    "total": 2,
+    "passed": 2,
     "failed": 0
   },
   "tolerance": {
@@ -91,6 +91,32 @@
           "orientation": {
             "detected": "side-right",
             "expected": "side-right",
+            "match": true
+          }
+        }
+      ]
+    },
+    {
+      "video": "20190107_211108.mp4",
+      "status": "pass",
+      "shots": [
+        {
+          "shotNumber": 1,
+          "startFrame": {
+            "detected": 39,
+            "expected": 33,
+            "diff": 6,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 56,
+            "expected": 62,
+            "diff": 6,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "front",
+            "expected": "front",
             "match": true
           }
         }

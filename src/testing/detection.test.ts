@@ -263,15 +263,16 @@ describe("detectOrientation", () => {
   });
 
   it("detects 'side-left' orientation with aligned shoulders and depth difference", () => {
-    // Create frames with shoulders nearly aligned in X but different Z
+    // Create frames with shoulders nearly overlapping in X (< 0.02) and large Z-depth (> 0.45)
+    // This represents a true side view where shoulders align but one is closer to camera
     const frames: Frame[] = [];
     for (let i = 0; i < 30; i++) {
       const frame = createFrameWithWrists(i, 0.5, 0.5, {
-        leftShoulderX: 0.48,
-        rightShoulderX: 0.52,
-        leftHipX: 0.48,
-        rightHipX: 0.52,
-        shoulderZ: -0.2, // Left shoulder closer, right farther
+        leftShoulderX: 0.505, // Nearly identical X positions (separation = 0.01)
+        rightShoulderX: 0.495,
+        leftHipX: 0.505,
+        rightHipX: 0.495,
+        shoulderZ: -0.25, // Large Z-depth (results in Z-diff of 0.5)
       });
       frames.push(frame);
     }
@@ -281,15 +282,16 @@ describe("detectOrientation", () => {
   });
 
   it("detects 'side-right' orientation with aligned shoulders and opposite depth", () => {
-    // Create frames with shoulders nearly aligned in X but different Z
+    // Create frames with shoulders nearly overlapping in X (< 0.02) and large Z-depth (> 0.45)
+    // This represents a true side view where shoulders align but one is closer to camera
     const frames: Frame[] = [];
     for (let i = 0; i < 30; i++) {
       const frame = createFrameWithWrists(i, 0.5, 0.5, {
-        leftShoulderX: 0.48,
-        rightShoulderX: 0.52,
-        leftHipX: 0.48,
-        rightHipX: 0.52,
-        shoulderZ: 0.2, // Right shoulder closer, left farther
+        leftShoulderX: 0.505, // Nearly identical X positions (separation = 0.01)
+        rightShoulderX: 0.495,
+        leftHipX: 0.505,
+        rightHipX: 0.495,
+        shoulderZ: 0.25, // Large Z-depth (results in Z-diff of -0.5)
       });
       frames.push(frame);
     }

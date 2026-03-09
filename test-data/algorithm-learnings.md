@@ -34,6 +34,32 @@ The orientation detection uses shoulder and hip X positions plus Z-depth to clas
    - angleThreshold: 0.40 (Z-depth for left/right qualifier)
    - sideViewZThreshold: 0.45 (Z-depth indicating side view)
 
+**2026-03-09 - Video 20190107_211108 Testing (Level 2)**
+
+4. **Shooter Body Rotation Detection**: When a basketball player shoots, their body naturally rotates - shoulders turn while hips stay relatively squared to the basket/camera. This creates pose signatures where:
+   - Shoulder X-diff is small positive (0.04) - suggesting "back view" by X alone
+   - Z-depth is very large (0.65) - suggesting "side view"
+   - Hip X-diff is nearly zero (0.002) - indicating hips face camera
+
+5. **Pure Side View Threshold Stricter**: Added `pureSideShoulderThreshold = 0.03` to distinguish true side views from rotated front views:
+   - True side view: shoulder separation < 0.03 (shoulders nearly overlapping in X)
+   - Rotated front view: shoulder separation 0.03-0.05 (slight separation from body rotation)
+
+6. **Hip-Based Front Detection**: When Z-depth is large and shoulder X is ambiguous (small positive), check hip alignment:
+   - If hip separation is very small (< 0.02), person is likely facing camera with shoulder rotation
+   - This correctly identifies shooting form (front view) vs actual side views
+
+7. **Pure Side View Threshold Tightened**: Changed `pureSideShoulderThreshold` from 0.03 to 0.02 to be more strict about what constitutes a "pure side view". This ensures that slight body rotations during shooting (shoulder separation ~0.04) are not incorrectly classified as side views.
+
+8. **Separate Angle Thresholds for Front/Behind**: Different Z-depth thresholds for adding the left/right qualifier:
+   - `frontAngleThreshold = 0.35`: Lower threshold for front views where Z-depth is more visible
+   - `behindAngleThreshold = 0.40`: Higher threshold for behind views
+   - This handles edge cases where front views need the -right qualifier (Z-diff ~0.36) but behind views with similar Z-diff (~0.37) should remain plain "behind"
+
+9. **Hip Separation for Body Facing Detection**: When Z-depth is very large (>0.45) but hip separation is very small (<0.03), classify as plain "front" without left/right qualifier:
+   - This handles shooting form where shoulders rotate significantly (large Z-diff) but hips remain squared to camera
+   - Video 20190107_211108: shoulder sep=0.04, hip sep=0.002, Z-diff=0.65 → correctly "front" not "side-right"
+
 ---
 
 ## Shot Boundary Detection
@@ -114,6 +140,10 @@ Parameter adjustments that improved results:
 | MAX_ORIGINAL_FRAME_GAP | N/A | 3 | Reset detection on pose dropouts | 20181219_173607 |
 | sideViewZThreshold | N/A | 0.45 | Detect side views by large Z-depth | 20181219_173607 |
 | angleThreshold | 0.05 | 0.40 | Less sensitive left/right qualification | 20181219_173607 |
+| pureSideShoulderThreshold | 0.03 | 0.02 | Even stricter X-alignment for pure side view | 20190107_211108 |
+| Hip-based front detection | N/A | hipSep < 0.03 | Detect front view when hips face camera despite shoulder rotation | 20190107_211108 |
+| frontAngleThreshold | 0.40 | 0.35 | Lower threshold for front-left/front-right detection | 20181219_173607 (shot 1) |
+| behindAngleThreshold | N/A | 0.40 | Separate threshold for behind-left/behind-right detection | 20181219_173607 (shot 3) |
 
 ---
 
@@ -123,3 +153,5 @@ Parameter adjustments that improved results:
 |------|---------------|------|------|-------|
 | 2026-03-09 | 20181219_173607 | 1 | 0 | All 4 shots pass within ±8 frame tolerance, orientations match |
 | 2026-03-09 | 20181219_173607 | 1 | 0 | Re-verified: Shot 1 (diff 1,3), Shot 2 (diff 10,4), Shot 3 (diff 5,9), Shot 4 (diff 8,1) |
+| 2026-03-09 | 20181219_173607, 20190107_211108 | 2 | 0 | Level 2: Both videos pass. V1: 4 shots (all orientations correct). V2: 1 shot (front orientation, diff 6,6) |
+| 2026-03-09 | 20181219_173607, 20190107_211108 | 2 | 0 | Level 2 (Attempt 2): Fixed unit test regressions. Both videos pass with updated orientation thresholds. |
