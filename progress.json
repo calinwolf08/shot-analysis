@@ -3,7 +3,7 @@
 		"name": "shot-detection-iterative-testing",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-08T12:00:00.000Z",
-		"updated_at": "2026-03-09T20:29:06.954Z"
+		"updated_at": "2026-03-09T20:38:19.009Z"
 	},
 	"status": "in_progress",
 	"global_constraints": {
@@ -383,8 +383,8 @@
 				{
 					"id": "1.7",
 					"name": "Level 6 - Videos 1-6 (add 20200606_111929)",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want to add more test videos to validate generalization.",
@@ -423,7 +423,8 @@
 							"id": "1.7.5",
 							"description": "Verify all 6 videos pass detection thresholds"
 						}
-					]
+					],
+					"commit_hash": "8df5b843809b45a451ba93257b224e7f3117d330"
 				},
 				{
 					"id": "1.8",

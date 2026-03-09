@@ -309,6 +309,19 @@ export function detectOrientationFromFrames(
       return "side-right";
     }
   }
+  // CASE 2b: Near-pure side view - very small shoulder X separation (< 0.03) with moderate-high Z-depth (> 0.40)
+  // This handles cases where Z-depth is just below the 0.45 threshold but body position
+  // clearly indicates a side view (shoulders nearly overlapping in X with significant Z separation)
+  else if (
+    shoulderSeparation < 0.03 &&
+    absZDiff > 0.40
+  ) {
+    if (avgZDiff > 0) {
+      return "side-left";
+    } else {
+      return "side-right";
+    }
+  }
   // CASE 3: Large Z-depth (> 0.45) with moderate shoulder separation
   // When Z-depth is extreme, it could be:
   // - A true side view (shoulders overlapping in X, one closer to camera)

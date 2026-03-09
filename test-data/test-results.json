@@ -1,8 +1,8 @@
 {
-  "runAt": "2026-03-09T20:36:06.185Z",
+  "runAt": "2026-03-09T20:41:45.693Z",
   "summary": {
-    "total": 6,
-    "passed": 6,
+    "total": 7,
+    "passed": 7,
     "failed": 0
   },
   "tolerance": {
@@ -541,6 +541,32 @@
           "orientation": {
             "detected": "front-right",
             "expected": "front-right",
+            "match": true
+          }
+        }
+      ]
+    },
+    {
+      "video": "20201212_134104.mp4",
+      "status": "pass",
+      "shots": [
+        {
+          "shotNumber": 1,
+          "startFrame": {
+            "detected": 84,
+            "expected": 76,
+            "diff": 8,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 104,
+            "expected": 111,
+            "diff": 7,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-right",
+            "expected": "side-right",
             "match": true
           }
         }
