@@ -3,7 +3,7 @@
 		"name": "shot-detection-iterative-testing",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-03-08T12:00:00.000Z",
-		"updated_at": "2026-03-09T20:43:02.771Z"
+		"updated_at": "2026-03-09T20:47:57.422Z"
 	},
 	"status": "in_progress",
 	"global_constraints": {
@@ -475,8 +475,8 @@
 				{
 					"id": "1.9",
 					"name": "Level 8 - Videos 1-8 (add chris-5)",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want to add another single-shot video from a different source.",
@@ -515,7 +515,8 @@
 							"id": "1.9.5",
 							"description": "Verify all 8 videos pass detection thresholds"
 						}
-					]
+					],
+					"commit_hash": "d44f7b3bc2761d03439484b7e42ffe6a89873967"
 				},
 				{
 					"id": "1.10",

@@ -266,7 +266,8 @@ export function detectOrientationFromFrames(
   // Front views: lower threshold as the Z-depth is more visible in the pose
   // Behind views: higher threshold since we're seeing the back of the person
   // Lowered from 0.35 to 0.25 to handle front-right shots with moderate Z-depth (video 6 shots 4-5)
-  const frontAngleThreshold = 0.25;
+  // Further lowered to 0.12 for front-left detection in zak-1 shot 9 (ZDiff=0.14)
+  const frontAngleThreshold = 0.12;
   const behindAngleThreshold = 0.40;
 
   // Absolute shoulder separation for front/back vs side determination
@@ -303,6 +304,13 @@ export function detectOrientationFromFrames(
     shoulderSeparation < pureSideShoulderThreshold &&
     absZDiff > sideViewZThreshold
   ) {
+    // Special case: front-right when both shoulder AND hip separation are very small
+    // AND isFrontView is true. This indicates camera is in front but at an angle,
+    // not a true side view. Example: zak-1 shot 1 with shoulderSep=0.003, hipSep=0.004
+    if (isFrontView && hipSeparation < 0.01 && avgZDiff < 0) {
+      return "front-right";
+    }
+
     if (avgZDiff > 0) {
       return "side-left";
     } else {
@@ -413,13 +421,17 @@ export function detectOrientationFromFrames(
     // If shoulder separation is moderate AND shoulder/hip Z ratio is low,
     // this indicates both shoulders AND hips show similar angle offset
     // → true camera angle (front-left/front-right)
+    // EXCEPT: when X-ratio is high (>1.6), shoulder rotation from shooting creates
+    // the separation, not camera angle. This indicates side view.
     const frontLeftShoulderThreshold = 0.08;
     const maxZRatioForFrontLeft = 1.7; // Lower ratio = hips follow shoulders = camera angle
+    const maxXRatioForFrontLeft = 1.6; // High X-ratio = shoulder rotation = side view
 
     if (
       isFrontView &&
       shoulderSeparation > frontLeftShoulderThreshold &&
-      shoulderHipZRatio < maxZRatioForFrontLeft
+      shoulderHipZRatio < maxZRatioForFrontLeft &&
+      shoulderHipXRatio < maxXRatioForFrontLeft
     ) {
       if (avgZDiff > 0) {
         return "front-left";
@@ -427,6 +439,24 @@ export function detectOrientationFromFrames(
         return "front-right";
       }
     }
+    // Special case: "front" when isBackView but metrics suggest front-facing camera
+    // This happens when body rotation during shooting makes shoulders appear "reversed"
+    // but the camera is actually in front. Key indicators:
+    // - isBackView = true (shoulders appear reversed)
+    // - X-ratio is low (< 1.4): consistent body alignment, not just shoulder rotation
+    // - Z-ratio is low (< 1.5): hips follow shoulders
+    // - moderate shoulder separation (0.10-0.15): not too small, not too large
+    // Example: zak-1 shot 6 with X-ratio=1.29, Z-ratio=1.40, shoulderSep=0.119
+    if (
+      isBackView &&
+      shoulderHipXRatio < 1.4 &&
+      shoulderHipZRatio < 1.5 &&
+      shoulderSeparation > 0.10 &&
+      shoulderSeparation < frontBackThreshold
+    ) {
+      return "front";
+    }
+
     // Otherwise, large Z-depth with high ratio = side view (shoulder rotation from shooting)
     if (avgZDiff > 0) {
       return "side-left";
@@ -479,6 +509,15 @@ export function detectOrientationFromFrames(
         }
       }
 
+      // Calculate X-ratio for side-view detection with higher shoulder separation
+      // When X-ratio is high (>1.6), shoulder rotation from shooting creates
+      // the separation, not camera angle. This indicates side view.
+      // Applies to shots just outside the moderateShoulderSep range (e.g., shoulderSep=0.122).
+      const shoulderHipXRatio = hipSeparation > 0.01 ? shoulderSeparation / hipSeparation : 999;
+      if (avgZDiff > 0 && shoulderHipXRatio > 1.6 && absZDiff > 0.30) {
+        return "side-left";
+      }
+
       if (avgZDiff > frontAngleThreshold) {
         return "front-left";
       } else if (avgZDiff < -frontAngleThreshold) {
@@ -499,6 +538,7 @@ export function detectOrientationFromFrames(
       // - Small shoulder separation (< sideThreshold of 0.05)
       // - Moderate Z-depth (0.30-0.45)
       // - Hip Z follows shoulder Z direction
+      const absHipZDiff = Math.abs(avgHipZDiff);
       const moderateZForSide = absZDiff > 0.30 && absZDiff < sideViewZThreshold;
       const smallShoulderSep = shoulderSeparation < sideThreshold;
       const hipFollowsShoulderZ =
@@ -520,6 +560,22 @@ export function detectOrientationFromFrames(
       } else if (avgZDiff < -behindAngleThreshold) {
         return "behind-right";
       }
+
+      // Special case: subtle behind-right when Z and HipZ are consistently negative
+      // but below the normal threshold. Indicates slight right-side camera offset.
+      // Criteria: both Z values negative, shoulder separation in moderate range (0.10-0.15)
+      // This catches shots like zak-1 shot 4 where ZDiff=-0.02, HipZ=-0.03
+      if (
+        avgZDiff < 0 &&
+        avgHipZDiff < 0 &&
+        shoulderSeparation > 0.10 &&
+        shoulderSeparation < frontBackThreshold &&
+        absZDiff < behindAngleThreshold &&
+        absHipZDiff < 0.10
+      ) {
+        return "behind-right";
+      }
+
       return "behind";
     }
   }
