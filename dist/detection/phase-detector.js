@@ -196,10 +196,15 @@ export class PhaseDetector {
         this.findKeyPoints(frameData, state);
         // Identify phases based on key points
         this.assignPhases(frameData, state, baseFrame);
-        // Convert Map to ShotPhases object
+        // Calculate the maximum allowed frame index
+        const maxFrameIndex = baseFrame + frameData.length - 1;
+        // Convert Map to ShotPhases object, clamping endFrames to maxFrameIndex
         const phases = {};
         for (const [phase, range] of state.phases) {
-            phases[phase] = range;
+            phases[phase] = {
+                startFrame: range.startFrame,
+                endFrame: Math.min(range.endFrame, maxFrameIndex),
+            };
         }
         return phases;
     }

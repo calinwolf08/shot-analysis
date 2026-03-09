@@ -1,8 +1,8 @@
 {
-  "runAt": "2026-03-09T19:10:18.828Z",
+  "runAt": "2026-03-09T19:48:31.970Z",
   "summary": {
-    "total": 3,
-    "passed": 3,
+    "total": 4,
+    "passed": 4,
     "failed": 0
   },
   "tolerance": {
@@ -223,6 +223,152 @@
           "orientation": {
             "detected": "side-left",
             "expected": "side-left",
+            "match": true
+          }
+        }
+      ]
+    },
+    {
+      "video": "20190804_140654.mp4",
+      "status": "pass",
+      "shots": [
+        {
+          "shotNumber": 1,
+          "startFrame": {
+            "detected": 29,
+            "expected": 19,
+            "diff": 10,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 42,
+            "expected": 48,
+            "diff": 6,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-left",
+            "expected": "side-left",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 2,
+          "startFrame": {
+            "detected": 141,
+            "expected": 135,
+            "diff": 6,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 166,
+            "expected": 167,
+            "diff": 1,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "behind-left",
+            "expected": "behind-left",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 3,
+          "startFrame": {
+            "detected": 265,
+            "expected": 257,
+            "diff": 8,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 282,
+            "expected": 286,
+            "diff": 4,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "behind-left",
+            "expected": "behind-left",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 4,
+          "startFrame": {
+            "detected": 378,
+            "expected": 371,
+            "diff": 7,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 397,
+            "expected": 398,
+            "diff": 1,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "behind",
+            "expected": "behind",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 5,
+          "startFrame": {
+            "detected": 511,
+            "expected": 506,
+            "diff": 5,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 536,
+            "expected": 537,
+            "diff": 1,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "behind-right",
+            "expected": "behind-right",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 6,
+          "startFrame": {
+            "detected": 628,
+            "expected": 621,
+            "diff": 7,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 651,
+            "expected": 653,
+            "diff": 2,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-right",
+            "expected": "side-right",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 7,
+          "startFrame": {
+            "detected": 753,
+            "expected": 750,
+            "diff": 3,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 774,
+            "expected": 778,
+            "diff": 4,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-right",
+            "expected": "side-right",
             "match": true
           }
         }

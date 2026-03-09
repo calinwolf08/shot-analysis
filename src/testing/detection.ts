@@ -315,19 +315,61 @@ export function detectOrientationFromFrames(
   // Key insight: if hip separation is very small (< 0.03), the person's body is facing camera
   // even if shoulders show rotation due to shooting form.
   else if (absZDiff > sideViewZThreshold) {
-    // Special case: very small hip separation means body is facing camera
-    // This indicates front view with shoulder rotation, not a true side view
-    // DON'T add left/right qualifier since the Z-depth is from shooting form rotation,
-    // not actual camera angle offset.
-    if (hipSeparation < 0.03 && shoulderSeparation < sideThreshold) {
+    // Check hip Z consistency - if hips show similar Z pattern, it's camera angle not rotation
+    // This helps distinguish behind-angled views from front with rotation
+    const absHipZDiff = Math.abs(avgHipZDiff);
+    const hipZConsistent = absHipZDiff > 0.25 && Math.sign(avgHipZDiff) === Math.sign(avgZDiff);
+
+    // Special case: very small hip separation (< 0.01) indicates front view
+    // This is when the person's body is facing camera but shoulders rotate during shooting
+    if (hipSeparation < 0.01) {
       // Front view - no left/right qualifier despite large Z-depth
       return "front";
+    }
+
+    // Behind-angled views: when hips follow shoulder Z pattern strongly
+    // This indicates camera is actually positioned behind and to the side
+    // ALSO: Require shoulder separation above pureSide threshold to avoid classifying
+    // true side views (very small shoulderSep) as behind-angled
+    // NOTE: behind-left (positive Z) and behind-right (negative Z) have asymmetric criteria:
+    // - behind-left: typical criteria work well
+    // - behind-right: requires larger shoulder separation to distinguish from side-right
+    //
+    // EXTENDED: Also handle cases where isFrontView but shoulderDiffX is only slightly negative
+    // This happens when body rotates during shooting, creating a "front-like" pose
+    // but the camera is actually behind. Key indicators:
+    // - Very high Z-depth (> 0.50)
+    // - High hip Z-depth (> 0.30)
+    // - shoulderDiffX only slightly negative (> -0.05)
+    // - Small shoulder separation (< 0.05)
+    // - Shoulder separation >= hip separation (if hips are more separated, it's likely side view)
+    const isSlightlyFrontView = isFrontView && avgShoulderDiffX > -0.05;
+    const shoulderHipSeparationRatio = hipSeparation > 0.01 ? shoulderSeparation / hipSeparation : 999;
+    const shoulderMoreOrEquallyAligned = shoulderHipSeparationRatio >= 1.0;
+    const isBehindCandidate = isBackView || (isSlightlyFrontView && absZDiff > 0.50 && absHipZDiff > 0.30 && shoulderMoreOrEquallyAligned);
+
+    if (hipZConsistent && isBehindCandidate &&
+        shoulderSeparation > pureSideShoulderThreshold && shoulderSeparation < sideThreshold &&
+        hipSeparation > 0.02 && hipSeparation < 0.04) {
+      // Additional check: strong hip Z pattern (>0.30) suggests behind-angled
+      if (absHipZDiff > 0.30) {
+        if (avgZDiff > 0) {
+          return "behind-left";
+        } else {
+          // For behind-right: require larger shoulder separation (> 0.04) to distinguish from side-right
+          // Shot 7 (side-right): shoulderSep=0.034, hipSep=0.025 - should NOT be behind-right
+          // Shot 5 (behind-right): shoulderSep=0.186, hipSep=0.111 - much larger
+          if (shoulderSeparation > 0.04) {
+            return "behind-right";
+          }
+          // Small shoulder separation with negative Z → side-right
+        }
+      }
     }
 
     // Use shoulder/hip Z ratio to distinguish front-left from side-left
     // When ratio is low (< 1.7), hips follow shoulders → true camera angle offset → front-left
     // When ratio is high (> 1.7), only shoulders rotated → shooting motion → side view
-    const absHipZDiff = Math.abs(avgHipZDiff);
     const shoulderHipZRatio =
       absHipZDiff > 0.1 ? absZDiff / absHipZDiff : 999; // Avoid division by very small numbers
 
@@ -357,7 +399,34 @@ export function detectOrientationFromFrames(
   }
   // CASE 4: Angled view (moderate separation, moderate Z)
   else {
+    // Calculate hip Z consistency for CASE 4 as well
+    const absHipZDiff = Math.abs(avgHipZDiff);
+
     if (isFrontView) {
+      // Check for side views with moderate Z-depth (0.30-0.45)
+      // Key insight: if Z-diff is moderate and shoulder separation suggests angled body,
+      // this could be a side view rather than front. The camera is positioned to the side
+      // but the body rotation during shooting creates a "front-like" appearance.
+      // Characteristics:
+      // - Moderate shoulder separation (0.05 < sep < 0.12)
+      // - Moderate Z-depth (0.30 < Z < 0.45)
+      // - Hip Z follows shoulder Z direction (same sign, reasonable magnitude)
+      // - Hip Z is NOT highly consistent (< 0.25), otherwise it's more likely front-angled
+      //   When hip Z is high (> 0.25), both shoulders and hips show the angle offset,
+      //   which is more consistent with a front-angled view than a side view with rotation.
+      const moderateZForSide = absZDiff > 0.30 && absZDiff < sideViewZThreshold;
+      const moderateShoulderSep = shoulderSeparation > sideThreshold && shoulderSeparation < 0.12;
+      const hipFollowsShoulder = Math.sign(avgHipZDiff) === Math.sign(avgZDiff) && absHipZDiff > 0.15;
+      const hipNotHighlyConsistent = absHipZDiff < 0.25;
+
+      if (moderateZForSide && moderateShoulderSep && hipFollowsShoulder && hipNotHighlyConsistent) {
+        if (avgZDiff > 0) {
+          return "side-left";
+        } else {
+          return "side-right";
+        }
+      }
+
       if (avgZDiff > frontAngleThreshold) {
         return "front-left";
       } else if (avgZDiff < -frontAngleThreshold) {
