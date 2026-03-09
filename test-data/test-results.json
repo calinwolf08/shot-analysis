@@ -1,8 +1,8 @@
 {
-  "runAt": "2026-03-09T19:48:31.970Z",
+  "runAt": "2026-03-09T20:27:36.057Z",
   "summary": {
-    "total": 4,
-    "passed": 4,
+    "total": 5,
+    "passed": 5,
     "failed": 0
   },
   "tolerance": {
@@ -369,6 +369,72 @@
           "orientation": {
             "detected": "side-right",
             "expected": "side-right",
+            "match": true
+          }
+        }
+      ]
+    },
+    {
+      "video": "20190818_142631.mp4",
+      "status": "pass",
+      "shots": [
+        {
+          "shotNumber": 1,
+          "startFrame": {
+            "detected": 35,
+            "expected": 31,
+            "diff": 4,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 56,
+            "expected": 55,
+            "diff": 1,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-left",
+            "expected": "side-left",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 2,
+          "startFrame": {
+            "detected": 278,
+            "expected": 270,
+            "diff": 8,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 307,
+            "expected": 312,
+            "diff": 5,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-left",
+            "expected": "side-left",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 3,
+          "startFrame": {
+            "detected": 555,
+            "expected": 554,
+            "diff": 1,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 573,
+            "expected": 578,
+            "diff": 5,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "front",
+            "expected": "front",
             "match": true
           }
         }

@@ -133,6 +133,16 @@ export declare class ShotBoundaryDetector {
      */
     private findMotionStart;
     /**
+     * After a shot is confirmed, look backward to find if there's a "dip" phase
+     * (where the wrist moved down before the upward motion). This is the gather
+     * phase of the shot and should be included in the shot boundary.
+     *
+     * Uses raw (unsmoothed) wrist positions to detect the dip more accurately.
+     * Only adjusts the start if there's a significant gap between dip point and
+     * upward start (indicating the labeler expects the dip phase to be included).
+     */
+    private findDipStart;
+    /**
      * Checks if the video starts in the middle of a shot motion.
      * Returns true if the first few frames show consistent upward movement.
      */

@@ -373,6 +373,29 @@ export function detectOrientationFromFrames(
     const shoulderHipZRatio =
       absHipZDiff > 0.1 ? absZDiff / absHipZDiff : 999; // Avoid division by very small numbers
 
+    // Calculate shoulder/hip X separation ratio
+    // When ratio is > 1.0, shoulders are more separated than hips (front view with rotation)
+    // When ratio is < 1.0, hips are more separated than shoulders (side view)
+    const shoulderHipXRatio =
+      hipSeparation > 0.01 ? shoulderSeparation / hipSeparation : 999;
+
+    // CASE 3a: Front view with small shoulder separation
+    // When shoulders separate MORE than hips during shooting, it indicates:
+    // - Camera is in front
+    // - Shoulder rotation from shooting motion causes the Z-depth
+    // Key criteria:
+    // - Z-ratio < 1.6: hip Z follows shoulder Z (not pure shoulder rotation)
+    // - X-ratio > 1.2: shoulders distinctly more separated than hips (front view characteristic)
+    // - Small shoulder separation (< 0.05): shoulders nearly aligned = front-ish view
+    if (
+      isFrontView &&
+      shoulderSeparation < 0.05 &&
+      shoulderHipZRatio < 1.6 &&
+      shoulderHipXRatio > 1.2
+    ) {
+      return "front";
+    }
+
     // If shoulder separation is moderate AND shoulder/hip Z ratio is low,
     // this indicates both shoulders AND hips show similar angle offset
     // → true camera angle (front-left/front-right)
@@ -404,6 +427,7 @@ export function detectOrientationFromFrames(
 
     if (isFrontView) {
       // Check for side views with moderate Z-depth (0.30-0.45)
+      // Check for side views with moderate Z-depth (0.30-0.45)
       // Key insight: if Z-diff is moderate and shoulder separation suggests angled body,
       // this could be a side view rather than front. The camera is positioned to the side
       // but the body rotation during shooting creates a "front-like" appearance.
@@ -419,10 +443,24 @@ export function detectOrientationFromFrames(
       const hipFollowsShoulder = Math.sign(avgHipZDiff) === Math.sign(avgZDiff) && absHipZDiff > 0.15;
       const hipNotHighlyConsistent = absHipZDiff < 0.25;
 
-      if (moderateZForSide && moderateShoulderSep && hipFollowsShoulder && hipNotHighlyConsistent) {
+      // Additional criteria for side-left with higher shoulder separation:
+      // When shoulder separation is higher (0.07-0.12), we need stronger side-view indicators
+      // Higher shoulder sep could be side view OR front-angled view
+      // Side-left is more likely when:
+      // - Z-diff is positive (left shoulder farther from camera = camera on left side)
+      // - Hip Z-diff is lower (< 0.24), indicating the Z-depth is from camera angle, not rotation
+      const higherShoulderSep = shoulderSeparation > 0.07;
+      const isHigherSepSideLeft = avgZDiff > 0 && absHipZDiff < 0.25;
+
+      if (moderateZForSide && moderateShoulderSep && hipFollowsShoulder) {
         if (avgZDiff > 0) {
-          return "side-left";
-        } else {
+          // Side-left candidates
+          if (!higherShoulderSep || isHigherSepSideLeft) {
+            return "side-left";
+          }
+          // Higher shoulder sep without strong side indicators falls through
+        } else if (hipNotHighlyConsistent) {
+          // Side-right only with lower hip Z
           return "side-right";
         }
       }
