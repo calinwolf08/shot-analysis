@@ -98,6 +98,8 @@ export declare function saveJsonReport(results: readonly ComparisonResult[], out
 export interface CliArgs {
     /** Specific video name to test (from --video flag) */
     readonly video?: string;
+    /** Multiple video names/patterns to test (from --videos flag, comma-separated) */
+    readonly videos?: readonly string[];
     /** Path to test data directory */
     readonly testDataDir: string;
     /** Path to output JSON report */
@@ -110,6 +112,7 @@ export interface CliArgs {
  *
  * Supports:
  * - --video <name>: Run test for a specific video only
+ * - --videos <list>: Run tests for multiple videos (comma-separated)
  * - --test-data <path>: Path to test data directory (default: test-data)
  * - --output <path>: Path for JSON report (default: test-data/test-results.json)
  * - --help: Show help message

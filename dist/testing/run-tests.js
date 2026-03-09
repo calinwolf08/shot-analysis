@@ -51,9 +51,10 @@ async function main() {
         // Exit 0 for no tests (as per requirements)
         process.exit(0);
     }
-    // Filter to specific video if --video flag provided
+    // Filter to specific video(s) if --video or --videos flag provided
     let testCases = [...discovery.testCases];
     if (args.video) {
+        // Single video filter
         const videoFilter = args.video;
         testCases = testCases.filter((tc) => tc.name === videoFilter ||
             tc.name.includes(videoFilter) ||
@@ -61,6 +62,19 @@ async function main() {
             tc.labelData.video.includes(videoFilter));
         if (testCases.length === 0) {
             console.log(`${COLORS.red}Error: No test case found matching '${args.video}'${COLORS.reset}`);
+            console.log(`\nAvailable test cases: ${discovery.testCases.map((tc) => tc.name).join(", ")}`);
+            process.exit(1);
+        }
+    }
+    else if (args.videos && args.videos.length > 0) {
+        // Multiple video filter (comma-separated patterns)
+        const videoFilters = args.videos;
+        testCases = testCases.filter((tc) => videoFilters.some((filter) => tc.name === filter ||
+            tc.name.includes(filter) ||
+            tc.labelData.video === filter ||
+            tc.labelData.video.includes(filter)));
+        if (testCases.length === 0) {
+            console.log(`${COLORS.red}Error: No test cases found matching any of: ${videoFilters.join(", ")}${COLORS.reset}`);
             console.log(`\nAvailable test cases: ${discovery.testCases.map((tc) => tc.name).join(", ")}`);
             process.exit(1);
         }

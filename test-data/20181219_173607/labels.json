@@ -1,0 +1,31 @@
+{
+  "video": "20181219_173607.mp4",
+  "labeledBy": "human",
+  "labeledAt": "2026-03-09T05:55:18.960Z",
+  "shots": [
+    {
+      "shotNumber": 1,
+      "startFrame": 31,
+      "endFrame": 58,
+      "cameraOrientation": "front-right"
+    },
+    {
+      "shotNumber": 2,
+      "startFrame": 327,
+      "endFrame": 350,
+      "cameraOrientation": "side-left"
+    },
+    {
+      "shotNumber": 3,
+      "startFrame": 566,
+      "endFrame": 596,
+      "cameraOrientation": "behind"
+    },
+    {
+      "shotNumber": 4,
+      "startFrame": 825,
+      "endFrame": 864,
+      "cameraOrientation": "side-right"
+    }
+  ]
+}

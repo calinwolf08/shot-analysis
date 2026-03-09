@@ -154,8 +154,13 @@ describe("poseDataSchema", () => {
     });
 });
 describe("labeledShotSchema", () => {
-    it("accepts valid labeled shot", () => {
-        const shot = { shotNumber: 1, startFrame: 10, endFrame: 50 };
+    it("accepts valid labeled shot with cameraOrientation", () => {
+        const shot = {
+            shotNumber: 1,
+            startFrame: 10,
+            endFrame: 50,
+            cameraOrientation: "front",
+        };
         const result = labeledShotSchema.safeParse(shot);
         expect(result.success).toBe(true);
         if (result.success) {
@@ -167,11 +172,13 @@ describe("labeledShotSchema", () => {
             shotNumber: 0,
             startFrame: 10,
             endFrame: 50,
+            cameraOrientation: "front",
         }).success).toBe(false);
         expect(labeledShotSchema.safeParse({
             shotNumber: -1,
             startFrame: 10,
             endFrame: 50,
+            cameraOrientation: "front",
         }).success).toBe(false);
     });
     it("rejects negative frame indices", () => {
@@ -179,17 +186,24 @@ describe("labeledShotSchema", () => {
             shotNumber: 1,
             startFrame: -1,
             endFrame: 50,
+            cameraOrientation: "front",
         }).success).toBe(false);
     });
 });
 describe("labelDataSchema", () => {
-    it("accepts valid label data", () => {
+    it("accepts valid label data with per-shot orientation", () => {
         const labelData = {
             video: "test-video.mp4",
             labeledBy: "tester",
             labeledAt: "2024-01-01T00:00:00Z",
-            orientation: "front",
-            shots: [{ shotNumber: 1, startFrame: 10, endFrame: 50 }],
+            shots: [
+                {
+                    shotNumber: 1,
+                    startFrame: 10,
+                    endFrame: 50,
+                    cameraOrientation: "front",
+                },
+            ],
         };
         const result = labelDataSchema.safeParse(labelData);
         expect(result.success).toBe(true);
@@ -199,18 +213,23 @@ describe("labelDataSchema", () => {
             video: "test-video.mp4",
             labeledBy: "tester",
             labeledAt: "2024-01-01T00:00:00Z",
-            orientation: "side-left",
             shots: [],
         };
         expect(labelDataSchema.safeParse(labelData).success).toBe(true);
     });
-    it("rejects invalid orientation", () => {
+    it("rejects invalid shot orientation", () => {
         const labelData = {
             video: "test-video.mp4",
             labeledBy: "tester",
             labeledAt: "2024-01-01T00:00:00Z",
-            orientation: "invalid",
-            shots: [],
+            shots: [
+                {
+                    shotNumber: 1,
+                    startFrame: 10,
+                    endFrame: 50,
+                    cameraOrientation: "invalid",
+                },
+            ],
         };
         expect(labelDataSchema.safeParse(labelData).success).toBe(false);
     });

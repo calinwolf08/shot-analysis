@@ -55,6 +55,18 @@ export interface FrameComparison {
 }
 
 /**
+ * Per-shot orientation comparison.
+ */
+export interface OrientationComparison {
+  /** Detected orientation for this shot */
+  readonly detected: Orientation | "unknown";
+  /** Expected (labeled) orientation */
+  readonly expected: Orientation;
+  /** Whether orientations match */
+  readonly match: boolean;
+}
+
+/**
  * Comparison result for a single shot.
  */
 export interface ShotComparison {
@@ -64,6 +76,8 @@ export interface ShotComparison {
   readonly startFrame: FrameComparison;
   /** End frame comparison */
   readonly endFrame: FrameComparison;
+  /** Orientation comparison for this shot */
+  readonly orientation: OrientationComparison;
 }
 
 /**
@@ -74,13 +88,7 @@ export interface ComparisonResult {
   readonly video: string;
   /** Overall pass/fail status */
   readonly status: "pass" | "fail";
-  /** Orientation comparison */
-  readonly orientation: {
-    readonly detected: Orientation | "unknown";
-    readonly expected: Orientation;
-    readonly match: boolean;
-  };
-  /** Per-shot comparisons */
+  /** Per-shot comparisons (includes per-shot orientation) */
   readonly shots: readonly ShotComparison[];
   /** Failure reason if status is 'fail' */
   readonly failureReason?: string;
@@ -90,13 +98,13 @@ export interface ComparisonResult {
 // Adapter: PoseData to PoseLandmarks
 // ============================================================================
 
+import type { TestLandmark } from "./types";
+
 /**
  * Converts a TestLandmark (from test data) to a Landmark (for shot detector).
  * Adds a default confidence value since TestLandmark doesn't include it.
  */
-function convertTestLandmarkToLandmark(
-  testLandmark: Frame["landmarks"][number],
-): Landmark {
+function convertTestLandmarkToLandmark(testLandmark: TestLandmark): Landmark {
   return {
     x: testLandmark.x,
     y: testLandmark.y,
@@ -108,8 +116,12 @@ function convertTestLandmarkToLandmark(
 
 /**
  * Converts a Frame (from test data) to PoseLandmarks (for shot detector).
+ * Returns null if the frame has no landmarks (no pose detected).
  */
-function convertFrameToPoseLandmarks(frame: Frame): PoseLandmarks {
+function convertFrameToPoseLandmarks(frame: Frame): PoseLandmarks | null {
+  if (frame.landmarks === null) {
+    return null;
+  }
   return {
     landmarks: frame.landmarks.map(convertTestLandmarkToLandmark),
     poseConfidence: frame.poseConfidence,
@@ -118,14 +130,22 @@ function convertFrameToPoseLandmarks(frame: Frame): PoseLandmarks {
 
 /**
  * Converts PoseData frames to an array of PoseLandmarks for the shot detector.
+ * Frames with null landmarks are filtered out.
  *
  * @param poseData - Pose data loaded from test case
- * @returns Array of PoseLandmarks suitable for shot detection
+ * @returns Array of PoseLandmarks suitable for shot detection (null frames filtered)
  */
 export function adaptPoseDataToDetector(
   poseData: PoseData,
 ): readonly PoseLandmarks[] {
-  return poseData.frames.map(convertFrameToPoseLandmarks);
+  const results: PoseLandmarks[] = [];
+  for (const frame of poseData.frames) {
+    const converted = convertFrameToPoseLandmarks(frame);
+    if (converted !== null) {
+      results.push(converted);
+    }
+  }
+  return results;
 }
 
 // ============================================================================
@@ -133,30 +153,30 @@ export function adaptPoseDataToDetector(
 // ============================================================================
 
 /**
- * Detects camera orientation from hip-shoulder alignment.
+ * Detects camera orientation from hip-shoulder alignment for a range of frames.
  *
  * The orientation is determined by comparing the X positions of shoulders and hips:
- * - front: Left landmarks are to the left of right landmarks (left.x < right.x)
- * - side-left: Shooter's left side visible (shoulders roughly aligned in X, left side closer)
- * - side-right: Shooter's right side visible (shoulders roughly aligned in X, right side closer)
- * - front-left: Between front and side-left
- * - front-right: Between front and side-right
+ * - Front views: Left landmarks are to the left of right landmarks (rightX > leftX)
+ * - Back views: Left landmarks are to the right of right landmarks (rightX < leftX, reversed)
+ * - Side views: Shoulders nearly aligned in X
  *
- * @param poseData - Pose data to analyze
+ * 8 orientations covering full 360°:
+ * - front: Camera facing shooter from the front
+ * - front-left: Camera at ~45° from front, shooter's left side
+ * - front-right: Camera at ~45° from front, shooter's right side
+ * - side-left: Camera at ~90° viewing shooter's left side
+ * - side-right: Camera at ~90° viewing shooter's right side
+ * - behind-left: Camera at ~135° from front, behind and to the left
+ * - behind-right: Camera at ~135° from front, behind and to the right
+ * - behind: Camera directly behind the shooter
+ *
+ * @param frames - Array of frames to analyze
  * @returns Detected orientation or 'unknown' if detection fails
  */
-export function detectOrientation(poseData: PoseData): Orientation | "unknown" {
-  // Need at least some frames to analyze
-  if (poseData.frames.length === 0) {
-    return "unknown";
-  }
-
-  // Sample frames from the middle of the video (more stable poses)
-  const startSample = Math.floor(poseData.frames.length * 0.3);
-  const endSample = Math.floor(poseData.frames.length * 0.7);
-  const sampleSize = Math.min(10, endSample - startSample);
-
-  if (sampleSize < 3) {
+export function detectOrientationFromFrames(
+  frames: readonly Frame[],
+): Orientation | "unknown" {
+  if (frames.length === 0) {
     return "unknown";
   }
 
@@ -165,12 +185,12 @@ export function detectOrientation(poseData: PoseData): Orientation | "unknown" {
   let totalShoulderZ = 0;
   let validSamples = 0;
 
-  for (
-    let i = startSample;
-    i < startSample + sampleSize && i < poseData.frames.length;
-    i++
-  ) {
-    const frame = poseData.frames[i]!;
+  for (const frame of frames) {
+    // Skip frames with null landmarks
+    if (frame.landmarks === null) {
+      continue;
+    }
+
     const landmarks = frame.landmarks;
 
     const leftShoulder = landmarks[LANDMARK_INDEX.LEFT_SHOULDER];
@@ -193,18 +213,20 @@ export function detectOrientation(poseData: PoseData): Orientation | "unknown" {
       continue;
     }
 
-    // X difference: positive = left is left of right (front view)
-    // negative = left is right of right (back view or flipped)
+    // X difference: positive = right is to the right of left (front view, normal)
+    // negative = right is to the left of left (back view, shoulders appear reversed)
     totalShoulderDiffX += rightShoulder.x - leftShoulder.x;
     totalHipDiffX += rightHip.x - leftHip.x;
 
     // Z difference: which side is closer to camera
+    // Positive = right shoulder farther from camera (left side closer)
+    // Negative = left shoulder farther from camera (right side closer)
     totalShoulderZ += rightShoulder.z - leftShoulder.z;
 
     validSamples++;
   }
 
-  if (validSamples < 3) {
+  if (validSamples < 1) {
     return "unknown";
   }
 
@@ -212,46 +234,121 @@ export function detectOrientation(poseData: PoseData): Orientation | "unknown" {
   const avgHipDiffX = totalHipDiffX / validSamples;
   const avgZDiff = totalShoulderZ / validSamples;
 
-  // Thresholds for determining orientation
-  const frontThreshold = 0.15; // Shoulders clearly separated in X
-  const sideThreshold = 0.05; // Shoulders nearly aligned in X
+  // Determine if we're viewing from front or back based on X ordering
+  // Front view: rightShoulder.x > leftShoulder.x (positive avgShoulderDiffX)
+  // Back view: rightShoulder.x < leftShoulder.x (negative avgShoulderDiffX, reversed)
+  const isFrontView = avgShoulderDiffX > 0;
+  const isBackView = avgShoulderDiffX < 0;
 
-  // Determine orientation based on shoulder X separation
+  // Thresholds for determining orientation
+  const frontBackThreshold = 0.15; // Shoulders clearly separated in X
+  const sideThreshold = 0.05; // Shoulders nearly aligned in X
+  const angleThreshold = 0.05; // Z-depth threshold for angular views
+
+  // Absolute shoulder separation for front/back vs side determination
   const shoulderSeparation = Math.abs(avgShoulderDiffX);
   const hipSeparation = Math.abs(avgHipDiffX);
   const avgSeparation = (shoulderSeparation + hipSeparation) / 2;
 
-  if (avgSeparation > frontThreshold) {
-    // Good shoulder separation - frontal or front-angled view
-    // Check if slightly angled based on Z depth difference
-    const angleThreshold = 0.05;
-    if (avgZDiff > angleThreshold) {
-      // Right side is farther back - shot from front-left
-      return "front-left";
-    } else if (avgZDiff < -angleThreshold) {
-      // Left side is farther back - shot from front-right
-      return "front-right";
+  if (avgSeparation > frontBackThreshold) {
+    // Good shoulder separation - frontal or back view
+    if (isFrontView) {
+      // Front-facing orientations
+      if (avgZDiff > angleThreshold) {
+        return "front-left";
+      } else if (avgZDiff < -angleThreshold) {
+        return "front-right";
+      }
+      return "front";
+    } else if (isBackView) {
+      // Back-facing orientations (shoulders appear reversed)
+      // Z-depth interpretation is also reversed for back views
+      if (avgZDiff > angleThreshold) {
+        return "behind-left";
+      } else if (avgZDiff < -angleThreshold) {
+        return "behind-right";
+      }
+      return "behind";
     }
-    return "front";
   } else if (avgSeparation < sideThreshold) {
-    // Shoulders very close in X - side view
-    // Determine which side based on Z depth
+    // Shoulders very close in X - pure side view
     if (avgZDiff > 0) {
-      // Right side is farther (we see left side)
       return "side-left";
     } else {
-      // Left side is farther (we see right side)
       return "side-right";
     }
   } else {
-    // In between - angled view
-    if (avgZDiff > 0) {
-      return "front-left";
-    } else if (avgZDiff < 0) {
-      return "front-right";
+    // In between - angled view (front-left, front-right, behind-left, behind-right)
+    if (isFrontView) {
+      if (avgZDiff > 0) {
+        return "front-left";
+      } else if (avgZDiff < 0) {
+        return "front-right";
+      }
+      return "front";
+    } else if (isBackView) {
+      if (avgZDiff > 0) {
+        return "behind-left";
+      } else if (avgZDiff < 0) {
+        return "behind-right";
+      }
+      return "behind";
     }
-    return "front";
   }
+
+  return "unknown";
+}
+
+/**
+ * Detects camera orientation from pose data by sampling frames.
+ *
+ * @param poseData - Pose data to analyze
+ * @returns Detected orientation or 'unknown' if detection fails
+ */
+export function detectOrientation(poseData: PoseData): Orientation | "unknown" {
+  if (poseData.frames.length === 0) {
+    return "unknown";
+  }
+
+  // Sample frames from the middle of the video (more stable poses)
+  const startSample = Math.floor(poseData.frames.length * 0.3);
+  const endSample = Math.floor(poseData.frames.length * 0.7);
+  const sampleSize = Math.min(10, endSample - startSample);
+
+  if (sampleSize < 1) {
+    return "unknown";
+  }
+
+  const sampleFrames = poseData.frames.slice(
+    startSample,
+    startSample + sampleSize,
+  );
+  return detectOrientationFromFrames(sampleFrames);
+}
+
+/**
+ * Detects camera orientation for a specific shot (frame range).
+ *
+ * @param poseData - Full pose data
+ * @param startFrame - Start frame index (inclusive)
+ * @param endFrame - End frame index (inclusive)
+ * @returns Detected orientation or 'unknown' if detection fails
+ */
+export function detectOrientationForShot(
+  poseData: PoseData,
+  startFrame: number,
+  endFrame: number,
+): Orientation | "unknown" {
+  // Get frames within the shot range
+  const shotFrames = poseData.frames.filter(
+    (f) => f.frameIndex >= startFrame && f.frameIndex <= endFrame,
+  );
+
+  if (shotFrames.length === 0) {
+    return "unknown";
+  }
+
+  return detectOrientationFromFrames(shotFrames);
 }
 
 // ============================================================================
@@ -366,19 +463,19 @@ function compareFrame(
 
 /**
  * Compares detection results against labeled ground truth.
+ * Orientation is compared per-shot, not per-video.
  *
  * @param detection - Detection result from runDetection()
  * @param labelData - Ground truth label data
+ * @param poseData - Pose data for per-shot orientation detection
  * @returns Comparison result with pass/fail status and detailed shot comparisons
  */
 export function compareResults(
   detection: DetectionResult,
   labelData: LabelData,
+  poseData: PoseData,
 ): ComparisonResult {
   const video = labelData.video;
-
-  // Check orientation match
-  const orientationMatch = detection.orientation === labelData.orientation;
 
   // Check for shot count mismatch
   if (detection.shots.length !== labelData.shots.length) {
@@ -390,11 +487,6 @@ export function compareResults(
     return {
       video,
       status: "fail",
-      orientation: {
-        detected: detection.orientation,
-        expected: labelData.orientation,
-        match: orientationMatch,
-      },
       shots: [],
       failureReason,
     };
@@ -412,11 +504,18 @@ export function compareResults(
   // Determine if we should use expanded tolerance
   const useExpandedTolerance = shouldExpandTolerance(allDiffs);
 
-  // Compare each shot
+  // Compare each shot (including per-shot orientation)
   const shotComparisons: ShotComparison[] = [];
   for (let i = 0; i < detection.shots.length; i++) {
     const detected = detection.shots[i]!;
     const labeled = labelData.shots[i]!;
+
+    // Detect orientation for this specific shot
+    const detectedOrientation = detectOrientationForShot(
+      poseData,
+      detected.startFrame,
+      detected.endFrame,
+    );
 
     const comparison: ShotComparison = {
       shotNumber: labeled.shotNumber,
@@ -430,6 +529,11 @@ export function compareResults(
         labeled.endFrame,
         useExpandedTolerance,
       ),
+      orientation: {
+        detected: detectedOrientation,
+        expected: labeled.cameraOrientation,
+        match: detectedOrientation === labeled.cameraOrientation,
+      },
     };
 
     shotComparisons.push(comparison);
@@ -437,32 +541,27 @@ export function compareResults(
 
   // Determine overall pass/fail
   const allShotsPass = shotComparisons.every(
-    (shot) => shot.startFrame.pass && shot.endFrame.pass,
+    (shot) =>
+      shot.startFrame.pass && shot.endFrame.pass && shot.orientation.match,
   );
-  const overallPass = allShotsPass && orientationMatch;
 
   // Build result based on pass/fail
-  if (overallPass) {
+  if (allShotsPass) {
     return {
       video,
       status: "pass",
-      orientation: {
-        detected: detection.orientation,
-        expected: labelData.orientation,
-        match: orientationMatch,
-      },
       shots: shotComparisons,
     };
   }
 
   // Build failure reason
   const reasons: string[] = [];
-  if (!orientationMatch) {
-    reasons.push(
-      `orientation mismatch: detected '${detection.orientation}', expected '${labelData.orientation}'`,
-    );
-  }
   for (const shot of shotComparisons) {
+    if (!shot.orientation.match) {
+      reasons.push(
+        `shot ${shot.shotNumber} orientation: detected '${shot.orientation.detected}', expected '${shot.orientation.expected}'`,
+      );
+    }
     if (!shot.startFrame.pass) {
       reasons.push(
         `shot ${shot.shotNumber} start: diff ${shot.startFrame.diff} exceeds tolerance`,
@@ -478,11 +577,6 @@ export function compareResults(
   return {
     video,
     status: "fail",
-    orientation: {
-      detected: detection.orientation,
-      expected: labelData.orientation,
-      match: orientationMatch,
-    },
     shots: shotComparisons,
     failureReason: reasons.join("; "),
   };
@@ -504,5 +598,5 @@ export function runAndCompare(
   labelData: LabelData,
 ): ComparisonResult {
   const detection = runDetection(poseData);
-  return compareResults(detection, labelData);
+  return compareResults(detection, labelData, poseData);
 }

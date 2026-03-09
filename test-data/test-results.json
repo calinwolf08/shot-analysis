@@ -1,0 +1,47 @@
+{
+  "runAt": "2026-03-09T06:57:27.071Z",
+  "summary": {
+    "total": 2,
+    "passed": 0,
+    "failed": 2
+  },
+  "tolerance": {
+    "frames": 3,
+    "expandedTo": 5
+  },
+  "results": [
+    {
+      "video": "20181219_173607.mp4",
+      "status": "fail",
+      "shots": [],
+      "failureReason": "shot count mismatch: detected 3, expected 4"
+    },
+    {
+      "video": "20190107_211108.mp4",
+      "status": "fail",
+      "shots": [
+        {
+          "shotNumber": 1,
+          "startFrame": {
+            "detected": 43,
+            "expected": 33,
+            "diff": 10,
+            "pass": false
+          },
+          "endFrame": {
+            "detected": 78,
+            "expected": 62,
+            "diff": 16,
+            "pass": false
+          },
+          "orientation": {
+            "detected": "side-right",
+            "expected": "front",
+            "match": false
+          }
+        }
+      ],
+      "failureReason": "shot 1 orientation: detected 'side-right', expected 'front'; shot 1 start: diff 10 exceeds tolerance; shot 1 end: diff 16 exceeds tolerance"
+    }
+  ]
+}

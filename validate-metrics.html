@@ -761,42 +761,6 @@
         font-size: 13px;
       }
 
-      .orientation-group {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 15px;
-        padding: 10px 12px;
-        background: #1a1a1a;
-        border-radius: 6px;
-      }
-
-      .orientation-group label {
-        color: #9ca3af;
-        font-size: 0.9rem;
-      }
-
-      .orientation-group select {
-        padding: 6px 10px;
-        background: #374151;
-        border: 1px solid #4b5563;
-        border-radius: 4px;
-        color: #fff;
-        font-size: 13px;
-        min-width: 140px;
-      }
-
-      .orientation-group select:focus {
-        outline: none;
-        border-color: #2563eb;
-      }
-
-      .orientation-hint {
-        color: #6b7280;
-        font-size: 0.8rem;
-        font-style: italic;
-      }
-
       .shot-list {
         max-height: 300px;
         overflow-y: auto;
@@ -804,8 +768,8 @@
 
       .shot-entry {
         display: flex;
-        align-items: center;
-        gap: 10px;
+        flex-direction: column;
+        gap: 8px;
         padding: 10px 12px;
         background: #1a1a1a;
         border-radius: 6px;
@@ -832,14 +796,18 @@
         border-color: #16a34a;
       }
 
+      .shot-entry-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
       .shot-entry-number {
         font-weight: 600;
         color: #60a5fa;
-        min-width: 60px;
       }
 
       .shot-entry-frames {
-        flex: 1;
         display: flex;
         gap: 15px;
         font-size: 0.9rem;
@@ -857,6 +825,32 @@
       .shot-entry-frames .frame-value.unset {
         color: #6b7280;
         font-style: italic;
+      }
+
+      .shot-entry-orientation {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+      }
+
+      .shot-entry-orientation .frame-label {
+        color: #9ca3af;
+      }
+
+      .shot-orientation-select {
+        background: #2a2a2a;
+        border: 1px solid #404040;
+        border-radius: 4px;
+        color: #fff;
+        padding: 4px 8px;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+
+      .shot-orientation-select:focus {
+        outline: none;
+        border-color: #2563eb;
       }
 
       .shot-entry-status {
@@ -995,16 +989,7 @@
           </div>
         </div>
 
-        <div class="toolbar hidden" id="toolbar">
-          <button id="saveProgressBtn" class="secondary">Save Progress</button>
-          <button id="loadProgressBtn" class="secondary">Load Progress</button>
-          <input
-            type="file"
-            id="progressInput"
-            accept=".json"
-            style="display: none"
-          />
-          <button id="exportBtn" class="success">Export Validation</button>
+        <div class="toolbar hidden" id="videoToolbar">
           <button
             id="exportPosesBtn"
             class="secondary"
@@ -1020,6 +1005,18 @@
           >
             Export Labels
           </button>
+        </div>
+
+        <div class="toolbar hidden" id="toolbar">
+          <button id="saveProgressBtn" class="secondary">Save Progress</button>
+          <button id="loadProgressBtn" class="secondary">Load Progress</button>
+          <input
+            type="file"
+            id="progressInput"
+            accept=".json"
+            style="display: none"
+          />
+          <button id="exportBtn" class="success">Export Validation</button>
         </div>
       </div>
 
@@ -1128,18 +1125,6 @@
                   Remove Shot
                 </button>
               </div>
-            </div>
-
-            <div class="orientation-group">
-              <label for="cameraOrientation">Camera Orientation:</label>
-              <select id="cameraOrientation">
-                <option value="front">Front</option>
-                <option value="side-left">Side Left</option>
-                <option value="side-right">Side Right</option>
-                <option value="front-left">Front Left</option>
-                <option value="front-right">Front Right</option>
-              </select>
-              <span class="orientation-hint">(from shooter's point of view)</span>
             </div>
 
             <div class="shot-list" id="shotList">
@@ -1258,12 +1243,11 @@
       };
 
       // Shot labeling state
-      // Shot: { shotNumber: number, startFrame: number | null, endFrame: number | null }
-      // Orientation: 'front' | 'side-left' | 'side-right' | 'front-left' | 'front-right'
+      // Shot: { shotNumber: number, startFrame: number | null, endFrame: number | null, cameraOrientation: string }
+      // Orientation values: 'front' | 'side-left' | 'side-right' | 'front-left' | 'front-right' | 'behind' | 'behind-left' | 'behind-right'
       const labelingState = {
         shots: [],
         selectedShotIndex: null,
-        cameraOrientation: "front",
       };
 
       // =========================================================================
@@ -1282,6 +1266,7 @@
         progressText: $("progressText"),
         progressBar: $("progressBar"),
         toolbar: $("toolbar"),
+        videoToolbar: $("videoToolbar"),
         video: $("video"),
         videoPlaceholder: $("videoPlaceholder"),
         loadingPlaceholder: $("loadingPlaceholder"),
@@ -1323,7 +1308,6 @@
         shotLabelingPanel: $("shotLabelingPanel"),
         addShotBtn: $("addShotBtn"),
         removeShotBtn: $("removeShotBtn"),
-        cameraOrientation: $("cameraOrientation"),
         shotList: $("shotList"),
         shotLabelingEmpty: $("shotLabelingEmpty"),
         shotValidationError: $("shotValidationError"),
@@ -1413,6 +1397,20 @@
         appState.videoLoaded = false;
         appState.totalFrames = 0;
         appState.fps = 30; // Default FPS (HTML5 video doesn't expose native FPS)
+        appState.poseData = null;
+        appState.analysisData = null;
+
+        // Reset labeling state for new video
+        labelingState.shots = [];
+        labelingState.selectedShotIndex = null;
+        renderShotList();
+        updateRemoveButtonState();
+        showValidationErrors([]);
+
+        // Hide analysis UI (will be shown again after analysis)
+        elements.metricsContent.classList.add("hidden");
+        elements.noDataMessage.classList.remove("hidden");
+        elements.toolbar.classList.add("hidden");
 
         // Create blob URL from the selected file
         const blobUrl = URL.createObjectURL(file);
@@ -1455,6 +1453,9 @@
 
           // Enable Export Poses button now that video is loaded
           updateExportPosesButtonState();
+
+          // Show video toolbar (Export Poses, Export Labels)
+          elements.videoToolbar.classList.remove("hidden");
 
           // Update frame display to show initial frame info
           updateFrameDisplay();
@@ -1503,6 +1504,8 @@
         disableControls();
         // Disable Add Shot button when video is not loaded
         updateAddShotButtonState();
+        // Hide video toolbar
+        elements.videoToolbar.classList.add("hidden");
       }
 
       function enableControls() {
@@ -2374,11 +2377,11 @@
           video: videoName,
           labeledBy: "human",
           labeledAt: new Date().toISOString(),
-          orientation: labeling.cameraOrientation,
           shots: labeling.shots.map((shot) => ({
             shotNumber: shot.shotNumber,
             startFrame: shot.startFrame,
             endFrame: shot.endFrame,
+            cameraOrientation: shot.cameraOrientation || "front",
           })),
         };
       }
@@ -2754,6 +2757,7 @@
           shotNumber: nextShotNumber,
           startFrame: null,
           endFrame: null,
+          cameraOrientation: "front",
         };
 
         labelingState.shots.push(newShot);
@@ -2941,16 +2945,47 @@
           const startClass = shot.startFrame !== null ? "" : "unset";
           const endClass = shot.endFrame !== null ? "" : "unset";
 
+          // Get current orientation value
+          const orientation = shot.cameraOrientation || "front";
+
           entry.innerHTML = `
-          <span class="shot-entry-number">Shot ${shot.shotNumber}</span>
+          <div class="shot-entry-header">
+            <span class="shot-entry-number">Shot ${shot.shotNumber}</span>
+            <span class="shot-entry-status ${status}">${label}</span>
+          </div>
           <div class="shot-entry-frames">
             <span><span class="frame-label">Start:</span> <span class="frame-value ${startClass}">${startFrameStr}</span></span>
             <span><span class="frame-label">End:</span> <span class="frame-value ${endClass}">${endFrameStr}</span></span>
           </div>
-          <span class="shot-entry-status ${status}">${label}</span>
+          <div class="shot-entry-orientation">
+            <span class="frame-label">Camera:</span>
+            <select class="shot-orientation-select" data-shot-index="${index}">
+              <option value="front" ${orientation === "front" ? "selected" : ""}>Front</option>
+              <option value="side-left" ${orientation === "side-left" ? "selected" : ""}>Side Left</option>
+              <option value="side-right" ${orientation === "side-right" ? "selected" : ""}>Side Right</option>
+              <option value="front-left" ${orientation === "front-left" ? "selected" : ""}>Front Left</option>
+              <option value="front-right" ${orientation === "front-right" ? "selected" : ""}>Front Right</option>
+              <option value="behind" ${orientation === "behind" ? "selected" : ""}>Behind</option>
+              <option value="behind-left" ${orientation === "behind-left" ? "selected" : ""}>Behind Left</option>
+              <option value="behind-right" ${orientation === "behind-right" ? "selected" : ""}>Behind Right</option>
+            </select>
+          </div>
         `;
 
-          entry.onclick = () => selectShot(index);
+          // Click on entry to select shot (but not on the orientation dropdown)
+          entry.onclick = (e) => {
+            if (!e.target.classList.contains("shot-orientation-select")) {
+              selectShot(index);
+            }
+          };
+
+          // Handle orientation change
+          const orientationSelect = entry.querySelector(".shot-orientation-select");
+          orientationSelect.onchange = (e) => {
+            e.stopPropagation();
+            updateShotOrientation(index, e.target.value);
+          };
+
           elements.shotList.appendChild(entry);
         });
       }
@@ -2973,8 +3008,13 @@
       /**
        * Updates camera orientation state
        */
-      function updateCameraOrientation(value) {
-        labelingState.cameraOrientation = value;
+      /**
+       * Updates camera orientation for a specific shot
+       */
+      function updateShotOrientation(shotIndex, value) {
+        if (shotIndex >= 0 && shotIndex < labelingState.shots.length) {
+          labelingState.shots[shotIndex].cameraOrientation = value;
+        }
       }
 
       /**
@@ -2982,11 +3022,11 @@
        */
       function getLabelingData() {
         return {
-          cameraOrientation: labelingState.cameraOrientation,
           shots: labelingState.shots.map((shot) => ({
             shotNumber: shot.shotNumber,
             startFrame: shot.startFrame,
             endFrame: shot.endFrame,
+            cameraOrientation: shot.cameraOrientation || "front",
           })),
         };
       }
@@ -2995,15 +3035,12 @@
        * Loads labeling data (for restoring from saved progress)
        */
       function loadLabelingData(data) {
-        if (data.cameraOrientation) {
-          labelingState.cameraOrientation = data.cameraOrientation;
-          elements.cameraOrientation.value = data.cameraOrientation;
-        }
         if (data.shots && Array.isArray(data.shots)) {
           labelingState.shots = data.shots.map((shot) => ({
             shotNumber: shot.shotNumber,
             startFrame: shot.startFrame,
             endFrame: shot.endFrame,
+            cameraOrientation: shot.cameraOrientation || "front",
           }));
           labelingState.selectedShotIndex =
             labelingState.shots.length > 0 ? 0 : null;
@@ -3136,8 +3173,6 @@
       // Shot labeling event listeners
       elements.addShotBtn.onclick = addShot;
       elements.removeShotBtn.onclick = removeShot;
-      elements.cameraOrientation.onchange = (e) =>
-        updateCameraOrientation(e.target.value);
     </script>
   </body>
 </html>

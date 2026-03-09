@@ -16,23 +16,39 @@ import { z } from "zod";
 /**
  * Camera orientation relative to the shooter.
  * Used to determine which arm is the shooting arm.
+ *
+ * 8 orientations covering full 360° around the shooter:
+ * - front: Camera facing shooter from the front
+ * - front-left: Camera at ~45° from front, shooter's left side
+ * - front-right: Camera at ~45° from front, shooter's right side
+ * - side-left: Camera at ~90° viewing shooter's left side
+ * - side-right: Camera at ~90° viewing shooter's right side
+ * - behind-left: Camera at ~135° from front, behind and to the left
+ * - behind-right: Camera at ~135° from front, behind and to the right
+ * - behind: Camera directly behind the shooter
  */
 export type Orientation =
   | "front"
+  | "front-left"
+  | "front-right"
   | "side-left"
   | "side-right"
-  | "front-left"
-  | "front-right";
+  | "behind-left"
+  | "behind-right"
+  | "behind";
 
 /**
  * Zod schema for Orientation validation.
  */
 export const orientationSchema = z.enum([
   "front",
-  "side-left",
-  "side-right",
   "front-left",
   "front-right",
+  "side-left",
+  "side-right",
+  "behind-left",
+  "behind-right",
+  "behind",
 ]);
 
 // ============================================================================
@@ -78,18 +94,19 @@ export interface Frame {
   readonly timestamp: number;
   /** Overall pose detection confidence (0-1) */
   readonly poseConfidence: number;
-  /** Array of 33 MediaPipe pose landmarks */
-  readonly landmarks: readonly TestLandmark[];
+  /** Array of 33 MediaPipe pose landmarks, or null if no pose was detected */
+  readonly landmarks: readonly TestLandmark[] | null;
 }
 
 /**
  * Zod schema for Frame validation.
+ * Note: landmarks can be null when no pose was detected in the frame.
  */
 export const frameSchema = z.object({
   frameIndex: z.number().int().nonnegative(),
   timestamp: z.number().nonnegative(),
   poseConfidence: z.number().min(0).max(1),
-  landmarks: z.array(testLandmarkSchema),
+  landmarks: z.array(testLandmarkSchema).nullable(),
 });
 
 // ============================================================================
@@ -144,6 +161,8 @@ export interface LabeledShot {
   readonly startFrame: number;
   /** Ending frame index (inclusive, 0-based) */
   readonly endFrame: number;
+  /** Camera orientation for this specific shot */
+  readonly cameraOrientation: Orientation;
 }
 
 /**
@@ -153,11 +172,15 @@ export const labeledShotSchema = z.object({
   shotNumber: z.number().int().positive(),
   startFrame: z.number().int().nonnegative(),
   endFrame: z.number().int().nonnegative(),
+  cameraOrientation: orientationSchema,
 });
 
 /**
  * Ground truth label data for a video.
  * Corresponds to the structure of labels.json files.
+ *
+ * Note: Camera orientation is specified per-shot in LabeledShot.cameraOrientation,
+ * allowing videos with multiple shots from different camera angles.
  */
 export interface LabelData {
   /** Original video filename */
@@ -166,9 +189,7 @@ export interface LabelData {
   readonly labeledBy: string;
   /** ISO timestamp of when labels were created */
   readonly labeledAt: string;
-  /** Camera orientation relative to shooter */
-  readonly orientation: Orientation;
-  /** Array of labeled shots */
+  /** Array of labeled shots (each shot has its own cameraOrientation) */
   readonly shots: readonly LabeledShot[];
 }
 
@@ -179,7 +200,6 @@ export const labelDataSchema = z.object({
   video: z.string().min(1),
   labeledBy: z.string(),
   labeledAt: z.string(),
-  orientation: orientationSchema,
   shots: z.array(labeledShotSchema),
 });
 

@@ -1,0 +1,61 @@
+{
+  "video": "zak 1.mp4",
+  "labeledBy": "human",
+  "labeledAt": "2026-03-09T06:09:31.883Z",
+  "shots": [
+    {
+      "shotNumber": 1,
+      "startFrame": 3,
+      "endFrame": 26,
+      "cameraOrientation": "front-right"
+    },
+    {
+      "shotNumber": 2,
+      "startFrame": 110,
+      "endFrame": 132,
+      "cameraOrientation": "side-right"
+    },
+    {
+      "shotNumber": 3,
+      "startFrame": 243,
+      "endFrame": 265,
+      "cameraOrientation": "side-right"
+    },
+    {
+      "shotNumber": 4,
+      "startFrame": 342,
+      "endFrame": 364,
+      "cameraOrientation": "behind-right"
+    },
+    {
+      "shotNumber": 5,
+      "startFrame": 437,
+      "endFrame": 459,
+      "cameraOrientation": "behind"
+    },
+    {
+      "shotNumber": 6,
+      "startFrame": 536,
+      "endFrame": 558,
+      "cameraOrientation": "front"
+    },
+    {
+      "shotNumber": 7,
+      "startFrame": 676,
+      "endFrame": 701,
+      "cameraOrientation": "side-left"
+    },
+    {
+      "shotNumber": 8,
+      "startFrame": 783,
+      "endFrame": 806,
+      "cameraOrientation": "side-left"
+    },
+    {
+      "shotNumber": 9,
+      "startFrame": 899,
+      "endFrame": 920,
+      "cameraOrientation": "front-left"
+    }
+  ]
+}

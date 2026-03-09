@@ -10,12 +10,22 @@ import { z } from "zod";
 /**
  * Camera orientation relative to the shooter.
  * Used to determine which arm is the shooting arm.
+ *
+ * 8 orientations covering full 360° around the shooter:
+ * - front: Camera facing shooter from the front
+ * - front-left: Camera at ~45° from front, shooter's left side
+ * - front-right: Camera at ~45° from front, shooter's right side
+ * - side-left: Camera at ~90° viewing shooter's left side
+ * - side-right: Camera at ~90° viewing shooter's right side
+ * - behind-left: Camera at ~135° from front, behind and to the left
+ * - behind-right: Camera at ~135° from front, behind and to the right
+ * - behind: Camera directly behind the shooter
  */
-export type Orientation = "front" | "side-left" | "side-right" | "front-left" | "front-right";
+export type Orientation = "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
 /**
  * Zod schema for Orientation validation.
  */
-export declare const orientationSchema: z.ZodEnum<["front", "side-left", "side-right", "front-left", "front-right"]>;
+export declare const orientationSchema: z.ZodEnum<["front", "front-left", "front-right", "side-left", "side-right", "behind-left", "behind-right", "behind"]>;
 /**
  * A single pose landmark from the extracted pose data.
  * Simplified structure compared to MediaPipe's full Landmark type.
@@ -59,17 +69,18 @@ export interface Frame {
     readonly timestamp: number;
     /** Overall pose detection confidence (0-1) */
     readonly poseConfidence: number;
-    /** Array of 33 MediaPipe pose landmarks */
-    readonly landmarks: readonly TestLandmark[];
+    /** Array of 33 MediaPipe pose landmarks, or null if no pose was detected */
+    readonly landmarks: readonly TestLandmark[] | null;
 }
 /**
  * Zod schema for Frame validation.
+ * Note: landmarks can be null when no pose was detected in the frame.
  */
 export declare const frameSchema: z.ZodObject<{
     frameIndex: z.ZodNumber;
     timestamp: z.ZodNumber;
     poseConfidence: z.ZodNumber;
-    landmarks: z.ZodArray<z.ZodObject<{
+    landmarks: z.ZodNullable<z.ZodArray<z.ZodObject<{
         x: z.ZodNumber;
         y: z.ZodNumber;
         z: z.ZodNumber;
@@ -84,7 +95,7 @@ export declare const frameSchema: z.ZodObject<{
         y: number;
         z: number;
         visibility: number;
-    }>, "many">;
+    }>, "many">>;
 }, "strip", z.ZodTypeAny, {
     frameIndex: number;
     timestamp: number;
@@ -94,7 +105,7 @@ export declare const frameSchema: z.ZodObject<{
         y: number;
         z: number;
         visibility: number;
-    }[];
+    }[] | null;
 }, {
     frameIndex: number;
     timestamp: number;
@@ -104,7 +115,7 @@ export declare const frameSchema: z.ZodObject<{
         y: number;
         z: number;
         visibility: number;
-    }[];
+    }[] | null;
 }>;
 /**
  * Complete pose data extracted from a video file.
@@ -140,7 +151,7 @@ export declare const poseDataSchema: z.ZodObject<{
         frameIndex: z.ZodNumber;
         timestamp: z.ZodNumber;
         poseConfidence: z.ZodNumber;
-        landmarks: z.ZodArray<z.ZodObject<{
+        landmarks: z.ZodNullable<z.ZodArray<z.ZodObject<{
             x: z.ZodNumber;
             y: z.ZodNumber;
             z: z.ZodNumber;
@@ -155,7 +166,7 @@ export declare const poseDataSchema: z.ZodObject<{
             y: number;
             z: number;
             visibility: number;
-        }>, "many">;
+        }>, "many">>;
     }, "strip", z.ZodTypeAny, {
         frameIndex: number;
         timestamp: number;
@@ -165,7 +176,7 @@ export declare const poseDataSchema: z.ZodObject<{
             y: number;
             z: number;
             visibility: number;
-        }[];
+        }[] | null;
     }, {
         frameIndex: number;
         timestamp: number;
@@ -175,7 +186,7 @@ export declare const poseDataSchema: z.ZodObject<{
             y: number;
             z: number;
             visibility: number;
-        }[];
+        }[] | null;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     video: string;
@@ -193,7 +204,7 @@ export declare const poseDataSchema: z.ZodObject<{
             y: number;
             z: number;
             visibility: number;
-        }[];
+        }[] | null;
     }[];
 }, {
     video: string;
@@ -211,7 +222,7 @@ export declare const poseDataSchema: z.ZodObject<{
             y: number;
             z: number;
             visibility: number;
-        }[];
+        }[] | null;
     }[];
 }>;
 /**
@@ -224,6 +235,8 @@ export interface LabeledShot {
     readonly startFrame: number;
     /** Ending frame index (inclusive, 0-based) */
     readonly endFrame: number;
+    /** Camera orientation for this specific shot */
+    readonly cameraOrientation: Orientation;
 }
 /**
  * Zod schema for LabeledShot validation.
@@ -232,11 +245,14 @@ export declare const labeledShotSchema: z.ZodObject<{
     shotNumber: z.ZodNumber;
     startFrame: z.ZodNumber;
     endFrame: z.ZodNumber;
+    cameraOrientation: z.ZodEnum<["front", "front-left", "front-right", "side-left", "side-right", "behind-left", "behind-right", "behind"]>;
 }, "strip", z.ZodTypeAny, {
+    cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
     shotNumber: number;
     startFrame: number;
     endFrame: number;
 }, {
+    cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
     shotNumber: number;
     startFrame: number;
     endFrame: number;
@@ -244,6 +260,9 @@ export declare const labeledShotSchema: z.ZodObject<{
 /**
  * Ground truth label data for a video.
  * Corresponds to the structure of labels.json files.
+ *
+ * Note: Camera orientation is specified per-shot in LabeledShot.cameraOrientation,
+ * allowing videos with multiple shots from different camera angles.
  */
 export interface LabelData {
     /** Original video filename */
@@ -252,9 +271,7 @@ export interface LabelData {
     readonly labeledBy: string;
     /** ISO timestamp of when labels were created */
     readonly labeledAt: string;
-    /** Camera orientation relative to shooter */
-    readonly orientation: Orientation;
-    /** Array of labeled shots */
+    /** Array of labeled shots (each shot has its own cameraOrientation) */
     readonly shots: readonly LabeledShot[];
 }
 /**
@@ -264,16 +281,18 @@ export declare const labelDataSchema: z.ZodObject<{
     video: z.ZodString;
     labeledBy: z.ZodString;
     labeledAt: z.ZodString;
-    orientation: z.ZodEnum<["front", "side-left", "side-right", "front-left", "front-right"]>;
     shots: z.ZodArray<z.ZodObject<{
         shotNumber: z.ZodNumber;
         startFrame: z.ZodNumber;
         endFrame: z.ZodNumber;
+        cameraOrientation: z.ZodEnum<["front", "front-left", "front-right", "side-left", "side-right", "behind-left", "behind-right", "behind"]>;
     }, "strip", z.ZodTypeAny, {
+        cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
         shotNumber: number;
         startFrame: number;
         endFrame: number;
     }, {
+        cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
         shotNumber: number;
         startFrame: number;
         endFrame: number;
@@ -281,23 +300,23 @@ export declare const labelDataSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     video: string;
     shots: {
+        cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
         shotNumber: number;
         startFrame: number;
         endFrame: number;
     }[];
     labeledBy: string;
     labeledAt: string;
-    orientation: "front" | "side-left" | "side-right" | "front-left" | "front-right";
 }, {
     video: string;
     shots: {
+        cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
         shotNumber: number;
         startFrame: number;
         endFrame: number;
     }[];
     labeledBy: string;
     labeledAt: string;
-    orientation: "front" | "side-left" | "side-right" | "front-left" | "front-right";
 }>;
 /**
  * A discovered test case with its data.

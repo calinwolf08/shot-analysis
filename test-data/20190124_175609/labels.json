@@ -1,0 +1,37 @@
+{
+  "video": "20190124_175609.mp4",
+  "labeledBy": "human",
+  "labeledAt": "2026-03-09T06:01:20.573Z",
+  "shots": [
+    {
+      "shotNumber": 1,
+      "startFrame": 15,
+      "endFrame": 41,
+      "cameraOrientation": "front-left"
+    },
+    {
+      "shotNumber": 2,
+      "startFrame": 273,
+      "endFrame": 303,
+      "cameraOrientation": "side-left"
+    },
+    {
+      "shotNumber": 3,
+      "startFrame": 579,
+      "endFrame": 602,
+      "cameraOrientation": "side-left"
+    },
+    {
+      "shotNumber": 4,
+      "startFrame": 803,
+      "endFrame": 828,
+      "cameraOrientation": "side-left"
+    },
+    {
+      "shotNumber": 5,
+      "startFrame": 944,
+      "endFrame": 967,
+      "cameraOrientation": "side-left"
+    }
+  ]
+}

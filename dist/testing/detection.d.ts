@@ -11,7 +11,7 @@
  * @see Task 9.2 - Detection Execution & Comparison
  */
 import type { PoseLandmarks } from "../pose/types";
-import type { PoseData, LabelData, Orientation } from "./types";
+import type { PoseData, LabelData, Orientation, Frame } from "./types";
 /**
  * A detected shot from the algorithm.
  */
@@ -44,6 +44,17 @@ export interface FrameComparison {
     readonly pass: boolean;
 }
 /**
+ * Per-shot orientation comparison.
+ */
+export interface OrientationComparison {
+    /** Detected orientation for this shot */
+    readonly detected: Orientation | "unknown";
+    /** Expected (labeled) orientation */
+    readonly expected: Orientation;
+    /** Whether orientations match */
+    readonly match: boolean;
+}
+/**
  * Comparison result for a single shot.
  */
 export interface ShotComparison {
@@ -53,6 +64,8 @@ export interface ShotComparison {
     readonly startFrame: FrameComparison;
     /** End frame comparison */
     readonly endFrame: FrameComparison;
+    /** Orientation comparison for this shot */
+    readonly orientation: OrientationComparison;
 }
 /**
  * Overall comparison result for a video.
@@ -62,38 +75,57 @@ export interface ComparisonResult {
     readonly video: string;
     /** Overall pass/fail status */
     readonly status: "pass" | "fail";
-    /** Orientation comparison */
-    readonly orientation: {
-        readonly detected: Orientation | "unknown";
-        readonly expected: Orientation;
-        readonly match: boolean;
-    };
-    /** Per-shot comparisons */
+    /** Per-shot comparisons (includes per-shot orientation) */
     readonly shots: readonly ShotComparison[];
     /** Failure reason if status is 'fail' */
     readonly failureReason?: string;
 }
 /**
  * Converts PoseData frames to an array of PoseLandmarks for the shot detector.
+ * Frames with null landmarks are filtered out.
  *
  * @param poseData - Pose data loaded from test case
- * @returns Array of PoseLandmarks suitable for shot detection
+ * @returns Array of PoseLandmarks suitable for shot detection (null frames filtered)
  */
 export declare function adaptPoseDataToDetector(poseData: PoseData): readonly PoseLandmarks[];
 /**
- * Detects camera orientation from hip-shoulder alignment.
+ * Detects camera orientation from hip-shoulder alignment for a range of frames.
  *
  * The orientation is determined by comparing the X positions of shoulders and hips:
- * - front: Left landmarks are to the left of right landmarks (left.x < right.x)
- * - side-left: Shooter's left side visible (shoulders roughly aligned in X, left side closer)
- * - side-right: Shooter's right side visible (shoulders roughly aligned in X, right side closer)
- * - front-left: Between front and side-left
- * - front-right: Between front and side-right
+ * - Front views: Left landmarks are to the left of right landmarks (rightX > leftX)
+ * - Back views: Left landmarks are to the right of right landmarks (rightX < leftX, reversed)
+ * - Side views: Shoulders nearly aligned in X
+ *
+ * 8 orientations covering full 360°:
+ * - front: Camera facing shooter from the front
+ * - front-left: Camera at ~45° from front, shooter's left side
+ * - front-right: Camera at ~45° from front, shooter's right side
+ * - side-left: Camera at ~90° viewing shooter's left side
+ * - side-right: Camera at ~90° viewing shooter's right side
+ * - behind-left: Camera at ~135° from front, behind and to the left
+ * - behind-right: Camera at ~135° from front, behind and to the right
+ * - behind: Camera directly behind the shooter
+ *
+ * @param frames - Array of frames to analyze
+ * @returns Detected orientation or 'unknown' if detection fails
+ */
+export declare function detectOrientationFromFrames(frames: readonly Frame[]): Orientation | "unknown";
+/**
+ * Detects camera orientation from pose data by sampling frames.
  *
  * @param poseData - Pose data to analyze
  * @returns Detected orientation or 'unknown' if detection fails
  */
 export declare function detectOrientation(poseData: PoseData): Orientation | "unknown";
+/**
+ * Detects camera orientation for a specific shot (frame range).
+ *
+ * @param poseData - Full pose data
+ * @param startFrame - Start frame index (inclusive)
+ * @param endFrame - End frame index (inclusive)
+ * @returns Detected orientation or 'unknown' if detection fails
+ */
+export declare function detectOrientationForShot(poseData: PoseData, startFrame: number, endFrame: number): Orientation | "unknown";
 /**
  * Runs shot detection on pose data and returns detected shots with orientation.
  *
@@ -103,12 +135,14 @@ export declare function detectOrientation(poseData: PoseData): Orientation | "un
 export declare function runDetection(poseData: PoseData): DetectionResult;
 /**
  * Compares detection results against labeled ground truth.
+ * Orientation is compared per-shot, not per-video.
  *
  * @param detection - Detection result from runDetection()
  * @param labelData - Ground truth label data
+ * @param poseData - Pose data for per-shot orientation detection
  * @returns Comparison result with pass/fail status and detailed shot comparisons
  */
-export declare function compareResults(detection: DetectionResult, labelData: LabelData): ComparisonResult;
+export declare function compareResults(detection: DetectionResult, labelData: LabelData, poseData: PoseData): ComparisonResult;
 /**
  * Runs detection on pose data and compares against labels in one call.
  *

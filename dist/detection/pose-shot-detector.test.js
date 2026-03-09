@@ -291,7 +291,8 @@ describe("detectShots", () => {
         // Make some frames have very low confidence
         for (let i = 25; i < 30; i++) {
             const oldFrame = frames[i];
-            frames[i] = createFrame(i, [...oldFrame.landmarks], 0.1);
+            const oldLandmarks = oldFrame.landmarks ?? [];
+            frames[i] = createFrame(i, [...oldLandmarks], 0.1);
         }
         const poseData = createPoseData(frames);
         // Should not throw and should still try to detect

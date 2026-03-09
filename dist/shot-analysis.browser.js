@@ -58,6 +58,7 @@ var ShotAnalysis = (() => {
     createEmptyShotAnalysis: () => createEmptyShotAnalysis,
     createEmptyVideoMetadata: () => createEmptyVideoMetadata,
     createMediaStreamProvider: () => createMediaStreamProvider,
+    createPoseDetector: () => createPoseDetector,
     createShotAnalyzer: () => createShotAnalyzer,
     createVideoElementProvider: () => createVideoElementProvider,
     filterMetricsByConfidence: () => filterMetricsByConfidence,

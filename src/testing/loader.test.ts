@@ -193,8 +193,14 @@ describe("loadLabelData", () => {
         video: "test.mp4",
         labeledBy: "tester",
         labeledAt: "2024-01-01T00:00:00Z",
-        orientation: "invalid-orientation",
-        shots: [],
+        shots: [
+          {
+            shotNumber: 1,
+            startFrame: 10,
+            endFrame: 50,
+            cameraOrientation: "invalid-orientation",
+          },
+        ],
       }),
     );
 
@@ -211,8 +217,14 @@ describe("loadLabelData", () => {
       video: "test.mp4",
       labeledBy: "tester",
       labeledAt: "2024-01-01T00:00:00Z",
-      orientation: "front",
-      shots: [{ shotNumber: 1, startFrame: 10, endFrame: 50 }],
+      shots: [
+        {
+          shotNumber: 1,
+          startFrame: 10,
+          endFrame: 50,
+          cameraOrientation: "front",
+        },
+      ],
     };
 
     mockFs.existsSync.mockReturnValue(true);
@@ -223,8 +235,8 @@ describe("loadLabelData", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.video).toBe("test.mp4");
-      expect(result.data.orientation).toBe("front");
       expect(result.data.shots.length).toBe(1);
+      expect(result.data.shots[0]!.cameraOrientation).toBe("front");
     }
   });
 });
@@ -346,7 +358,6 @@ describe("discoverTestCases", () => {
         video: "test.mp4",
         labeledBy: "tester",
         labeledAt: "2024-01-01T00:00:00Z",
-        orientation: "front",
         shots: [],
       });
     });
@@ -412,8 +423,14 @@ describe("discoverTestCases", () => {
         video: "test.mp4",
         labeledBy: "tester",
         labeledAt: "2024-01-01T00:00:00Z",
-        orientation: "front",
-        shots: [{ shotNumber: 1, startFrame: 10, endFrame: 50 }],
+        shots: [
+          {
+            shotNumber: 1,
+            startFrame: 10,
+            endFrame: 50,
+            cameraOrientation: "front",
+          },
+        ],
       });
     });
 
@@ -448,7 +465,6 @@ describe("discoverTestCases", () => {
         video: "test.mp4",
         labeledBy: "tester",
         labeledAt: "2024-01-01T00:00:00Z",
-        orientation: "front",
         shots: [],
       });
     });
@@ -492,8 +508,14 @@ describe("reportDiscoveryResults", () => {
             video: "test.mp4",
             labeledBy: "tester",
             labeledAt: "2024-01-01T00:00:00Z",
-            orientation: "front",
-            shots: [{ shotNumber: 1, startFrame: 10, endFrame: 50 }],
+            shots: [
+              {
+                shotNumber: 1,
+                startFrame: 10,
+                endFrame: 50,
+                cameraOrientation: "front",
+              },
+            ],
           },
         },
       ],

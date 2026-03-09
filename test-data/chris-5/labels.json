@@ -1,13 +1,13 @@
 {
   "video": "chris 5.mp4",
   "labeledBy": "human",
-  "labeledAt": "2026-03-07T22:27:18.046Z",
-  "orientation": "side-right",
+  "labeledAt": "2026-03-09T06:22:28.748Z",
   "shots": [
     {
       "shotNumber": 1,
-      "startFrame": 58,
-      "endFrame": 87
+      "startFrame": 60,
+      "endFrame": 83,
+      "cameraOrientation": "side-right"
     }
   ]
 }

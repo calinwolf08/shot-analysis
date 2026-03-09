@@ -134,8 +134,13 @@ export function calculateKneeAngle(
 
 /**
  * Extracts Point3D from a frame landmark at the given index.
+ * Returns null if frame has no landmarks or landmark is not visible.
  */
 function getLandmarkPoint(frame: Frame, index: number): Point3D | null {
+  // Handle frames with null landmarks (no pose detected)
+  if (frame.landmarks === null) {
+    return null;
+  }
   const landmark = frame.landmarks[index];
   if (!landmark || landmark.visibility < 0.3) {
     return null;
@@ -425,6 +430,11 @@ export function detectOrientation(poseData: PoseData): Orientation | "unknown" {
   for (let i = startSample; i < startSample + sampleSize && i < poseData.frames.length; i++) {
     const frame = poseData.frames[i]!;
     const landmarks = frame.landmarks;
+
+    // Skip frames with null landmarks
+    if (landmarks === null) {
+      continue;
+    }
 
     const leftShoulder = landmarks[LANDMARK_INDEX.LEFT_SHOULDER];
     const rightShoulder = landmarks[LANDMARK_INDEX.RIGHT_SHOULDER];

@@ -195,10 +195,10 @@ export function formatConsoleOutput(
 /**
  * Formats frame comparison details for a single shot.
  *
- * Shows detected vs expected frames and the difference.
+ * Shows detected vs expected frames, the difference, and orientation.
  *
  * @param shot - Shot comparison data
- * @returns Formatted string with frame differences
+ * @returns Formatted string with frame differences and orientation
  */
 function formatShotComparison(shot: ShotComparison): string {
   const lines: string[] = [];
@@ -208,6 +208,9 @@ function formatShotComparison(shot: ShotComparison): string {
     ? COLORS.green
     : `${COLORS.red}${COLORS.bold}`;
   const endStatus = shot.endFrame.pass
+    ? COLORS.green
+    : `${COLORS.red}${COLORS.bold}`;
+  const orientationStatus = shot.orientation.match
     ? COLORS.green
     : `${COLORS.red}${COLORS.bold}`;
 
@@ -229,6 +232,9 @@ function formatShotComparison(shot: ShotComparison): string {
   lines.push(
     `      End:   ${endStatus}detected ${shot.endFrame.detected}, expected ${shot.endFrame.expected} (${endDiffStr})${COLORS.reset}`,
   );
+  lines.push(
+    `      Orientation: ${orientationStatus}detected '${shot.orientation.detected}', expected '${shot.orientation.expected}'${shot.orientation.match ? " (match)" : ""}${COLORS.reset}`,
+  );
 
   return lines.join("\n");
 }
@@ -245,8 +251,8 @@ function formatDiff(diff: number, detected: number, expected: number): string {
  * Formats detailed failure information for a single test case.
  *
  * Shows:
- * - Orientation comparison (if mismatched)
  * - Per-shot frame comparisons with detected vs expected values
+ * - Per-shot orientation comparisons
  * - Failure reason summary
  *
  * @param result - Comparison result for a failing test case
@@ -257,18 +263,7 @@ function formatSingleFailure(result: ComparisonResult): string {
 
   lines.push(`\n  ${COLORS.red}${SYMBOLS.fail} ${result.video}${COLORS.reset}`);
 
-  // Orientation info
-  if (!result.orientation.match) {
-    lines.push(
-      `    ${COLORS.red}Orientation: detected '${result.orientation.detected}', expected '${result.orientation.expected}'${COLORS.reset}`,
-    );
-  } else {
-    lines.push(
-      `    ${COLORS.gray}Orientation: ${result.orientation.detected} (match)${COLORS.reset}`,
-    );
-  }
-
-  // Shot comparisons
+  // Shot comparisons (now includes per-shot orientation)
   if (result.shots.length > 0) {
     for (const shot of result.shots) {
       lines.push(formatShotComparison(shot));
@@ -392,6 +387,8 @@ export function saveJsonReport(
 export interface CliArgs {
   /** Specific video name to test (from --video flag) */
   readonly video?: string;
+  /** Multiple video names/patterns to test (from --videos flag, comma-separated) */
+  readonly videos?: readonly string[];
   /** Path to test data directory */
   readonly testDataDir: string;
   /** Path to output JSON report */
@@ -405,6 +402,7 @@ export interface CliArgs {
  *
  * Supports:
  * - --video <name>: Run test for a specific video only
+ * - --videos <list>: Run tests for multiple videos (comma-separated)
  * - --test-data <path>: Path to test data directory (default: test-data)
  * - --output <path>: Path for JSON report (default: test-data/test-results.json)
  * - --help: Show help message
@@ -415,6 +413,7 @@ export interface CliArgs {
 export function parseCliArgs(args: string[] = process.argv.slice(2)): CliArgs {
   const result: {
     video?: string;
+    videos?: readonly string[];
     testDataDir: string;
     outputPath: string;
     help: boolean;
@@ -429,6 +428,13 @@ export function parseCliArgs(args: string[] = process.argv.slice(2)): CliArgs {
 
     if (arg === "--video" && i + 1 < args.length) {
       result.video = args[i + 1]!;
+      i++;
+    } else if (arg === "--videos" && i + 1 < args.length) {
+      // Parse comma-separated list of video patterns
+      result.videos = args[i + 1]!
+        .split(",")
+        .map((v) => v.trim())
+        .filter((v) => v.length > 0);
       i++;
     } else if (arg === "--test-data" && i + 1 < args.length) {
       result.testDataDir = args[i + 1]!;
@@ -455,6 +461,7 @@ Usage: npx tsx src/testing/run-tests.ts [options]
 
 Options:
   --video <name>      Run test for a specific video only
+  --videos <list>     Run tests for a subset of videos (comma-separated)
   --test-data <path>  Path to test data directory (default: test-data)
   --output <path>     Path for JSON report (default: test-data/test-results.json)
   --help, -h          Show this help message
@@ -462,6 +469,7 @@ Options:
 Examples:
   npx tsx src/testing/run-tests.ts
   npx tsx src/testing/run-tests.ts --video my-video
+  npx tsx src/testing/run-tests.ts --videos "20181219,20190107"
   npx tsx src/testing/run-tests.ts --test-data ./my-tests --output ./results.json
 `;
 }

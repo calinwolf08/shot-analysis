@@ -12,10 +12,13 @@ import { z } from "zod";
  */
 export const orientationSchema = z.enum([
     "front",
-    "side-left",
-    "side-right",
     "front-left",
     "front-right",
+    "side-left",
+    "side-right",
+    "behind-left",
+    "behind-right",
+    "behind",
 ]);
 /**
  * Zod schema for TestLandmark validation.
@@ -28,12 +31,13 @@ export const testLandmarkSchema = z.object({
 });
 /**
  * Zod schema for Frame validation.
+ * Note: landmarks can be null when no pose was detected in the frame.
  */
 export const frameSchema = z.object({
     frameIndex: z.number().int().nonnegative(),
     timestamp: z.number().nonnegative(),
     poseConfidence: z.number().min(0).max(1),
-    landmarks: z.array(testLandmarkSchema),
+    landmarks: z.array(testLandmarkSchema).nullable(),
 });
 /**
  * Zod schema for PoseData validation.
@@ -54,6 +58,7 @@ export const labeledShotSchema = z.object({
     shotNumber: z.number().int().positive(),
     startFrame: z.number().int().nonnegative(),
     endFrame: z.number().int().nonnegative(),
+    cameraOrientation: orientationSchema,
 });
 /**
  * Zod schema for LabelData validation.
@@ -62,7 +67,6 @@ export const labelDataSchema = z.object({
     video: z.string().min(1),
     labeledBy: z.string(),
     labeledAt: z.string(),
-    orientation: orientationSchema,
     shots: z.array(labeledShotSchema),
 });
 // ============================================================================

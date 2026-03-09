@@ -33,16 +33,12 @@ function createPassingResult(
   return {
     video,
     status: "pass",
-    orientation: {
-      detected: "front",
-      expected: "front",
-      match: true,
-    },
     shots: [
       {
         shotNumber: 1,
         startFrame: { detected: 10, expected: 10, diff: 0, pass: true },
         endFrame: { detected: 50, expected: 50, diff: 0, pass: true },
+        orientation: { detected: "front", expected: "front", match: true },
       },
     ],
   };
@@ -57,16 +53,12 @@ function createFailingResult(
   return {
     video,
     status: "fail",
-    orientation: {
-      detected: "front",
-      expected: "front",
-      match: true,
-    },
     shots: [
       {
         shotNumber: 1,
         startFrame: { detected: 10, expected: 10, diff: 0, pass: true },
         endFrame: { detected: 60, expected: 50, diff: 10, pass: false },
+        orientation: { detected: "front", expected: "front", match: true },
       },
     ],
     failureReason: "shot 1 end: diff 10 exceeds tolerance",
@@ -74,7 +66,7 @@ function createFailingResult(
 }
 
 /**
- * Creates a failing result with orientation mismatch.
+ * Creates a failing result with orientation mismatch (per-shot).
  */
 function createOrientationMismatchResult(
   video: string = "orientation-mismatch.mp4",
@@ -82,20 +74,16 @@ function createOrientationMismatchResult(
   return {
     video,
     status: "fail",
-    orientation: {
-      detected: "side-left",
-      expected: "front",
-      match: false,
-    },
     shots: [
       {
         shotNumber: 1,
         startFrame: { detected: 10, expected: 10, diff: 0, pass: true },
         endFrame: { detected: 50, expected: 50, diff: 0, pass: true },
+        orientation: { detected: "side-left", expected: "front", match: false },
       },
     ],
     failureReason:
-      "orientation mismatch: detected 'side-left', expected 'front'",
+      "shot 1 orientation: detected 'side-left', expected 'front'",
   };
 }
 
@@ -106,11 +94,6 @@ function createNoShotsResult(video: string = "no-shots.mp4"): ComparisonResult {
   return {
     video,
     status: "fail",
-    orientation: {
-      detected: "unknown",
-      expected: "front",
-      match: false,
-    },
     shots: [],
     failureReason: "no shots detected",
   };
@@ -240,12 +223,16 @@ describe("formatFailureDetails", () => {
     expect(stripped).toContain("expected 'front'");
   });
 
-  it("shows orientation match in gray for passing orientation", () => {
+  it("shows per-shot orientation in output", () => {
     const failing = createFailingResult();
     const output = formatFailureDetails([failing]);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain("Orientation: front (match)");
+    // Per-shot orientation is now shown as: "Orientation: detected 'X', expected 'Y' (match)"
+    expect(stripped).toContain("Orientation:");
+    expect(stripped).toContain("detected 'front'");
+    expect(stripped).toContain("expected 'front'");
+    expect(stripped).toContain("(match)");
   });
 
   it("shows failure reason when no shots detected", () => {

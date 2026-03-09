@@ -184,3 +184,8 @@ export type {
   FrameLabel,
   ShotDetectionResult,
 } from "./detection/types";
+
+// Pose detector exports (browser-compatible factory)
+export type { PoseDetector } from "./pose/detector";
+export type { PoseDetectorConfig } from "./pose/factory";
+export { createPoseDetector } from "./pose/factory";

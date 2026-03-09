@@ -43,4 +43,5 @@ export { ProfileComparisonEngine, } from "./profiles/comparison";
 export { youthFundamentalsProfile, highSchoolProfile, proFormProfile, builtInProfiles, allBuiltInProfiles, getBuiltInProfile, } from "./profiles";
 // Detection types exports
 export { ShotPhase as DetectionShotPhase, SHOT_PHASES, TOTAL_SHOT_PHASES, } from "./detection/types";
+export { createPoseDetector } from "./pose/factory";
 //# sourceMappingURL=browser-entry.js.map
