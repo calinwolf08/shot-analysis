@@ -1,8 +1,8 @@
 {
-  "runAt": "2026-03-09T20:27:36.057Z",
+  "runAt": "2026-03-09T20:36:06.185Z",
   "summary": {
-    "total": 5,
-    "passed": 5,
+    "total": 6,
+    "passed": 6,
     "failed": 0
   },
   "tolerance": {
@@ -435,6 +435,112 @@
           "orientation": {
             "detected": "front",
             "expected": "front",
+            "match": true
+          }
+        }
+      ]
+    },
+    {
+      "video": "20200606_111929.mp4",
+      "status": "pass",
+      "shots": [
+        {
+          "shotNumber": 1,
+          "startFrame": {
+            "detected": 107,
+            "expected": 102,
+            "diff": 5,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 123,
+            "expected": 124,
+            "diff": 1,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-right",
+            "expected": "side-right",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 2,
+          "startFrame": {
+            "detected": 430,
+            "expected": 424,
+            "diff": 6,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 450,
+            "expected": 448,
+            "diff": 2,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-right",
+            "expected": "side-right",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 3,
+          "startFrame": {
+            "detected": 650,
+            "expected": 645,
+            "diff": 5,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 666,
+            "expected": 668,
+            "diff": 2,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-right",
+            "expected": "side-right",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 4,
+          "startFrame": {
+            "detected": 968,
+            "expected": 964,
+            "diff": 4,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 984,
+            "expected": 987,
+            "diff": 3,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "front-right",
+            "expected": "front-right",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 5,
+          "startFrame": {
+            "detected": 1291,
+            "expected": 1287,
+            "diff": 4,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 1310,
+            "expected": 1312,
+            "diff": 2,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "front-right",
+            "expected": "front-right",
             "match": true
           }
         }

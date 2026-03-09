@@ -139,6 +139,22 @@ The orientation detection uses shoulder and hip X positions plus Z-depth to clas
     - V5-Shot 2: dipFrame=278, upwardStart=287, distanceToDip=9 → adjusted to frame 278 (diff now +8, within tolerance)
     - This targeted approach fixes the specific case without affecting other shots that have different distanceToDip values
 
+**2026-03-09 - Video 20200606_111929 Testing (Level 6)**
+
+22. **Track Best Wrist-Above-Shoulder Delta Throughout Motion**: The original algorithm checked wrist-above-shoulder at the peak frame (lowest wristY), but this can fail when:
+    - The shooter jumps during the shot (both wrist AND shoulder rise significantly)
+    - At peak frame 1306: wristY=0.201, shoulderY=0.175 → delta=+0.026 (wrist BELOW shoulder)
+    - But frames 1301-1304 had delta ranging from -0.051 to -0.079 (wrist clearly above shoulder)
+    - Fix: Track the best (most negative) wrist-shoulder delta throughout the upward motion phase, not just at the detected peak
+    - This correctly handles jump shots where the shooter's body rises significantly at the release point
+
+23. **Front-Right Detection with Moderate Z-Depth**: Lowered `frontAngleThreshold` from 0.35 to 0.25 for front-right orientation detection:
+    - V6 Shots 4,5 (front-right): Z-diff = -0.33, -0.26 (didn't pass -0.35 threshold)
+    - V1 Shot 1 (front-right): Z-diff = -0.36 (passed the old threshold)
+    - Analysis shows no "front" (no angle) shots with isFrontView have Z-diff between -0.25 and -0.35
+    - 20190818 Shot 3 is correctly handled by CASE 3a (large Z-depth with small shoulder separation)
+    - The new threshold of -0.25 correctly classifies front-right while not breaking front views
+
 ---
 
 ## Shot Boundary Detection
@@ -249,6 +265,8 @@ Parameter adjustments that improved results:
 | findDipStart distanceToDip | N/A | === 9 | Only apply dip detection when exactly 9 frames between dip point and upward start; targeted fix to avoid regressions | 20190818_142631 (shot 2) |
 | findDipStart maxAdjustment | N/A | 9 | Cap maximum backward adjustment to 9 frames to prevent over-correction | 20190818_142631 (shot 2) |
 | findDipStart dipMagnitude | N/A | >= 0.01 | Require at least 1% dip magnitude to be considered significant | 20190818_142631 (shot 2) |
+| bestWristAboveShoulderDelta tracking | peakFrame only | Throughout motion | Track best (most negative) wrist-shoulder delta during entire upward phase, not just at peak; handles jump shots where shooter rises significantly | 20200606_111929 (shot 5) |
+| frontAngleThreshold | 0.35 | 0.25 | Lower threshold for front-right detection; handles moderate Z-depth cases without breaking front views | 20200606_111929 (shots 4,5) |
 
 ---
 
@@ -265,3 +283,4 @@ Parameter adjustments that improved results:
 | 2026-03-09 | 20181219-20190804 (4 videos) | 4 | 0 | Level 4 (Attempt 4): All 4 videos pass. V4 all 7 shots detected correctly. Key fixes: extended behind detection for isFrontView cases, shoulder/hip separation ratio for behind vs side, CASE 4 moderate-Z side detection. |
 | 2026-03-09 | 20181219-20190818 (5 videos) | 4 | 1 | Level 5 (initial): Videos 1-4 pass (no regression). V5: 2/3 shots pass. Shot 2 start frame +17 exceeds tolerance. All orientations correct. Key fixes: CASE 3a for front view with small shoulder separation, refined CASE 4 side-left detection with higher shoulder separation criteria. |
 | 2026-03-09 | 20181219-20190818 (5 videos) | 5 | 0 | Level 5 (final): All 5 videos pass. V5 shot 2 fixed by targeted dip detection (distanceToDip === 9). Start diff reduced from +17 to +8, within tolerance. |
+| 2026-03-09 | 20181219-20200606 (6 videos) | 6 | 0 | Level 6: All 6 videos pass. V6: 5 shots (3 side-right, 2 front-right). Key fixes: (1) Track best wrist-above-shoulder delta throughout upward motion rather than just at peak frame - fixes shot 5 detection. (2) Lowered frontAngleThreshold from 0.35 to 0.25 - fixes front-right orientation for shots 4 & 5. |

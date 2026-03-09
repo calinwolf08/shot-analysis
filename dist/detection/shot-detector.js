@@ -167,6 +167,7 @@ export class ShotBoundaryDetector {
         let gapFrames = 0; // Frames since last upward motion
         let peakFrame = -1;
         let peakY = Infinity;
+        let bestWristAboveShoulderDelta = Infinity; // Track the best (most negative) wrist-shoulder delta
         // Check if video starts mid-shot (already in upward motion)
         const startsInMotion = this.checkStartsInMotion(frameData);
         if (startsInMotion) {
@@ -217,11 +218,20 @@ export class ShotBoundaryDetector {
                         // Reset peak tracking - only track peak from the confirmed shot start onwards
                         peakY = Infinity;
                         peakFrame = -1;
+                        bestWristAboveShoulderDelta = Infinity;
                     }
                     // Track peak (lowest Y = highest position) - only after shot start is detected
                     if (shotStartFrame !== -1 && frame.avgWristY < peakY) {
                         peakY = frame.avgWristY;
                         peakFrame = i;
+                    }
+                    // Track the best wrist-shoulder delta (most negative = wrist highest above shoulder)
+                    if (shotStartFrame !== -1) {
+                        const shoulderY = (frame.leftShoulder.y + frame.rightShoulder.y) / 2;
+                        const wristShoulderDelta = frame.avgWristY - shoulderY;
+                        if (wristShoulderDelta < bestWristAboveShoulderDelta) {
+                            bestWristAboveShoulderDelta = wristShoulderDelta;
+                        }
                     }
                 }
                 else {
@@ -234,15 +244,10 @@ export class ShotBoundaryDetector {
                         // Require minimum upward frames AND minimum Y range for a valid shot
                         const minFrames = this.config.minShotDuration / 2;
                         const minYRange = 0.08; // Minimum 8% of frame height movement
-                        // Check if wrist reached above shoulder at peak
+                        // Check if wrist reached above shoulder at ANY point during the upward motion
                         // This distinguishes true shots from other arm movements
-                        const peakFrameData = frameData[peakFrame];
-                        const peakShoulderY = peakFrameData
-                            ? (peakFrameData.leftShoulder.y + peakFrameData.rightShoulder.y) /
-                                2
-                            : 0;
-                        const wristShoulderDelta = peakY - peakShoulderY;
-                        const hasWristAboveShoulder = wristShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
+                        // Use the best (most negative) delta tracked throughout the motion
+                        const hasWristAboveShoulder = bestWristAboveShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
                         if (upwardFrameCount >= minFrames &&
                             yRange >= minYRange &&
                             hasWristAboveShoulder) {
@@ -264,6 +269,7 @@ export class ShotBoundaryDetector {
                             shotStartFrame = -1;
                             peakY = Infinity;
                             peakFrame = -1;
+                            bestWristAboveShoulderDelta = Infinity;
                         }
                         upwardFrameCount = 0;
                     }
@@ -300,6 +306,7 @@ export class ShotBoundaryDetector {
                     gapFrames = 0;
                     peakFrame = -1;
                     peakY = Infinity;
+                    bestWristAboveShoulderDelta = Infinity;
                 }
             }
         }
@@ -309,13 +316,8 @@ export class ShotBoundaryDetector {
             const yRange = startY - peakY;
             const minFrames = this.config.minShotDuration / 2;
             const minYRange = 0.08;
-            // Check if wrist reached above shoulder at peak
-            const peakFrameData = frameData[peakFrame];
-            const peakShoulderY = peakFrameData
-                ? (peakFrameData.leftShoulder.y + peakFrameData.rightShoulder.y) / 2
-                : 0;
-            const wristShoulderDelta = peakY - peakShoulderY;
-            const hasWristAboveShoulder = wristShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
+            // Check if wrist reached above shoulder at ANY point during the upward motion
+            const hasWristAboveShoulder = bestWristAboveShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
             if (upwardFrameCount >= minFrames &&
                 yRange >= minYRange &&
                 hasWristAboveShoulder) {

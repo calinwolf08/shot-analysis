@@ -265,7 +265,8 @@ export function detectOrientationFromFrames(
   // Z-depth thresholds for left/right qualifier - different for front vs behind
   // Front views: lower threshold as the Z-depth is more visible in the pose
   // Behind views: higher threshold since we're seeing the back of the person
-  const frontAngleThreshold = 0.35;
+  // Lowered from 0.35 to 0.25 to handle front-right shots with moderate Z-depth (video 6 shots 4-5)
+  const frontAngleThreshold = 0.25;
   const behindAngleThreshold = 0.40;
 
   // Absolute shoulder separation for front/back vs side determination
