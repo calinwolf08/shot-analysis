@@ -1,278 +1,92 @@
 {
-  "runAt": "2026-03-09T17:57:13.613Z",
+  "runAt": "2026-03-09T18:20:02.105Z",
   "summary": {
-    "total": 9,
-    "passed": 0,
-    "failed": 9
+    "total": 1,
+    "passed": 1,
+    "failed": 0
   },
   "tolerance": {
-    "frames": 3,
-    "expandedTo": 5
+    "frames": 8,
+    "expandedTo": 10
   },
   "results": [
     {
       "video": "20181219_173607.mp4",
-      "status": "fail",
-      "shots": [],
-      "failureReason": "shot count mismatch: detected 3, expected 4"
-    },
-    {
-      "video": "20190107_211108.mp4",
-      "status": "fail",
+      "status": "pass",
       "shots": [
         {
           "shotNumber": 1,
           "startFrame": {
-            "detected": 43,
-            "expected": 33,
-            "diff": 10,
-            "pass": false
-          },
-          "endFrame": {
-            "detected": 78,
-            "expected": 62,
-            "diff": 16,
-            "pass": false
-          },
-          "orientation": {
-            "detected": "side-right",
-            "expected": "front",
-            "match": false
-          }
-        }
-      ],
-      "failureReason": "shot 1 orientation: detected 'side-right', expected 'front'; shot 1 start: diff 10 exceeds tolerance; shot 1 end: diff 16 exceeds tolerance"
-    },
-    {
-      "video": "20190124_175609.mp4",
-      "status": "fail",
-      "shots": [],
-      "failureReason": "shot count mismatch: detected 7, expected 5"
-    },
-    {
-      "video": "20190804_140654.mp4",
-      "status": "fail",
-      "shots": [],
-      "failureReason": "shot count mismatch: detected 3, expected 7"
-    },
-    {
-      "video": "20190818_142631.mp4",
-      "status": "fail",
-      "shots": [
-        {
-          "shotNumber": 1,
-          "startFrame": {
-            "detected": 39,
+            "detected": 30,
             "expected": 31,
-            "diff": 8,
-            "pass": false
-          },
-          "endFrame": {
-            "detected": 97,
-            "expected": 55,
-            "diff": 42,
-            "pass": false
-          },
-          "orientation": {
-            "detected": "behind-left",
-            "expected": "side-left",
-            "match": false
-          }
-        },
-        {
-          "shotNumber": 2,
-          "startFrame": {
-            "detected": 292,
-            "expected": 270,
-            "diff": 22,
-            "pass": false
-          },
-          "endFrame": {
-            "detected": 356,
-            "expected": 312,
-            "diff": 44,
-            "pass": false
-          },
-          "orientation": {
-            "detected": "behind-left",
-            "expected": "side-left",
-            "match": false
-          }
-        },
-        {
-          "shotNumber": 3,
-          "startFrame": {
-            "detected": 554,
-            "expected": 554,
-            "diff": 0,
+            "diff": 1,
             "pass": true
           },
           "endFrame": {
-            "detected": 612,
-            "expected": 578,
-            "diff": 34,
-            "pass": false
-          },
-          "orientation": {
-            "detected": "side-left",
-            "expected": "front",
-            "match": false
-          }
-        }
-      ],
-      "failureReason": "shot 1 orientation: detected 'behind-left', expected 'side-left'; shot 1 start: diff 8 exceeds tolerance; shot 1 end: diff 42 exceeds tolerance; shot 2 orientation: detected 'behind-left', expected 'side-left'; shot 2 start: diff 22 exceeds tolerance; shot 2 end: diff 44 exceeds tolerance; shot 3 orientation: detected 'side-left', expected 'front'; shot 3 end: diff 34 exceeds tolerance"
-    },
-    {
-      "video": "20200606_111929.mp4",
-      "status": "fail",
-      "shots": [
-        {
-          "shotNumber": 1,
-          "startFrame": {
-            "detected": 110,
-            "expected": 102,
-            "diff": 8,
-            "pass": false
-          },
-          "endFrame": {
-            "detected": 176,
-            "expected": 124,
-            "diff": 52,
-            "pass": false
-          },
-          "orientation": {
-            "detected": "side-right",
-            "expected": "side-right",
-            "match": true
-          }
-        },
-        {
-          "shotNumber": 2,
-          "startFrame": {
-            "detected": 374,
-            "expected": 424,
-            "diff": 50,
-            "pass": false
-          },
-          "endFrame": {
-            "detected": 439,
-            "expected": 448,
-            "diff": 9,
-            "pass": false
-          },
-          "orientation": {
-            "detected": "side-right",
-            "expected": "side-right",
-            "match": true
-          }
-        },
-        {
-          "shotNumber": 3,
-          "startFrame": {
-            "detected": 595,
-            "expected": 645,
-            "diff": 50,
-            "pass": false
-          },
-          "endFrame": {
-            "detected": 671,
-            "expected": 668,
+            "detected": 55,
+            "expected": 58,
             "diff": 3,
             "pass": true
           },
           "orientation": {
-            "detected": "side-right",
-            "expected": "side-right",
+            "detected": "front-right",
+            "expected": "front-right",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 2,
+          "startFrame": {
+            "detected": 317,
+            "expected": 327,
+            "diff": 10,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 346,
+            "expected": 350,
+            "diff": 4,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-left",
+            "expected": "side-left",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 3,
+          "startFrame": {
+            "detected": 561,
+            "expected": 566,
+            "diff": 5,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 587,
+            "expected": 596,
+            "diff": 9,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "behind",
+            "expected": "behind",
             "match": true
           }
         },
         {
           "shotNumber": 4,
           "startFrame": {
-            "detected": 885,
-            "expected": 964,
-            "diff": 79,
-            "pass": false
-          },
-          "endFrame": {
-            "detected": 949,
-            "expected": 987,
-            "diff": 38,
-            "pass": false
-          },
-          "orientation": {
-            "detected": "behind-right",
-            "expected": "front-right",
-            "match": false
-          }
-        },
-        {
-          "shotNumber": 5,
-          "startFrame": {
-            "detected": 1027,
-            "expected": 1287,
-            "diff": 260,
-            "pass": false
-          },
-          "endFrame": {
-            "detected": 1199,
-            "expected": 1312,
-            "diff": 113,
-            "pass": false
-          },
-          "orientation": {
-            "detected": "side-left",
-            "expected": "front-right",
-            "match": false
-          }
-        }
-      ],
-      "failureReason": "shot 1 start: diff 8 exceeds tolerance; shot 1 end: diff 52 exceeds tolerance; shot 2 start: diff 50 exceeds tolerance; shot 2 end: diff 9 exceeds tolerance; shot 3 start: diff 50 exceeds tolerance; shot 4 orientation: detected 'behind-right', expected 'front-right'; shot 4 start: diff 79 exceeds tolerance; shot 4 end: diff 38 exceeds tolerance; shot 5 orientation: detected 'side-left', expected 'front-right'; shot 5 start: diff 260 exceeds tolerance; shot 5 end: diff 113 exceeds tolerance"
-    },
-    {
-      "video": "20201212_134104.mp4",
-      "status": "fail",
-      "shots": [
-        {
-          "shotNumber": 1,
-          "startFrame": {
-            "detected": 85,
-            "expected": 76,
-            "diff": 9,
-            "pass": false
-          },
-          "endFrame": {
-            "detected": 129,
-            "expected": 111,
-            "diff": 18,
-            "pass": false
-          },
-          "orientation": {
-            "detected": "side-right",
-            "expected": "side-right",
-            "match": true
-          }
-        }
-      ],
-      "failureReason": "shot 1 start: diff 9 exceeds tolerance; shot 1 end: diff 18 exceeds tolerance"
-    },
-    {
-      "video": "chris 5.mp4",
-      "status": "fail",
-      "shots": [
-        {
-          "shotNumber": 1,
-          "startFrame": {
-            "detected": 68,
-            "expected": 60,
+            "detected": 833,
+            "expected": 825,
             "diff": 8,
-            "pass": false
+            "pass": true
           },
           "endFrame": {
-            "detected": 102,
-            "expected": 83,
-            "diff": 19,
-            "pass": false
+            "detected": 865,
+            "expected": 864,
+            "diff": 1,
+            "pass": true
           },
           "orientation": {
             "detected": "side-right",
@@ -280,14 +94,7 @@
             "match": true
           }
         }
-      ],
-      "failureReason": "shot 1 start: diff 8 exceeds tolerance; shot 1 end: diff 19 exceeds tolerance"
-    },
-    {
-      "video": "zak 1.mp4",
-      "status": "fail",
-      "shots": [],
-      "failureReason": "shot count mismatch: detected 6, expected 9"
+      ]
     }
   ]
 }

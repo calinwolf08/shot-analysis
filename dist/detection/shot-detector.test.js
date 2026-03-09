@@ -494,31 +494,26 @@ describe("ShotBoundaryDetector", () => {
         });
         it("handles very fast shots (minimal frames)", () => {
             // Quick shot with minimal frames per phase
+            // Need: 4+ upward frames with velocity exceeding threshold, Y range >= 0.08
             const fastShot = [
-                [0.65, 0.65],
-                [0.55, 0.53],
-                [0.4, 0.38],
-                [0.25, 0.23],
-                [0.12, 0.1],
-                [0.1, 0.08],
-                [0.18, 0.1],
-                [0.3, 0.22],
-                [0.45, 0.38],
-                [0.58, 0.52],
-                [0.65, 0.62],
-                [0.65, 0.65],
-                [0.65, 0.65],
-                [0.65, 0.65],
-                [0.65, 0.65],
-                [0.65, 0.65],
-                [0.65, 0.65],
+                [0.65, 0.65], // Start low (high Y = low position)
+                [0.60, 0.60], // Upward
+                [0.50, 0.50], // Upward
+                [0.40, 0.40], // Upward
+                [0.30, 0.30], // Upward
+                [0.20, 0.20], // Upward - peak
+                [0.25, 0.25], // Downward
+                [0.35, 0.35], // Downward
+                [0.45, 0.45], // Downward
+                [0.55, 0.55], // Downward
+                [0.65, 0.65], // Return
                 [0.65, 0.65],
                 [0.65, 0.65],
                 [0.65, 0.65],
             ];
             const sequence = createFrameSequenceWithWrists(fastShot);
             const detector = createShotBoundaryDetector({
-                minShotDuration: 8, // Allow shorter shots
+                minShotDuration: 6, // Allow shorter shots
             });
             const shots = detector.detectShots(sequence);
             // Should detect the fast shot

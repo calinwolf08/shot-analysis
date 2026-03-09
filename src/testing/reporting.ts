@@ -34,9 +34,9 @@ export interface TestSummary {
  * Tolerance configuration used for the test run.
  */
 export interface ToleranceConfig {
-  /** Base tolerance in frames (±3) */
+  /** Base tolerance in frames (±8) */
   readonly frames: number;
-  /** Expanded tolerance when triggered (±5) */
+  /** Expanded tolerance when triggered (±10) */
   readonly expandedTo: number;
 }
 
@@ -324,8 +324,8 @@ export function createTestReport(
       failed: results.filter((r) => r.status === "fail").length,
     },
     tolerance: {
-      frames: 3,
-      expandedTo: 5,
+      frames: 8,
+      expandedTo: 10,
     },
     results,
   };

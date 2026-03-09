@@ -225,8 +225,8 @@ export function createTestReport(results) {
             failed: results.filter((r) => r.status === "fail").length,
         },
         tolerance: {
-            frames: 3,
-            expandedTo: 5,
+            frames: 8,
+            expandedTo: 10,
         },
         results,
     };

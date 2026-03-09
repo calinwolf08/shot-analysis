@@ -97,16 +97,19 @@ export declare class ShotBoundaryDetector {
      * Detects all shot boundaries in a sequence of pose landmarks.
      *
      * @param sequence - Array of PoseLandmarks from consecutive frames
+     * @param originalFrameIndices - Optional array mapping sequence indices to original frame numbers
      * @returns Array of detected boundaries (start/end pairs)
      */
-    detectBoundaries(sequence: readonly PoseLandmarks[]): DetectedBoundary[];
+    detectBoundaries(sequence: readonly PoseLandmarks[], originalFrameIndices?: readonly number[]): DetectedBoundary[];
     /**
      * Detects shots as paired start/end boundaries.
      *
      * @param sequence - Array of PoseLandmarks from consecutive frames
+     * @param originalFrameIndices - Optional array mapping sequence indices to original frame numbers.
+     *                               Used to detect pose tracking gaps and reset shot detection.
      * @returns Array of detected shots with boundaries
      */
-    detectShots(sequence: readonly PoseLandmarks[]): DetectedShot[];
+    detectShots(sequence: readonly PoseLandmarks[], originalFrameIndices?: readonly number[]): DetectedShot[];
     /**
      * Extracts relevant landmark data from each frame.
      */
@@ -115,12 +118,20 @@ export declare class ShotBoundaryDetector {
      * Calculates wrist velocity for each frame.
      * Velocity is the change in Y position per frame.
      * Negative velocity = upward movement (lower Y value).
+     *
+     * Velocities that are too large (indicating pose dropout recovery) are clamped to 0.
      */
     private calculateVelocities;
     /**
      * Finds shot start and end boundaries based on velocity patterns.
+     * Uses gap tolerance to handle small breaks in upward motion.
      */
     private findBoundaries;
+    /**
+     * Finds the actual start of upward motion by looking backward from the current frame.
+     * Looks for the first frame where Y starts decreasing.
+     */
+    private findMotionStart;
     /**
      * Checks if the video starts in the middle of a shot motion.
      * Returns true if the first few frames show consistent upward movement.

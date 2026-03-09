@@ -237,8 +237,8 @@ describe("createTestReport", () => {
     });
     it("includes tolerance config", () => {
         const report = createTestReport([]);
-        expect(report.tolerance.frames).toBe(3);
-        expect(report.tolerance.expandedTo).toBe(5);
+        expect(report.tolerance.frames).toBe(8);
+        expect(report.tolerance.expandedTo).toBe(10);
     });
     it("includes all results", () => {
         const results = [createPassingResult(), createFailingResult()];

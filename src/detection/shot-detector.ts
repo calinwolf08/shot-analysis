@@ -63,11 +63,23 @@ export interface ShotBoundaryDetectorConfig {
 const DEFAULT_CONFIG: Required<ShotBoundaryDetectorConfig> = {
   velocityThreshold: 0.012, // Lowered from 0.015 to catch more subtle upward motion
   smoothingWindowSize: 3,
-  minShotDuration: 15, // Lowered from 20 (check becomes >= 7.5 frames instead of 10)
+  minShotDuration: 10, // Lowered from 15 (check becomes >= 5 frames)
   minUpwardFrames: 3,
   armReturnThreshold: 1.0,
   confirmationWindow: 3,
 };
+
+/**
+ * Maximum allowed gap in upward motion to still consider it continuous.
+ * Allows small dips in velocity without breaking the shot detection.
+ */
+const MAX_GAP_FRAMES = 3;
+
+/**
+ * Maximum velocity that indicates invalid data (pose dropout recovery).
+ * If velocity exceeds this, it's likely due to pose reappearing after a gap.
+ */
+const MAX_VALID_VELOCITY = 0.1;
 
 /**
  * A detected shot boundary (start or end).
@@ -101,8 +113,10 @@ export interface DetectedShot {
  * Internal tracking data for a single frame.
  */
 interface FrameData {
-  /** Frame index */
+  /** Frame index in the filtered array */
   readonly frameIndex: number;
+  /** Original frame index in the source video (may differ due to pose dropout filtering) */
+  readonly originalFrameIndex: number;
   /** Left wrist position */
   readonly leftWrist: Landmark;
   /** Right wrist position */
@@ -145,15 +159,19 @@ export class ShotBoundaryDetector {
    * Detects all shot boundaries in a sequence of pose landmarks.
    *
    * @param sequence - Array of PoseLandmarks from consecutive frames
+   * @param originalFrameIndices - Optional array mapping sequence indices to original frame numbers
    * @returns Array of detected boundaries (start/end pairs)
    */
-  detectBoundaries(sequence: readonly PoseLandmarks[]): DetectedBoundary[] {
+  detectBoundaries(
+    sequence: readonly PoseLandmarks[],
+    originalFrameIndices?: readonly number[],
+  ): DetectedBoundary[] {
     if (sequence.length < 2) {
       return [];
     }
 
     // Extract and smooth hand position data
-    const frameData = this.extractFrameData(sequence);
+    const frameData = this.extractFrameData(sequence, originalFrameIndices);
 
     // Calculate velocities
     this.calculateVelocities(frameData);
@@ -203,17 +221,25 @@ export class ShotBoundaryDetector {
    * Detects shots as paired start/end boundaries.
    *
    * @param sequence - Array of PoseLandmarks from consecutive frames
+   * @param originalFrameIndices - Optional array mapping sequence indices to original frame numbers.
+   *                               Used to detect pose tracking gaps and reset shot detection.
    * @returns Array of detected shots with boundaries
    */
-  detectShots(sequence: readonly PoseLandmarks[]): DetectedShot[] {
-    const boundaries = this.detectBoundaries(sequence);
+  detectShots(
+    sequence: readonly PoseLandmarks[],
+    originalFrameIndices?: readonly number[],
+  ): DetectedShot[] {
+    const boundaries = this.detectBoundaries(sequence, originalFrameIndices);
     return this.pairBoundaries(boundaries, sequence.length);
   }
 
   /**
    * Extracts relevant landmark data from each frame.
    */
-  private extractFrameData(sequence: readonly PoseLandmarks[]): FrameData[] {
+  private extractFrameData(
+    sequence: readonly PoseLandmarks[],
+    originalFrameIndices?: readonly number[],
+  ): FrameData[] {
     const frameData: FrameData[] = [];
 
     for (let i = 0; i < sequence.length; i++) {
@@ -223,8 +249,12 @@ export class ShotBoundaryDetector {
       const leftShoulder = landmarks[LANDMARK_INDEX.LEFT_SHOULDER]!;
       const rightShoulder = landmarks[LANDMARK_INDEX.RIGHT_SHOULDER]!;
 
+      // Use original frame index if provided, otherwise use array index
+      const originalFrameIndex = originalFrameIndices?.[i] ?? i;
+
       frameData.push({
         frameIndex: i,
+        originalFrameIndex,
         leftWrist,
         rightWrist,
         leftShoulder,
@@ -254,13 +284,23 @@ export class ShotBoundaryDetector {
    * Calculates wrist velocity for each frame.
    * Velocity is the change in Y position per frame.
    * Negative velocity = upward movement (lower Y value).
+   *
+   * Velocities that are too large (indicating pose dropout recovery) are clamped to 0.
    */
   private calculateVelocities(frameData: FrameData[]): void {
     for (let i = 1; i < frameData.length; i++) {
       const current = frameData[i]!;
       const previous = frameData[i - 1]!;
       // Negative value means Y decreased = upward movement
-      current.wristVelocity = current.avgWristY - previous.avgWristY;
+      let velocity = current.avgWristY - previous.avgWristY;
+
+      // Filter out invalid velocities from pose dropout recovery
+      // If velocity is too large, it's likely due to pose reappearing after a gap
+      if (Math.abs(velocity) > MAX_VALID_VELOCITY) {
+        velocity = 0;
+      }
+
+      current.wristVelocity = velocity;
     }
     // First frame has no velocity
     if (frameData.length > 0) {
@@ -270,6 +310,7 @@ export class ShotBoundaryDetector {
 
   /**
    * Finds shot start and end boundaries based on velocity patterns.
+   * Uses gap tolerance to handle small breaks in upward motion.
    */
   private findBoundaries(
     frameData: FrameData[],
@@ -278,7 +319,8 @@ export class ShotBoundaryDetector {
     const boundaries: DetectedBoundary[] = [];
     let inShot = false;
     let shotStartFrame = -1;
-    let consecutiveUpwardFrames = 0;
+    let upwardFrameCount = 0; // Total upward frames (not necessarily consecutive)
+    let gapFrames = 0; // Frames since last upward motion
     let peakFrame = -1;
     let peakY = Infinity;
 
@@ -286,75 +328,111 @@ export class ShotBoundaryDetector {
     const startsInMotion = this.checkStartsInMotion(frameData);
     if (startsInMotion) {
       shotStartFrame = 0;
-      consecutiveUpwardFrames = this.config.minUpwardFrames;
+      upwardFrameCount = this.config.minUpwardFrames;
     }
 
-    let debugLogCount = 0;
     for (let i = 0; i < frameData.length; i++) {
       const frame = frameData[i]!;
+      const prevFrame = i > 0 ? frameData[i - 1] : null;
       const isUpward = frame.wristVelocity < -this.config.velocityThreshold;
+
+      // Check for gap in original frames (pose tracking loss)
+      // Reset detection state and skip this frame if gap > 3
+      const MAX_ORIGINAL_FRAME_GAP = 3;
+      if (prevFrame) {
+        const originalGap = frame.originalFrameIndex - prevFrame.originalFrameIndex;
+        if (originalGap > MAX_ORIGINAL_FRAME_GAP) {
+          // Gap - reset state, this motion is discontinuous
+          if (shotStartFrame !== -1 && !inShot) {
+            console.log(
+              `[ShotDetector] Frame gap ${originalGap} at filtered ${i} (orig ${frame.originalFrameIndex}), resetting`,
+            );
+          }
+          shotStartFrame = -1;
+          upwardFrameCount = 0;
+          gapFrames = 0;
+          peakY = Infinity;
+          peakFrame = -1;
+          // Also reset shot-in-progress (can't track through gap)
+          if (inShot) {
+            // End the shot at the previous frame
+            boundaries.push({
+              type: "end",
+              frameIndex: i - 1,
+              confidence: 0.5,
+              isPartial: true,
+            });
+            inShot = false;
+          }
+          continue;
+        }
+      }
 
       if (!inShot) {
         // Looking for shot start
         if (isUpward) {
-          consecutiveUpwardFrames++;
-          if (debugLogCount < 5) {
-            console.log(
-              `[ShotDetector] Frame ${i}: upward velocity=${frame.wristVelocity.toFixed(4)}, consecutive=${consecutiveUpwardFrames}`,
-            );
-            debugLogCount++;
-          }
+          upwardFrameCount++;
+          gapFrames = 0;
+
           if (
-            consecutiveUpwardFrames >= this.config.minUpwardFrames &&
+            upwardFrameCount >= this.config.minUpwardFrames &&
             shotStartFrame === -1
           ) {
-            // Start of potential shot
-            shotStartFrame = Math.max(0, i - this.config.minUpwardFrames + 1);
+            // Start of potential shot - look back to find actual start
+            shotStartFrame = this.findMotionStart(frameData, i);
             console.log(
               `[ShotDetector] Potential shot start at frame ${shotStartFrame}`,
             );
           }
+
+          // Track peak (lowest Y = highest position)
+          if (frame.avgWristY < peakY) {
+            peakY = frame.avgWristY;
+            peakFrame = i;
+          }
         } else {
-          if (shotStartFrame !== -1) {
-            // Had a potential start but movement stopped - check if sustained
-            const duration = i - shotStartFrame;
+          gapFrames++;
+
+          // If we have a potential shot and gap is too large, evaluate
+          if (shotStartFrame !== -1 && gapFrames > MAX_GAP_FRAMES) {
+            // Calculate total motion range (Y drop from start to peak)
+            const startY = frameData[shotStartFrame]?.avgWristY ?? 0;
+            const yRange = startY - peakY;
+
+            // Require minimum upward frames AND minimum Y range for a valid shot
+            const minFrames = this.config.minShotDuration / 2;
+            const minYRange = 0.08; // Minimum 8% of frame height movement
+
             console.log(
-              `[ShotDetector] Upward motion stopped at frame ${i}, duration=${duration}, minRequired=${this.config.minShotDuration / 2}`,
+              `[ShotDetector] Gap at frame ${i}: upwardFrames=${upwardFrameCount}, yRange=${yRange.toFixed(3)}`,
             );
-            if (duration >= this.config.minShotDuration / 2) {
+
+            if (upwardFrameCount >= minFrames && yRange >= minYRange) {
               // Confirmed shot start
               inShot = true;
-              peakFrame = i;
-              peakY = frame.avgWristY;
               boundaries.push({
                 type: "start",
                 frameIndex: shotStartFrame,
                 confidence: this.calculateStartConfidence(
                   frameData,
                   shotStartFrame,
-                  i,
+                  peakFrame,
                 ),
                 isPartial: shotStartFrame === 0,
               });
               console.log(
-                `[ShotDetector] Confirmed shot start at frame ${shotStartFrame}`,
+                `[ShotDetector] Confirmed shot start at frame ${shotStartFrame} (upward=${upwardFrameCount}, yRange=${yRange.toFixed(3)})`,
               );
             } else {
-              // Too short, reset (pump fake filter)
+              // Too short or not enough movement, reset
               console.log(
-                `[ShotDetector] Rejected as pump fake (duration ${duration} < ${this.config.minShotDuration / 2})`,
+                `[ShotDetector] Rejected as pump fake (upward=${upwardFrameCount} < ${minFrames} or yRange=${yRange.toFixed(3)} < ${minYRange})`,
               );
               shotStartFrame = -1;
+              peakY = Infinity;
+              peakFrame = -1;
             }
-          }
-          consecutiveUpwardFrames = 0;
-        }
-
-        // Track peak position for shots in progress
-        if (inShot === false && shotStartFrame !== -1) {
-          if (frame.avgWristY < peakY) {
-            peakY = frame.avgWristY;
-            peakFrame = i;
+            upwardFrameCount = 0;
           }
         }
       } else {
@@ -364,33 +442,46 @@ export class ShotBoundaryDetector {
           peakFrame = i;
         }
 
-        // Check for shot end: arm returning down
-        const shoulderY = (frame.leftShoulder.y + frame.rightShoulder.y) / 2;
-        const wristBelowShoulder =
-          frame.avgWristY > shoulderY * this.config.armReturnThreshold;
-        const significantDrop = frame.avgWristY > peakY + 0.1;
+        // Shot end detection: look for sustained downward movement after peak
+        // The shot ends when the arm starts returning (ball release point)
+        const dropFromPeak = frame.avgWristY - peakY;
+        const framesSincePeak = i - peakFrame;
 
-        if (wristBelowShoulder && significantDrop) {
-          // Shot ended
+        // Two conditions for shot end:
+        // 1. Moderate drop (0.04) + time since peak (5+ frames) - for quick releases
+        // 2. Larger drop (0.08) - for any release
+        const moderateDrop = dropFromPeak >= 0.04 && framesSincePeak >= 5;
+        const significantDrop = dropFromPeak >= 0.08;
+
+        if (moderateDrop || significantDrop) {
+          // Shot ended - use peak frame + small buffer as the end frame
+          // The labeled end is typically a few frames after the peak
+          const endFrameIndex = Math.min(peakFrame + 3, i);
+
           boundaries.push({
             type: "end",
-            frameIndex: i,
-            confidence: this.calculateEndConfidence(frameData, peakFrame, i),
+            frameIndex: endFrameIndex,
+            confidence: this.calculateEndConfidence(frameData, peakFrame, endFrameIndex),
             isPartial: false,
           });
           inShot = false;
           shotStartFrame = -1;
-          consecutiveUpwardFrames = 0;
+          upwardFrameCount = 0;
+          gapFrames = 0;
           peakFrame = -1;
           peakY = Infinity;
         }
       }
     }
 
-    // Handle shot in progress (still rising) at end of sequence
+    // Handle shot in progress at end of sequence
     if (shotStartFrame !== -1 && !inShot) {
-      const duration = frameData.length - shotStartFrame;
-      if (duration >= this.config.minShotDuration / 2) {
+      const startY = frameData[shotStartFrame]?.avgWristY ?? 0;
+      const yRange = startY - peakY;
+      const minFrames = this.config.minShotDuration / 2;
+      const minYRange = 0.08;
+
+      if (upwardFrameCount >= minFrames && yRange >= minYRange) {
         boundaries.push({
           type: "start",
           frameIndex: shotStartFrame,
@@ -401,7 +492,6 @@ export class ShotBoundaryDetector {
           ),
           isPartial: shotStartFrame === 0,
         });
-        // Mark end as partial
         boundaries.push({
           type: "end",
           frameIndex: totalFrames - 1,
@@ -422,6 +512,32 @@ export class ShotBoundaryDetector {
     }
 
     return boundaries;
+  }
+
+  /**
+   * Finds the actual start of upward motion by looking backward from the current frame.
+   * Looks for the first frame where Y starts decreasing.
+   */
+  private findMotionStart(frameData: FrameData[], currentFrame: number): number {
+    // Look back up to 10 frames to find where the motion truly started
+    const lookback = 10;
+    let startFrame = currentFrame;
+
+    for (let i = currentFrame - 1; i >= Math.max(0, currentFrame - lookback); i--) {
+      const frame = frameData[i];
+      const nextFrame = frameData[i + 1];
+      if (!frame || !nextFrame) break;
+
+      // If velocity was still negative (upward), keep looking back
+      if (nextFrame.wristVelocity < 0) {
+        startFrame = i;
+      } else {
+        // Found where upward motion started
+        break;
+      }
+    }
+
+    return startFrame;
   }
 
   /**

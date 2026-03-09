@@ -81,13 +81,23 @@ export interface ComparisonResult {
     readonly failureReason?: string;
 }
 /**
+ * Result of adapting pose data, including frame index mapping.
+ */
+export interface AdaptedPoseData {
+    /** Array of PoseLandmarks for valid frames */
+    readonly landmarks: readonly PoseLandmarks[];
+    /** Maps filtered array index to original frame index */
+    readonly indexToFrame: readonly number[];
+}
+/**
  * Converts PoseData frames to an array of PoseLandmarks for the shot detector.
  * Frames with null landmarks are filtered out.
+ * Returns both the landmarks array and a mapping from array indices to original frame numbers.
  *
  * @param poseData - Pose data loaded from test case
- * @returns Array of PoseLandmarks suitable for shot detection (null frames filtered)
+ * @returns Adapted pose data with landmarks and frame index mapping
  */
-export declare function adaptPoseDataToDetector(poseData: PoseData): readonly PoseLandmarks[];
+export declare function adaptPoseDataToDetector(poseData: PoseData): AdaptedPoseData;
 /**
  * Detects camera orientation from hip-shoulder alignment for a range of frames.
  *

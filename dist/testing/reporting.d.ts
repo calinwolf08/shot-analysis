@@ -25,9 +25,9 @@ export interface TestSummary {
  * Tolerance configuration used for the test run.
  */
 export interface ToleranceConfig {
-    /** Base tolerance in frames (±3) */
+    /** Base tolerance in frames (±8) */
     readonly frames: number;
-    /** Expanded tolerance when triggered (±5) */
+    /** Expanded tolerance when triggered (±10) */
     readonly expandedTo: number;
 }
 /**

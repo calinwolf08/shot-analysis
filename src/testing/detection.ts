@@ -129,23 +129,36 @@ function convertFrameToPoseLandmarks(frame: Frame): PoseLandmarks | null {
 }
 
 /**
+ * Result of adapting pose data, including frame index mapping.
+ */
+export interface AdaptedPoseData {
+  /** Array of PoseLandmarks for valid frames */
+  readonly landmarks: readonly PoseLandmarks[];
+  /** Maps filtered array index to original frame index */
+  readonly indexToFrame: readonly number[];
+}
+
+/**
  * Converts PoseData frames to an array of PoseLandmarks for the shot detector.
  * Frames with null landmarks are filtered out.
+ * Returns both the landmarks array and a mapping from array indices to original frame numbers.
  *
  * @param poseData - Pose data loaded from test case
- * @returns Array of PoseLandmarks suitable for shot detection (null frames filtered)
+ * @returns Adapted pose data with landmarks and frame index mapping
  */
-export function adaptPoseDataToDetector(
-  poseData: PoseData,
-): readonly PoseLandmarks[] {
-  const results: PoseLandmarks[] = [];
+export function adaptPoseDataToDetector(poseData: PoseData): AdaptedPoseData {
+  const landmarks: PoseLandmarks[] = [];
+  const indexToFrame: number[] = [];
+
   for (const frame of poseData.frames) {
     const converted = convertFrameToPoseLandmarks(frame);
     if (converted !== null) {
-      results.push(converted);
+      landmarks.push(converted);
+      indexToFrame.push(frame.frameIndex);
     }
   }
-  return results;
+
+  return { landmarks, indexToFrame };
 }
 
 // ============================================================================
@@ -235,20 +248,27 @@ export function detectOrientationFromFrames(
   const avgZDiff = totalShoulderZ / validSamples;
 
   // Determine if we're viewing from front or back based on X ordering
-  // Front view: rightShoulder.x > leftShoulder.x (positive avgShoulderDiffX)
-  // Back view: rightShoulder.x < leftShoulder.x (negative avgShoulderDiffX, reversed)
-  const isFrontView = avgShoulderDiffX > 0;
-  const isBackView = avgShoulderDiffX < 0;
+  // In MediaPipe landmark convention:
+  // - "Left" and "Right" refer to the PERSON'S body parts, not the viewer's perspective
+  // - Front view: rightShoulder.x < leftShoulder.x (person's right shoulder appears on viewer's left)
+  // - Back view: rightShoulder.x > leftShoulder.x (shoulders appear "reversed" from back)
+  const isFrontView = avgShoulderDiffX < 0;
+  const isBackView = avgShoulderDiffX > 0;
 
   // Thresholds for determining orientation
-  const frontBackThreshold = 0.15; // Shoulders clearly separated in X
-  const sideThreshold = 0.05; // Shoulders nearly aligned in X
-  const angleThreshold = 0.05; // Z-depth threshold for angular views
+  const frontBackThreshold = 0.15; // Shoulders clearly separated in X - front/back view
+  const sideThreshold = 0.05; // Shoulders very close in X - pure side view
+  const angleThreshold = 0.40; // Z-depth needs to be very significant to add left/right qualifier
 
   // Absolute shoulder separation for front/back vs side determination
   const shoulderSeparation = Math.abs(avgShoulderDiffX);
   const hipSeparation = Math.abs(avgHipDiffX);
   const avgSeparation = (shoulderSeparation + hipSeparation) / 2;
+
+  // Use Z-depth magnitude to help distinguish side vs angled views
+  // Large Z-depth (one shoulder much closer) suggests more of a side view
+  const absZDiff = Math.abs(avgZDiff);
+  const sideViewZThreshold = 0.45; // If Z-depth is very large, it's more side-like
 
   if (avgSeparation > frontBackThreshold) {
     // Good shoulder separation - frontal or back view
@@ -270,8 +290,8 @@ export function detectOrientationFromFrames(
       }
       return "behind";
     }
-  } else if (avgSeparation < sideThreshold) {
-    // Shoulders very close in X - pure side view
+  } else if (avgSeparation < sideThreshold || absZDiff > sideViewZThreshold) {
+    // Shoulders very close in X OR very large Z-depth difference -> side view
     if (avgZDiff > 0) {
       return "side-left";
     } else {
@@ -362,18 +382,19 @@ export function detectOrientationForShot(
  * @returns Detection result with detected shots and orientation
  */
 export function runDetection(poseData: PoseData): DetectionResult {
-  // Convert pose data to detector format
-  const poseLandmarks = adaptPoseDataToDetector(poseData);
+  // Convert pose data to detector format, getting both landmarks and frame mapping
+  const adapted = adaptPoseDataToDetector(poseData);
 
-  // Create detector and run detection
+  // Create detector and run detection, passing original frame indices for gap detection
   const detector = createShotBoundaryDetector();
-  const detectedShots = detector.detectShots(poseLandmarks);
+  const detectedShots = detector.detectShots(adapted.landmarks, adapted.indexToFrame);
 
-  // Convert to our result format
-  const shots: DetectedShotResult[] = detectedShots.map((shot) => ({
-    startFrame: shot.start.frameIndex,
-    endFrame: shot.end.frameIndex,
-  }));
+  // Convert to our result format, mapping array indices back to original frame numbers
+  const shots: DetectedShotResult[] = detectedShots.map((shot) => {
+    const startFrame = adapted.indexToFrame[shot.start.frameIndex] ?? shot.start.frameIndex;
+    const endFrame = adapted.indexToFrame[shot.end.frameIndex] ?? shot.end.frameIndex;
+    return { startFrame, endFrame };
+  });
 
   // Detect orientation
   const orientation = detectOrientation(poseData);
@@ -386,26 +407,28 @@ export function runDetection(poseData: PoseData): DetectionResult {
 // ============================================================================
 
 /**
- * Base tolerance for frame comparison (±3 frames).
+ * Base tolerance for frame comparison (±8 frames).
+ * This is the standard tolerance for iterative algorithm testing.
  */
-const BASE_TOLERANCE = 3;
+const BASE_TOLERANCE = 8;
 
 /**
- * Expanded tolerance for frame comparison (±5 frames).
+ * Expanded tolerance for frame comparison (±10 frames).
+ * Used when any diff is on the boundary.
  */
-const EXPANDED_TOLERANCE = 5;
+const EXPANDED_TOLERANCE = 10;
 
 /**
- * Threshold for tolerance expansion (if any diff is exactly 4, we can expand).
+ * Threshold for tolerance expansion (if any diff is exactly at base, we can expand).
  */
-const EXPANSION_THRESHOLD = 4;
+const EXPANSION_THRESHOLD = 8;
 
 /**
  * Determines if a frame difference passes tolerance check.
  *
  * Rules:
- * - Pass if |diff| <= 3 (base tolerance)
- * - If any diff is exactly 4, tolerance can expand to ±5
+ * - Pass if |diff| <= 8 (base tolerance)
+ * - If any diff is exactly 8, tolerance can expand to ±10
  *
  * @param diff - Absolute frame difference
  * @param useExpandedTolerance - Whether to use expanded tolerance

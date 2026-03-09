@@ -178,9 +178,9 @@ describe("adaptPoseDataToDetector", () => {
 
     const result = adaptPoseDataToDetector(poseData);
 
-    expect(result).toHaveLength(2);
-    expect(result[0]!.landmarks).toHaveLength(33);
-    expect(result[0]!.poseConfidence).toBe(0.95);
+    expect(result.landmarks).toHaveLength(2);
+    expect(result.landmarks[0]!.landmarks).toHaveLength(33);
+    expect(result.landmarks[0]!.poseConfidence).toBe(0.95);
   });
 
   it("adds confidence property to landmarks", () => {
@@ -190,7 +190,7 @@ describe("adaptPoseDataToDetector", () => {
     const result = adaptPoseDataToDetector(poseData);
 
     // Test landmarks now have confidence (same as visibility)
-    const landmark = result[0]!.landmarks[0]!;
+    const landmark = result.landmarks[0]!.landmarks[0]!;
     expect(landmark).toHaveProperty("confidence");
     expect(landmark.confidence).toBe(landmark.visibility);
   });
@@ -198,7 +198,21 @@ describe("adaptPoseDataToDetector", () => {
   it("handles empty frames array", () => {
     const poseData = createPoseData([]);
     const result = adaptPoseDataToDetector(poseData);
-    expect(result).toHaveLength(0);
+    expect(result.landmarks).toHaveLength(0);
+  });
+
+  it("provides correct indexToFrame mapping", () => {
+    const frames = [
+      createFrameWithWrists(0, 0.5, 0.5),
+      createFrameWithWrists(1, 0.45, 0.45),
+    ];
+    const poseData = createPoseData(frames);
+
+    const result = adaptPoseDataToDetector(poseData);
+
+    expect(result.indexToFrame).toHaveLength(2);
+    expect(result.indexToFrame[0]).toBe(0);
+    expect(result.indexToFrame[1]).toBe(1);
   });
 });
 
@@ -214,6 +228,8 @@ describe("detectOrientation", () => {
 
   it("can detect orientation with minimal frames", () => {
     // With the updated algorithm, even 2 frames may be enough if they have valid landmarks
+    // Note: default createFrameWithWrists uses leftShoulderX=0.35, rightShoulderX=0.65
+    // which is rightShoulder.x > leftShoulder.x -> "behind" view in MediaPipe convention
     const frames = [
       createFrameWithWrists(0, 0.5, 0.5),
       createFrameWithWrists(1, 0.5, 0.5),
@@ -221,21 +237,23 @@ describe("detectOrientation", () => {
     const poseData = createPoseData(frames);
     const orientation = detectOrientation(poseData);
     // With clear shoulder separation in createFrameWithWrists, we can detect orientation
-    expect(["front", "front-left", "front-right", "unknown"]).toContain(
+    expect(["behind", "behind-left", "behind-right", "unknown"]).toContain(
       orientation,
     );
   });
 
   it("detects 'front' orientation with clear shoulder separation", () => {
-    // Create frames with shoulders clearly separated (left at 0.3, right at 0.7)
+    // Create frames with shoulders clearly separated for FRONT view
+    // MediaPipe convention: "left"/"right" refer to PERSON's body parts
+    // Front view: rightShoulder.x < leftShoulder.x (person's right appears on viewer's left)
     const frames: Frame[] = [];
     for (let i = 0; i < 30; i++) {
       frames.push(
         createFrameWithWrists(i, 0.5, 0.5, {
-          leftShoulderX: 0.3,
-          rightShoulderX: 0.7,
-          leftHipX: 0.35,
-          rightHipX: 0.65,
+          leftShoulderX: 0.7, // Person's left shoulder on viewer's right
+          rightShoulderX: 0.3, // Person's right shoulder on viewer's left
+          leftHipX: 0.65,
+          rightHipX: 0.35,
         }),
       );
     }
@@ -286,81 +304,104 @@ describe("detectOrientation", () => {
 // ============================================================================
 
 describe("compareResults - tolerance logic", () => {
-  it("passes with diff <= 3 (base tolerance)", () => {
+  // Front view requires leftShoulderX > rightShoulderX (person's right appears on viewer's left)
+  const frontShoulderOptions = {
+    leftShoulderX: 0.65,
+    rightShoulderX: 0.35,
+    leftHipX: 0.6,
+    rightHipX: 0.4,
+  };
+
+  it("passes with diff <= 8 (base tolerance)", () => {
     const detection: DetectionResult = {
       shots: [{ startFrame: 10, endFrame: 50 }],
       orientation: "front",
     };
-    const labels = createLabelData([{ startFrame: 12, endFrame: 48 }], "front");
-    const poseData = createMinimalPoseData([{ startFrame: 10, endFrame: 50 }]);
+    const labels = createLabelData([{ startFrame: 15, endFrame: 45 }], "front");
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 10, endFrame: 50 }],
+      frontShoulderOptions,
+    );
 
     const result = compareResults(detection, labels, poseData);
 
     expect(result.status).toBe("pass");
-    expect(result.shots[0]!.startFrame.diff).toBe(2);
-    expect(result.shots[0]!.endFrame.diff).toBe(2);
+    expect(result.shots[0]!.startFrame.diff).toBe(5);
+    expect(result.shots[0]!.endFrame.diff).toBe(5);
   });
 
-  it("fails with diff > 5 even with expansion", () => {
+  it("fails with diff > 10 even with expansion", () => {
     const detection: DetectionResult = {
       shots: [{ startFrame: 10, endFrame: 50 }],
       orientation: "front",
     };
-    const labels = createLabelData([{ startFrame: 10, endFrame: 57 }], "front");
-    const poseData = createMinimalPoseData([{ startFrame: 10, endFrame: 57 }]);
+    const labels = createLabelData([{ startFrame: 10, endFrame: 62 }], "front");
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 10, endFrame: 62 }],
+      frontShoulderOptions,
+    );
 
     const result = compareResults(detection, labels, poseData);
 
     expect(result.status).toBe("fail");
-    expect(result.shots[0]!.endFrame.diff).toBe(7);
+    expect(result.shots[0]!.endFrame.diff).toBe(12);
     expect(result.shots[0]!.endFrame.pass).toBe(false);
   });
 
-  it("expands tolerance when diff is exactly 4", () => {
-    // Diff of 4 should trigger expansion to ±5
+  it("expands tolerance when diff is exactly 8", () => {
+    // Diff of 8 should trigger expansion to ±10
     const detection: DetectionResult = {
-      shots: [{ startFrame: 10, endFrame: 54 }],
+      shots: [{ startFrame: 10, endFrame: 58 }],
       orientation: "front",
     };
     const labels = createLabelData([{ startFrame: 10, endFrame: 50 }], "front");
-    const poseData = createMinimalPoseData([{ startFrame: 10, endFrame: 54 }]);
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 10, endFrame: 58 }],
+      frontShoulderOptions,
+    );
 
     const result = compareResults(detection, labels, poseData);
 
     expect(result.status).toBe("pass");
-    expect(result.shots[0]!.endFrame.diff).toBe(4);
+    expect(result.shots[0]!.endFrame.diff).toBe(8);
     expect(result.shots[0]!.endFrame.pass).toBe(true);
   });
 
-  it("passes with diff of 5 when tolerance is expanded", () => {
-    // Diff of 4 triggers expansion, then diff of 5 should pass
+  it("passes with diff of 10 when tolerance is expanded", () => {
+    // Diff of 8 triggers expansion, then diff of 10 should pass
     const detection: DetectionResult = {
-      shots: [{ startFrame: 14, endFrame: 55 }], // start diff = 4, end diff = 5
+      shots: [{ startFrame: 18, endFrame: 60 }], // start diff = 8, end diff = 10
       orientation: "front",
     };
     const labels = createLabelData([{ startFrame: 10, endFrame: 50 }], "front");
-    const poseData = createMinimalPoseData([{ startFrame: 14, endFrame: 55 }]);
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 18, endFrame: 60 }],
+      frontShoulderOptions,
+    );
 
     const result = compareResults(detection, labels, poseData);
 
     expect(result.status).toBe("pass");
-    expect(result.shots[0]!.startFrame.diff).toBe(4);
-    expect(result.shots[0]!.endFrame.diff).toBe(5);
+    expect(result.shots[0]!.startFrame.diff).toBe(8);
+    expect(result.shots[0]!.endFrame.diff).toBe(10);
   });
 
-  it("does not expand tolerance if no diff is exactly 4", () => {
-    // Diff of 5 without a 4 should fail
+  it("does not expand tolerance if no diff is exactly 8", () => {
+    // Diff of 9 without an 8 should fail
     const detection: DetectionResult = {
-      shots: [{ startFrame: 10, endFrame: 55 }],
+      shots: [{ startFrame: 10, endFrame: 59 }],
       orientation: "front",
     };
     const labels = createLabelData([{ startFrame: 10, endFrame: 50 }], "front");
-    const poseData = createMinimalPoseData([{ startFrame: 10, endFrame: 55 }]);
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 10, endFrame: 59 }],
+      frontShoulderOptions,
+    );
 
     const result = compareResults(detection, labels, poseData);
 
     expect(result.status).toBe("fail");
-    expect(result.shots[0]!.endFrame.diff).toBe(5);
+    expect(result.shots[0]!.endFrame.diff).toBe(9);
     expect(result.shots[0]!.endFrame.pass).toBe(false);
   });
 });
@@ -433,6 +474,14 @@ describe("compareResults - shot count mismatch", () => {
 // ============================================================================
 
 describe("compareResults - per-shot orientation", () => {
+  // Front view requires leftShoulderX > rightShoulderX (person's right appears on viewer's left)
+  const frontShoulderOptions = {
+    leftShoulderX: 0.65,
+    rightShoulderX: 0.35,
+    leftHipX: 0.6,
+    rightHipX: 0.4,
+  };
+
   it("fails when shot orientation does not match", () => {
     const detection: DetectionResult = {
       shots: [{ startFrame: 10, endFrame: 50 }],
@@ -443,7 +492,10 @@ describe("compareResults - per-shot orientation", () => {
       "side-left",
     );
     // Create pose data with front orientation (will mismatch side-left label)
-    const poseData = createMinimalPoseData([{ startFrame: 10, endFrame: 50 }]);
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 10, endFrame: 50 }],
+      frontShoulderOptions,
+    );
 
     const result = compareResults(detection, labels, poseData);
 
@@ -462,7 +514,10 @@ describe("compareResults - per-shot orientation", () => {
       [{ startFrame: 10, endFrame: 50, cameraOrientation: "front" }],
       "front",
     );
-    const poseData = createMinimalPoseData([{ startFrame: 10, endFrame: 50 }]);
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 10, endFrame: 50 }],
+      frontShoulderOptions,
+    );
 
     const result = compareResults(detection, labels, poseData);
 
@@ -479,7 +534,10 @@ describe("compareResults - per-shot orientation", () => {
       [{ startFrame: 10, endFrame: 50, cameraOrientation: "front" }],
       "front",
     );
-    const poseData = createMinimalPoseData([{ startFrame: 10, endFrame: 50 }]);
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 10, endFrame: 50 }],
+      frontShoulderOptions,
+    );
 
     const result = compareResults(detection, labels, poseData);
 
@@ -495,6 +553,14 @@ describe("compareResults - per-shot orientation", () => {
 // ============================================================================
 
 describe("compareResults - multiple shots", () => {
+  // Front view requires leftShoulderX > rightShoulderX (person's right appears on viewer's left)
+  const frontShoulderOptions = {
+    leftShoulderX: 0.65,
+    rightShoulderX: 0.35,
+    leftHipX: 0.6,
+    rightHipX: 0.4,
+  };
+
   it("passes when all shots are within tolerance", () => {
     const detection: DetectionResult = {
       shots: [
@@ -510,10 +576,13 @@ describe("compareResults - multiple shots", () => {
       ],
       "front",
     );
-    const poseData = createMinimalPoseData([
-      { startFrame: 11, endFrame: 48 },
-      { startFrame: 61, endFrame: 99 },
-    ]);
+    const poseData = createMinimalPoseData(
+      [
+        { startFrame: 11, endFrame: 48 },
+        { startFrame: 61, endFrame: 99 },
+      ],
+      frontShoulderOptions,
+    );
 
     const result = compareResults(detection, labels, poseData);
 
@@ -540,10 +609,13 @@ describe("compareResults - multiple shots", () => {
       ],
       "front",
     );
-    const poseData = createMinimalPoseData([
-      { startFrame: 10, endFrame: 50 },
-      { startFrame: 60, endFrame: 110 },
-    ]);
+    const poseData = createMinimalPoseData(
+      [
+        { startFrame: 10, endFrame: 50 },
+        { startFrame: 60, endFrame: 110 },
+      ],
+      frontShoulderOptions,
+    );
 
     const result = compareResults(detection, labels, poseData);
 
