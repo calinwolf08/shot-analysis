@@ -196,6 +196,7 @@ export function detectOrientationFromFrames(
   let totalShoulderDiffX = 0;
   let totalHipDiffX = 0;
   let totalShoulderZ = 0;
+  let totalHipZ = 0;
   let validSamples = 0;
 
   for (const frame of frames) {
@@ -235,6 +236,7 @@ export function detectOrientationFromFrames(
     // Positive = right shoulder farther from camera (left side closer)
     // Negative = left shoulder farther from camera (right side closer)
     totalShoulderZ += rightShoulder.z - leftShoulder.z;
+    totalHipZ += rightHip.z - leftHip.z;
 
     validSamples++;
   }
@@ -246,6 +248,7 @@ export function detectOrientationFromFrames(
   const avgShoulderDiffX = totalShoulderDiffX / validSamples;
   const avgHipDiffX = totalHipDiffX / validSamples;
   const avgZDiff = totalShoulderZ / validSamples;
+  const avgHipZDiff = totalHipZ / validSamples;
 
   // Determine if we're viewing from front or back based on X ordering
   // In MediaPipe landmark convention:
@@ -320,7 +323,32 @@ export function detectOrientationFromFrames(
       // Front view - no left/right qualifier despite large Z-depth
       return "front";
     }
-    // Otherwise, large Z-depth with moderate separation = side view
+
+    // Use shoulder/hip Z ratio to distinguish front-left from side-left
+    // When ratio is low (< 1.7), hips follow shoulders → true camera angle offset → front-left
+    // When ratio is high (> 1.7), only shoulders rotated → shooting motion → side view
+    const absHipZDiff = Math.abs(avgHipZDiff);
+    const shoulderHipZRatio =
+      absHipZDiff > 0.1 ? absZDiff / absHipZDiff : 999; // Avoid division by very small numbers
+
+    // If shoulder separation is moderate AND shoulder/hip Z ratio is low,
+    // this indicates both shoulders AND hips show similar angle offset
+    // → true camera angle (front-left/front-right)
+    const frontLeftShoulderThreshold = 0.08;
+    const maxZRatioForFrontLeft = 1.7; // Lower ratio = hips follow shoulders = camera angle
+
+    if (
+      isFrontView &&
+      shoulderSeparation > frontLeftShoulderThreshold &&
+      shoulderHipZRatio < maxZRatioForFrontLeft
+    ) {
+      if (avgZDiff > 0) {
+        return "front-left";
+      } else {
+        return "front-right";
+      }
+    }
+    // Otherwise, large Z-depth with high ratio = side view (shoulder rotation from shooting)
     if (avgZDiff > 0) {
       return "side-left";
     } else {

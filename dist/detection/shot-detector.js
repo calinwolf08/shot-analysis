@@ -30,6 +30,14 @@ const DEFAULT_CONFIG = {
  */
 const MAX_GAP_FRAMES = 3;
 /**
+ * How far above the shoulder (in Y units) the wrist must reach at peak.
+ * Negative means wrist is above shoulder (lower Y = higher position).
+ * -0.05 means wrist must be at least 5% of frame height above shoulder.
+ * Using -0.049 to account for floating point precision issues (e.g., smoothed
+ * values like 0.75/3 - 0.30 = -0.04999999999999999 should pass the threshold).
+ */
+const MIN_WRIST_ABOVE_SHOULDER_DELTA = -0.049;
+/**
  * Maximum velocity that indicates invalid data (pose dropout recovery).
  * If velocity exceeds this, it's likely due to pose reappearing after a gap.
  */
@@ -226,10 +234,13 @@ export class ShotBoundaryDetector {
                         shotStartFrame === -1) {
                         // Start of potential shot - look back to find actual start
                         shotStartFrame = this.findMotionStart(frameData, i);
+                        // Reset peak tracking - only track peak from the confirmed shot start onwards
+                        peakY = Infinity;
+                        peakFrame = -1;
                         console.log(`[ShotDetector] Potential shot start at frame ${shotStartFrame}`);
                     }
-                    // Track peak (lowest Y = highest position)
-                    if (frame.avgWristY < peakY) {
+                    // Track peak (lowest Y = highest position) - only after shot start is detected
+                    if (shotStartFrame !== -1 && frame.avgWristY < peakY) {
                         peakY = frame.avgWristY;
                         peakFrame = i;
                     }
@@ -244,8 +255,19 @@ export class ShotBoundaryDetector {
                         // Require minimum upward frames AND minimum Y range for a valid shot
                         const minFrames = this.config.minShotDuration / 2;
                         const minYRange = 0.08; // Minimum 8% of frame height movement
-                        console.log(`[ShotDetector] Gap at frame ${i}: upwardFrames=${upwardFrameCount}, yRange=${yRange.toFixed(3)}`);
-                        if (upwardFrameCount >= minFrames && yRange >= minYRange) {
+                        // Check if wrist reached above shoulder at peak
+                        // This distinguishes true shots from other arm movements
+                        const peakFrameData = frameData[peakFrame];
+                        const peakShoulderY = peakFrameData
+                            ? (peakFrameData.leftShoulder.y + peakFrameData.rightShoulder.y) /
+                                2
+                            : 0;
+                        const wristShoulderDelta = peakY - peakShoulderY;
+                        const hasWristAboveShoulder = wristShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
+                        console.log(`[ShotDetector] Gap at frame ${i}: upwardFrames=${upwardFrameCount}, yRange=${yRange.toFixed(3)}, wristShoulderDelta=${wristShoulderDelta.toFixed(3)}`);
+                        if (upwardFrameCount >= minFrames &&
+                            yRange >= minYRange &&
+                            hasWristAboveShoulder) {
                             // Confirmed shot start
                             inShot = true;
                             boundaries.push({
@@ -254,11 +276,11 @@ export class ShotBoundaryDetector {
                                 confidence: this.calculateStartConfidence(frameData, shotStartFrame, peakFrame),
                                 isPartial: shotStartFrame === 0,
                             });
-                            console.log(`[ShotDetector] Confirmed shot start at frame ${shotStartFrame} (upward=${upwardFrameCount}, yRange=${yRange.toFixed(3)})`);
+                            console.log(`[ShotDetector] Confirmed shot start at frame ${shotStartFrame} (upward=${upwardFrameCount}, yRange=${yRange.toFixed(3)}, wristShoulderDelta=${wristShoulderDelta.toFixed(3)})`);
                         }
                         else {
                             // Too short or not enough movement, reset
-                            console.log(`[ShotDetector] Rejected as pump fake (upward=${upwardFrameCount} < ${minFrames} or yRange=${yRange.toFixed(3)} < ${minYRange})`);
+                            console.log(`[ShotDetector] Rejected as pump fake (upward=${upwardFrameCount} < ${minFrames} or yRange=${yRange.toFixed(3)} < ${minYRange} or wristShoulderDelta=${wristShoulderDelta.toFixed(3)} > ${MIN_WRIST_ABOVE_SHOULDER_DELTA})`);
                             shotStartFrame = -1;
                             peakY = Infinity;
                             peakFrame = -1;
@@ -307,7 +329,16 @@ export class ShotBoundaryDetector {
             const yRange = startY - peakY;
             const minFrames = this.config.minShotDuration / 2;
             const minYRange = 0.08;
-            if (upwardFrameCount >= minFrames && yRange >= minYRange) {
+            // Check if wrist reached above shoulder at peak
+            const peakFrameData = frameData[peakFrame];
+            const peakShoulderY = peakFrameData
+                ? (peakFrameData.leftShoulder.y + peakFrameData.rightShoulder.y) / 2
+                : 0;
+            const wristShoulderDelta = peakY - peakShoulderY;
+            const hasWristAboveShoulder = wristShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
+            if (upwardFrameCount >= minFrames &&
+                yRange >= minYRange &&
+                hasWristAboveShoulder) {
                 boundaries.push({
                     type: "start",
                     frameIndex: shotStartFrame,
@@ -338,8 +369,9 @@ export class ShotBoundaryDetector {
      * Looks for the first frame where Y starts decreasing.
      */
     findMotionStart(frameData, currentFrame) {
-        // Look back up to 10 frames to find where the motion truly started
-        const lookback = 10;
+        // Look back up to 7 frames to find where the motion truly started
+        // (Reduced from 10 to better align with labeled shot starts)
+        const lookback = 7;
         let startFrame = currentFrame;
         for (let i = currentFrame - 1; i >= Math.max(0, currentFrame - lookback); i--) {
             const frame = frameData[i];

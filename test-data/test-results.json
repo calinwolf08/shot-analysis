@@ -1,8 +1,8 @@
 {
-  "runAt": "2026-03-09T18:43:28.397Z",
+  "runAt": "2026-03-09T19:10:18.828Z",
   "summary": {
-    "total": 2,
-    "passed": 2,
+    "total": 3,
+    "passed": 3,
     "failed": 0
   },
   "tolerance": {
@@ -17,7 +17,7 @@
         {
           "shotNumber": 1,
           "startFrame": {
-            "detected": 30,
+            "detected": 32,
             "expected": 31,
             "diff": 1,
             "pass": true
@@ -37,9 +37,9 @@
         {
           "shotNumber": 2,
           "startFrame": {
-            "detected": 317,
+            "detected": 318,
             "expected": 327,
-            "diff": 10,
+            "diff": 9,
             "pass": true
           },
           "endFrame": {
@@ -117,6 +117,112 @@
           "orientation": {
             "detected": "front",
             "expected": "front",
+            "match": true
+          }
+        }
+      ]
+    },
+    {
+      "video": "20190124_175609.mp4",
+      "status": "pass",
+      "shots": [
+        {
+          "shotNumber": 1,
+          "startFrame": {
+            "detected": 12,
+            "expected": 15,
+            "diff": 3,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 34,
+            "expected": 41,
+            "diff": 7,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "front-left",
+            "expected": "front-left",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 2,
+          "startFrame": {
+            "detected": 277,
+            "expected": 273,
+            "diff": 4,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 297,
+            "expected": 303,
+            "diff": 6,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-left",
+            "expected": "side-left",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 3,
+          "startFrame": {
+            "detected": 573,
+            "expected": 579,
+            "diff": 6,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 597,
+            "expected": 602,
+            "diff": 5,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-left",
+            "expected": "side-left",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 4,
+          "startFrame": {
+            "detected": 800,
+            "expected": 803,
+            "diff": 3,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 822,
+            "expected": 828,
+            "diff": 6,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-left",
+            "expected": "side-left",
+            "match": true
+          }
+        },
+        {
+          "shotNumber": 5,
+          "startFrame": {
+            "detected": 939,
+            "expected": 944,
+            "diff": 5,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 968,
+            "expected": 967,
+            "diff": 1,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-left",
+            "expected": "side-left",
             "match": true
           }
         }

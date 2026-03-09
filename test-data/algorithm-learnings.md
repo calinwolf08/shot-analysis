@@ -60,6 +60,16 @@ The orientation detection uses shoulder and hip X positions plus Z-depth to clas
    - This handles shooting form where shoulders rotate significantly (large Z-diff) but hips remain squared to camera
    - Video 20190107_211108: shoulder sep=0.04, hip sep=0.002, Z-diff=0.65 → correctly "front" not "side-right"
 
+**2026-03-09 - Video 20190124_175609 Testing (Level 3)**
+
+10. **Shoulder/Hip Z-Depth Ratio for front-left vs side-left**: Two shots with similar metrics can have different orientations:
+    - side-left: shoulderZ=0.429, hipZ=0.227 → ratio 1.89 (shoulders rotated more than hips)
+    - front-left: shoulderZ=0.468, hipZ=0.306 → ratio 1.53 (hips follow shoulders closely)
+
+    When ratio is low (<1.7), both shoulders AND hips show similar angle offset, indicating a true camera position offset. When ratio is high (>1.7), only shoulders are rotated (shooting form), suggesting a side view with shoulder rotation.
+
+11. **Hip Z-Depth Tracking**: Added tracking of `avgHipZDiff` alongside `avgZDiff` (shoulder Z) to compute the ratio. This is the key distinguishing metric for edge cases between front-left and side-left.
+
 ---
 
 ## Shot Boundary Detection
@@ -75,6 +85,16 @@ The orientation detection uses shoulder and hip X positions plus Z-depth to clas
 3. **Gap Tolerance**: Changed from requiring strictly consecutive upward frames to allowing small gaps (MAX_GAP_FRAMES = 3) in the upward motion, counting total upward frames within a region.
 
 4. **Motion Start Lookback**: The findMotionStart function looks back from the detection point to find where negative velocity first began, ensuring the shot start is at the beginning of the motion.
+
+**2026-03-09 - Video 20190124_175609 Testing (Level 3)**
+
+5. **Wrist-Above-Shoulder Validation**: Added requirement that wrist must reach significantly above shoulder (peakY - shoulderY <= -0.05) to confirm a shot. This eliminates false positives from other arm movements where wrist never goes above shoulder:
+   - True shots: wristShoulderDelta ranges from -0.12 to -0.16
+   - False positives: wristShoulderDelta positive (0.07 to 0.15) - wrist below shoulder
+
+6. **Peak Tracking Reset**: Fixed bug where peakFrame/peakY from previous shot evaluation could contaminate next shot evaluation. Now reset peak tracking when shotStartFrame is first detected.
+
+7. **Motion Start Lookback Tuning**: Reduced findMotionStart lookback from 10 to 7 frames. The longer lookback was finding motion start too early, causing frame timing diffs to exceed ±8 tolerance. Shorter lookback better aligns with labeled shot starts.
 
 ---
 
@@ -95,6 +115,10 @@ Cases where the algorithm detected a shot that wasn't there:
 | Video | Frame Range | Likely Cause | Notes |
 |-------|-------------|--------------|-------|
 | 20181219_173607 | 164-194 (before fix) | Pose dropouts created velocity spikes | Fixed by detecting >3 frame gaps and resetting state |
+| 20190124_175609 | 85-105 (before fix) | Arm movement without wrist above shoulder | Fixed by wrist-above-shoulder validation (delta=0.10) |
+| 20190124_175609 | 185-204 (before fix) | Minor upward motion, wrist barely above shoulder | Fixed by requiring delta <= -0.05 |
+| 20190124_175609 | 359-407 (before fix) | Large upward motion during non-shot activity | Fixed by wrist-above-shoulder + peak tracking reset |
+| 20190124_175609 | 669-680 (before fix) | Noisy pose data with jumpy wrist positions | Fixed by wrist-above-shoulder validation |
 
 ---
 
@@ -144,6 +168,9 @@ Parameter adjustments that improved results:
 | Hip-based front detection | N/A | hipSep < 0.03 | Detect front view when hips face camera despite shoulder rotation | 20190107_211108 |
 | frontAngleThreshold | 0.40 | 0.35 | Lower threshold for front-left/front-right detection | 20181219_173607 (shot 1) |
 | behindAngleThreshold | N/A | 0.40 | Separate threshold for behind-left/behind-right detection | 20181219_173607 (shot 3) |
+| MIN_WRIST_ABOVE_SHOULDER_DELTA | N/A | -0.05 | Require wrist to reach above shoulder at peak to distinguish shots from other movements | 20190124_175609 |
+| findMotionStart lookback | 10 | 7 | Reduced lookback to better align detected start with labeled start frames | 20190124_175609 (shot 3) |
+| Shoulder/hip Z ratio | N/A | 1.7 threshold | Use shoulder/hip Z-depth ratio to distinguish front-left from side-left; lower ratio = true camera angle | 20181219_173607, 20190124_175609 |
 
 ---
 
@@ -155,3 +182,4 @@ Parameter adjustments that improved results:
 | 2026-03-09 | 20181219_173607 | 1 | 0 | Re-verified: Shot 1 (diff 1,3), Shot 2 (diff 10,4), Shot 3 (diff 5,9), Shot 4 (diff 8,1) |
 | 2026-03-09 | 20181219_173607, 20190107_211108 | 2 | 0 | Level 2: Both videos pass. V1: 4 shots (all orientations correct). V2: 1 shot (front orientation, diff 6,6) |
 | 2026-03-09 | 20181219_173607, 20190107_211108 | 2 | 0 | Level 2 (Attempt 2): Fixed unit test regressions. Both videos pass with updated orientation thresholds. |
+| 2026-03-09 | 20181219_173607, 20190107_211108, 20190124_175609 | 3 | 0 | Level 3: All 3 videos pass. V3: 5 shots (1 front-left, 4 side-left). Key fixes: wrist-above-shoulder validation, shoulder/hip Z ratio for orientation. |

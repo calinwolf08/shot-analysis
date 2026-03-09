@@ -87,6 +87,12 @@ export class PhaseDetector {
         }
         // Identify phases using the analyzed data
         const phases = this.identifyPhases(frameData, actualStart);
+        // Debug: Check for out-of-bounds phases
+        for (const [phaseName, phaseRange] of Object.entries(phases)) {
+            if (phaseRange && (phaseRange.startFrame < actualStart || phaseRange.endFrame > actualEnd)) {
+                console.log(`[PhaseDetector] WARNING: Phase ${phaseName} out of bounds: ${phaseRange.startFrame}-${phaseRange.endFrame} (expected ${actualStart}-${actualEnd})`);
+            }
+        }
         // Calculate overall confidence
         const confidence = this.calculateOverallConfidence(frameData, phases);
         return { phases, confidence };
