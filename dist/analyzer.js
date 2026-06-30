@@ -61,6 +61,7 @@ import { createPoseDetector } from "./pose/factory";
 import { ShotDetector, } from "./detection/integrated-shot-detector";
 import { MetricOrchestrator, createShootingArmCalculators, createGuideArmCalculators, createBallMetricCalculators, createLowerBodyCalculators, createPostureCalculators, createTimingCalculators, } from "./metrics";
 import { getProfileRegistry } from "./profiles/registry";
+import { detectOrientation } from "./detection/pose-shot-detector";
 /**
  * Converts pose detection PoseLandmarks to metrics PoseLandmarks.
  *
@@ -78,6 +79,45 @@ function convertToMetricsPoseLandmarks(pose, frameIndex, timestamp) {
         timestamp,
         frameIndex,
     };
+}
+/**
+ * Calculates camera orientation for a shot from pose landmarks.
+ *
+ * Converts the metrics pose landmarks to the format expected by detectOrientation.
+ */
+function calculateShotOrientation(poseLandmarks, startFrame, endFrame) {
+    // Filter landmarks to the shot's frame range
+    const shotLandmarks = poseLandmarks.filter((p) => p.frameIndex >= startFrame && p.frameIndex <= endFrame);
+    if (shotLandmarks.length < 3) {
+        return "unknown";
+    }
+    // Convert to PoseData format for detectOrientation
+    const poseData = {
+        video: "analysis",
+        fps: 30,
+        totalFrames: shotLandmarks.length,
+        width: 1920,
+        height: 1080,
+        extractedAt: new Date().toISOString(),
+        frames: shotLandmarks.map((pl) => ({
+            frameIndex: pl.frameIndex,
+            timestamp: pl.timestamp / 1000, // Convert ms to seconds
+            poseConfidence: pl.confidence,
+            landmarks: pl.landmarks.map((l) => ({
+                x: l.position.x,
+                y: l.position.y,
+                z: l.position.z,
+                visibility: l.visibility,
+            })),
+        })),
+    };
+    try {
+        const result = detectOrientation(poseData);
+        return result === "unknown" ? "unknown" : result;
+    }
+    catch {
+        return "unknown";
+    }
 }
 /**
  * Error thrown when analyzer methods are called before initialization.
@@ -382,7 +422,13 @@ export class ShotAnalyzer {
             const shotLandmarks = allMetricsLandmarks.slice(shot.frameRange.start, shot.frameRange.end + 1);
             // Analyze the shot with metric extraction
             const analysis = this.metricOrchestrator.analyzeShot(shot.shotIndex, shotLandmarks, shot.frameRange, shot.phases, this.config);
-            shotAnalyses.push(analysis);
+            // Calculate orientation for this shot
+            const orientation = calculateShotOrientation(allMetricsLandmarks, shot.frameRange.start, shot.frameRange.end);
+            // Add orientation to the analysis
+            shotAnalyses.push({
+                ...analysis,
+                orientation,
+            });
         }
         return {
             shots: shotAnalyses,
@@ -563,7 +609,13 @@ export class ShotAnalyzer {
             const shotLandmarks = state.metricsLandmarks.slice(shot.frameRange.start, shot.frameRange.end + 1);
             // Analyze the shot with metric extraction
             const analysis = this.metricOrchestrator.analyzeShot(shot.shotIndex, shotLandmarks, shot.frameRange, shot.phases, this.config);
-            shotAnalyses.push(analysis);
+            // Calculate orientation for this shot
+            const orientation = calculateShotOrientation(state.metricsLandmarks, shot.frameRange.start, shot.frameRange.end);
+            // Add orientation to the analysis
+            shotAnalyses.push({
+                ...analysis,
+                orientation,
+            });
         }
         return {
             shots: shotAnalyses,

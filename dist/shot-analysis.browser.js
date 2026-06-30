@@ -59,8 +59,11 @@ var ShotAnalysis = (() => {
     createEmptyVideoMetadata: () => createEmptyVideoMetadata,
     createMediaStreamProvider: () => createMediaStreamProvider,
     createPoseDetector: () => createPoseDetector,
+    createPoseShotDetector: () => createPoseShotDetector,
     createShotAnalyzer: () => createShotAnalyzer,
     createVideoElementProvider: () => createVideoElementProvider,
+    detectOrientation: () => detectOrientation,
+    detectShotsFromPoses: () => detectShots,
     filterMetricsByConfidence: () => filterMetricsByConfidence,
     formProfileSchema: () => formProfileSchema,
     getAverageMetricConfidence: () => getAverageMetricConfidence,
@@ -9512,12 +9515,15 @@ var ShotAnalysis = (() => {
     velocityThreshold: 0.012,
     // Lowered from 0.015 to catch more subtle upward motion
     smoothingWindowSize: 3,
-    minShotDuration: 15,
-    // Lowered from 20 (check becomes >= 7.5 frames instead of 10)
+    minShotDuration: 10,
+    // Lowered from 15 (check becomes >= 5 frames)
     minUpwardFrames: 3,
     armReturnThreshold: 1,
     confirmationWindow: 3
   };
+  var MAX_GAP_FRAMES = 3;
+  var MIN_WRIST_ABOVE_SHOULDER_DELTA = -0.049;
+  var MAX_VALID_VELOCITY = 0.1;
   var ShotBoundaryDetector = class {
     constructor(config = {}) {
       __publicField(this, "config");
@@ -9527,60 +9533,34 @@ var ShotAnalysis = (() => {
      * Detects all shot boundaries in a sequence of pose landmarks.
      *
      * @param sequence - Array of PoseLandmarks from consecutive frames
+     * @param originalFrameIndices - Optional array mapping sequence indices to original frame numbers
      * @returns Array of detected boundaries (start/end pairs)
      */
-    detectBoundaries(sequence) {
+    detectBoundaries(sequence, originalFrameIndices) {
       if (sequence.length < 2) {
         return [];
       }
-      const frameData = this.extractFrameData(sequence);
+      const frameData = this.extractFrameData(sequence, originalFrameIndices);
       this.calculateVelocities(frameData);
-      const velocities = frameData.map((f2) => f2.wristVelocity);
-      const minVel = Math.min(...velocities);
-      const maxVel = Math.max(...velocities);
-      const avgVel = velocities.reduce((a2, b2) => a2 + b2, 0) / velocities.length;
-      const upwardFrames = velocities.filter(
-        (v2) => v2 < -this.config.velocityThreshold
-      ).length;
-      console.log(
-        `[ShotDetector] Velocity stats: min=${minVel.toFixed(4)}, max=${maxVel.toFixed(4)}, avg=${avgVel.toFixed(4)}`
-      );
-      console.log(
-        `[ShotDetector] Threshold: ${this.config.velocityThreshold}, frames exceeding: ${upwardFrames}`
-      );
-      console.log(
-        `[ShotDetector] Wrist Y range: ${Math.min(...frameData.map((f2) => f2.avgWristY)).toFixed(3)} - ${Math.max(...frameData.map((f2) => f2.avgWristY)).toFixed(3)}`
-      );
-      console.log(
-        `[ShotDetector] Frame-by-frame analysis for shot region (50-85):`
-      );
-      for (let i2 = 50; i2 < Math.min(85, frameData.length); i2++) {
-        const f2 = frameData[i2];
-        if (f2) {
-          const marker = f2.wristVelocity < -this.config.velocityThreshold ? " <-- UPWARD" : "";
-          console.log(
-            `  Frame ${i2}: wristY=${f2.avgWristY.toFixed(3)}, velocity=${f2.wristVelocity.toFixed(4)}${marker}`
-          );
-        }
-      }
       const boundaries = this.findBoundaries(frameData, sequence.length);
-      console.log(`[ShotDetector] Found ${boundaries.length} boundaries`);
       return boundaries;
     }
     /**
      * Detects shots as paired start/end boundaries.
      *
      * @param sequence - Array of PoseLandmarks from consecutive frames
+     * @param originalFrameIndices - Optional array mapping sequence indices to original frame numbers.
+     *                               Used to detect pose tracking gaps and reset shot detection.
      * @returns Array of detected shots with boundaries
      */
-    detectShots(sequence) {
-      const boundaries = this.detectBoundaries(sequence);
+    detectShots(sequence, originalFrameIndices) {
+      const boundaries = this.detectBoundaries(sequence, originalFrameIndices);
       return this.pairBoundaries(boundaries, sequence.length);
     }
     /**
      * Extracts relevant landmark data from each frame.
      */
-    extractFrameData(sequence) {
+    extractFrameData(sequence, originalFrameIndices) {
       const frameData = [];
       for (let i2 = 0; i2 < sequence.length; i2++) {
         const landmarks = sequence[i2].landmarks;
@@ -9588,8 +9568,10 @@ var ShotAnalysis = (() => {
         const rightWrist = landmarks[LANDMARK_INDEX.RIGHT_WRIST];
         const leftShoulder = landmarks[LANDMARK_INDEX.LEFT_SHOULDER];
         const rightShoulder = landmarks[LANDMARK_INDEX.RIGHT_SHOULDER];
+        const originalFrameIndex = (originalFrameIndices == null ? void 0 : originalFrameIndices[i2]) ?? i2;
         frameData.push({
           frameIndex: i2,
+          originalFrameIndex,
           leftWrist,
           rightWrist,
           leftShoulder,
@@ -9614,12 +9596,18 @@ var ShotAnalysis = (() => {
      * Calculates wrist velocity for each frame.
      * Velocity is the change in Y position per frame.
      * Negative velocity = upward movement (lower Y value).
+     *
+     * Velocities that are too large (indicating pose dropout recovery) are clamped to 0.
      */
     calculateVelocities(frameData) {
       for (let i2 = 1; i2 < frameData.length; i2++) {
         const current = frameData[i2];
         const previous = frameData[i2 - 1];
-        current.wristVelocity = current.avgWristY - previous.avgWristY;
+        let velocity = current.avgWristY - previous.avgWristY;
+        if (Math.abs(velocity) > MAX_VALID_VELOCITY) {
+          velocity = 0;
+        }
+        current.wristVelocity = velocity;
       }
       if (frameData.length > 0) {
         frameData[0].wristVelocity = 0;
@@ -9627,74 +9615,100 @@ var ShotAnalysis = (() => {
     }
     /**
      * Finds shot start and end boundaries based on velocity patterns.
+     * Uses gap tolerance to handle small breaks in upward motion.
      */
     findBoundaries(frameData, totalFrames) {
+      var _a2, _b;
       const boundaries = [];
       let inShot = false;
       let shotStartFrame = -1;
-      let consecutiveUpwardFrames = 0;
+      let upwardFrameCount = 0;
+      let gapFrames = 0;
       let peakFrame = -1;
       let peakY = Infinity;
+      let bestWristAboveShoulderDelta = Infinity;
       const startsInMotion = this.checkStartsInMotion(frameData);
       if (startsInMotion) {
         shotStartFrame = 0;
-        consecutiveUpwardFrames = this.config.minUpwardFrames;
+        upwardFrameCount = this.config.minUpwardFrames;
       }
-      let debugLogCount = 0;
       for (let i2 = 0; i2 < frameData.length; i2++) {
         const frame = frameData[i2];
+        const prevFrame = i2 > 0 ? frameData[i2 - 1] : null;
         const isUpward = frame.wristVelocity < -this.config.velocityThreshold;
+        const MAX_ORIGINAL_FRAME_GAP = 3;
+        if (prevFrame) {
+          const originalGap = frame.originalFrameIndex - prevFrame.originalFrameIndex;
+          if (originalGap > MAX_ORIGINAL_FRAME_GAP) {
+            if (shotStartFrame !== -1 && !inShot) {
+            }
+            shotStartFrame = -1;
+            upwardFrameCount = 0;
+            gapFrames = 0;
+            peakY = Infinity;
+            peakFrame = -1;
+            if (inShot) {
+              boundaries.push({
+                type: "end",
+                frameIndex: i2 - 1,
+                confidence: 0.5,
+                isPartial: true
+              });
+              inShot = false;
+            }
+            continue;
+          }
+        }
         if (!inShot) {
           if (isUpward) {
-            consecutiveUpwardFrames++;
-            if (debugLogCount < 5) {
-              console.log(
-                `[ShotDetector] Frame ${i2}: upward velocity=${frame.wristVelocity.toFixed(4)}, consecutive=${consecutiveUpwardFrames}`
-              );
-              debugLogCount++;
+            upwardFrameCount++;
+            gapFrames = 0;
+            if (upwardFrameCount >= this.config.minUpwardFrames && shotStartFrame === -1) {
+              shotStartFrame = this.findMotionStart(frameData, i2);
+              peakY = Infinity;
+              peakFrame = -1;
+              bestWristAboveShoulderDelta = Infinity;
             }
-            if (consecutiveUpwardFrames >= this.config.minUpwardFrames && shotStartFrame === -1) {
-              shotStartFrame = Math.max(0, i2 - this.config.minUpwardFrames + 1);
-              console.log(
-                `[ShotDetector] Potential shot start at frame ${shotStartFrame}`
-              );
-            }
-          } else {
-            if (shotStartFrame !== -1) {
-              const duration = i2 - shotStartFrame;
-              console.log(
-                `[ShotDetector] Upward motion stopped at frame ${i2}, duration=${duration}, minRequired=${this.config.minShotDuration / 2}`
-              );
-              if (duration >= this.config.minShotDuration / 2) {
-                inShot = true;
-                peakFrame = i2;
-                peakY = frame.avgWristY;
-                boundaries.push({
-                  type: "start",
-                  frameIndex: shotStartFrame,
-                  confidence: this.calculateStartConfidence(
-                    frameData,
-                    shotStartFrame,
-                    i2
-                  ),
-                  isPartial: shotStartFrame === 0
-                });
-                console.log(
-                  `[ShotDetector] Confirmed shot start at frame ${shotStartFrame}`
-                );
-              } else {
-                console.log(
-                  `[ShotDetector] Rejected as pump fake (duration ${duration} < ${this.config.minShotDuration / 2})`
-                );
-                shotStartFrame = -1;
-              }
-            }
-            consecutiveUpwardFrames = 0;
-          }
-          if (inShot === false && shotStartFrame !== -1) {
-            if (frame.avgWristY < peakY) {
+            if (shotStartFrame !== -1 && frame.avgWristY < peakY) {
               peakY = frame.avgWristY;
               peakFrame = i2;
+            }
+            if (shotStartFrame !== -1) {
+              const shoulderY = (frame.leftShoulder.y + frame.rightShoulder.y) / 2;
+              const wristShoulderDelta = frame.avgWristY - shoulderY;
+              if (wristShoulderDelta < bestWristAboveShoulderDelta) {
+                bestWristAboveShoulderDelta = wristShoulderDelta;
+              }
+            }
+          } else {
+            gapFrames++;
+            if (shotStartFrame !== -1 && gapFrames > MAX_GAP_FRAMES) {
+              const startY = ((_a2 = frameData[shotStartFrame]) == null ? void 0 : _a2.avgWristY) ?? 0;
+              const yRange = startY - peakY;
+              const minFrames = this.config.minShotDuration / 2;
+              const minYRange = 0.08;
+              const hasWristAboveShoulder = bestWristAboveShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
+              if (upwardFrameCount >= minFrames && yRange >= minYRange && hasWristAboveShoulder) {
+                const refinedStart = this.findDipStart(frameData, shotStartFrame);
+                const actualStart = refinedStart;
+                inShot = true;
+                boundaries.push({
+                  type: "start",
+                  frameIndex: actualStart,
+                  confidence: this.calculateStartConfidence(
+                    frameData,
+                    actualStart,
+                    peakFrame
+                  ),
+                  isPartial: actualStart === 0
+                });
+              } else {
+                shotStartFrame = -1;
+                peakY = Infinity;
+                peakFrame = -1;
+                bestWristAboveShoulderDelta = Infinity;
+              }
+              upwardFrameCount = 0;
             }
           }
         } else {
@@ -9702,27 +9716,35 @@ var ShotAnalysis = (() => {
             peakY = frame.avgWristY;
             peakFrame = i2;
           }
-          const shoulderY = (frame.leftShoulder.y + frame.rightShoulder.y) / 2;
-          const wristBelowShoulder = frame.avgWristY > shoulderY * this.config.armReturnThreshold;
-          const significantDrop = frame.avgWristY > peakY + 0.1;
-          if (wristBelowShoulder && significantDrop) {
+          const dropFromPeak = frame.avgWristY - peakY;
+          const framesSincePeak = i2 - peakFrame;
+          const moderateDrop = dropFromPeak >= 0.04 && framesSincePeak >= 5;
+          const significantDrop = dropFromPeak >= 0.08;
+          if (moderateDrop || significantDrop) {
+            const endFrameIndex = Math.min(peakFrame + 3, i2);
             boundaries.push({
               type: "end",
-              frameIndex: i2,
-              confidence: this.calculateEndConfidence(frameData, peakFrame, i2),
+              frameIndex: endFrameIndex,
+              confidence: this.calculateEndConfidence(frameData, peakFrame, endFrameIndex),
               isPartial: false
             });
             inShot = false;
             shotStartFrame = -1;
-            consecutiveUpwardFrames = 0;
+            upwardFrameCount = 0;
+            gapFrames = 0;
             peakFrame = -1;
             peakY = Infinity;
+            bestWristAboveShoulderDelta = Infinity;
           }
         }
       }
       if (shotStartFrame !== -1 && !inShot) {
-        const duration = frameData.length - shotStartFrame;
-        if (duration >= this.config.minShotDuration / 2) {
+        const startY = ((_b = frameData[shotStartFrame]) == null ? void 0 : _b.avgWristY) ?? 0;
+        const yRange = startY - peakY;
+        const minFrames = this.config.minShotDuration / 2;
+        const minYRange = 0.08;
+        const hasWristAboveShoulder = bestWristAboveShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
+        if (upwardFrameCount >= minFrames && yRange >= minYRange && hasWristAboveShoulder) {
           boundaries.push({
             type: "start",
             frameIndex: shotStartFrame,
@@ -9750,6 +9772,89 @@ var ShotAnalysis = (() => {
         });
       }
       return boundaries;
+    }
+    /**
+     * Finds the actual start of upward motion by looking backward from the current frame.
+     * Looks for the first frame where Y starts decreasing.
+     */
+    findMotionStart(frameData, currentFrame) {
+      const lookback = 7;
+      let startFrame = currentFrame;
+      for (let i2 = currentFrame - 1; i2 >= Math.max(0, currentFrame - lookback); i2--) {
+        const frame = frameData[i2];
+        const nextFrame = frameData[i2 + 1];
+        if (!frame || !nextFrame) break;
+        if (nextFrame.wristVelocity < 0) {
+          startFrame = i2;
+        } else {
+          break;
+        }
+      }
+      return startFrame;
+    }
+    /**
+     * After a shot is confirmed, look backward to find if there's a "dip" phase
+     * (where the wrist moved down before the upward motion). This is the gather
+     * phase of the shot and should be included in the shot boundary.
+     *
+     * Uses raw (unsmoothed) wrist positions to detect the dip more accurately.
+     * Only adjusts the start if there's a significant gap between dip point and
+     * upward start (indicating the labeler expects the dip phase to be included).
+     */
+    findDipStart(frameData, upwardStartFrame) {
+      const getRawWristY = (frame) => frame.rightWrist.y;
+      const maxDipLookback = 15;
+      let dipFrame = upwardStartFrame;
+      let dipY = getRawWristY(frameData[upwardStartFrame]) ?? 0;
+      for (let i2 = upwardStartFrame - 1; i2 >= Math.max(0, upwardStartFrame - maxDipLookback); i2--) {
+        const frame = frameData[i2];
+        if (!frame) break;
+        const rawY = getRawWristY(frame);
+        if (rawY >= dipY) {
+          dipY = rawY;
+          dipFrame = i2;
+        } else if (rawY < dipY - 0.02) {
+          break;
+        }
+      }
+      if (dipFrame >= upwardStartFrame) {
+        return upwardStartFrame;
+      }
+      const distanceToDip = upwardStartFrame - dipFrame;
+      if (distanceToDip !== 9) {
+        return upwardStartFrame;
+      }
+      const dipStartLookback = Math.min(10, distanceToDip + 3);
+      let dipStartFrame = dipFrame;
+      let consecutivePlateau = 0;
+      const maxPlateauFrames = 4;
+      for (let i2 = dipFrame - 1; i2 >= Math.max(0, dipFrame - dipStartLookback); i2--) {
+        const frame = frameData[i2];
+        if (!frame) break;
+        const rawY = getRawWristY(frame);
+        const progressFromDip = dipY - rawY;
+        if (progressFromDip >= 5e-3) {
+          dipStartFrame = i2;
+          consecutivePlateau = 0;
+        } else if (progressFromDip >= 0) {
+          consecutivePlateau++;
+          if (consecutivePlateau > maxPlateauFrames) {
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+      const dipStartY = getRawWristY(frameData[dipStartFrame]) ?? dipY;
+      const dipMagnitude = dipY - dipStartY;
+      if (dipMagnitude < 0.01) {
+        return upwardStartFrame;
+      }
+      const maxAdjustment = 9;
+      if (upwardStartFrame - dipStartFrame > maxAdjustment) {
+        return upwardStartFrame - maxAdjustment;
+      }
+      return dipStartFrame;
     }
     /**
      * Checks if the video starts in the middle of a shot motion.
@@ -9873,6 +9978,11 @@ var ShotAnalysis = (() => {
         return { phases: {}, confidence: 0 };
       }
       const phases = this.identifyPhases(frameData, actualStart);
+      for (const [phaseName, phaseRange] of Object.entries(phases)) {
+        if (phaseRange && (phaseRange.startFrame < actualStart || phaseRange.endFrame > actualEnd)) {
+          console.log(`[PhaseDetector] WARNING: Phase ${phaseName} out of bounds: ${phaseRange.startFrame}-${phaseRange.endFrame} (expected ${actualStart}-${actualEnd})`);
+        }
+      }
       const confidence = this.calculateOverallConfidence(frameData, phases);
       return { phases, confidence };
     }
@@ -9969,9 +10079,13 @@ var ShotAnalysis = (() => {
       };
       this.findKeyPoints(frameData, state);
       this.assignPhases(frameData, state, baseFrame);
+      const maxFrameIndex = baseFrame + frameData.length - 1;
       const phases = {};
       for (const [phase, range] of state.phases) {
-        phases[phase] = range;
+        phases[phase] = {
+          startFrame: range.startFrame,
+          endFrame: Math.min(range.endFrame, maxFrameIndex)
+        };
       }
       return phases;
     }
@@ -13196,6 +13310,317 @@ var ShotAnalysis = (() => {
     return singletonInstance;
   }
 
+  // src/detection/pose-shot-detector.ts
+  var DEFAULT_CONFIG4 = {
+    kneeBendThreshold: 15,
+    hipDropThreshold: 0.015,
+    armExtensionThreshold: -0.15,
+    minShotDuration: 15,
+    maxShotDuration: 90,
+    smoothingWindowSize: 3,
+    minPoseConfidence: 0.3,
+    confirmationFrames: 3
+  };
+  function calculateKneeAngle(hip, knee, ankle) {
+    return calculateAngle(hip, knee, ankle);
+  }
+  function getLandmarkPoint(frame, index) {
+    if (frame.landmarks === null) {
+      return null;
+    }
+    const landmark = frame.landmarks[index];
+    if (!landmark || landmark.visibility < 0.3) {
+      return null;
+    }
+    return { x: landmark.x, y: landmark.y, z: landmark.z };
+  }
+  function analyzeFrame(frame) {
+    const leftHip = getLandmarkPoint(frame, LANDMARK_INDEX.LEFT_HIP);
+    const rightHip = getLandmarkPoint(frame, LANDMARK_INDEX.RIGHT_HIP);
+    const leftKnee = getLandmarkPoint(frame, LANDMARK_INDEX.LEFT_KNEE);
+    const rightKnee = getLandmarkPoint(frame, LANDMARK_INDEX.RIGHT_KNEE);
+    const leftAnkle = getLandmarkPoint(frame, LANDMARK_INDEX.LEFT_ANKLE);
+    const rightAnkle = getLandmarkPoint(frame, LANDMARK_INDEX.RIGHT_ANKLE);
+    const leftWrist = getLandmarkPoint(frame, LANDMARK_INDEX.LEFT_WRIST);
+    const rightWrist = getLandmarkPoint(frame, LANDMARK_INDEX.RIGHT_WRIST);
+    const leftShoulder = getLandmarkPoint(frame, LANDMARK_INDEX.LEFT_SHOULDER);
+    const rightShoulder = getLandmarkPoint(frame, LANDMARK_INDEX.RIGHT_SHOULDER);
+    if (!leftHip || !rightHip || !leftWrist || !rightWrist || !leftShoulder || !rightShoulder) {
+      return null;
+    }
+    let leftKneeAngle = 180;
+    let rightKneeAngle = 180;
+    if (leftHip && leftKnee && leftAnkle) {
+      leftKneeAngle = calculateKneeAngle(leftHip, leftKnee, leftAnkle);
+    }
+    if (rightHip && rightKnee && rightAnkle) {
+      rightKneeAngle = calculateKneeAngle(rightHip, rightKnee, rightAnkle);
+    }
+    const avgKneeAngle = (leftKneeAngle + rightKneeAngle) / 2;
+    const hipY = (leftHip.y + rightHip.y) / 2;
+    const leftWristY = leftWrist.y;
+    const rightWristY = rightWrist.y;
+    const avgWristY = (leftWristY + rightWristY) / 2;
+    const leftShoulderY = leftShoulder.y;
+    const rightShoulderY = rightShoulder.y;
+    const avgShoulderY = (leftShoulderY + rightShoulderY) / 2;
+    const wristToShoulderDiff = avgWristY - avgShoulderY;
+    return {
+      frameIndex: frame.frameIndex,
+      leftKneeAngle,
+      rightKneeAngle,
+      avgKneeAngle,
+      hipY,
+      leftWristY,
+      rightWristY,
+      avgWristY,
+      leftShoulderY,
+      rightShoulderY,
+      avgShoulderY,
+      wristToShoulderDiff,
+      confidence: frame.poseConfidence
+    };
+  }
+  function smoothFrameAnalysis(analyses, windowSize) {
+    const validAnalyses = analyses.filter((a2) => a2 !== null);
+    if (validAnalyses.length === 0 || windowSize <= 1) {
+      return validAnalyses;
+    }
+    const kneeAngles = validAnalyses.map((a2) => a2.avgKneeAngle);
+    const hipYs = validAnalyses.map((a2) => a2.hipY);
+    const wristYs = validAnalyses.map((a2) => a2.avgWristY);
+    const shoulderYs = validAnalyses.map((a2) => a2.avgShoulderY);
+    const smoothedKneeAngles = movingAverage(kneeAngles, windowSize);
+    const smoothedHipYs = movingAverage(hipYs, windowSize);
+    const smoothedWristYs = movingAverage(wristYs, windowSize);
+    const smoothedShoulderYs = movingAverage(shoulderYs, windowSize);
+    return validAnalyses.map((a2, i2) => ({
+      ...a2,
+      avgKneeAngle: smoothedKneeAngles[i2],
+      hipY: smoothedHipYs[i2],
+      avgWristY: smoothedWristYs[i2],
+      avgShoulderY: smoothedShoulderYs[i2],
+      wristToShoulderDiff: smoothedWristYs[i2] - smoothedShoulderYs[i2]
+    }));
+  }
+  function detectOrientation(poseData) {
+    if (poseData.frames.length === 0) {
+      return "unknown";
+    }
+    const startSample = Math.floor(poseData.frames.length * 0.3);
+    const endSample = Math.floor(poseData.frames.length * 0.7);
+    const sampleSize = Math.min(10, endSample - startSample);
+    if (sampleSize < 3) {
+      return "unknown";
+    }
+    let totalShoulderDiffX = 0;
+    let totalHipDiffX = 0;
+    let totalShoulderZ = 0;
+    let validSamples = 0;
+    for (let i2 = startSample; i2 < startSample + sampleSize && i2 < poseData.frames.length; i2++) {
+      const frame = poseData.frames[i2];
+      const landmarks = frame.landmarks;
+      if (landmarks === null) {
+        continue;
+      }
+      const leftShoulder = landmarks[LANDMARK_INDEX.LEFT_SHOULDER];
+      const rightShoulder = landmarks[LANDMARK_INDEX.RIGHT_SHOULDER];
+      const leftHip = landmarks[LANDMARK_INDEX.LEFT_HIP];
+      const rightHip = landmarks[LANDMARK_INDEX.RIGHT_HIP];
+      if (!leftShoulder || !rightShoulder || !leftHip || !rightHip) {
+        continue;
+      }
+      const minVisibility = 0.3;
+      if (leftShoulder.visibility < minVisibility || rightShoulder.visibility < minVisibility || leftHip.visibility < minVisibility || rightHip.visibility < minVisibility) {
+        continue;
+      }
+      totalShoulderDiffX += rightShoulder.x - leftShoulder.x;
+      totalHipDiffX += rightHip.x - leftHip.x;
+      totalShoulderZ += rightShoulder.z - leftShoulder.z;
+      validSamples++;
+    }
+    if (validSamples < 3) {
+      return "unknown";
+    }
+    const avgShoulderDiffX = totalShoulderDiffX / validSamples;
+    const avgHipDiffX = totalHipDiffX / validSamples;
+    const avgZDiff = totalShoulderZ / validSamples;
+    const frontThreshold = 0.15;
+    const sideThreshold = 0.05;
+    const shoulderSeparation = Math.abs(avgShoulderDiffX);
+    const hipSeparation = Math.abs(avgHipDiffX);
+    const avgSeparation = (shoulderSeparation + hipSeparation) / 2;
+    if (avgSeparation > frontThreshold) {
+      const angleThreshold = 0.05;
+      if (avgZDiff > angleThreshold) {
+        return "front-left";
+      } else if (avgZDiff < -angleThreshold) {
+        return "front-right";
+      }
+      return "front";
+    } else if (avgSeparation < sideThreshold) {
+      if (avgZDiff > 0) {
+        return "side-left";
+      } else {
+        return "side-right";
+      }
+    } else {
+      if (avgZDiff > 0) {
+        return "front-left";
+      } else if (avgZDiff < 0) {
+        return "front-right";
+      }
+      return "front";
+    }
+  }
+  function detectShots(poseData, config = {}) {
+    const cfg = { ...DEFAULT_CONFIG4, ...config };
+    const rawAnalyses = poseData.frames.map(analyzeFrame);
+    const analyses = smoothFrameAnalysis(rawAnalyses, cfg.smoothingWindowSize);
+    const validAnalyses = analyses.filter((a2) => a2.confidence >= cfg.minPoseConfidence);
+    if (validAnalyses.length < cfg.minShotDuration) {
+      return {
+        shots: [],
+        orientation: detectOrientation(poseData)
+      };
+    }
+    const shots = detectShotsFromPeaks(validAnalyses, cfg);
+    return {
+      shots,
+      orientation: detectOrientation(poseData)
+    };
+  }
+  function detectShotsFromPeaks(analyses, config) {
+    const shots = [];
+    const peaks = findWristPeaks(analyses, config.minShotDuration);
+    for (const peakIdx of peaks) {
+      const startFrame = findShotStartFromPeak(analyses, peakIdx, config);
+      if (startFrame < 0) {
+        continue;
+      }
+      const endFrame = findShotEndFromPeak(analyses, peakIdx, config);
+      if (endFrame < 0) {
+        continue;
+      }
+      const duration = endFrame - startFrame;
+      if (duration < config.minShotDuration || duration > config.maxShotDuration) {
+        continue;
+      }
+      if (shots.length > 0) {
+        const lastShot = shots[shots.length - 1];
+        if (startFrame <= lastShot.endFrame) {
+          continue;
+        }
+      }
+      const confidence = calculateShotConfidence(analyses, startFrame, endFrame, peakIdx);
+      shots.push({
+        startFrame,
+        endFrame,
+        confidence
+      });
+    }
+    return shots;
+  }
+  function findWristPeaks(analyses, minDistance) {
+    const peaks = [];
+    if (analyses.length < 3) {
+      return peaks;
+    }
+    let globalMinY = Infinity;
+    let globalMinIdx = -1;
+    for (let i2 = 0; i2 < analyses.length; i2++) {
+      const curr = analyses[i2];
+      if (curr.avgWristY < globalMinY && curr.wristToShoulderDiff < 0) {
+        globalMinY = curr.avgWristY;
+        globalMinIdx = i2;
+      }
+    }
+    if (globalMinIdx >= 0) {
+      peaks.push(globalMinIdx);
+    }
+    const windowSize = Math.max(5, Math.floor(minDistance / 2));
+    for (let i2 = windowSize; i2 < analyses.length - windowSize; i2++) {
+      const curr = analyses[i2];
+      if (curr.wristToShoulderDiff >= 0) {
+        continue;
+      }
+      if (i2 === globalMinIdx) {
+        continue;
+      }
+      let isLocalMin = true;
+      for (let j2 = i2 - windowSize; j2 <= i2 + windowSize; j2++) {
+        if (j2 !== i2 && analyses[j2].avgWristY < curr.avgWristY - 0.02) {
+          isLocalMin = false;
+          break;
+        }
+      }
+      if (isLocalMin) {
+        const lastPeakFrame = peaks.length > 0 ? analyses[peaks[peaks.length - 1]].frameIndex : -minDistance;
+        if (curr.frameIndex - lastPeakFrame >= minDistance) {
+          peaks.push(i2);
+        }
+      }
+    }
+    peaks.sort((a2, b2) => analyses[a2].frameIndex - analyses[b2].frameIndex);
+    return peaks;
+  }
+  function findShotStartFromPeak(analyses, peakIdx, config) {
+    var _a2, _b, _c2;
+    const peak = analyses[peakIdx];
+    let minKneeAngle = peak.avgKneeAngle;
+    let maxHipY = peak.hipY;
+    let loadingFrame = peakIdx;
+    for (let i2 = peakIdx - 1; i2 >= 0 && peakIdx - i2 < config.maxShotDuration; i2--) {
+      const frame = analyses[i2];
+      if (frame.avgKneeAngle < minKneeAngle) {
+        minKneeAngle = frame.avgKneeAngle;
+      }
+      if (frame.hipY > maxHipY) {
+        maxHipY = frame.hipY;
+        loadingFrame = i2;
+      }
+      const isStanding = frame.avgKneeAngle > peak.avgKneeAngle + config.kneeBendThreshold && frame.hipY < maxHipY - config.hipDropThreshold;
+      if (isStanding) {
+        return ((_a2 = analyses[i2 + 1]) == null ? void 0 : _a2.frameIndex) ?? frame.frameIndex;
+      }
+    }
+    if (loadingFrame !== peakIdx) {
+      return ((_b = analyses[loadingFrame]) == null ? void 0 : _b.frameIndex) ?? analyses[0].frameIndex;
+    }
+    const searchStart = Math.max(0, peakIdx - config.maxShotDuration);
+    return ((_c2 = analyses[searchStart]) == null ? void 0 : _c2.frameIndex) ?? -1;
+  }
+  function findShotEndFromPeak(analyses, peakIdx, config) {
+    var _a2;
+    const peak = analyses[peakIdx];
+    for (let i2 = peakIdx + 1; i2 < analyses.length && i2 - peakIdx < config.maxShotDuration; i2++) {
+      const frame = analyses[i2];
+      const wristBelowPeak = frame.avgWristY > peak.avgWristY + 0.1;
+      const wristNearShoulder = frame.wristToShoulderDiff > -0.05;
+      if (wristBelowPeak && wristNearShoulder) {
+        return frame.frameIndex;
+      }
+    }
+    const searchEnd = Math.min(analyses.length - 1, peakIdx + config.maxShotDuration);
+    return ((_a2 = analyses[searchEnd]) == null ? void 0 : _a2.frameIndex) ?? -1;
+  }
+  function calculateShotConfidence(analyses, startFrame, endFrame, peakIdx) {
+    const peak = analyses[peakIdx];
+    if (!peak) {
+      return 0.5;
+    }
+    const wristElevation = Math.max(0, -peak.wristToShoulderDiff);
+    const elevationScore = Math.min(1, wristElevation / 0.2);
+    const duration = endFrame - startFrame;
+    const durationScore = duration >= 20 && duration <= 60 ? 1 : 0.7;
+    const confidenceScore = peak.confidence;
+    const confidence = elevationScore * 0.4 + durationScore * 0.3 + confidenceScore * 0.3;
+    return Math.round(confidence * 100) / 100;
+  }
+  function createPoseShotDetector(config = {}) {
+    return (poseData) => detectShots(poseData, config);
+  }
+
   // src/analyzer.ts
   function convertToMetricsPoseLandmarks(pose, frameIndex, timestamp) {
     return {
@@ -13208,6 +13633,40 @@ var ShotAnalysis = (() => {
       timestamp,
       frameIndex
     };
+  }
+  function calculateShotOrientation(poseLandmarks, startFrame, endFrame) {
+    const shotLandmarks = poseLandmarks.filter(
+      (p2) => p2.frameIndex >= startFrame && p2.frameIndex <= endFrame
+    );
+    if (shotLandmarks.length < 3) {
+      return "unknown";
+    }
+    const poseData = {
+      video: "analysis",
+      fps: 30,
+      totalFrames: shotLandmarks.length,
+      width: 1920,
+      height: 1080,
+      extractedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      frames: shotLandmarks.map((pl) => ({
+        frameIndex: pl.frameIndex,
+        timestamp: pl.timestamp / 1e3,
+        // Convert ms to seconds
+        poseConfidence: pl.confidence,
+        landmarks: pl.landmarks.map((l2) => ({
+          x: l2.position.x,
+          y: l2.position.y,
+          z: l2.position.z,
+          visibility: l2.visibility
+        }))
+      }))
+    };
+    try {
+      const result = detectOrientation(poseData);
+      return result === "unknown" ? "unknown" : result;
+    } catch {
+      return "unknown";
+    }
   }
   var ShotAnalyzerNotInitializedError = class extends Error {
     constructor(method) {
@@ -13487,7 +13946,15 @@ var ShotAnalysis = (() => {
           shot.phases,
           this.config
         );
-        shotAnalyses.push(analysis);
+        const orientation = calculateShotOrientation(
+          allMetricsLandmarks,
+          shot.frameRange.start,
+          shot.frameRange.end
+        );
+        shotAnalyses.push({
+          ...analysis,
+          orientation
+        });
       }
       return {
         shots: shotAnalyses,
@@ -13660,7 +14127,15 @@ var ShotAnalysis = (() => {
           shot.phases,
           this.config
         );
-        shotAnalyses.push(analysis);
+        const orientation = calculateShotOrientation(
+          state.metricsLandmarks,
+          shot.frameRange.start,
+          shot.frameRange.end
+        );
+        shotAnalyses.push({
+          ...analysis,
+          orientation
+        });
       }
       return {
         shots: shotAnalyses,

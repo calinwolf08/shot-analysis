@@ -84,7 +84,10 @@ import type {
   ShotAnalysis,
   VideoMetadata,
   MetricValue,
+  Orientation,
 } from "./metrics/types";
+import { detectOrientation } from "./detection/pose-shot-detector";
+import type { PoseData, Frame as TestFrame } from "./testing/types";
 
 /**
  * Converts pose detection PoseLandmarks to metrics PoseLandmarks.
@@ -107,6 +110,54 @@ function convertToMetricsPoseLandmarks(
     timestamp,
     frameIndex,
   };
+}
+
+/**
+ * Calculates camera orientation for a shot from pose landmarks.
+ *
+ * Converts the metrics pose landmarks to the format expected by detectOrientation.
+ */
+function calculateShotOrientation(
+  poseLandmarks: readonly MetricsPoseLandmarks[],
+  startFrame: number,
+  endFrame: number,
+): Orientation {
+  // Filter landmarks to the shot's frame range
+  const shotLandmarks = poseLandmarks.filter(
+    (p) => p.frameIndex >= startFrame && p.frameIndex <= endFrame
+  );
+
+  if (shotLandmarks.length < 3) {
+    return "unknown";
+  }
+
+  // Convert to PoseData format for detectOrientation
+  const poseData: PoseData = {
+    video: "analysis",
+    fps: 30,
+    totalFrames: shotLandmarks.length,
+    width: 1920,
+    height: 1080,
+    extractedAt: new Date().toISOString(),
+    frames: shotLandmarks.map((pl): TestFrame => ({
+      frameIndex: pl.frameIndex,
+      timestamp: pl.timestamp / 1000, // Convert ms to seconds
+      poseConfidence: pl.confidence,
+      landmarks: pl.landmarks.map((l) => ({
+        x: l.position.x,
+        y: l.position.y,
+        z: l.position.z,
+        visibility: l.visibility,
+      })),
+    })),
+  };
+
+  try {
+    const result = detectOrientation(poseData);
+    return result === "unknown" ? "unknown" : result;
+  } catch {
+    return "unknown";
+  }
 }
 
 /**
@@ -536,7 +587,18 @@ export class ShotAnalyzer {
         this.config as AnalysisConfig,
       );
 
-      shotAnalyses.push(analysis);
+      // Calculate orientation for this shot
+      const orientation = calculateShotOrientation(
+        allMetricsLandmarks,
+        shot.frameRange.start,
+        shot.frameRange.end,
+      );
+
+      // Add orientation to the analysis
+      shotAnalyses.push({
+        ...analysis,
+        orientation,
+      });
     }
 
     return {
@@ -764,7 +826,18 @@ export class ShotAnalyzer {
         this.config as AnalysisConfig,
       );
 
-      shotAnalyses.push(analysis);
+      // Calculate orientation for this shot
+      const orientation = calculateShotOrientation(
+        state.metricsLandmarks,
+        shot.frameRange.start,
+        shot.frameRange.end,
+      );
+
+      // Add orientation to the analysis
+      shotAnalyses.push({
+        ...analysis,
+        orientation,
+      });
     }
 
     return {

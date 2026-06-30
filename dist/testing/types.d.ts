@@ -247,15 +247,15 @@ export declare const labeledShotSchema: z.ZodObject<{
     endFrame: z.ZodNumber;
     cameraOrientation: z.ZodEnum<["front", "front-left", "front-right", "side-left", "side-right", "behind-left", "behind-right", "behind"]>;
 }, "strip", z.ZodTypeAny, {
-    cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
     shotNumber: number;
     startFrame: number;
     endFrame: number;
+    cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
 }, {
-    cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
     shotNumber: number;
     startFrame: number;
     endFrame: number;
+    cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
 }>;
 /**
  * Ground truth label data for a video.
@@ -287,33 +287,33 @@ export declare const labelDataSchema: z.ZodObject<{
         endFrame: z.ZodNumber;
         cameraOrientation: z.ZodEnum<["front", "front-left", "front-right", "side-left", "side-right", "behind-left", "behind-right", "behind"]>;
     }, "strip", z.ZodTypeAny, {
-        cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
         shotNumber: number;
         startFrame: number;
         endFrame: number;
+        cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
     }, {
-        cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
         shotNumber: number;
         startFrame: number;
         endFrame: number;
+        cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     video: string;
     shots: {
-        cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
         shotNumber: number;
         startFrame: number;
         endFrame: number;
+        cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
     }[];
     labeledBy: string;
     labeledAt: string;
 }, {
     video: string;
     shots: {
-        cameraOrientation: "front" | "side-left" | "side-right" | "front-left" | "front-right" | "behind-left" | "behind-right" | "behind";
         shotNumber: number;
         startFrame: number;
         endFrame: number;
+        cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
     }[];
     labeledBy: string;
     labeledAt: string;

@@ -44,4 +44,5 @@ export { youthFundamentalsProfile, highSchoolProfile, proFormProfile, builtInPro
 // Detection types exports
 export { ShotPhase as DetectionShotPhase, SHOT_PHASES, TOTAL_SHOT_PHASES, } from "./detection/types";
 export { createPoseDetector } from "./pose/factory";
+export { detectShots as detectShotsFromPoses, detectOrientation, createPoseShotDetector, } from "./detection/pose-shot-detector";
 //# sourceMappingURL=browser-entry.js.map

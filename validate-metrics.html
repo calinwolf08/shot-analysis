@@ -1781,6 +1781,7 @@
               phases: convertPhasesToExport(shot.phases),
               metrics: convertMetricsToExport(shot.metrics),
               overallConfidence: shot.overallConfidence,
+              orientation: shot.orientation || "unknown",
             })),
           };
 
@@ -1813,12 +1814,12 @@
           }
           updateExportPosesButtonState();
 
-          // Load the analysis data
-          loadAnalysisData(exportData);
-
-          // Load video for playback
+          // Load video for playback FIRST (this resets UI state)
           updateProgress("Loading video player...", 98);
           loadVideoIntoPlayer(file);
+
+          // Load the analysis data AFTER video (this shows the metrics UI)
+          loadAnalysisData(exportData);
 
           elements.progressSection.classList.add("hidden");
           showToast(
@@ -1939,10 +1940,21 @@
         // Shot info
         const frameCount = shot.frameRange.end - shot.frameRange.start + 1;
         const duration = (frameCount / appState.fps).toFixed(2);
+
+        // Get orientation from the shot (calculated by analyzer)
+        const orientation = shot.orientation || "unknown";
+
+        // Format orientation for display (e.g., "front-left" -> "Front Left")
+        const formatOrientation = (o) => o.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+
         elements.shotInfo.innerHTML = `
-        <span class="label">Frames:</span> <span class="value">${shot.frameRange.start} - ${shot.frameRange.end}</span>
+        <span class="label">Start:</span> <span class="value">${shot.frameRange.start}</span>
+        &nbsp;|&nbsp;
+        <span class="label">End:</span> <span class="value">${shot.frameRange.end}</span>
         &nbsp;|&nbsp;
         <span class="label">Duration:</span> <span class="value">${duration}s (${frameCount} frames)</span>
+        &nbsp;|&nbsp;
+        <span class="label">Orientation:</span> <span class="value">${formatOrientation(orientation)}</span>
         &nbsp;|&nbsp;
         <span class="label">Confidence:</span> <span class="value">${(shot.overallConfidence * 100).toFixed(0)}%</span>
       `;

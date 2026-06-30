@@ -30,6 +30,20 @@ export interface MetricValue {
 }
 
 /**
+ * Camera orientation relative to the shooter.
+ */
+export type Orientation =
+  | "front"
+  | "front-left"
+  | "front-right"
+  | "side-left"
+  | "side-right"
+  | "behind-left"
+  | "behind-right"
+  | "behind"
+  | "unknown";
+
+/**
  * Analysis results for a single basketball shot.
  *
  * Contains the shot's frame range, phase breakdown, calculated metrics,
@@ -51,6 +65,8 @@ export interface ShotAnalysis {
   readonly metrics: Readonly<Record<string, MetricValue>>;
   /** Overall confidence score for this shot analysis (0-1) */
   readonly overallConfidence: number;
+  /** Detected camera orientation for this shot (optional, calculated by analyzer) */
+  readonly orientation?: Orientation;
 }
 
 /**
