@@ -2,7 +2,7 @@
  * Unit tests for testing/types.ts
  */
 import { describe, it, expect } from "vitest";
-import { orientationSchema, testLandmarkSchema, frameSchema, poseDataSchema, labeledShotSchema, labelDataSchema, isPoseData, isLabelData, } from "./types";
+import { orientationSchema, testLandmarkSchema, frameSchema, poseDataSchema, labeledShotSchema, labelDataSchema, isPoseData, isLabelData, keyframeFieldSchema, KEYFRAME_IDS, } from "./types";
 describe("orientationSchema", () => {
     it("accepts valid orientations", () => {
         expect(orientationSchema.safeParse("front").success).toBe(true);
@@ -153,6 +153,50 @@ describe("poseDataSchema", () => {
         expect(poseDataSchema.safeParse(poseData).success).toBe(false);
     });
 });
+describe("keyframeFieldSchema", () => {
+    it("accepts valid non-negative integer", () => {
+        expect(keyframeFieldSchema.safeParse(0).success).toBe(true);
+        expect(keyframeFieldSchema.safeParse(100).success).toBe(true);
+        expect(keyframeFieldSchema.safeParse(999).success).toBe(true);
+    });
+    it("accepts null (not labeled)", () => {
+        expect(keyframeFieldSchema.safeParse(null).success).toBe(true);
+    });
+    it("accepts undefined (field omitted)", () => {
+        expect(keyframeFieldSchema.safeParse(undefined).success).toBe(true);
+    });
+    it("rejects negative frame numbers", () => {
+        expect(keyframeFieldSchema.safeParse(-1).success).toBe(false);
+        expect(keyframeFieldSchema.safeParse(-100).success).toBe(false);
+    });
+    it("rejects non-integer frame numbers", () => {
+        expect(keyframeFieldSchema.safeParse(10.5).success).toBe(false);
+        expect(keyframeFieldSchema.safeParse(0.1).success).toBe(false);
+    });
+    it("rejects non-numeric values", () => {
+        expect(keyframeFieldSchema.safeParse("10").success).toBe(false);
+        expect(keyframeFieldSchema.safeParse({}).success).toBe(false);
+    });
+});
+describe("KEYFRAME_IDS", () => {
+    it("contains exactly 10 keyframe IDs in order", () => {
+        expect(KEYFRAME_IDS).toHaveLength(10);
+        expect(KEYFRAME_IDS[0]).toBe("legs_start_bending");
+        expect(KEYFRAME_IDS[9]).toBe("feet_land");
+    });
+    it("contains all expected keyframe IDs", () => {
+        expect(KEYFRAME_IDS).toContain("legs_start_bending");
+        expect(KEYFRAME_IDS).toContain("leg_bend_low_point");
+        expect(KEYFRAME_IDS).toContain("ball_low_point");
+        expect(KEYFRAME_IDS).toContain("legs_start_extending");
+        expect(KEYFRAME_IDS).toContain("ball_starts_upward");
+        expect(KEYFRAME_IDS).toContain("set_point");
+        expect(KEYFRAME_IDS).toContain("release");
+        expect(KEYFRAME_IDS).toContain("arms_fully_extended");
+        expect(KEYFRAME_IDS).toContain("feet_leave_ground");
+        expect(KEYFRAME_IDS).toContain("feet_land");
+    });
+});
 describe("labeledShotSchema", () => {
     it("accepts valid labeled shot with cameraOrientation", () => {
         const shot = {
@@ -164,7 +208,10 @@ describe("labeledShotSchema", () => {
         const result = labeledShotSchema.safeParse(shot);
         expect(result.success).toBe(true);
         if (result.success) {
-            expect(result.data).toEqual(shot);
+            expect(result.data.shotNumber).toBe(1);
+            expect(result.data.startFrame).toBe(10);
+            expect(result.data.endFrame).toBe(50);
+            expect(result.data.cameraOrientation).toBe("front");
         }
     });
     it("rejects non-positive shotNumber", () => {
@@ -188,6 +235,122 @@ describe("labeledShotSchema", () => {
             endFrame: 50,
             cameraOrientation: "front",
         }).success).toBe(false);
+    });
+    // Keyframe field tests
+    it("accepts shot with all keyframe fields as integers", () => {
+        const shot = {
+            shotNumber: 1,
+            startFrame: 10,
+            endFrame: 100,
+            cameraOrientation: "front",
+            legs_start_bending: 10,
+            leg_bend_low_point: 20,
+            ball_low_point: 25,
+            legs_start_extending: 30,
+            ball_starts_upward: 35,
+            set_point: 50,
+            release: 60,
+            arms_fully_extended: 70,
+            feet_leave_ground: 40,
+            feet_land: 100,
+        };
+        const result = labeledShotSchema.safeParse(shot);
+        expect(result.success).toBe(true);
+        if (result.success) {
+            expect(result.data.legs_start_bending).toBe(10);
+            expect(result.data.release).toBe(60);
+            expect(result.data.feet_land).toBe(100);
+        }
+    });
+    it("accepts shot with keyframe fields as null (not labeled)", () => {
+        const shot = {
+            shotNumber: 1,
+            startFrame: 10,
+            endFrame: 100,
+            cameraOrientation: "front",
+            legs_start_bending: null,
+            leg_bend_low_point: null,
+            ball_low_point: null,
+            legs_start_extending: null,
+            ball_starts_upward: null,
+            set_point: null,
+            release: null,
+            arms_fully_extended: null,
+            feet_leave_ground: null,
+            feet_land: null,
+        };
+        const result = labeledShotSchema.safeParse(shot);
+        expect(result.success).toBe(true);
+        if (result.success) {
+            expect(result.data.legs_start_bending).toBeNull();
+            expect(result.data.release).toBeNull();
+        }
+    });
+    it("accepts shot without keyframe fields (backward compatibility)", () => {
+        const legacyShot = {
+            shotNumber: 1,
+            startFrame: 10,
+            endFrame: 50,
+            cameraOrientation: "front",
+        };
+        const result = labeledShotSchema.safeParse(legacyShot);
+        expect(result.success).toBe(true);
+        if (result.success) {
+            // Optional fields should be undefined
+            expect(result.data.legs_start_bending).toBeUndefined();
+            expect(result.data.release).toBeUndefined();
+            expect(result.data.feet_land).toBeUndefined();
+        }
+    });
+    it("accepts shot with partial keyframe fields", () => {
+        const partialShot = {
+            shotNumber: 1,
+            startFrame: 10,
+            endFrame: 50,
+            cameraOrientation: "front",
+            legs_start_bending: 10,
+            release: 40,
+            feet_land: 50,
+        };
+        const result = labeledShotSchema.safeParse(partialShot);
+        expect(result.success).toBe(true);
+        if (result.success) {
+            expect(result.data.legs_start_bending).toBe(10);
+            expect(result.data.release).toBe(40);
+            expect(result.data.feet_land).toBe(50);
+            expect(result.data.ball_low_point).toBeUndefined();
+        }
+    });
+    it("rejects shot with negative keyframe frame number", () => {
+        const shot = {
+            shotNumber: 1,
+            startFrame: 10,
+            endFrame: 50,
+            cameraOrientation: "front",
+            legs_start_bending: -5,
+        };
+        expect(labeledShotSchema.safeParse(shot).success).toBe(false);
+    });
+    it("rejects shot with non-integer keyframe frame number", () => {
+        const shot = {
+            shotNumber: 1,
+            startFrame: 10,
+            endFrame: 50,
+            cameraOrientation: "front",
+            release: 35.5,
+        };
+        expect(labeledShotSchema.safeParse(shot).success).toBe(false);
+    });
+    it("accepts keyframe at frame 0", () => {
+        const shot = {
+            shotNumber: 1,
+            startFrame: 0,
+            endFrame: 50,
+            cameraOrientation: "front",
+            legs_start_bending: 0,
+        };
+        const result = labeledShotSchema.safeParse(shot);
+        expect(result.success).toBe(true);
     });
 });
 describe("labelDataSchema", () => {

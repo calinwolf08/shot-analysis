@@ -226,7 +226,29 @@ export declare const poseDataSchema: z.ZodObject<{
     }[];
 }>;
 /**
+ * Identifiers for each keyframe in a basketball shot.
+ * These match the phase-based breakdown in metrics-by-phase.md.
+ *
+ * Phases and their keyframes:
+ * - Load: legs_start_bending, leg_bend_low_point, ball_low_point
+ * - Rise: legs_start_extending, ball_starts_upward
+ * - Set Point: set_point
+ * - Release: release, arms_fully_extended
+ * - Follow-through: feet_leave_ground, feet_land
+ */
+export type KeyframeId = "legs_start_bending" | "leg_bend_low_point" | "ball_low_point" | "legs_start_extending" | "ball_starts_upward" | "set_point" | "release" | "arms_fully_extended" | "feet_leave_ground" | "feet_land";
+/**
+ * All keyframe IDs in chronological order.
+ */
+export declare const KEYFRAME_IDS: readonly KeyframeId[];
+/**
+ * Zod schema for keyframe frame number validation.
+ * Keyframe fields are optional and can be null (not labeled) or a non-negative integer.
+ */
+export declare const keyframeFieldSchema: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+/**
  * A labeled shot from ground truth data.
+ * Includes optional keyframe annotations for detailed shot phase analysis.
  */
 export interface LabeledShot {
     /** One-based shot number (for human readability) */
@@ -237,25 +259,76 @@ export interface LabeledShot {
     readonly endFrame: number;
     /** Camera orientation for this specific shot */
     readonly cameraOrientation: Orientation;
+    /** Frame where legs start bending (Load phase start) */
+    readonly legs_start_bending?: number | null | undefined;
+    /** Frame of deepest knee bend */
+    readonly leg_bend_low_point?: number | null | undefined;
+    /** Frame of lowest ball position (dip) */
+    readonly ball_low_point?: number | null | undefined;
+    /** Frame where legs begin pushing up (Rise phase start) */
+    readonly legs_start_extending?: number | null | undefined;
+    /** Frame where ball begins rising */
+    readonly ball_starts_upward?: number | null | undefined;
+    /** Frame where ball is at peak before release (Set Point) */
+    readonly set_point?: number | null | undefined;
+    /** Frame where wrist snaps and ball leaves hand (Release) */
+    readonly release?: number | null | undefined;
+    /** Frame of maximum arm extension */
+    readonly arms_fully_extended?: number | null | undefined;
+    /** Frame where feet leave ground (if jumping) */
+    readonly feet_leave_ground?: number | null | undefined;
+    /** Frame where feet land (shot end) */
+    readonly feet_land?: number | null | undefined;
 }
 /**
  * Zod schema for LabeledShot validation.
+ * Keyframe fields are optional for backward compatibility with legacy labels.
  */
 export declare const labeledShotSchema: z.ZodObject<{
     shotNumber: z.ZodNumber;
     startFrame: z.ZodNumber;
     endFrame: z.ZodNumber;
     cameraOrientation: z.ZodEnum<["front", "front-left", "front-right", "side-left", "side-right", "behind-left", "behind-right", "behind"]>;
+    legs_start_bending: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    leg_bend_low_point: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    ball_low_point: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    legs_start_extending: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    ball_starts_upward: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    set_point: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    release: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    arms_fully_extended: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    feet_leave_ground: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    feet_land: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
 }, "strip", z.ZodTypeAny, {
     shotNumber: number;
     startFrame: number;
     endFrame: number;
     cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
+    release?: number | null | undefined;
+    legs_start_bending?: number | null | undefined;
+    leg_bend_low_point?: number | null | undefined;
+    ball_low_point?: number | null | undefined;
+    legs_start_extending?: number | null | undefined;
+    ball_starts_upward?: number | null | undefined;
+    set_point?: number | null | undefined;
+    arms_fully_extended?: number | null | undefined;
+    feet_leave_ground?: number | null | undefined;
+    feet_land?: number | null | undefined;
 }, {
     shotNumber: number;
     startFrame: number;
     endFrame: number;
     cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
+    release?: number | null | undefined;
+    legs_start_bending?: number | null | undefined;
+    leg_bend_low_point?: number | null | undefined;
+    ball_low_point?: number | null | undefined;
+    legs_start_extending?: number | null | undefined;
+    ball_starts_upward?: number | null | undefined;
+    set_point?: number | null | undefined;
+    arms_fully_extended?: number | null | undefined;
+    feet_leave_ground?: number | null | undefined;
+    feet_land?: number | null | undefined;
 }>;
 /**
  * Ground truth label data for a video.
@@ -286,16 +359,46 @@ export declare const labelDataSchema: z.ZodObject<{
         startFrame: z.ZodNumber;
         endFrame: z.ZodNumber;
         cameraOrientation: z.ZodEnum<["front", "front-left", "front-right", "side-left", "side-right", "behind-left", "behind-right", "behind"]>;
+        legs_start_bending: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        leg_bend_low_point: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        ball_low_point: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        legs_start_extending: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        ball_starts_upward: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        set_point: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        release: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        arms_fully_extended: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        feet_leave_ground: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        feet_land: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     }, "strip", z.ZodTypeAny, {
         shotNumber: number;
         startFrame: number;
         endFrame: number;
         cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
+        release?: number | null | undefined;
+        legs_start_bending?: number | null | undefined;
+        leg_bend_low_point?: number | null | undefined;
+        ball_low_point?: number | null | undefined;
+        legs_start_extending?: number | null | undefined;
+        ball_starts_upward?: number | null | undefined;
+        set_point?: number | null | undefined;
+        arms_fully_extended?: number | null | undefined;
+        feet_leave_ground?: number | null | undefined;
+        feet_land?: number | null | undefined;
     }, {
         shotNumber: number;
         startFrame: number;
         endFrame: number;
         cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
+        release?: number | null | undefined;
+        legs_start_bending?: number | null | undefined;
+        leg_bend_low_point?: number | null | undefined;
+        ball_low_point?: number | null | undefined;
+        legs_start_extending?: number | null | undefined;
+        ball_starts_upward?: number | null | undefined;
+        set_point?: number | null | undefined;
+        arms_fully_extended?: number | null | undefined;
+        feet_leave_ground?: number | null | undefined;
+        feet_land?: number | null | undefined;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     video: string;
@@ -304,6 +407,16 @@ export declare const labelDataSchema: z.ZodObject<{
         startFrame: number;
         endFrame: number;
         cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
+        release?: number | null | undefined;
+        legs_start_bending?: number | null | undefined;
+        leg_bend_low_point?: number | null | undefined;
+        ball_low_point?: number | null | undefined;
+        legs_start_extending?: number | null | undefined;
+        ball_starts_upward?: number | null | undefined;
+        set_point?: number | null | undefined;
+        arms_fully_extended?: number | null | undefined;
+        feet_leave_ground?: number | null | undefined;
+        feet_land?: number | null | undefined;
     }[];
     labeledBy: string;
     labeledAt: string;
@@ -314,6 +427,16 @@ export declare const labelDataSchema: z.ZodObject<{
         startFrame: number;
         endFrame: number;
         cameraOrientation: "front" | "front-left" | "front-right" | "side-left" | "side-right" | "behind-left" | "behind-right" | "behind";
+        release?: number | null | undefined;
+        legs_start_bending?: number | null | undefined;
+        leg_bend_low_point?: number | null | undefined;
+        ball_low_point?: number | null | undefined;
+        legs_start_extending?: number | null | undefined;
+        ball_starts_upward?: number | null | undefined;
+        set_point?: number | null | undefined;
+        arms_fully_extended?: number | null | undefined;
+        feet_leave_ground?: number | null | undefined;
+        feet_land?: number | null | undefined;
     }[];
     labeledBy: string;
     labeledAt: string;

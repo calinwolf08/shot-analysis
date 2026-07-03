@@ -1,578 +1,590 @@
 {
 	"project": {
-		"name": "shot-detection-iterative-testing",
+		"name": "all-frame-keypoint-detection",
 		"root_path": "/home/calin/projects/shot-analysis",
-		"created_at": "2026-03-08T12:00:00.000Z",
-		"updated_at": "2026-03-09T21:03:43.145Z"
+		"created_at": "2026-07-02T12:00:00.000Z",
+		"updated_at": "2026-07-02T12:00:00.000Z"
 	},
-	"status": "complete",
+	"status": "pending",
 	"global_constraints": {
 		"CRITICAL_RULE": "Labels are IMMUTABLE ground truth. The algorithm must be tuned to match the labels, NEVER the other way around.",
 		"forbidden_actions": [
 			"Modifying any labels.json file",
-			"Changing startFrame, endFrame, or cameraOrientation values in labels",
-			"Adding or removing shots from labels",
+			"Changing any keyframe values in labels",
 			"Adjusting labels to match algorithm output"
 		],
 		"allowed_actions": [
 			"Modifying algorithm parameters and thresholds",
-			"Changing detection logic in shot-detector.ts",
-			"Adjusting orientation detection in detection.ts",
+			"Changing detection logic in keyframe-detector.ts",
 			"Tuning any algorithm configuration values"
 		],
-		"frame_tolerance": "±8 frames from labeled values",
-		"orientation_tolerance": "Exact match required",
+		"frame_tolerance": "±8 frames from labeled values for all keyframes",
+		"keyframes_to_detect": [
+			"legs_start_bending",
+			"leg_bend_low_point",
+			"ball_low_point",
+			"legs_start_extending",
+			"ball_starts_upward",
+			"set_point",
+			"release",
+			"arms_fully_extended",
+			"feet_leave_ground",
+			"feet_land"
+		],
 		"failure_response": "If algorithm cannot match labels within tolerance, document the gap in algorithm-learnings.md and try a different algorithmic approach. NEVER modify labels.",
 		"algorithm_tuning_guidance": {
 			"analysis_approach": [
-				"Read poses.json around labeled start/end frames (±10 frames)",
-				"Examine ALL available pose landmarks at labeled frames vs detected frames",
-				"Identify what makes labeled frames distinct from surrounding frames"
+				"Read poses.json around labeled keyframe (±10 frames)",
+				"Examine ALL available pose landmarks at labeled frame vs surrounding frames",
+				"Identify what makes the labeled frame distinct from surrounding frames"
 			],
-			"freedom_to_experiment": [
-				"Try ANY pose metrics that distinguish labeled frames (not limited to wrist/knee)",
-				"Work backwards: find end frame first, then derive start frame",
-				"Work from middle: find peak/apex of shot, then expand to find boundaries",
-				"Combine multiple signals (e.g., wrist height + shoulder rotation + hip position)",
-				"Use velocity, acceleration, or rate-of-change of any landmark",
-				"Use relative positions between landmarks (e.g., wrist relative to shoulder)",
-				"Use z-depth patterns for orientation and motion phase detection"
-			],
+			"keyframe_specific_hints": {
+				"legs_start_bending": "Look for knee angle decrease beginning, hip drop start",
+				"leg_bend_low_point": "Find minimum knee angle (maximum bend)",
+				"ball_low_point": "Find lowest wrist Y position during dip phase",
+				"legs_start_extending": "Detect knee angle starting to increase",
+				"ball_starts_upward": "Detect wrist Y velocity turning negative (upward)",
+				"set_point": "Ball at highest position before release motion begins",
+				"release": "Maximum wrist flexion (snap), ball leaves hand",
+				"arms_fully_extended": "Maximum arm extension angle",
+				"feet_leave_ground": "Ankle Y position drops below threshold (jump)",
+				"feet_land": "Ankle Y returns to ground level"
+			},
 			"iteration_process": [
-				"1. Run test, note which shots fail and by how many frames",
-				"2. Load poses.json for failing video, examine frames around labeled boundaries",
+				"1. Run test, note which keyframes fail and by how many frames",
+				"2. Load poses.json for failing video, examine frames around labeled keyframe",
 				"3. Hypothesize what signal would correctly identify the labeled frame",
 				"4. Implement and test the hypothesis",
 				"5. If regression in other videos, refine approach to work for all",
 				"6. Document findings in algorithm-learnings.md"
 			],
-			"success_criteria": "Algorithm detects frames within ±8 of labels using consistent logic across all videos"
+			"success_criteria": "Algorithm detects all 10 keyframes within ±8 of labels using consistent logic across all videos"
 		}
 	},
 	"features": [
 		{
 			"id": "1.0",
-			"name": "Iterative Algorithm Testing",
-			"status": "complete",
+			"name": "Infrastructure Updates",
+			"status": "pending",
 			"parallel_group": 1,
 			"tasks": [
 				{
 					"id": "1.1",
-					"name": "Test Infrastructure Setup",
-					"status": "complete",
-					"phase": "complete",
+					"name": "Update Label Schema for All Keyframes",
+					"status": "pending",
+					"phase": "pending",
 					"attempts": 0,
 					"context": {
-						"user_story": "As a developer, I want the test infrastructure to correctly load and validate test data so that tests can actually run.",
+						"user_story": "As a developer, I want the label schema to include all 10 keyframe fields so that I can validate the algorithm against complete ground truth data.",
 						"acceptance_criteria": [
-							"Update frameSchema to allow landmarks: TestLandmark[] | null",
-							"Update Orientation type/schema to include behind, behind-left, behind-right (8 total orientations)",
-							"Update labeledShotSchema to include cameraOrientation: Orientation",
-							"Remove required top-level orientation from labelDataSchema (orientation is per-shot)",
-							"Update compareResults() in detection.ts to compare orientation per-shot instead of per-video",
-							"Update detectOrientation() to detect all 8 orientations including behind variants",
-							"Add --videos CLI flag to run on a subset of videos (e.g., --videos \"20181219,20190107\")",
-							"Handle frames with null landmarks gracefully in shot detection (skip them)",
-							"Create test-data/algorithm-learnings.md with initial structure",
-							"All 9 test videos load successfully (no validation errors)",
-							"Test runner executes and produces comparison output (even if tests fail)"
+							"Extend LabeledShot interface in types.ts with all 10 keyframe fields (each as number | null)",
+							"Update labeledShotSchema Zod validator to include keyframe fields",
+							"Keyframe fields are: legs_start_bending, leg_bend_low_point, ball_low_point, legs_start_extending, ball_starts_upward, set_point, release, arms_fully_extended, feet_leave_ground, feet_land",
+							"Each keyframe field is optional (null if not labeled)",
+							"Existing startFrame maps to legs_start_bending, endFrame maps to feet_land",
+							"Unit tests pass for new schema validation"
 						],
 						"edge_cases": [
-							"Frame with null landmarks: Skip frame in detection, don't crash",
-							"Shot spans frames with some null landmarks: Use available frames only",
-							"Video has shots with mixed orientations: Each shot compared independently"
+							"Keyframe field is null (not labeled): Schema accepts null values",
+							"Keyframe field is negative: Schema rejects negative frame numbers",
+							"Legacy labels without keyframes: Should still validate (fields optional)"
 						],
-						"data_model": "Orientation enum extended to 8 values: front, front-left, front-right, side-left, side-right, behind, behind-left, behind-right. LabeledShot includes cameraOrientation field. LabelData no longer has top-level orientation field. Frame.landmarks can be null when no pose detected.",
-						"technical_notes": "Files to modify: src/testing/types.ts (schemas), src/testing/detection.ts (comparison logic, orientation detection), src/testing/run-tests.ts (--videos flag), src/testing/reporting.ts (per-shot orientation output). Behind orientation detection uses reversed shoulder X positions (right shoulder X < left shoulder X) combined with Z-depth for behind-left vs behind-right."
+						"data_model": "LabeledShot interface extended with: legs_start_bending?: number | null, leg_bend_low_point?: number | null, ball_low_point?: number | null, legs_start_extending?: number | null, ball_starts_upward?: number | null, set_point?: number | null, release?: number | null, arms_fully_extended?: number | null, feet_leave_ground?: number | null, feet_land?: number | null",
+						"technical_notes": "The keyframe field names match exactly with video-tagger output and metrics-by-phase.md. Note that video-tagger labels use the OLD schema which has arms_most_acute and legs_fully_extended instead of release. The conversion script (Task 1.2) will handle mapping."
 					},
 					"subtasks": [
-						{
-							"id": "1.1.1",
-							"description": "Update Orientation type and schema to include 8 values (add behind, behind-left, behind-right)"
-						},
-						{
-							"id": "1.1.2",
-							"description": "Update frameSchema to allow landmarks: TestLandmark[] | null"
-						},
-						{
-							"id": "1.1.3",
-							"description": "Update labeledShotSchema to include cameraOrientation field"
-						},
-						{
-							"id": "1.1.4",
-							"description": "Remove top-level orientation from labelDataSchema and LabelData interface"
-						},
-						{
-							"id": "1.1.5",
-							"description": "Update detectOrientation() in detection.ts to detect all 8 orientations including behind variants"
-						},
-						{
-							"id": "1.1.6",
-							"description": "Update compareResults() to compare orientation per-shot instead of per-video"
-						},
-						{
-							"id": "1.1.7",
-							"description": "Update reporting.ts to show per-shot orientation comparison"
-						},
-						{
-							"id": "1.1.8",
-							"description": "Handle null landmarks in adaptPoseDataToDetector and related functions"
-						},
-						{
-							"id": "1.1.9",
-							"description": "Add --videos CLI flag to run-tests.ts for subset testing"
-						},
-						{
-							"id": "1.1.10",
-							"description": "Create test-data/algorithm-learnings.md with structured sections"
-						},
-						{
-							"id": "1.1.11",
-							"description": "Run test runner and verify all 9 videos load without validation errors"
-						}
-					],
-					"commit_hash": "53187a05c1cd41c436451912067f5529175732f5"
+						{ "id": "1.1.1", "description": "Add 10 keyframe fields to LabeledShot interface in types.ts" },
+						{ "id": "1.1.2", "description": "Update labeledShotSchema with optional keyframe field validators" },
+						{ "id": "1.1.3", "description": "Add type definitions for KeyframeId union type" },
+						{ "id": "1.1.4", "description": "Write unit tests for schema validation with keyframe fields" },
+						{ "id": "1.1.5", "description": "Verify existing test data still loads (backward compatibility)" }
+					]
 				},
 				{
 					"id": "1.2",
-					"name": "Level 1 - Video 1 (20181219_173607)",
-					"status": "complete",
-					"phase": "complete",
+					"name": "Convert Video-Tagger Labels to Test Data",
+					"status": "pending",
+					"phase": "pending",
 					"attempts": 0,
 					"context": {
-						"user_story": "As a developer, I want to pass the first test video so that I have a baseline for the algorithm's accuracy.",
+						"user_story": "As a developer, I want to convert video-tagger JSON files to test-data format so that I have ground truth keyframe labels for algorithm validation.",
 						"acceptance_criteria": [
-							"Run test on 20181219_173607 only using --videos flag",
-							"All 4 shots detected with correct count",
-							"Shot start/end frames within ±8 frame tolerance",
-							"Per-shot orientation matches labeled cameraOrientation exactly",
-							"Document any algorithm adjustments in algorithm-learnings.md",
-							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+							"Create script to read video-tagger _labels.json files from OneDrive path",
+							"Map old keyframe names to new: legs_start_bending stays, leg_bend_low_point stays, ball_low_point stays, ball_starts_upward stays, legs_start_extending stays, set_point stays, arms_fully_extended stays, feet_leave_ground stays, feet_land stays",
+							"Handle missing 'release' keyframe (set to null for old files, preserve if present)",
+							"Ignore arms_most_acute and legs_fully_extended (not in new schema)",
+							"Map orientation to cameraOrientation",
+							"Output labels.json in test-data/{video-name}/ directory format",
+							"Copy corresponding poses.json if available, or note missing",
+							"Script handles all 8 labeled videos (24 shots total)"
 						],
 						"edge_cases": [
-							"If shot count mismatch: Tune algorithm parameters (minShotGap, minYRange, etc.) - DO NOT add/remove labels",
-							"If frame timing off: Adjust detection thresholds (start/end proportional thresholds) - DO NOT change labeled frames",
-							"If orientation wrong: Tune orientation detection thresholds - DO NOT change labeled orientations"
+							"Video-tagger JSON has null keyframe: Preserve as null",
+							"poses.json doesn't exist for video: Log warning, skip pose copy",
+							"Video name has spaces: Handle properly in directory names",
+							"Partial labels (like cody/20190818_142631 shot 3): Preserve partial data",
+							"New format with release and orientation: Preserve these fields"
 						],
-						"data_model": "Video 20181219_173607 contains 4 labeled shots with various orientations. Labels are ground truth - algorithm must match them.",
-						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219\". Maximum 10 attempts per level. CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+						"data_model": "Input: video-tagger format {video, fps, shots: [{shot_number, orientation, keypoints: {key: frame}}]}. Output: test-data format {video, labeledBy, labeledAt, shots: [{shotNumber, startFrame, endFrame, cameraOrientation, ...keyframes}]}",
+						"technical_notes": "Video-tagger files are at: /mnt/c/Users/calin/OneDrive - Soul Focused Group/Personal Photos/basketball clips/{player}/*_labels.json. Players: chris, cody, cole, jax, edmond. The script should be in scripts/ directory. Map shot_number to shotNumber, orientation to cameraOrientation, keypoints.legs_start_bending to both legs_start_bending field AND startFrame for compatibility."
 					},
 					"subtasks": [
-						{
-							"id": "1.2.1",
-							"description": "Run test on 20181219_173607 and analyze initial results"
-						},
-						{
-							"id": "1.2.2",
-							"description": "If failures: Analyze frame diffs and orientation mismatches"
-						},
-						{
-							"id": "1.2.3",
-							"description": "If failures: Examine poses.json around labeled frames to understand ground truth"
-						},
-						{
-							"id": "1.2.4",
-							"description": "If failures: Update algorithm code to fix detection issues"
-						},
-						{
-							"id": "1.2.5",
-							"description": "Document algorithm changes in algorithm-learnings.md History section"
-						},
-						{
-							"id": "1.2.6",
-							"description": "Verify all 4 shots pass detection thresholds"
-						}
-					],
-					"commit_hash": "ea0ff0c26ba2eddf085af9949b9b2a1a79b39eb3"
+						{ "id": "1.2.1", "description": "Create scripts/convert-video-tagger-labels.ts" },
+						{ "id": "1.2.2", "description": "Implement reading video-tagger JSON format" },
+						{ "id": "1.2.3", "description": "Implement mapping old keyframe names to new schema" },
+						{ "id": "1.2.4", "description": "Implement output in test-data labels.json format" },
+						{ "id": "1.2.5", "description": "Run conversion for all 8 video-tagger label files" },
+						{ "id": "1.2.6", "description": "Verify converted labels load correctly with updated schema" }
+					]
 				},
 				{
 					"id": "1.3",
-					"name": "Level 2 - Videos 1-2 (add 20190107_211108)",
-					"status": "complete",
-					"phase": "complete",
+					"name": "Build Keyframe Comparison Infrastructure",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want the test runner to compare all 10 detected keyframes against labeled values so that I can validate the complete keyframe detection algorithm.",
+						"acceptance_criteria": [
+							"Extend compareResults() in detection.ts to compare all 10 keyframes",
+							"Each keyframe compared independently with ±8 frame tolerance",
+							"Report per-keyframe pass/fail status",
+							"Report frame difference for each keyframe",
+							"Overall shot passes only if ALL labeled keyframes pass",
+							"Skip comparison for null-labeled keyframes (not labeled = not tested)",
+							"Update console output to show keyframe-by-keyframe results"
+						],
+						"edge_cases": [
+							"Labeled keyframe is null: Skip comparison, don't count as failure",
+							"Detected keyframe is null but label exists: Failure (missed detection)",
+							"Keyframe detected but no label: Ignore (can't validate without ground truth)",
+							"Multiple keyframes fail: Report all failures, not just first"
+						],
+						"data_model": "KeyframeComparisonResult: { keyframeId: string, labeled: number | null, detected: number | null, diff: number | null, passed: boolean }. ShotComparisonResult extended with: keyframes: KeyframeComparisonResult[]",
+						"technical_notes": "Build on existing compareResults() logic. The tolerance check is: Math.abs(detected - labeled) <= 8. For console output, show: '✓ set_point: 65 (diff: +2)' or '✗ release: 73 (expected 70, diff: +3, EXCEEDS TOLERANCE)'"
+					},
+					"subtasks": [
+						{ "id": "1.3.1", "description": "Add KeyframeComparisonResult type to types.ts" },
+						{ "id": "1.3.2", "description": "Extend ShotComparisonResult with keyframes array" },
+						{ "id": "1.3.3", "description": "Implement compareKeyframes() function in detection.ts" },
+						{ "id": "1.3.4", "description": "Update compareResults() to call compareKeyframes()" },
+						{ "id": "1.3.5", "description": "Update reporting.ts to display per-keyframe results" },
+						{ "id": "1.3.6", "description": "Write unit tests for keyframe comparison logic" }
+					]
+				}
+			]
+		},
+		{
+			"id": "2.0",
+			"name": "Keyframe Detection Algorithms",
+			"status": "pending",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "2.1",
+					"name": "Load Phase Keyframe Detection",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to detect the Load phase keyframes (leg_bend_low_point, ball_low_point) so that I can identify the dip/gather phase of the shot.",
+						"acceptance_criteria": [
+							"Implement detectLegBendLowPoint(): Find frame with minimum knee angle (deepest bend)",
+							"Implement detectBallLowPoint(): Find frame with lowest wrist Y position during dip",
+							"Both functions take pose data and shot boundary (start/end) as input",
+							"Both functions return frame number or null if not detectable",
+							"Detection uses existing pose landmark data (no new extraction needed)",
+							"Initial implementation does not need to pass all tests - will be tuned iteratively"
+						],
+						"edge_cases": [
+							"No clear dip in the shot: Return frame closest to start",
+							"Multiple local minima: Choose the one within first 40% of shot",
+							"Pose landmarks missing for some frames: Skip frames with null landmarks"
+						],
+						"data_model": "Knee angle calculated from: hip, knee, ankle landmarks. Ball position approximated by wrist Y. MediaPipe landmark indices: LEFT_HIP=23, RIGHT_HIP=24, LEFT_KNEE=25, RIGHT_KNEE=26, LEFT_ANKLE=27, RIGHT_ANKLE=28, LEFT_WRIST=15, RIGHT_WRIST=16",
+						"technical_notes": "Create new file src/keyframe-detector.ts. Knee angle = angle between hip-knee and knee-ankle vectors. Lower angle = more bent. Wrist Y in normalized coords (0=top, 1=bottom), so 'lower' position means higher Y value."
+					},
+					"subtasks": [
+						{ "id": "2.1.1", "description": "Create src/keyframe-detector.ts with KeyframeDetector class" },
+						{ "id": "2.1.2", "description": "Implement calculateKneeAngle() helper function" },
+						{ "id": "2.1.3", "description": "Implement detectLegBendLowPoint() - find minimum knee angle frame" },
+						{ "id": "2.1.4", "description": "Implement detectBallLowPoint() - find maximum wrist Y frame in first half" },
+						{ "id": "2.1.5", "description": "Add unit tests for Load phase detection" }
+					]
+				},
+				{
+					"id": "2.2",
+					"name": "Rise Phase Keyframe Detection",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to detect the Rise phase keyframes (legs_start_extending, ball_starts_upward) so that I can identify when the shooting motion begins.",
+						"acceptance_criteria": [
+							"Implement detectLegsStartExtending(): Find frame where knee angle starts increasing",
+							"Implement detectBallStartsUpward(): Find frame where wrist Y starts decreasing (moving up)",
+							"Both should occur AFTER the Load phase low points",
+							"Use velocity/derivative to detect direction change",
+							"Initial implementation does not need to pass all tests - will be tuned iteratively"
+						],
+						"edge_cases": [
+							"Noisy pose data causing false direction changes: Apply smoothing",
+							"Gradual vs sudden transition: Use threshold for 'significant' change",
+							"legs_start_extending occurs before ball_starts_upward: Allow independent detection"
+						],
+						"data_model": "Velocity calculated as: (value[frame] - value[frame-1]) / (1/fps). Positive knee angle velocity = extending. Negative wrist Y velocity = rising (since Y=0 is top).",
+						"technical_notes": "Look for sustained direction change, not single-frame spikes. Consider requiring 2-3 consecutive frames of positive velocity to confirm. The ball_starts_upward detection can reuse wrist tracking from existing shot detector."
+					},
+					"subtasks": [
+						{ "id": "2.2.1", "description": "Implement detectLegsStartExtending() - find knee angle inflection point" },
+						{ "id": "2.2.2", "description": "Implement detectBallStartsUpward() - find wrist Y inflection point" },
+						{ "id": "2.2.3", "description": "Add velocity smoothing for noise reduction" },
+						{ "id": "2.2.4", "description": "Add unit tests for Rise phase detection" }
+					]
+				},
+				{
+					"id": "2.3",
+					"name": "Set Point and Release Detection",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to detect set_point and release keyframes so that I can identify the critical shooting mechanics frames.",
+						"acceptance_criteria": [
+							"Implement detectSetPoint(): Find frame where ball is at highest point BEFORE release motion",
+							"Implement detectRelease(): Find frame of maximum wrist flexion (snap)",
+							"set_point occurs before release, release occurs after set_point",
+							"Use elbow angle and wrist angle to distinguish set_point from release",
+							"Initial implementation does not need to pass all tests - will be tuned iteratively"
+						],
+						"edge_cases": [
+							"Quick release with minimal pause at set point: set_point and release may be close",
+							"Pump fake or hesitation: May have multiple 'pauses' - use final one before release",
+							"Jump shot vs set shot: Handle both mechanics"
+						],
+						"data_model": "Set point identified by: wrist at local high point, elbow still bent. Release identified by: wrist moving forward/down, elbow extending, wrist flexion at maximum. Elbow angle from shoulder-elbow-wrist vectors.",
+						"technical_notes": "The set_point is the 'cocking' position where the ball is held at highest point before the forward/upward release motion. The release is when the wrist snaps (maximum wrist flexion angle) which is when the ball leaves the hand."
+					},
+					"subtasks": [
+						{ "id": "2.3.1", "description": "Implement calculateElbowAngle() helper function" },
+						{ "id": "2.3.2", "description": "Implement calculateWristAngle() helper function" },
+						{ "id": "2.3.3", "description": "Implement detectSetPoint() - find wrist high point with bent elbow" },
+						{ "id": "2.3.4", "description": "Implement detectRelease() - find maximum wrist flexion after set_point" },
+						{ "id": "2.3.5", "description": "Add unit tests for Set/Release detection" }
+					]
+				},
+				{
+					"id": "2.4",
+					"name": "Follow-through Keyframe Detection",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to detect Follow-through keyframes (arms_fully_extended, feet_leave_ground, feet_land) so that I can complete the shot analysis.",
+						"acceptance_criteria": [
+							"Implement detectArmsFullyExtended(): Find frame of maximum arm extension",
+							"Implement detectFeetLeaveGround(): Find frame when ankles rise above ground level",
+							"Implement detectFeetLand(): Find frame when ankles return to ground level",
+							"arms_fully_extended occurs after release",
+							"feet_leave_ground may occur during Rise or Set Point phase (jump shots)",
+							"feet_land is typically the shot end frame",
+							"Initial implementation does not need to pass all tests - will be tuned iteratively"
+						],
+						"edge_cases": [
+							"Set shot (no jump): feet_leave_ground may be null or same as shot start",
+							"Fade-away or off-balance shot: feet positions may be asymmetric",
+							"Multiple hop steps: Detect the jump during shooting motion, not approach"
+						],
+						"data_model": "Arm extension = elbow angle approaching 180°. Ground level = baseline ankle Y established at shot start. Jump detected when ankle Y drops significantly below baseline.",
+						"technical_notes": "The arms_fully_extended frame is typically the follow-through hold position. For ground detection, establish a baseline from the first few frames and detect significant deviation. This may already be similar to existing shot end detection."
+					},
+					"subtasks": [
+						{ "id": "2.4.1", "description": "Implement detectArmsFullyExtended() - find maximum elbow extension" },
+						{ "id": "2.4.2", "description": "Implement establishGroundBaseline() - get ankle Y at shot start" },
+						{ "id": "2.4.3", "description": "Implement detectFeetLeaveGround() - find ankle lift above baseline" },
+						{ "id": "2.4.4", "description": "Implement detectFeetLand() - find ankle return to baseline" },
+						{ "id": "2.4.5", "description": "Add unit tests for Follow-through detection" }
+					]
+				}
+			]
+		},
+		{
+			"id": "3.0",
+			"name": "Iterative Testing Levels",
+			"status": "pending",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "3.1",
+					"name": "Level 1 - chris 5 (1 shot)",
+					"status": "pending",
+					"phase": "pending",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to pass all keyframe detection for the first test video so that I have a working baseline for iterative tuning.",
+						"acceptance_criteria": [
+							"Run keyframe detection on chris 5 video (1 shot)",
+							"All 10 keyframes detected within ±8 frames of labels",
+							"NOTE: release keyframe may not be labeled (needs manual addition to labels)",
+							"Document any algorithm adjustments in algorithm-learnings.md",
+							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
+						],
+						"edge_cases": [
+							"If keyframe detection is off by >8 frames: Analyze pose data and tune algorithm",
+							"If a keyframe is not in the labeled data: Skip validation for that keyframe"
+						],
+						"data_model": "chris 5 labeled keyframes from video-tagger: legs_start_bending=55, leg_bend_low_point=66, ball_low_point=55, ball_starts_upward=60, legs_start_extending=67, set_point=70, arms_fully_extended=76, feet_leave_ground=74, feet_land=80. Release not labeled.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris\". First video is chosen as simplest case (1 shot, good pose quality, side-right orientation). Algorithm Tuning Process: (1) Run test, note which keyframes fail. (2) Read poses.json around labeled keyframe (±10 frames). (3) Identify what makes labeled frame distinct. (4) Implement hypothesis, test. (5) Document findings."
+					},
+					"subtasks": [
+						{ "id": "3.1.1", "description": "Run keyframe detection on chris 5 and analyze initial results" },
+						{ "id": "3.1.2", "description": "For each failing keyframe: Examine poses.json around labeled frame" },
+						{ "id": "3.1.3", "description": "Tune detection algorithms based on pose analysis" },
+						{ "id": "3.1.4", "description": "Document algorithm changes in algorithm-learnings.md" },
+						{ "id": "3.1.5", "description": "Verify all 10 keyframes pass within ±8 tolerance" }
+					]
+				},
+				{
+					"id": "3.2",
+					"name": "Level 2 - Add cole/20201212_134104 (1 shot)",
+					"status": "pending",
+					"phase": "pending",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want to add a second test video without breaking the first so that the algorithm generalizes.",
 						"acceptance_criteria": [
-							"Run test on both 20181219_173607 and 20190107_211108",
-							"Video 1 (20181219_173607) still passes - no regression",
-							"Video 2 (20190107_211108) 1 shot detected correctly",
-							"Shot timing within ±8 frames, orientation matches exactly",
+							"Run keyframe detection on chris 5 AND cole/20201212_134104",
+							"chris 5 still passes all keyframes (no regression)",
+							"cole/20201212_134104 all keyframes detected within ±8 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
-							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
 						"edge_cases": [
-							"Regression in video 1: Fix by tuning algorithm - DO NOT modify video 1 labels",
-							"Algorithm change helps video 2 but breaks video 1: Find algorithm parameters that work for BOTH - DO NOT adjust labels"
+							"Regression in video 1: Fix by tuning algorithm, NOT by modifying video 1 labels",
+							"Different camera orientation may affect detection: Handle orientation differences"
 						],
-						"data_model": "Video 20190107_211108 contains 1 labeled shot with front orientation. Labels are immutable ground truth.",
-						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107\". Regression check is critical. CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+						"data_model": "cole/20201212_134104 labeled keyframes: legs_start_bending=75, leg_bend_low_point=86, ball_low_point=81, ball_starts_upward=83, legs_start_extending=88, set_point=91, arms_fully_extended=99, feet_leave_ground=97, feet_land=107",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212\". This is the second single-shot video, also side-right orientation. Check for consistency with chris 5 patterns."
 					},
 					"subtasks": [
-						{
-							"id": "1.3.1",
-							"description": "Run test on videos 1-2 and analyze results"
-						},
-						{
-							"id": "1.3.2",
-							"description": "Verify video 1 still passes (no regression)"
-						},
-						{
-							"id": "1.3.3",
-							"description": "If video 2 fails: Analyze and fix without breaking video 1"
-						},
-						{
-							"id": "1.3.4",
-							"description": "Document any algorithm changes in algorithm-learnings.md"
-						},
-						{
-							"id": "1.3.5",
-							"description": "Verify both videos pass all detection thresholds"
-						}
-					],
-					"commit_hash": "544f1b3d65ce01a5d59b5b62cf6f3877b3f6f5cd"
+						{ "id": "3.2.1", "description": "Run test on videos 1-2 and analyze results" },
+						{ "id": "3.2.2", "description": "Verify video 1 (chris 5) still passes (no regression)" },
+						{ "id": "3.2.3", "description": "If video 2 fails: Analyze and fix without breaking video 1" },
+						{ "id": "3.2.4", "description": "Document any changes in algorithm-learnings.md" },
+						{ "id": "3.2.5", "description": "Verify both videos pass all keyframe thresholds" }
+					]
 				},
 				{
-					"id": "1.4",
-					"name": "Level 3 - Videos 1-3 (add 20190124_175609)",
-					"status": "complete",
-					"phase": "complete",
+					"id": "3.3",
+					"name": "Level 3 - Add chris/20190103_181419 (2 shots)",
+					"status": "pending",
+					"phase": "pending",
 					"attempts": 0,
 					"context": {
-						"user_story": "As a developer, I want to add a third test video with 5 shots to validate multi-shot detection.",
+						"user_story": "As a developer, I want to add a multi-shot video to ensure keyframe detection works across shot boundaries.",
 						"acceptance_criteria": [
-							"Run test on videos 1-3",
-							"Videos 1-2 still pass - no regression",
-							"Video 3 (20190124_175609) all 5 shots detected correctly",
-							"Shot timing within ±8 frames, orientation matches exactly for each shot",
+							"Run keyframe detection on all videos 1-3",
+							"Videos 1-2 still pass (no regression)",
+							"chris/20190103_181419 all keyframes for both shots detected within ±8 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
-							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
 						"edge_cases": [
-							"Same error pattern across multiple videos: Apply systematic algorithm fix - DO NOT batch-modify labels",
-							"Video has front-left and side-left orientations: Tune orientation thresholds - DO NOT change labeled orientations"
+							"Different shot timing within same video: Each shot detected independently",
+							"Keyframe detection should reset between shots"
 						],
-						"data_model": "Video 20190124_175609 contains 5 labeled shots with front-left and side-left orientations. Labels are immutable.",
-						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124\". If orientation detection disagrees with labels, the ALGORITHM is wrong. CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+						"data_model": "chris/20190103_181419 has 2 shots. Shot 1: legs_start_bending=11, leg_bend_low_point=20, ball_low_point=10, ball_starts_upward=16, legs_start_extending=21, set_point=23, arms_fully_extended=28, feet_leave_ground=26, feet_land=35. Shot 2: Similar pattern starting at frame 121.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419\". First video with multiple shots. May reveal issues with shot boundary detection affecting keyframe detection."
 					},
 					"subtasks": [
-						{
-							"id": "1.4.1",
-							"description": "Run test on videos 1-3 and analyze results"
-						},
-						{
-							"id": "1.4.2",
-							"description": "Verify videos 1-2 still pass (no regression)"
-						},
-						{
-							"id": "1.4.3",
-							"description": "If video 3 fails: Analyze frame diffs and orientation mismatches"
-						},
-						{
-							"id": "1.4.4",
-							"description": "Update algorithm if needed to handle front-left/side-left orientations"
-						},
-						{
-							"id": "1.4.5",
-							"description": "Document changes in algorithm-learnings.md"
-						},
-						{
-							"id": "1.4.6",
-							"description": "Verify all 3 videos pass detection thresholds"
-						}
-					],
-					"commit_hash": "5ca5102a18ffd4da3d5f128d23ac4a53f5c4ab8d"
+						{ "id": "3.3.1", "description": "Run test on videos 1-3 and analyze results" },
+						{ "id": "3.3.2", "description": "Verify videos 1-2 still pass (no regression)" },
+						{ "id": "3.3.3", "description": "If video 3 fails: Analyze both shots for patterns" },
+						{ "id": "3.3.4", "description": "Document any changes in algorithm-learnings.md" },
+						{ "id": "3.3.5", "description": "Verify all 3 videos pass all keyframe thresholds" }
+					]
 				},
 				{
-					"id": "1.5",
-					"name": "Level 4 - Videos 1-4 (add 20190804_140654)",
-					"status": "complete",
-					"phase": "complete",
+					"id": "3.4",
+					"name": "Level 4 - Add chris/20190103_180930 (3 shots)",
+					"status": "pending",
+					"phase": "pending",
 					"attempts": 0,
 					"context": {
-						"user_story": "As a developer, I want to add a video with 'behind' orientations to validate the extended orientation detection.",
+						"user_story": "As a developer, I want to add more shots to validate keyframe detection robustness.",
 						"acceptance_criteria": [
-							"Run test on videos 1-4",
-							"Videos 1-3 still pass - no regression",
-							"Video 4 (20190804_140654) all 7 shots detected correctly",
-							"Behind, behind-left, behind-right orientations detected correctly to match labels",
+							"Run keyframe detection on all videos 1-4",
+							"Videos 1-3 still pass (no regression)",
+							"chris/20190103_180930 all keyframes for all 3 shots detected within ±8 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
-							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
 						"edge_cases": [
-							"Behind orientation detection: If algorithm detects wrong orientation, tune detection thresholds - DO NOT change labels",
-							"Video has mix of behind and side orientations: Algorithm must correctly distinguish them - DO NOT relabel"
+							"Varying shot styles within same video: Algorithm handles variety",
+							"Different timing patterns: Algorithm adapts"
 						],
-						"data_model": "Video 20190804_140654 contains 7 labeled shots with orientations: side-left, behind-left (x2), behind, behind-right, side-right (x2). Labels are ground truth.",
-						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124,20190804\". If behind detection fails, fix the orientation detection algorithm. CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+						"data_model": "chris/20190103_180930 has 3 shots with full keyframe labels.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419,20190103_180930\". Total of 7 shots across 4 videos."
 					},
 					"subtasks": [
-						{
-							"id": "1.5.1",
-							"description": "Run test on videos 1-4 and analyze results"
-						},
-						{
-							"id": "1.5.2",
-							"description": "Verify videos 1-3 still pass (no regression)"
-						},
-						{
-							"id": "1.5.3",
-							"description": "If video 4 fails: Focus on behind orientation detection logic"
-						},
-						{
-							"id": "1.5.4",
-							"description": "Tune behind detection thresholds if needed"
-						},
-						{
-							"id": "1.5.5",
-							"description": "Document behind detection insights in algorithm-learnings.md"
-						},
-						{
-							"id": "1.5.6",
-							"description": "Verify all 4 videos pass detection thresholds"
-						}
-					],
-					"commit_hash": "b3664bff12d035b04fcc0dc93428e506aa91c065"
+						{ "id": "3.4.1", "description": "Run test on videos 1-4 and analyze results" },
+						{ "id": "3.4.2", "description": "Verify videos 1-3 still pass (no regression)" },
+						{ "id": "3.4.3", "description": "If video 4 fails: Analyze and fix detection issues" },
+						{ "id": "3.4.4", "description": "Document any changes in algorithm-learnings.md" },
+						{ "id": "3.4.5", "description": "Verify all 4 videos pass all keyframe thresholds" }
+					]
 				},
 				{
-					"id": "1.6",
-					"name": "Level 5 - Videos 1-5 (add 20190818_142631)",
-					"status": "complete",
-					"phase": "complete",
+					"id": "3.5",
+					"name": "Level 5 - Add cody/20190818_142631 (3 shots)",
+					"status": "pending",
+					"phase": "pending",
 					"attempts": 0,
 					"context": {
-						"user_story": "As a developer, I want to continue adding videos to ensure the algorithm remains robust.",
+						"user_story": "As a developer, I want to add a video with partial labels to test handling of incomplete ground truth.",
 						"acceptance_criteria": [
-							"Run test on videos 1-5",
-							"Videos 1-4 still pass - no regression",
-							"Video 5 (20190818_142631) all 3 shots detected correctly",
-							"Shot timing within ±8 frames, orientation matches exactly",
+							"Run keyframe detection on all videos 1-5",
+							"Videos 1-4 still pass (no regression)",
+							"cody/20190818_142631 all keyframes for all shots detected within ±8 frames",
+							"Shot 3 has partial labels (leg_bend_low_point is null) - skip that keyframe validation",
 							"Document any algorithm adjustments in algorithm-learnings.md",
-							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
 						"edge_cases": [
-							"Video has side-left and front orientations: Tune front/side boundary threshold in algorithm - DO NOT change labels"
+							"Partial labels (null keyframes): Skip comparison for null-labeled keyframes",
+							"Different shooter (Cody vs Chris): Algorithm handles different body types"
 						],
-						"data_model": "Video 20190818_142631 contains 3 labeled shots with side-left and front orientations. Labels are immutable.",
-						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124,20190804,20190818\". CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+						"data_model": "cody/20190818_142631 has 3 shots. Shot 3 has leg_bend_low_point=null (unlabeled).",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419,20190103_180930,20190818\". First video from different shooter. Total 10 shots."
 					},
 					"subtasks": [
-						{
-							"id": "1.6.1",
-							"description": "Run test on videos 1-5 and analyze results"
-						},
-						{
-							"id": "1.6.2",
-							"description": "Verify videos 1-4 still pass (no regression)"
-						},
-						{
-							"id": "1.6.3",
-							"description": "If video 5 fails: Analyze and fix detection issues"
-						},
-						{
-							"id": "1.6.4",
-							"description": "Document any changes in algorithm-learnings.md"
-						},
-						{
-							"id": "1.6.5",
-							"description": "Verify all 5 videos pass detection thresholds"
-						}
-					],
-					"commit_hash": "5f525e6e7e09b12fa4c3b467d5f0ce8770b92082"
+						{ "id": "3.5.1", "description": "Run test on videos 1-5 and analyze results" },
+						{ "id": "3.5.2", "description": "Verify videos 1-4 still pass (no regression)" },
+						{ "id": "3.5.3", "description": "Verify null keyframes are skipped in comparison" },
+						{ "id": "3.5.4", "description": "If video 5 fails: Analyze and fix detection issues" },
+						{ "id": "3.5.5", "description": "Document any changes in algorithm-learnings.md" },
+						{ "id": "3.5.6", "description": "Verify all 5 videos pass all keyframe thresholds" }
+					]
 				},
 				{
-					"id": "1.7",
-					"name": "Level 6 - Videos 1-6 (add 20200606_111929)",
-					"status": "complete",
-					"phase": "complete",
+					"id": "3.6",
+					"name": "Level 6 - Add cody/20190804_140617 (3 shots)",
+					"status": "pending",
+					"phase": "pending",
 					"attempts": 0,
 					"context": {
-						"user_story": "As a developer, I want to add more test videos to validate generalization.",
+						"user_story": "As a developer, I want to add cody's video to continue building keyframe detection robustness.",
 						"acceptance_criteria": [
-							"Run test on videos 1-6",
-							"Videos 1-5 still pass - no regression",
-							"Video 6 (20200606_111929) all 5 shots detected correctly",
-							"Shot timing within ±8 frames, orientation matches exactly",
+							"Run keyframe detection on all 6 videos",
+							"Videos 1-5 still pass (no regression)",
+							"cody/20190804_140617 all keyframes for all 3 shots detected within ±8 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
-							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
 						"edge_cases": [
-							"Video has side-right and front-right orientations: Tune algorithm to detect these correctly - DO NOT change labels"
+							"Different shooter body type: Algorithm handles variety"
 						],
-						"data_model": "Video 20200606_111929 contains 5 labeled shots with side-right and front-right orientations. Labels are immutable.",
-						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124,20190804,20190818,20200606\". CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+						"data_model": "cody/20190804_140617 has 3 shots with full keyframe labels.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419,20190103_180930,20190818,20190804\". Total 13 shots across 6 videos."
 					},
 					"subtasks": [
-						{
-							"id": "1.7.1",
-							"description": "Run test on videos 1-6 and analyze results"
-						},
-						{
-							"id": "1.7.2",
-							"description": "Verify videos 1-5 still pass (no regression)"
-						},
-						{
-							"id": "1.7.3",
-							"description": "If video 6 fails: Analyze side-right/front-right detection"
-						},
-						{
-							"id": "1.7.4",
-							"description": "Document any changes in algorithm-learnings.md"
-						},
-						{
-							"id": "1.7.5",
-							"description": "Verify all 6 videos pass detection thresholds"
-						}
-					],
-					"commit_hash": "8df5b843809b45a451ba93257b224e7f3117d330"
+						{ "id": "3.6.1", "description": "Run test on videos 1-6 and analyze results" },
+						{ "id": "3.6.2", "description": "Verify videos 1-5 still pass (no regression)" },
+						{ "id": "3.6.3", "description": "If video 6 fails: Analyze and fix detection issues" },
+						{ "id": "3.6.4", "description": "Document any changes in algorithm-learnings.md" },
+						{ "id": "3.6.5", "description": "Verify all 6 videos pass all keyframe thresholds" }
+					]
 				},
 				{
-					"id": "1.8",
-					"name": "Level 7 - Videos 1-7 (add 20201212_134104)",
-					"status": "complete",
-					"phase": "complete",
+					"id": "3.7",
+					"name": "Level 7 - Add jax/20181219_173607 (4 shots)",
+					"status": "pending",
+					"phase": "pending",
 					"attempts": 0,
 					"context": {
-						"user_story": "As a developer, I want to add a single-shot video to ensure simple cases still work.",
+						"user_story": "As a developer, I want to add jax's video with multiple orientations to test keyframe detection across different camera angles.",
 						"acceptance_criteria": [
-							"Run test on videos 1-7",
-							"Videos 1-6 still pass - no regression",
-							"Video 7 (20201212_134104) 1 shot detected correctly",
-							"Shot timing within ±8 frames, orientation matches exactly",
+							"Run keyframe detection on all 7 videos",
+							"Videos 1-6 still pass (no regression)",
+							"jax/20181219_173607 all keyframes for all 4 shots detected within ±8 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
-							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
 						"edge_cases": [
-							"Single shot video with false positives: Tune minYRange or other filters - DO NOT remove shots from labels"
+							"Multiple orientations in one video: front-right, side-left, behind, side-right",
+							"Different shooter (Jax): Algorithm handles different body types"
 						],
-						"data_model": "Video 20201212_134104 contains 1 labeled shot with side-right orientation. Labels are immutable.",
-						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124,20190804,20190818,20200606,20201212\". CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+						"data_model": "jax/20181219_173607 has 4 shots with orientations: front-right, side-left, behind, side-right. All keyframes including release are labeled.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419,20190103_180930,20190818,20190804_140617,20181219_173607\". Total 17 shots across 7 videos."
 					},
 					"subtasks": [
-						{
-							"id": "1.8.1",
-							"description": "Run test on videos 1-7 and analyze results"
-						},
-						{
-							"id": "1.8.2",
-							"description": "Verify videos 1-6 still pass (no regression)"
-						},
-						{
-							"id": "1.8.3",
-							"description": "If video 7 fails: Fix detection for single-shot video"
-						},
-						{
-							"id": "1.8.4",
-							"description": "Document any changes in algorithm-learnings.md"
-						},
-						{
-							"id": "1.8.5",
-							"description": "Verify all 7 videos pass detection thresholds"
-						}
-					],
-					"commit_hash": "9976376d32cf95aed1299d6947d30ca9c0fda978"
+						{ "id": "3.7.1", "description": "Run test on videos 1-7 and analyze results" },
+						{ "id": "3.7.2", "description": "Verify videos 1-6 still pass (no regression)" },
+						{ "id": "3.7.3", "description": "If video 7 fails: Analyze and fix detection issues" },
+						{ "id": "3.7.4", "description": "Document any changes in algorithm-learnings.md" },
+						{ "id": "3.7.5", "description": "Verify all 7 videos pass all keyframe thresholds" }
+					]
 				},
 				{
-					"id": "1.9",
-					"name": "Level 8 - Videos 1-8 (add chris-5)",
-					"status": "complete",
-					"phase": "complete",
+					"id": "3.8",
+					"name": "Level 8 - Add edmond/20190804_140654 (7 shots)",
+					"status": "pending",
+					"phase": "pending",
 					"attempts": 0,
 					"context": {
-						"user_story": "As a developer, I want to add another single-shot video from a different source.",
+						"user_story": "As a developer, I want to add edmond's video with the most shots to stress-test keyframe detection.",
 						"acceptance_criteria": [
-							"Run test on videos 1-8",
-							"Videos 1-7 still pass - no regression",
-							"Video 8 (chris-5) 1 shot detected correctly",
-							"Shot timing within ±8 frames, orientation matches exactly",
+							"Run keyframe detection on all 8 videos",
+							"Videos 1-7 still pass (no regression)",
+							"edmond/20190804_140654 all keyframes for all 7 shots detected within ±8 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
-							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
 						"edge_cases": [
-							"Different video source may have different pose quality: Tune algorithm to handle variations - DO NOT adjust labels"
+							"Largest video with 7 shots: Tests algorithm consistency",
+							"Multiple behind orientations: behind-left (x2), behind, behind-right",
+							"Different shooter (Edmond): Algorithm handles different body types"
 						],
-						"data_model": "Video chris-5 contains 1 labeled shot with side-right orientation. Start frame 60, end frame 83. Labels are immutable.",
-						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124,20190804,20190818,20200606,20201212,chris\". CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+						"data_model": "edmond/20190804_140654 has 7 shots with orientations: side-left, behind-left (x2), behind, behind-right, side-right (x2). All keyframes including release are labeled.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419,20190103_180930,20190818,20190804_140617,20181219_173607,edmond_20190804\". Total 24 shots across 8 videos."
 					},
 					"subtasks": [
-						{
-							"id": "1.9.1",
-							"description": "Run test on videos 1-8 and analyze results"
-						},
-						{
-							"id": "1.9.2",
-							"description": "Verify videos 1-7 still pass (no regression)"
-						},
-						{
-							"id": "1.9.3",
-							"description": "If video 8 fails: Analyze and fix detection"
-						},
-						{
-							"id": "1.9.4",
-							"description": "Document any changes in algorithm-learnings.md"
-						},
-						{
-							"id": "1.9.5",
-							"description": "Verify all 8 videos pass detection thresholds"
-						}
-					],
-					"commit_hash": "d44f7b3bc2761d03439484b7e42ffe6a89873967"
+						{ "id": "3.8.1", "description": "Run test on videos 1-8 and analyze results" },
+						{ "id": "3.8.2", "description": "Verify videos 1-7 still pass (no regression)" },
+						{ "id": "3.8.3", "description": "If video 8 fails: Analyze and fix detection issues" },
+						{ "id": "3.8.4", "description": "Document any changes in algorithm-learnings.md" },
+						{ "id": "3.8.5", "description": "Verify all 8 videos pass all keyframe thresholds" }
+					]
 				},
 				{
-					"id": "1.10",
-					"name": "Level 9 - All Videos (add zak-1, final validation)",
-					"status": "complete",
-					"phase": "complete",
+					"id": "3.9",
+					"name": "Final Validation and Documentation",
+					"status": "pending",
+					"phase": "pending",
 					"attempts": 0,
 					"context": {
-						"user_story": "As a developer, I want all 9 videos to pass and document the final algorithm configuration.",
+						"user_story": "As a developer, I want the final algorithm documented after all videos pass so that the working configuration is preserved.",
 						"acceptance_criteria": [
-							"Run test on all 9 videos",
-							"Videos 1-8 still pass - no regression",
-							"Video 9 (zak-1) all 9 shots detected correctly with all 8 orientations",
-							"All videos pass in single test run with ±8 frame tolerance and exact orientation match",
-							"algorithm-learnings.md has complete 'Current Algorithm Summary' section",
+							"All 8 videos (24 shots) pass in single test run",
+							"All 10 keyframes detected within ±8 frames for all labeled keyframes",
+							"algorithm-learnings.md has complete 'Keyframe Detection Summary' section",
 							"Configuration parameters documented (thresholds, windows, etc.)",
-							"CRITICAL: NO modifications to any labels.json - algorithm was tuned to match labels throughout"
+							"Document per-keyframe detection accuracy statistics"
 						],
 						"edge_cases": [
-							"zak-1 contains all 8 orientation types: Algorithm must detect all correctly - DO NOT relabel",
-							"Final video is largest with 9 shots: Tune shot gap and duration parameters - DO NOT adjust labels"
+							"N/A (only reached after all levels pass)"
 						],
-						"data_model": "Video zak-1 contains 9 labeled shots covering all 8 orientation types. Labels are immutable ground truth.",
-						"technical_notes": "Run: npx tsx src/testing/run-tests.ts (all videos). Success means the ALGORITHM matches ALL labels across ALL videos. CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+						"data_model": "Final statistics: per-keyframe average error, max error, pass rate.",
+						"technical_notes": "Create summary section in algorithm-learnings.md with: (1) What works for each keyframe type, (2) Key observations about keyframe detection, (3) Configuration parameter values, (4) Total shots tested (24), pass rate."
 					},
 					"subtasks": [
-						{
-							"id": "1.10.1",
-							"description": "Run test on all 9 videos and analyze results"
-						},
-						{
-							"id": "1.10.2",
-							"description": "Verify videos 1-8 still pass (no regression)"
-						},
-						{
-							"id": "1.10.3",
-							"description": "If video 9 fails: Fix remaining orientation or timing issues"
-						},
-						{
-							"id": "1.10.4",
-							"description": "Complete 'What Works' section in algorithm-learnings.md"
-						},
-						{
-							"id": "1.10.5",
-							"description": "Complete 'Key Observations' section in algorithm-learnings.md"
-						},
-						{
-							"id": "1.10.6",
-							"description": "Complete 'Current Algorithm Summary' with final configuration parameters"
-						},
-						{
-							"id": "1.10.7",
-							"description": "Final verification: Run all tests and confirm 100% pass rate"
-						}
-					],
-					"commit_hash": "7645ae9f098b6cdd2b4b594dbc6b0251becb46c7"
+						{ "id": "3.9.1", "description": "Run final test on all 8 videos" },
+						{ "id": "3.9.2", "description": "Calculate per-keyframe accuracy statistics" },
+						{ "id": "3.9.3", "description": "Document 'What Works' for keyframe detection in algorithm-learnings.md" },
+						{ "id": "3.9.4", "description": "Document 'Key Observations' for keyframe detection" },
+						{ "id": "3.9.5", "description": "Document final configuration parameters" },
+						{ "id": "3.9.6", "description": "Create summary table of test results" }
+					]
 				}
 			]
 		}

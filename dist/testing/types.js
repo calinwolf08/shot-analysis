@@ -52,13 +52,50 @@ export const poseDataSchema = z.object({
     frames: z.array(frameSchema),
 });
 /**
+ * All keyframe IDs in chronological order.
+ */
+export const KEYFRAME_IDS = [
+    "legs_start_bending",
+    "leg_bend_low_point",
+    "ball_low_point",
+    "legs_start_extending",
+    "ball_starts_upward",
+    "set_point",
+    "release",
+    "arms_fully_extended",
+    "feet_leave_ground",
+    "feet_land",
+];
+/**
+ * Zod schema for keyframe frame number validation.
+ * Keyframe fields are optional and can be null (not labeled) or a non-negative integer.
+ */
+export const keyframeFieldSchema = z
+    .number()
+    .int()
+    .nonnegative()
+    .nullable()
+    .optional();
+/**
  * Zod schema for LabeledShot validation.
+ * Keyframe fields are optional for backward compatibility with legacy labels.
  */
 export const labeledShotSchema = z.object({
     shotNumber: z.number().int().positive(),
     startFrame: z.number().int().nonnegative(),
     endFrame: z.number().int().nonnegative(),
     cameraOrientation: orientationSchema,
+    // Keyframe fields (optional, null if not labeled)
+    legs_start_bending: keyframeFieldSchema,
+    leg_bend_low_point: keyframeFieldSchema,
+    ball_low_point: keyframeFieldSchema,
+    legs_start_extending: keyframeFieldSchema,
+    ball_starts_upward: keyframeFieldSchema,
+    set_point: keyframeFieldSchema,
+    release: keyframeFieldSchema,
+    arms_fully_extended: keyframeFieldSchema,
+    feet_leave_ground: keyframeFieldSchema,
+    feet_land: keyframeFieldSchema,
 });
 /**
  * Zod schema for LabelData validation.

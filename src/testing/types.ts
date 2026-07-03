@@ -148,11 +148,66 @@ export const poseDataSchema = z.object({
 });
 
 // ============================================================================
+// Keyframe Types
+// ============================================================================
+
+/**
+ * Identifiers for each keyframe in a basketball shot.
+ * These match the phase-based breakdown in metrics-by-phase.md.
+ *
+ * Phases and their keyframes:
+ * - Load: legs_start_bending, leg_bend_low_point, ball_low_point
+ * - Rise: legs_start_extending, ball_starts_upward
+ * - Set Point: set_point
+ * - Release: release, arms_fully_extended
+ * - Follow-through: feet_leave_ground, feet_land
+ */
+export type KeyframeId =
+  | "legs_start_bending"
+  | "leg_bend_low_point"
+  | "ball_low_point"
+  | "legs_start_extending"
+  | "ball_starts_upward"
+  | "set_point"
+  | "release"
+  | "arms_fully_extended"
+  | "feet_leave_ground"
+  | "feet_land";
+
+/**
+ * All keyframe IDs in chronological order.
+ */
+export const KEYFRAME_IDS: readonly KeyframeId[] = [
+  "legs_start_bending",
+  "leg_bend_low_point",
+  "ball_low_point",
+  "legs_start_extending",
+  "ball_starts_upward",
+  "set_point",
+  "release",
+  "arms_fully_extended",
+  "feet_leave_ground",
+  "feet_land",
+] as const;
+
+/**
+ * Zod schema for keyframe frame number validation.
+ * Keyframe fields are optional and can be null (not labeled) or a non-negative integer.
+ */
+export const keyframeFieldSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .nullable()
+  .optional();
+
+// ============================================================================
 // Label Types
 // ============================================================================
 
 /**
  * A labeled shot from ground truth data.
+ * Includes optional keyframe annotations for detailed shot phase analysis.
  */
 export interface LabeledShot {
   /** One-based shot number (for human readability) */
@@ -163,16 +218,52 @@ export interface LabeledShot {
   readonly endFrame: number;
   /** Camera orientation for this specific shot */
   readonly cameraOrientation: Orientation;
+
+  // ---- Keyframe annotations (optional, null if not labeled) ----
+
+  /** Frame where legs start bending (Load phase start) */
+  readonly legs_start_bending?: number | null | undefined;
+  /** Frame of deepest knee bend */
+  readonly leg_bend_low_point?: number | null | undefined;
+  /** Frame of lowest ball position (dip) */
+  readonly ball_low_point?: number | null | undefined;
+  /** Frame where legs begin pushing up (Rise phase start) */
+  readonly legs_start_extending?: number | null | undefined;
+  /** Frame where ball begins rising */
+  readonly ball_starts_upward?: number | null | undefined;
+  /** Frame where ball is at peak before release (Set Point) */
+  readonly set_point?: number | null | undefined;
+  /** Frame where wrist snaps and ball leaves hand (Release) */
+  readonly release?: number | null | undefined;
+  /** Frame of maximum arm extension */
+  readonly arms_fully_extended?: number | null | undefined;
+  /** Frame where feet leave ground (if jumping) */
+  readonly feet_leave_ground?: number | null | undefined;
+  /** Frame where feet land (shot end) */
+  readonly feet_land?: number | null | undefined;
 }
 
 /**
  * Zod schema for LabeledShot validation.
+ * Keyframe fields are optional for backward compatibility with legacy labels.
  */
 export const labeledShotSchema = z.object({
   shotNumber: z.number().int().positive(),
   startFrame: z.number().int().nonnegative(),
   endFrame: z.number().int().nonnegative(),
   cameraOrientation: orientationSchema,
+
+  // Keyframe fields (optional, null if not labeled)
+  legs_start_bending: keyframeFieldSchema,
+  leg_bend_low_point: keyframeFieldSchema,
+  ball_low_point: keyframeFieldSchema,
+  legs_start_extending: keyframeFieldSchema,
+  ball_starts_upward: keyframeFieldSchema,
+  set_point: keyframeFieldSchema,
+  release: keyframeFieldSchema,
+  arms_fully_extended: keyframeFieldSchema,
+  feet_leave_ground: keyframeFieldSchema,
+  feet_land: keyframeFieldSchema,
 });
 
 /**

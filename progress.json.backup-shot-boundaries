@@ -1,0 +1,580 @@
+{
+	"project": {
+		"name": "shot-detection-iterative-testing",
+		"root_path": "/home/calin/projects/shot-analysis",
+		"created_at": "2026-03-08T12:00:00.000Z",
+		"updated_at": "2026-03-09T21:03:43.145Z"
+	},
+	"status": "complete",
+	"global_constraints": {
+		"CRITICAL_RULE": "Labels are IMMUTABLE ground truth. The algorithm must be tuned to match the labels, NEVER the other way around.",
+		"forbidden_actions": [
+			"Modifying any labels.json file",
+			"Changing startFrame, endFrame, or cameraOrientation values in labels",
+			"Adding or removing shots from labels",
+			"Adjusting labels to match algorithm output"
+		],
+		"allowed_actions": [
+			"Modifying algorithm parameters and thresholds",
+			"Changing detection logic in shot-detector.ts",
+			"Adjusting orientation detection in detection.ts",
+			"Tuning any algorithm configuration values"
+		],
+		"frame_tolerance": "±8 frames from labeled values",
+		"orientation_tolerance": "Exact match required",
+		"failure_response": "If algorithm cannot match labels within tolerance, document the gap in algorithm-learnings.md and try a different algorithmic approach. NEVER modify labels.",
+		"algorithm_tuning_guidance": {
+			"analysis_approach": [
+				"Read poses.json around labeled start/end frames (±10 frames)",
+				"Examine ALL available pose landmarks at labeled frames vs detected frames",
+				"Identify what makes labeled frames distinct from surrounding frames"
+			],
+			"freedom_to_experiment": [
+				"Try ANY pose metrics that distinguish labeled frames (not limited to wrist/knee)",
+				"Work backwards: find end frame first, then derive start frame",
+				"Work from middle: find peak/apex of shot, then expand to find boundaries",
+				"Combine multiple signals (e.g., wrist height + shoulder rotation + hip position)",
+				"Use velocity, acceleration, or rate-of-change of any landmark",
+				"Use relative positions between landmarks (e.g., wrist relative to shoulder)",
+				"Use z-depth patterns for orientation and motion phase detection"
+			],
+			"iteration_process": [
+				"1. Run test, note which shots fail and by how many frames",
+				"2. Load poses.json for failing video, examine frames around labeled boundaries",
+				"3. Hypothesize what signal would correctly identify the labeled frame",
+				"4. Implement and test the hypothesis",
+				"5. If regression in other videos, refine approach to work for all",
+				"6. Document findings in algorithm-learnings.md"
+			],
+			"success_criteria": "Algorithm detects frames within ±8 of labels using consistent logic across all videos"
+		}
+	},
+	"features": [
+		{
+			"id": "1.0",
+			"name": "Iterative Algorithm Testing",
+			"status": "complete",
+			"parallel_group": 1,
+			"tasks": [
+				{
+					"id": "1.1",
+					"name": "Test Infrastructure Setup",
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want the test infrastructure to correctly load and validate test data so that tests can actually run.",
+						"acceptance_criteria": [
+							"Update frameSchema to allow landmarks: TestLandmark[] | null",
+							"Update Orientation type/schema to include behind, behind-left, behind-right (8 total orientations)",
+							"Update labeledShotSchema to include cameraOrientation: Orientation",
+							"Remove required top-level orientation from labelDataSchema (orientation is per-shot)",
+							"Update compareResults() in detection.ts to compare orientation per-shot instead of per-video",
+							"Update detectOrientation() to detect all 8 orientations including behind variants",
+							"Add --videos CLI flag to run on a subset of videos (e.g., --videos \"20181219,20190107\")",
+							"Handle frames with null landmarks gracefully in shot detection (skip them)",
+							"Create test-data/algorithm-learnings.md with initial structure",
+							"All 9 test videos load successfully (no validation errors)",
+							"Test runner executes and produces comparison output (even if tests fail)"
+						],
+						"edge_cases": [
+							"Frame with null landmarks: Skip frame in detection, don't crash",
+							"Shot spans frames with some null landmarks: Use available frames only",
+							"Video has shots with mixed orientations: Each shot compared independently"
+						],
+						"data_model": "Orientation enum extended to 8 values: front, front-left, front-right, side-left, side-right, behind, behind-left, behind-right. LabeledShot includes cameraOrientation field. LabelData no longer has top-level orientation field. Frame.landmarks can be null when no pose detected.",
+						"technical_notes": "Files to modify: src/testing/types.ts (schemas), src/testing/detection.ts (comparison logic, orientation detection), src/testing/run-tests.ts (--videos flag), src/testing/reporting.ts (per-shot orientation output). Behind orientation detection uses reversed shoulder X positions (right shoulder X < left shoulder X) combined with Z-depth for behind-left vs behind-right."
+					},
+					"subtasks": [
+						{
+							"id": "1.1.1",
+							"description": "Update Orientation type and schema to include 8 values (add behind, behind-left, behind-right)"
+						},
+						{
+							"id": "1.1.2",
+							"description": "Update frameSchema to allow landmarks: TestLandmark[] | null"
+						},
+						{
+							"id": "1.1.3",
+							"description": "Update labeledShotSchema to include cameraOrientation field"
+						},
+						{
+							"id": "1.1.4",
+							"description": "Remove top-level orientation from labelDataSchema and LabelData interface"
+						},
+						{
+							"id": "1.1.5",
+							"description": "Update detectOrientation() in detection.ts to detect all 8 orientations including behind variants"
+						},
+						{
+							"id": "1.1.6",
+							"description": "Update compareResults() to compare orientation per-shot instead of per-video"
+						},
+						{
+							"id": "1.1.7",
+							"description": "Update reporting.ts to show per-shot orientation comparison"
+						},
+						{
+							"id": "1.1.8",
+							"description": "Handle null landmarks in adaptPoseDataToDetector and related functions"
+						},
+						{
+							"id": "1.1.9",
+							"description": "Add --videos CLI flag to run-tests.ts for subset testing"
+						},
+						{
+							"id": "1.1.10",
+							"description": "Create test-data/algorithm-learnings.md with structured sections"
+						},
+						{
+							"id": "1.1.11",
+							"description": "Run test runner and verify all 9 videos load without validation errors"
+						}
+					],
+					"commit_hash": "53187a05c1cd41c436451912067f5529175732f5"
+				},
+				{
+					"id": "1.2",
+					"name": "Level 1 - Video 1 (20181219_173607)",
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to pass the first test video so that I have a baseline for the algorithm's accuracy.",
+						"acceptance_criteria": [
+							"Run test on 20181219_173607 only using --videos flag",
+							"All 4 shots detected with correct count",
+							"Shot start/end frames within ±8 frame tolerance",
+							"Per-shot orientation matches labeled cameraOrientation exactly",
+							"Document any algorithm adjustments in algorithm-learnings.md",
+							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+						],
+						"edge_cases": [
+							"If shot count mismatch: Tune algorithm parameters (minShotGap, minYRange, etc.) - DO NOT add/remove labels",
+							"If frame timing off: Adjust detection thresholds (start/end proportional thresholds) - DO NOT change labeled frames",
+							"If orientation wrong: Tune orientation detection thresholds - DO NOT change labeled orientations"
+						],
+						"data_model": "Video 20181219_173607 contains 4 labeled shots with various orientations. Labels are ground truth - algorithm must match them.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219\". Maximum 10 attempts per level. CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+					},
+					"subtasks": [
+						{
+							"id": "1.2.1",
+							"description": "Run test on 20181219_173607 and analyze initial results"
+						},
+						{
+							"id": "1.2.2",
+							"description": "If failures: Analyze frame diffs and orientation mismatches"
+						},
+						{
+							"id": "1.2.3",
+							"description": "If failures: Examine poses.json around labeled frames to understand ground truth"
+						},
+						{
+							"id": "1.2.4",
+							"description": "If failures: Update algorithm code to fix detection issues"
+						},
+						{
+							"id": "1.2.5",
+							"description": "Document algorithm changes in algorithm-learnings.md History section"
+						},
+						{
+							"id": "1.2.6",
+							"description": "Verify all 4 shots pass detection thresholds"
+						}
+					],
+					"commit_hash": "ea0ff0c26ba2eddf085af9949b9b2a1a79b39eb3"
+				},
+				{
+					"id": "1.3",
+					"name": "Level 2 - Videos 1-2 (add 20190107_211108)",
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to add a second test video without breaking the first so that the algorithm generalizes.",
+						"acceptance_criteria": [
+							"Run test on both 20181219_173607 and 20190107_211108",
+							"Video 1 (20181219_173607) still passes - no regression",
+							"Video 2 (20190107_211108) 1 shot detected correctly",
+							"Shot timing within ±8 frames, orientation matches exactly",
+							"Document any algorithm adjustments in algorithm-learnings.md",
+							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+						],
+						"edge_cases": [
+							"Regression in video 1: Fix by tuning algorithm - DO NOT modify video 1 labels",
+							"Algorithm change helps video 2 but breaks video 1: Find algorithm parameters that work for BOTH - DO NOT adjust labels"
+						],
+						"data_model": "Video 20190107_211108 contains 1 labeled shot with front orientation. Labels are immutable ground truth.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107\". Regression check is critical. CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+					},
+					"subtasks": [
+						{
+							"id": "1.3.1",
+							"description": "Run test on videos 1-2 and analyze results"
+						},
+						{
+							"id": "1.3.2",
+							"description": "Verify video 1 still passes (no regression)"
+						},
+						{
+							"id": "1.3.3",
+							"description": "If video 2 fails: Analyze and fix without breaking video 1"
+						},
+						{
+							"id": "1.3.4",
+							"description": "Document any algorithm changes in algorithm-learnings.md"
+						},
+						{
+							"id": "1.3.5",
+							"description": "Verify both videos pass all detection thresholds"
+						}
+					],
+					"commit_hash": "544f1b3d65ce01a5d59b5b62cf6f3877b3f6f5cd"
+				},
+				{
+					"id": "1.4",
+					"name": "Level 3 - Videos 1-3 (add 20190124_175609)",
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to add a third test video with 5 shots to validate multi-shot detection.",
+						"acceptance_criteria": [
+							"Run test on videos 1-3",
+							"Videos 1-2 still pass - no regression",
+							"Video 3 (20190124_175609) all 5 shots detected correctly",
+							"Shot timing within ±8 frames, orientation matches exactly for each shot",
+							"Document any algorithm adjustments in algorithm-learnings.md",
+							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+						],
+						"edge_cases": [
+							"Same error pattern across multiple videos: Apply systematic algorithm fix - DO NOT batch-modify labels",
+							"Video has front-left and side-left orientations: Tune orientation thresholds - DO NOT change labeled orientations"
+						],
+						"data_model": "Video 20190124_175609 contains 5 labeled shots with front-left and side-left orientations. Labels are immutable.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124\". If orientation detection disagrees with labels, the ALGORITHM is wrong. CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+					},
+					"subtasks": [
+						{
+							"id": "1.4.1",
+							"description": "Run test on videos 1-3 and analyze results"
+						},
+						{
+							"id": "1.4.2",
+							"description": "Verify videos 1-2 still pass (no regression)"
+						},
+						{
+							"id": "1.4.3",
+							"description": "If video 3 fails: Analyze frame diffs and orientation mismatches"
+						},
+						{
+							"id": "1.4.4",
+							"description": "Update algorithm if needed to handle front-left/side-left orientations"
+						},
+						{
+							"id": "1.4.5",
+							"description": "Document changes in algorithm-learnings.md"
+						},
+						{
+							"id": "1.4.6",
+							"description": "Verify all 3 videos pass detection thresholds"
+						}
+					],
+					"commit_hash": "5ca5102a18ffd4da3d5f128d23ac4a53f5c4ab8d"
+				},
+				{
+					"id": "1.5",
+					"name": "Level 4 - Videos 1-4 (add 20190804_140654)",
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to add a video with 'behind' orientations to validate the extended orientation detection.",
+						"acceptance_criteria": [
+							"Run test on videos 1-4",
+							"Videos 1-3 still pass - no regression",
+							"Video 4 (20190804_140654) all 7 shots detected correctly",
+							"Behind, behind-left, behind-right orientations detected correctly to match labels",
+							"Document any algorithm adjustments in algorithm-learnings.md",
+							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+						],
+						"edge_cases": [
+							"Behind orientation detection: If algorithm detects wrong orientation, tune detection thresholds - DO NOT change labels",
+							"Video has mix of behind and side orientations: Algorithm must correctly distinguish them - DO NOT relabel"
+						],
+						"data_model": "Video 20190804_140654 contains 7 labeled shots with orientations: side-left, behind-left (x2), behind, behind-right, side-right (x2). Labels are ground truth.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124,20190804\". If behind detection fails, fix the orientation detection algorithm. CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+					},
+					"subtasks": [
+						{
+							"id": "1.5.1",
+							"description": "Run test on videos 1-4 and analyze results"
+						},
+						{
+							"id": "1.5.2",
+							"description": "Verify videos 1-3 still pass (no regression)"
+						},
+						{
+							"id": "1.5.3",
+							"description": "If video 4 fails: Focus on behind orientation detection logic"
+						},
+						{
+							"id": "1.5.4",
+							"description": "Tune behind detection thresholds if needed"
+						},
+						{
+							"id": "1.5.5",
+							"description": "Document behind detection insights in algorithm-learnings.md"
+						},
+						{
+							"id": "1.5.6",
+							"description": "Verify all 4 videos pass detection thresholds"
+						}
+					],
+					"commit_hash": "b3664bff12d035b04fcc0dc93428e506aa91c065"
+				},
+				{
+					"id": "1.6",
+					"name": "Level 5 - Videos 1-5 (add 20190818_142631)",
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to continue adding videos to ensure the algorithm remains robust.",
+						"acceptance_criteria": [
+							"Run test on videos 1-5",
+							"Videos 1-4 still pass - no regression",
+							"Video 5 (20190818_142631) all 3 shots detected correctly",
+							"Shot timing within ±8 frames, orientation matches exactly",
+							"Document any algorithm adjustments in algorithm-learnings.md",
+							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+						],
+						"edge_cases": [
+							"Video has side-left and front orientations: Tune front/side boundary threshold in algorithm - DO NOT change labels"
+						],
+						"data_model": "Video 20190818_142631 contains 3 labeled shots with side-left and front orientations. Labels are immutable.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124,20190804,20190818\". CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+					},
+					"subtasks": [
+						{
+							"id": "1.6.1",
+							"description": "Run test on videos 1-5 and analyze results"
+						},
+						{
+							"id": "1.6.2",
+							"description": "Verify videos 1-4 still pass (no regression)"
+						},
+						{
+							"id": "1.6.3",
+							"description": "If video 5 fails: Analyze and fix detection issues"
+						},
+						{
+							"id": "1.6.4",
+							"description": "Document any changes in algorithm-learnings.md"
+						},
+						{
+							"id": "1.6.5",
+							"description": "Verify all 5 videos pass detection thresholds"
+						}
+					],
+					"commit_hash": "5f525e6e7e09b12fa4c3b467d5f0ce8770b92082"
+				},
+				{
+					"id": "1.7",
+					"name": "Level 6 - Videos 1-6 (add 20200606_111929)",
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to add more test videos to validate generalization.",
+						"acceptance_criteria": [
+							"Run test on videos 1-6",
+							"Videos 1-5 still pass - no regression",
+							"Video 6 (20200606_111929) all 5 shots detected correctly",
+							"Shot timing within ±8 frames, orientation matches exactly",
+							"Document any algorithm adjustments in algorithm-learnings.md",
+							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+						],
+						"edge_cases": [
+							"Video has side-right and front-right orientations: Tune algorithm to detect these correctly - DO NOT change labels"
+						],
+						"data_model": "Video 20200606_111929 contains 5 labeled shots with side-right and front-right orientations. Labels are immutable.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124,20190804,20190818,20200606\". CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+					},
+					"subtasks": [
+						{
+							"id": "1.7.1",
+							"description": "Run test on videos 1-6 and analyze results"
+						},
+						{
+							"id": "1.7.2",
+							"description": "Verify videos 1-5 still pass (no regression)"
+						},
+						{
+							"id": "1.7.3",
+							"description": "If video 6 fails: Analyze side-right/front-right detection"
+						},
+						{
+							"id": "1.7.4",
+							"description": "Document any changes in algorithm-learnings.md"
+						},
+						{
+							"id": "1.7.5",
+							"description": "Verify all 6 videos pass detection thresholds"
+						}
+					],
+					"commit_hash": "8df5b843809b45a451ba93257b224e7f3117d330"
+				},
+				{
+					"id": "1.8",
+					"name": "Level 7 - Videos 1-7 (add 20201212_134104)",
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to add a single-shot video to ensure simple cases still work.",
+						"acceptance_criteria": [
+							"Run test on videos 1-7",
+							"Videos 1-6 still pass - no regression",
+							"Video 7 (20201212_134104) 1 shot detected correctly",
+							"Shot timing within ±8 frames, orientation matches exactly",
+							"Document any algorithm adjustments in algorithm-learnings.md",
+							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+						],
+						"edge_cases": [
+							"Single shot video with false positives: Tune minYRange or other filters - DO NOT remove shots from labels"
+						],
+						"data_model": "Video 20201212_134104 contains 1 labeled shot with side-right orientation. Labels are immutable.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124,20190804,20190818,20200606,20201212\". CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+					},
+					"subtasks": [
+						{
+							"id": "1.8.1",
+							"description": "Run test on videos 1-7 and analyze results"
+						},
+						{
+							"id": "1.8.2",
+							"description": "Verify videos 1-6 still pass (no regression)"
+						},
+						{
+							"id": "1.8.3",
+							"description": "If video 7 fails: Fix detection for single-shot video"
+						},
+						{
+							"id": "1.8.4",
+							"description": "Document any changes in algorithm-learnings.md"
+						},
+						{
+							"id": "1.8.5",
+							"description": "Verify all 7 videos pass detection thresholds"
+						}
+					],
+					"commit_hash": "9976376d32cf95aed1299d6947d30ca9c0fda978"
+				},
+				{
+					"id": "1.9",
+					"name": "Level 8 - Videos 1-8 (add chris-5)",
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want to add another single-shot video from a different source.",
+						"acceptance_criteria": [
+							"Run test on videos 1-8",
+							"Videos 1-7 still pass - no regression",
+							"Video 8 (chris-5) 1 shot detected correctly",
+							"Shot timing within ±8 frames, orientation matches exactly",
+							"Document any algorithm adjustments in algorithm-learnings.md",
+							"CRITICAL: NO modifications to labels.json - only algorithm changes allowed"
+						],
+						"edge_cases": [
+							"Different video source may have different pose quality: Tune algorithm to handle variations - DO NOT adjust labels"
+						],
+						"data_model": "Video chris-5 contains 1 labeled shot with side-right orientation. Start frame 60, end frame 83. Labels are immutable.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"20181219,20190107,20190124,20190804,20190818,20200606,20201212,chris\". CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+					},
+					"subtasks": [
+						{
+							"id": "1.9.1",
+							"description": "Run test on videos 1-8 and analyze results"
+						},
+						{
+							"id": "1.9.2",
+							"description": "Verify videos 1-7 still pass (no regression)"
+						},
+						{
+							"id": "1.9.3",
+							"description": "If video 8 fails: Analyze and fix detection"
+						},
+						{
+							"id": "1.9.4",
+							"description": "Document any changes in algorithm-learnings.md"
+						},
+						{
+							"id": "1.9.5",
+							"description": "Verify all 8 videos pass detection thresholds"
+						}
+					],
+					"commit_hash": "d44f7b3bc2761d03439484b7e42ffe6a89873967"
+				},
+				{
+					"id": "1.10",
+					"name": "Level 9 - All Videos (add zak-1, final validation)",
+					"status": "complete",
+					"phase": "complete",
+					"attempts": 0,
+					"context": {
+						"user_story": "As a developer, I want all 9 videos to pass and document the final algorithm configuration.",
+						"acceptance_criteria": [
+							"Run test on all 9 videos",
+							"Videos 1-8 still pass - no regression",
+							"Video 9 (zak-1) all 9 shots detected correctly with all 8 orientations",
+							"All videos pass in single test run with ±8 frame tolerance and exact orientation match",
+							"algorithm-learnings.md has complete 'Current Algorithm Summary' section",
+							"Configuration parameters documented (thresholds, windows, etc.)",
+							"CRITICAL: NO modifications to any labels.json - algorithm was tuned to match labels throughout"
+						],
+						"edge_cases": [
+							"zak-1 contains all 8 orientation types: Algorithm must detect all correctly - DO NOT relabel",
+							"Final video is largest with 9 shots: Tune shot gap and duration parameters - DO NOT adjust labels"
+						],
+						"data_model": "Video zak-1 contains 9 labeled shots covering all 8 orientation types. Labels are immutable ground truth.",
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts (all videos). Success means the ALGORITHM matches ALL labels across ALL videos. CRITICAL: Labels are IMMUTABLE ground truth - NEVER modify labels.json files. Algorithm Tuning Process: (1) Run test, note which shots fail and by how many frames. (2) Read poses.json around labeled start/end frames (±10 frames) to examine ALL pose landmarks. (3) Identify what makes labeled frames distinct from detected frames. (4) Try ANY approach: different pose metrics, work backwards from end frame, find shot apex first, combine signals (wrist+shoulder+hip), use velocity/acceleration, use landmark relationships, use z-depth patterns. (5) Implement hypothesis, test, fix regressions. (6) Document findings in algorithm-learnings.md. Success = frames within ±8 of labels using consistent logic."
+					},
+					"subtasks": [
+						{
+							"id": "1.10.1",
+							"description": "Run test on all 9 videos and analyze results"
+						},
+						{
+							"id": "1.10.2",
+							"description": "Verify videos 1-8 still pass (no regression)"
+						},
+						{
+							"id": "1.10.3",
+							"description": "If video 9 fails: Fix remaining orientation or timing issues"
+						},
+						{
+							"id": "1.10.4",
+							"description": "Complete 'What Works' section in algorithm-learnings.md"
+						},
+						{
+							"id": "1.10.5",
+							"description": "Complete 'Key Observations' section in algorithm-learnings.md"
+						},
+						{
+							"id": "1.10.6",
+							"description": "Complete 'Current Algorithm Summary' with final configuration parameters"
+						},
+						{
+							"id": "1.10.7",
+							"description": "Final verification: Run all tests and confirm 100% pass rate"
+						}
+					],
+					"commit_hash": "7645ae9f098b6cdd2b4b594dbc6b0251becb46c7"
+				}
+			]
+		}
+	]
+}
