@@ -1,13 +1,23 @@
 {
   "video": "chris 5.mp4",
   "labeledBy": "human",
-  "labeledAt": "2026-03-09T06:22:28.748Z",
+  "labeledAt": "2026-07-05T18:18:23.847Z",
   "shots": [
     {
       "shotNumber": 1,
-      "startFrame": 60,
-      "endFrame": 83,
-      "cameraOrientation": "side-right"
+      "startFrame": 55,
+      "endFrame": 85,
+      "cameraOrientation": "side-right",
+      "legs_start_bending": 55,
+      "leg_bend_low_point": 66,
+      "ball_low_point": 55,
+      "ball_starts_upward": 60,
+      "legs_start_extending": 67,
+      "set_point": 70,
+      "arms_fully_extended": 76,
+      "feet_leave_ground": 74,
+      "feet_land": 80,
+      "release": 75
     }
   ]
 }

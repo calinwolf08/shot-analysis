@@ -1,13 +1,23 @@
 {
   "video": "20201212_134104.mp4",
   "labeledBy": "human",
-  "labeledAt": "2026-03-09T05:28:17.244Z",
+  "labeledAt": "2026-07-05T18:18:24.049Z",
   "shots": [
     {
       "shotNumber": 1,
-      "startFrame": 76,
-      "endFrame": 111,
-      "cameraOrientation": "side-right"
+      "startFrame": 75,
+      "endFrame": 112,
+      "cameraOrientation": "side-right",
+      "legs_start_bending": 75,
+      "leg_bend_low_point": 86,
+      "ball_low_point": 81,
+      "ball_starts_upward": 83,
+      "legs_start_extending": 88,
+      "set_point": 91,
+      "arms_fully_extended": 99,
+      "feet_leave_ground": 97,
+      "feet_land": 107,
+      "release": 98
     }
   ]
 }

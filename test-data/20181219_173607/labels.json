@@ -1,31 +1,71 @@
 {
   "video": "20181219_173607.mp4",
   "labeledBy": "human",
-  "labeledAt": "2026-03-09T05:55:18.960Z",
+  "labeledAt": "2026-07-05T18:18:24.073Z",
   "shots": [
     {
       "shotNumber": 1,
-      "startFrame": 31,
-      "endFrame": 58,
-      "cameraOrientation": "front-right"
+      "startFrame": 28,
+      "endFrame": 60,
+      "cameraOrientation": "front-right",
+      "legs_start_bending": 28,
+      "leg_bend_low_point": 38,
+      "ball_low_point": 27,
+      "ball_starts_upward": 28,
+      "legs_start_extending": 40,
+      "set_point": 44,
+      "arms_fully_extended": 52,
+      "feet_leave_ground": 49,
+      "feet_land": 55,
+      "release": 51
     },
     {
       "shotNumber": 2,
-      "startFrame": 327,
-      "endFrame": 350,
-      "cameraOrientation": "side-left"
+      "startFrame": 314,
+      "endFrame": 351,
+      "cameraOrientation": "side-left",
+      "legs_start_bending": 314,
+      "leg_bend_low_point": 327,
+      "ball_low_point": 312,
+      "ball_starts_upward": 315,
+      "legs_start_extending": 331,
+      "set_point": 337,
+      "arms_fully_extended": 344,
+      "feet_leave_ground": 343,
+      "feet_land": 346,
+      "release": 343
     },
     {
       "shotNumber": 3,
-      "startFrame": 566,
+      "startFrame": 561,
       "endFrame": 596,
-      "cameraOrientation": "behind"
+      "cameraOrientation": "behind",
+      "legs_start_bending": 561,
+      "leg_bend_low_point": 571,
+      "ball_low_point": 561,
+      "ball_starts_upward": 562,
+      "legs_start_extending": 571,
+      "set_point": 576,
+      "arms_fully_extended": 586,
+      "feet_leave_ground": 582,
+      "feet_land": 591,
+      "release": 585
     },
     {
       "shotNumber": 4,
-      "startFrame": 825,
+      "startFrame": 830,
       "endFrame": 864,
-      "cameraOrientation": "side-right"
+      "cameraOrientation": "side-right",
+      "legs_start_bending": 830,
+      "leg_bend_low_point": 844,
+      "ball_low_point": 830,
+      "ball_starts_upward": 833,
+      "legs_start_extending": 847,
+      "set_point": 850,
+      "arms_fully_extended": 859,
+      "feet_leave_ground": 856,
+      "feet_land": 859,
+      "release": 858
     }
   ]
 }

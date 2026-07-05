@@ -1,25 +1,55 @@
 {
   "video": "20190818_142631.mp4",
   "labeledBy": "human",
-  "labeledAt": "2026-03-09T05:19:36.498Z",
+  "labeledAt": "2026-07-05T18:18:23.976Z",
   "shots": [
     {
       "shotNumber": 1,
-      "startFrame": 31,
-      "endFrame": 55,
-      "cameraOrientation": "side-left"
+      "startFrame": 32,
+      "endFrame": 58,
+      "cameraOrientation": "side-left",
+      "legs_start_bending": 32,
+      "leg_bend_low_point": 35,
+      "ball_low_point": 32,
+      "ball_starts_upward": 34,
+      "legs_start_extending": 38,
+      "set_point": 42,
+      "arms_fully_extended": 48,
+      "feet_leave_ground": 46,
+      "feet_land": 53,
+      "release": 47
     },
     {
       "shotNumber": 2,
-      "startFrame": 270,
-      "endFrame": 312,
-      "cameraOrientation": "side-left"
+      "startFrame": 287,
+      "endFrame": 311,
+      "cameraOrientation": "side-left",
+      "legs_start_bending": 287,
+      "leg_bend_low_point": 292,
+      "ball_low_point": 280,
+      "ball_starts_upward": 285,
+      "legs_start_extending": 294,
+      "set_point": 298,
+      "arms_fully_extended": 303,
+      "feet_leave_ground": 303,
+      "feet_land": 306,
+      "release": 303
     },
     {
       "shotNumber": 3,
-      "startFrame": 554,
+      "startFrame": 556,
       "endFrame": 578,
-      "cameraOrientation": "front"
+      "cameraOrientation": "side-left",
+      "legs_start_bending": 556,
+      "leg_bend_low_point": 559,
+      "ball_low_point": 553,
+      "ball_starts_upward": 556,
+      "legs_start_extending": 560,
+      "set_point": 564,
+      "arms_fully_extended": 570,
+      "feet_leave_ground": 568,
+      "feet_land": 573,
+      "release": 569
     }
   ]
 }

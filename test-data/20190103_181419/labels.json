@@ -1,0 +1,39 @@
+{
+  "video": "20190103_181419.mp4",
+  "labeledBy": "human",
+  "labeledAt": "2026-07-05T18:18:23.781Z",
+  "shots": [
+    {
+      "shotNumber": 1,
+      "startFrame": 11,
+      "endFrame": 40,
+      "cameraOrientation": "side-right",
+      "legs_start_bending": 11,
+      "leg_bend_low_point": 20,
+      "ball_low_point": 10,
+      "ball_starts_upward": 16,
+      "legs_start_extending": 21,
+      "set_point": 23,
+      "arms_fully_extended": 28,
+      "feet_leave_ground": 26,
+      "feet_land": 35,
+      "release": 27
+    },
+    {
+      "shotNumber": 2,
+      "startFrame": 121,
+      "endFrame": 148,
+      "cameraOrientation": "side-right",
+      "legs_start_bending": 121,
+      "leg_bend_low_point": 127,
+      "ball_low_point": 118,
+      "ball_starts_upward": 123,
+      "legs_start_extending": 129,
+      "set_point": 131,
+      "arms_fully_extended": 136,
+      "feet_leave_ground": 134,
+      "feet_land": 143,
+      "release": 136
+    }
+  ]
+}
