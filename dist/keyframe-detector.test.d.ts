@@ -1,8 +1,7 @@
 /**
- * Unit tests for KeyframeDetector - Load phase keyframe detection.
+ * Unit tests for KeyframeDetector - Load, Rise, Set Point, and Release phase detection.
  *
- * Tests detectLegBendLowPoint() and detectBallLowPoint() functions
- * for identifying Load phase keyframes in basketball shots.
+ * Tests detection functions for identifying keyframes in basketball shots.
  */
 export {};
 //# sourceMappingURL=keyframe-detector.test.d.ts.map

@@ -27,6 +27,12 @@ export interface KeyframeDetectorConfig {
     readonly kneeVelocityThreshold?: number;
     /** Minimum wrist Y velocity (normalized units per frame) to detect upward motion. Default: -0.005 */
     readonly wristVelocityThreshold?: number;
+    /** Search window as percentage of shot duration for set_point detection. Default: 0.7 */
+    readonly setPointSearchWindow?: number;
+    /** Maximum elbow angle (degrees) to consider as "bent" for set point. Default: 160 */
+    readonly setPointMaxElbowAngle?: number;
+    /** Search window as percentage of remaining shot for release detection. Default: 0.5 */
+    readonly releaseSearchWindow?: number;
 }
 /**
  * Result of detecting a single keyframe.
@@ -48,6 +54,31 @@ export interface KeyframeDetectionResult {
     /** Overall confidence for the detection */
     readonly confidence: number;
 }
+/**
+ * Calculates the angle at the elbow joint (shoulder-elbow-wrist).
+ *
+ * The angle is measured at the elbow vertex between the shoulder-elbow vector
+ * and elbow-wrist vector. A straight arm is ~180 degrees, bent elbow is less.
+ *
+ * @param shoulder - Shoulder landmark position
+ * @param elbow - Elbow landmark position (vertex)
+ * @param wrist - Wrist landmark position
+ * @returns Angle in degrees (0-180). Returns null if any landmark is invalid.
+ */
+export declare function calculateElbowAngle(shoulder: TestLandmark | null, elbow: TestLandmark | null, wrist: TestLandmark | null): number | null;
+/**
+ * Calculates the wrist flexion angle (forearm-wrist-index finger).
+ *
+ * This measures the angle at the wrist joint between the forearm direction
+ * (elbow to wrist) and the hand direction (wrist to index finger).
+ * A straight wrist is ~180 degrees, flexed (snapped) wrist is less.
+ *
+ * @param elbow - Elbow landmark position
+ * @param wrist - Wrist landmark position (vertex)
+ * @param indexFinger - Index finger landmark position
+ * @returns Angle in degrees (0-180). Returns null if any landmark is invalid.
+ */
+export declare function calculateWristAngle(elbow: TestLandmark | null, wrist: TestLandmark | null, indexFinger: TestLandmark | null): number | null;
 /**
  * Calculates the angle at the knee joint (hip-knee-ankle).
  *
@@ -136,11 +167,44 @@ export declare function detectLegsStartExtending(frames: readonly Frame[], legBe
  */
 export declare function detectBallStartsUpward(frames: readonly Frame[], ballLowPointFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 /**
+ * Detects the "set point" frame - the highest wrist position before release
+ * with the elbow still bent.
+ *
+ * The set point is the "cocking" position where the ball is held at its highest
+ * point before the forward/upward release motion. It's characterized by:
+ * - Wrist at a local high point (minimum Y in normalized coords)
+ * - Elbow still bent (angle less than threshold)
+ *
+ * @param frames - Array of frames with pose data
+ * @param ballStartsUpwardFrame - Frame index where ball starts moving upward
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index of set point, or null if not detectable
+ */
+export declare function detectSetPoint(frames: readonly Frame[], ballStartsUpwardFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
+/**
+ * Detects the "release" frame - the frame of maximum wrist flexion (snap).
+ *
+ * The release is when the wrist snaps and the ball leaves the hand.
+ * It's characterized by:
+ * - Maximum wrist flexion angle (minimum angle = maximum snap)
+ * - Occurs after the set point
+ *
+ * @param frames - Array of frames with pose data
+ * @param setPointFrame - Frame index of the set point
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index of release, or null if not detectable
+ */
+export declare function detectRelease(frames: readonly Frame[], setPointFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
+/**
  * KeyframeDetector class for detecting keyframes within basketball shots.
  *
  * Implements keyframe detection for:
  * - Load phase: leg_bend_low_point, ball_low_point
  * - Rise phase: legs_start_extending, ball_starts_upward
+ * - Set Point phase: set_point
+ * - Release phase: release
  */
 export declare class KeyframeDetector {
     private readonly config;
@@ -167,6 +231,18 @@ export declare class KeyframeDetector {
      * @returns Detection result with keyframes and confidence
      */
     detectRisePhaseKeyframes(frames: readonly Frame[], legBendLowPointFrame: number, ballLowPointFrame: number, endFrame: number): KeyframeDetectionResult;
+    /**
+     * Detects Set Point and Release phase keyframes for a shot.
+     *
+     * Requires Rise phase keyframes to have been detected first,
+     * as set_point detection starts from ball_starts_upward.
+     *
+     * @param frames - Array of frames with pose data
+     * @param ballStartsUpwardFrame - Frame index where ball starts upward (from Rise phase)
+     * @param endFrame - Shot end frame index (inclusive)
+     * @returns Detection result with keyframes and confidence
+     */
+    detectSetPointReleaseKeyframes(frames: readonly Frame[], ballStartsUpwardFrame: number, endFrame: number): KeyframeDetectionResult;
     /**
      * Get the current configuration.
      */

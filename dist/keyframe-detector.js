@@ -20,7 +20,85 @@ const DEFAULT_CONFIG = {
     minConsecutiveFrames: 2,
     kneeVelocityThreshold: 0.5,
     wristVelocityThreshold: -0.005,
+    setPointSearchWindow: 0.7,
+    setPointMaxElbowAngle: 160,
+    releaseSearchWindow: 0.5,
 };
+/**
+ * Calculates the angle between three points at a joint (vertex).
+ *
+ * The angle is measured at the vertex point between the vectors
+ * pointing to point A and point B. A straight alignment is ~180 degrees.
+ *
+ * @param pointA - First landmark position (e.g., shoulder for elbow angle)
+ * @param vertex - Vertex landmark position (e.g., elbow)
+ * @param pointB - Second landmark position (e.g., wrist for elbow angle)
+ * @returns Angle in degrees (0-180). Returns null if any landmark is invalid.
+ */
+function calculateJointAngle(pointA, vertex, pointB) {
+    if (!pointA || !vertex || !pointB) {
+        return null;
+    }
+    // Convert to Point3D for calculation
+    const a = { x: pointA.x, y: pointA.y, z: pointA.z };
+    const v = { x: vertex.x, y: vertex.y, z: vertex.z };
+    const b = { x: pointB.x, y: pointB.y, z: pointB.z };
+    // Calculate vectors from vertex to point A and vertex to point B
+    const vA = {
+        x: a.x - v.x,
+        y: a.y - v.y,
+        z: a.z - v.z,
+    };
+    const vB = {
+        x: b.x - v.x,
+        y: b.y - v.y,
+        z: b.z - v.z,
+    };
+    // Calculate magnitudes
+    const magA = Math.sqrt(vA.x * vA.x + vA.y * vA.y + vA.z * vA.z);
+    const magB = Math.sqrt(vB.x * vB.x + vB.y * vB.y + vB.z * vB.z);
+    // Handle degenerate case (identical points)
+    if (magA === 0 || magB === 0) {
+        return null;
+    }
+    // Calculate dot product
+    const dotProduct = vA.x * vB.x + vA.y * vB.y + vA.z * vB.z;
+    // Calculate cosine of the angle (clamp to handle floating point errors)
+    const cosAngle = Math.max(-1, Math.min(1, dotProduct / (magA * magB)));
+    // Convert to degrees
+    const angleRadians = Math.acos(cosAngle);
+    const angleDegrees = angleRadians * (180 / Math.PI);
+    return angleDegrees;
+}
+/**
+ * Calculates the angle at the elbow joint (shoulder-elbow-wrist).
+ *
+ * The angle is measured at the elbow vertex between the shoulder-elbow vector
+ * and elbow-wrist vector. A straight arm is ~180 degrees, bent elbow is less.
+ *
+ * @param shoulder - Shoulder landmark position
+ * @param elbow - Elbow landmark position (vertex)
+ * @param wrist - Wrist landmark position
+ * @returns Angle in degrees (0-180). Returns null if any landmark is invalid.
+ */
+export function calculateElbowAngle(shoulder, elbow, wrist) {
+    return calculateJointAngle(shoulder, elbow, wrist);
+}
+/**
+ * Calculates the wrist flexion angle (forearm-wrist-index finger).
+ *
+ * This measures the angle at the wrist joint between the forearm direction
+ * (elbow to wrist) and the hand direction (wrist to index finger).
+ * A straight wrist is ~180 degrees, flexed (snapped) wrist is less.
+ *
+ * @param elbow - Elbow landmark position
+ * @param wrist - Wrist landmark position (vertex)
+ * @param indexFinger - Index finger landmark position
+ * @returns Angle in degrees (0-180). Returns null if any landmark is invalid.
+ */
+export function calculateWristAngle(elbow, wrist, indexFinger) {
+    return calculateJointAngle(elbow, wrist, indexFinger);
+}
 /**
  * Calculates the angle at the knee joint (hip-knee-ankle).
  *
@@ -145,6 +223,114 @@ function getFrameWristY(frame, visibilityThreshold) {
     }
     else if (rightVisible) {
         return rightWrist.y;
+    }
+    return null;
+}
+/**
+ * Gets the elbow angle for the shooting arm in a frame.
+ *
+ * For set point and release detection, we need the shooting arm elbow angle.
+ * This function returns the average of both arms, or whichever is visible.
+ *
+ * @param frame - The frame with pose landmarks
+ * @param visibilityThreshold - Minimum visibility for landmarks to be valid
+ * @returns Elbow angle in degrees, or null if neither arm is valid
+ */
+function getFrameElbowAngle(frame, visibilityThreshold) {
+    if (!frame.landmarks) {
+        return null;
+    }
+    const landmarks = frame.landmarks;
+    // Get left arm landmarks
+    const leftShoulder = landmarks[LANDMARK_INDICES.LEFT_SHOULDER];
+    const leftElbow = landmarks[LANDMARK_INDICES.LEFT_ELBOW];
+    const leftWrist = landmarks[LANDMARK_INDICES.LEFT_WRIST];
+    // Get right arm landmarks
+    const rightShoulder = landmarks[LANDMARK_INDICES.RIGHT_SHOULDER];
+    const rightElbow = landmarks[LANDMARK_INDICES.RIGHT_ELBOW];
+    const rightWrist = landmarks[LANDMARK_INDICES.RIGHT_WRIST];
+    // Check visibility
+    const leftVisible = leftShoulder &&
+        leftElbow &&
+        leftWrist &&
+        leftShoulder.visibility >= visibilityThreshold &&
+        leftElbow.visibility >= visibilityThreshold &&
+        leftWrist.visibility >= visibilityThreshold;
+    const rightVisible = rightShoulder &&
+        rightElbow &&
+        rightWrist &&
+        rightShoulder.visibility >= visibilityThreshold &&
+        rightElbow.visibility >= visibilityThreshold &&
+        rightWrist.visibility >= visibilityThreshold;
+    const leftAngle = leftVisible
+        ? calculateElbowAngle(leftShoulder, leftElbow, leftWrist)
+        : null;
+    const rightAngle = rightVisible
+        ? calculateElbowAngle(rightShoulder, rightElbow, rightWrist)
+        : null;
+    // Return average of both, or whichever is available
+    if (leftAngle !== null && rightAngle !== null) {
+        return (leftAngle + rightAngle) / 2;
+    }
+    else if (leftAngle !== null) {
+        return leftAngle;
+    }
+    else if (rightAngle !== null) {
+        return rightAngle;
+    }
+    return null;
+}
+/**
+ * Gets the wrist flexion angle for the shooting arm in a frame.
+ *
+ * Wrist flexion angle is measured from elbow -> wrist -> index finger.
+ * A straight wrist is ~180 degrees, a flexed/snapped wrist is less.
+ *
+ * @param frame - The frame with pose landmarks
+ * @param visibilityThreshold - Minimum visibility for landmarks to be valid
+ * @returns Wrist flexion angle in degrees, or null if neither arm is valid
+ */
+function getFrameWristAngle(frame, visibilityThreshold) {
+    if (!frame.landmarks) {
+        return null;
+    }
+    const landmarks = frame.landmarks;
+    // Get left arm landmarks
+    const leftElbow = landmarks[LANDMARK_INDICES.LEFT_ELBOW];
+    const leftWrist = landmarks[LANDMARK_INDICES.LEFT_WRIST];
+    const leftIndex = landmarks[LANDMARK_INDICES.LEFT_INDEX];
+    // Get right arm landmarks
+    const rightElbow = landmarks[LANDMARK_INDICES.RIGHT_ELBOW];
+    const rightWrist = landmarks[LANDMARK_INDICES.RIGHT_WRIST];
+    const rightIndex = landmarks[LANDMARK_INDICES.RIGHT_INDEX];
+    // Check visibility
+    const leftVisible = leftElbow &&
+        leftWrist &&
+        leftIndex &&
+        leftElbow.visibility >= visibilityThreshold &&
+        leftWrist.visibility >= visibilityThreshold &&
+        leftIndex.visibility >= visibilityThreshold;
+    const rightVisible = rightElbow &&
+        rightWrist &&
+        rightIndex &&
+        rightElbow.visibility >= visibilityThreshold &&
+        rightWrist.visibility >= visibilityThreshold &&
+        rightIndex.visibility >= visibilityThreshold;
+    const leftAngle = leftVisible
+        ? calculateWristAngle(leftElbow, leftWrist, leftIndex)
+        : null;
+    const rightAngle = rightVisible
+        ? calculateWristAngle(rightElbow, rightWrist, rightIndex)
+        : null;
+    // Return average of both, or whichever is available
+    if (leftAngle !== null && rightAngle !== null) {
+        return (leftAngle + rightAngle) / 2;
+    }
+    else if (leftAngle !== null) {
+        return leftAngle;
+    }
+    else if (rightAngle !== null) {
+        return rightAngle;
     }
     return null;
 }
@@ -383,11 +569,124 @@ export function detectBallStartsUpward(frames, ballLowPointFrame, endFrame, conf
     return null;
 }
 /**
+ * Detects the "set point" frame - the highest wrist position before release
+ * with the elbow still bent.
+ *
+ * The set point is the "cocking" position where the ball is held at its highest
+ * point before the forward/upward release motion. It's characterized by:
+ * - Wrist at a local high point (minimum Y in normalized coords)
+ * - Elbow still bent (angle less than threshold)
+ *
+ * @param frames - Array of frames with pose data
+ * @param ballStartsUpwardFrame - Frame index where ball starts moving upward
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index of set point, or null if not detectable
+ */
+export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config = DEFAULT_CONFIG) {
+    const shotDuration = endFrame - ballStartsUpwardFrame + 1;
+    const searchEndFrame = ballStartsUpwardFrame + Math.floor(shotDuration * config.setPointSearchWindow);
+    // Collect wrist Y positions and elbow angles for frames in the search window
+    const frameData = [];
+    for (const frame of frames) {
+        const frameIdx = frame.frameIndex;
+        // Only search from ball_starts_upward forward
+        if (frameIdx < ballStartsUpwardFrame || frameIdx > searchEndFrame) {
+            continue;
+        }
+        const wristY = getFrameWristY(frame, config.visibilityThreshold);
+        const elbowAngle = getFrameElbowAngle(frame, config.visibilityThreshold);
+        if (wristY !== null) {
+            frameData.push({ frameIndex: frameIdx, wristY, elbowAngle });
+        }
+    }
+    if (frameData.length === 0) {
+        return null;
+    }
+    // Sort by frame index
+    frameData.sort((a, b) => a.frameIndex - b.frameIndex);
+    // Strategy: Find the frame with minimum wrist Y (highest position)
+    // that also has a bent elbow (angle < threshold).
+    // If multiple frames have similar wrist Y, prefer the one with more bent elbow.
+    let bestFrame = null;
+    let minWristY = Infinity;
+    for (const data of frameData) {
+        // Check if elbow is bent enough (if we have the measurement)
+        const elbowBent = data.elbowAngle === null ||
+            data.elbowAngle < config.setPointMaxElbowAngle;
+        // Look for minimum wrist Y (highest position) with bent elbow
+        if (elbowBent && data.wristY < minWristY) {
+            minWristY = data.wristY;
+            bestFrame = data.frameIndex;
+        }
+    }
+    // If we couldn't find a frame with bent elbow, just use lowest wristY
+    if (bestFrame === null && frameData.length > 0) {
+        for (const data of frameData) {
+            if (data.wristY < minWristY) {
+                minWristY = data.wristY;
+                bestFrame = data.frameIndex;
+            }
+        }
+    }
+    return bestFrame;
+}
+/**
+ * Detects the "release" frame - the frame of maximum wrist flexion (snap).
+ *
+ * The release is when the wrist snaps and the ball leaves the hand.
+ * It's characterized by:
+ * - Maximum wrist flexion angle (minimum angle = maximum snap)
+ * - Occurs after the set point
+ *
+ * @param frames - Array of frames with pose data
+ * @param setPointFrame - Frame index of the set point
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index of release, or null if not detectable
+ */
+export function detectRelease(frames, setPointFrame, endFrame, config = DEFAULT_CONFIG) {
+    // Release must occur AFTER set_point, so start from setPointFrame + 1
+    const searchStartFrame = setPointFrame + 1;
+    const shotDuration = endFrame - setPointFrame + 1;
+    const searchEndFrame = setPointFrame + Math.floor(shotDuration * config.releaseSearchWindow);
+    // Collect wrist flexion angles for frames in the search window
+    const frameData = [];
+    for (const frame of frames) {
+        const frameIdx = frame.frameIndex;
+        // Only search from after set_point forward (release must come after set_point)
+        if (frameIdx < searchStartFrame || frameIdx > searchEndFrame) {
+            continue;
+        }
+        const wristAngle = getFrameWristAngle(frame, config.visibilityThreshold);
+        if (wristAngle !== null) {
+            frameData.push({ frameIndex: frameIdx, wristAngle });
+        }
+    }
+    if (frameData.length === 0) {
+        return null;
+    }
+    // Sort by frame index
+    frameData.sort((a, b) => a.frameIndex - b.frameIndex);
+    // Find the frame with minimum wrist angle (maximum flexion/snap)
+    let releaseFrame = null;
+    let minWristAngle = Infinity;
+    for (const data of frameData) {
+        if (data.wristAngle < minWristAngle) {
+            minWristAngle = data.wristAngle;
+            releaseFrame = data.frameIndex;
+        }
+    }
+    return releaseFrame;
+}
+/**
  * KeyframeDetector class for detecting keyframes within basketball shots.
  *
  * Implements keyframe detection for:
  * - Load phase: leg_bend_low_point, ball_low_point
  * - Rise phase: legs_start_extending, ball_starts_upward
+ * - Set Point phase: set_point
+ * - Release phase: release
  */
 export class KeyframeDetector {
     config;
@@ -456,6 +755,44 @@ export class KeyframeDetector {
             keyframeId: "ball_starts_upward",
             frameIndex: ballUpwardFrame,
             confidence: ballUpwardFrame !== null ? 0.8 : 0.0,
+        });
+        // Overall confidence based on successful detections
+        const successCount = keyframes.filter((k) => k.frameIndex !== null).length;
+        const overallConfidence = successCount / keyframes.length;
+        return {
+            keyframes,
+            confidence: overallConfidence,
+        };
+    }
+    /**
+     * Detects Set Point and Release phase keyframes for a shot.
+     *
+     * Requires Rise phase keyframes to have been detected first,
+     * as set_point detection starts from ball_starts_upward.
+     *
+     * @param frames - Array of frames with pose data
+     * @param ballStartsUpwardFrame - Frame index where ball starts upward (from Rise phase)
+     * @param endFrame - Shot end frame index (inclusive)
+     * @returns Detection result with keyframes and confidence
+     */
+    detectSetPointReleaseKeyframes(frames, ballStartsUpwardFrame, endFrame) {
+        const keyframes = [];
+        // Detect set_point
+        const setPointFrame = detectSetPoint(frames, ballStartsUpwardFrame, endFrame, this.config);
+        keyframes.push({
+            keyframeId: "set_point",
+            frameIndex: setPointFrame,
+            confidence: setPointFrame !== null ? 0.8 : 0.0,
+        });
+        // Detect release (requires set_point to be detected first)
+        let releaseFrame = null;
+        if (setPointFrame !== null) {
+            releaseFrame = detectRelease(frames, setPointFrame, endFrame, this.config);
+        }
+        keyframes.push({
+            keyframeId: "release",
+            frameIndex: releaseFrame,
+            confidence: releaseFrame !== null ? 0.8 : 0.0,
         });
         // Overall confidence based on successful detections
         const successCount = keyframes.filter((k) => k.frameIndex !== null).length;

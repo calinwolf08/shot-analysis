@@ -1,8 +1,7 @@
 /**
- * Unit tests for KeyframeDetector - Load phase keyframe detection.
+ * Unit tests for KeyframeDetector - Load, Rise, Set Point, and Release phase detection.
  *
- * Tests detectLegBendLowPoint() and detectBallLowPoint() functions
- * for identifying Load phase keyframes in basketball shots.
+ * Tests detection functions for identifying keyframes in basketball shots.
  */
 
 import { describe, it, expect } from "vitest";
@@ -10,10 +9,14 @@ import {
   KeyframeDetector,
   createKeyframeDetector,
   calculateKneeAngle,
+  calculateElbowAngle,
+  calculateWristAngle,
   detectLegBendLowPoint,
   detectBallLowPoint,
   detectLegsStartExtending,
   detectBallStartsUpward,
+  detectSetPoint,
+  detectRelease,
   calculateVelocity,
   calculateSmoothedVelocity,
   type KeyframeDetectorConfig,
@@ -33,6 +36,9 @@ const LOAD_PHASE_CONFIG: Required<KeyframeDetectorConfig> = {
   minConsecutiveFrames: 2,
   kneeVelocityThreshold: 0.5,
   wristVelocityThreshold: -0.005,
+  setPointSearchWindow: 0.7,
+  setPointMaxElbowAngle: 160,
+  releaseSearchWindow: 0.5,
 };
 
 /**
@@ -817,6 +823,9 @@ describe("detectLegsStartExtending", () => {
     minConsecutiveFrames: 2,
     kneeVelocityThreshold: 0.5,
     wristVelocityThreshold: -0.005,
+    setPointSearchWindow: 0.7,
+    setPointMaxElbowAngle: 160,
+    releaseSearchWindow: 0.5,
   };
 
   it("detects frame where knee starts extending", () => {
@@ -913,6 +922,9 @@ describe("detectBallStartsUpward", () => {
     minConsecutiveFrames: 2,
     kneeVelocityThreshold: 0.5,
     wristVelocityThreshold: -0.005,
+    setPointSearchWindow: 0.7,
+    setPointMaxElbowAngle: 160,
+    releaseSearchWindow: 0.5,
   };
 
   it("detects frame where ball starts rising", () => {
@@ -1114,5 +1126,564 @@ describe("KeyframeDetector.detectRisePhaseKeyframes", () => {
 
     // With fewer required consecutive frames, detection should be more sensitive
     expect(result1.confidence).toBeGreaterThanOrEqual(result2.confidence);
+  });
+});
+
+// ============================================================================
+// Set Point and Release Phase Tests
+// ============================================================================
+
+describe("calculateElbowAngle", () => {
+  it("returns null when shoulder is null", () => {
+    const elbow = createLandmark(0.5, 0.5);
+    const wrist = createLandmark(0.5, 0.7);
+    expect(calculateElbowAngle(null, elbow, wrist)).toBeNull();
+  });
+
+  it("returns null when elbow is null", () => {
+    const shoulder = createLandmark(0.5, 0.3);
+    const wrist = createLandmark(0.5, 0.7);
+    expect(calculateElbowAngle(shoulder, null, wrist)).toBeNull();
+  });
+
+  it("returns null when wrist is null", () => {
+    const shoulder = createLandmark(0.5, 0.3);
+    const elbow = createLandmark(0.5, 0.5);
+    expect(calculateElbowAngle(shoulder, elbow, null)).toBeNull();
+  });
+
+  it("calculates ~180 degrees for straight arm", () => {
+    // Straight vertical arm: shoulder, elbow, wrist in line
+    const shoulder = createLandmark(0.5, 0.3);
+    const elbow = createLandmark(0.5, 0.5);
+    const wrist = createLandmark(0.5, 0.7);
+
+    const angle = calculateElbowAngle(shoulder, elbow, wrist);
+    expect(angle).not.toBeNull();
+    expect(angle!).toBeCloseTo(180, 0);
+  });
+
+  it("calculates ~90 degrees for right angle bend", () => {
+    // Right angle: shoulder straight up from elbow, wrist straight right
+    const shoulder = createLandmark(0.5, 0.3);
+    const elbow = createLandmark(0.5, 0.5);
+    const wrist = createLandmark(0.7, 0.5);
+
+    const angle = calculateElbowAngle(shoulder, elbow, wrist);
+    expect(angle).not.toBeNull();
+    expect(angle!).toBeCloseTo(90, 0);
+  });
+
+  it("calculates angle < 180 for bent elbow", () => {
+    // Bent elbow: wrist slightly forward
+    const shoulder = createLandmark(0.5, 0.3);
+    const elbow = createLandmark(0.5, 0.5);
+    const wrist = createLandmark(0.55, 0.65);
+
+    const angle = calculateElbowAngle(shoulder, elbow, wrist);
+    expect(angle).not.toBeNull();
+    expect(angle!).toBeLessThan(180);
+    expect(angle!).toBeGreaterThan(90);
+  });
+
+  it("returns null for identical points (degenerate case)", () => {
+    const point = createLandmark(0.5, 0.5);
+    const angle = calculateElbowAngle(point, point, point);
+    expect(angle).toBeNull();
+  });
+});
+
+describe("calculateWristAngle", () => {
+  it("returns null when elbow is null", () => {
+    const wrist = createLandmark(0.5, 0.6);
+    const indexFinger = createLandmark(0.5, 0.65);
+    expect(calculateWristAngle(null, wrist, indexFinger)).toBeNull();
+  });
+
+  it("returns null when wrist is null", () => {
+    const elbow = createLandmark(0.5, 0.5);
+    const indexFinger = createLandmark(0.5, 0.65);
+    expect(calculateWristAngle(elbow, null, indexFinger)).toBeNull();
+  });
+
+  it("returns null when index finger is null", () => {
+    const elbow = createLandmark(0.5, 0.5);
+    const wrist = createLandmark(0.5, 0.6);
+    expect(calculateWristAngle(elbow, wrist, null)).toBeNull();
+  });
+
+  it("calculates ~180 degrees for straight wrist", () => {
+    // Straight wrist: elbow, wrist, index in line
+    const elbow = createLandmark(0.5, 0.4);
+    const wrist = createLandmark(0.5, 0.5);
+    const indexFinger = createLandmark(0.5, 0.6);
+
+    const angle = calculateWristAngle(elbow, wrist, indexFinger);
+    expect(angle).not.toBeNull();
+    expect(angle!).toBeCloseTo(180, 0);
+  });
+
+  it("calculates ~90 degrees for flexed wrist", () => {
+    // Flexed wrist at 90 degrees
+    const elbow = createLandmark(0.5, 0.4);
+    const wrist = createLandmark(0.5, 0.5);
+    const indexFinger = createLandmark(0.6, 0.5); // Index pointing perpendicular
+
+    const angle = calculateWristAngle(elbow, wrist, indexFinger);
+    expect(angle).not.toBeNull();
+    expect(angle!).toBeCloseTo(90, 0);
+  });
+
+  it("calculates angle < 180 for partially flexed wrist", () => {
+    // Partially flexed wrist
+    const elbow = createLandmark(0.5, 0.4);
+    const wrist = createLandmark(0.5, 0.5);
+    const indexFinger = createLandmark(0.52, 0.58);
+
+    const angle = calculateWristAngle(elbow, wrist, indexFinger);
+    expect(angle).not.toBeNull();
+    expect(angle!).toBeLessThan(180);
+    expect(angle!).toBeGreaterThan(90);
+  });
+});
+
+/**
+ * Creates a frame sequence simulating the Set Point and Release phase.
+ * The wrist rises to a high point (set point) with bent elbow,
+ * then the wrist snaps (flexes) during release.
+ *
+ * @param startFrame - Starting frame index
+ * @param frameCount - Number of frames
+ * @param setPointFrame - Frame where set point occurs (relative to start)
+ * @param releaseFrame - Frame where release occurs (relative to start)
+ */
+function createSetPointReleaseSequence(
+  startFrame: number,
+  frameCount: number,
+  setPointFrame: number,
+  releaseFrame: number,
+): Frame[] {
+  const frames: Frame[] = [];
+
+  for (let i = 0; i < frameCount; i++) {
+    const frameIdx = startFrame + i;
+    const landmarks = createDefaultLandmarks();
+
+    // Wrist Y position: rises to minimum (highest position) at setPointFrame
+    // Before set point: wrist rises (Y decreases)
+    // After set point: wrist stays high or slightly descends
+    let wristY: number;
+    if (i < setPointFrame) {
+      // Rising to set point
+      const progress = i / setPointFrame;
+      wristY = 0.6 - progress * 0.25; // 0.6 -> 0.35
+    } else {
+      // After set point: slight descent
+      const progress = (i - setPointFrame) / (frameCount - setPointFrame);
+      wristY = 0.35 + progress * 0.1; // 0.35 -> 0.45
+    }
+
+    // Elbow angle: starts bent, stays bent until after set point
+    // Then gradually extends
+    let elbowAngleTarget: number;
+    if (i <= setPointFrame) {
+      // Bent elbow at set point (~120 degrees)
+      elbowAngleTarget = 120;
+    } else {
+      // Elbow extends after set point
+      const progress = (i - setPointFrame) / (frameCount - setPointFrame);
+      elbowAngleTarget = 120 + progress * 50; // 120 -> 170
+    }
+
+    // Position arm landmarks to achieve target elbow angle
+    const shoulderY = 0.3;
+    const elbowY = 0.4;
+    // For a bent elbow, wrist moves forward relative to shoulder-elbow line
+    const normalizedBend = 1 - (elbowAngleTarget - 90) / 90;
+    const wristXOffset = normalizedBend * 0.15;
+
+    landmarks[LANDMARK_INDICES.LEFT_SHOULDER] = createLandmark(
+      0.4,
+      shoulderY,
+      0,
+    );
+    landmarks[LANDMARK_INDICES.RIGHT_SHOULDER] = createLandmark(
+      0.6,
+      shoulderY,
+      0,
+    );
+    landmarks[LANDMARK_INDICES.LEFT_ELBOW] = createLandmark(0.4, elbowY, 0);
+    landmarks[LANDMARK_INDICES.RIGHT_ELBOW] = createLandmark(0.6, elbowY, 0);
+    landmarks[LANDMARK_INDICES.LEFT_WRIST] = createLandmark(
+      0.4 + wristXOffset,
+      wristY,
+      0,
+    );
+    landmarks[LANDMARK_INDICES.RIGHT_WRIST] = createLandmark(
+      0.6 + wristXOffset,
+      wristY,
+      0,
+    );
+
+    // Wrist flexion angle: straight before release, maximally flexed at release
+    // Before release: ~170 degrees (mostly straight)
+    // At release: ~100-120 degrees (flexed/snapped)
+    // After release: gradually returns to straight
+    let wristFlexion: number;
+    if (i < releaseFrame) {
+      // Before release: gradually increase flexion
+      const progress = Math.max(
+        0,
+        (i - setPointFrame) / (releaseFrame - setPointFrame),
+      );
+      wristFlexion = 170 - progress * 60; // 170 -> 110
+    } else if (i === releaseFrame) {
+      // Maximum flexion at release
+      wristFlexion = 100;
+    } else {
+      // After release: return to straight
+      const progress = (i - releaseFrame) / (frameCount - releaseFrame);
+      wristFlexion = 100 + progress * 60; // 100 -> 160
+    }
+
+    // Position index finger to achieve target wrist flexion
+    // Wrist flexion is angle at wrist between forearm and hand direction
+    const wristPos = landmarks[LANDMARK_INDICES.LEFT_WRIST]!;
+    const flexionRad = (wristFlexion * Math.PI) / 180;
+    const indexOffset = 0.05; // Distance from wrist to index
+    // For simplicity, flex in the Y direction
+    const indexY = wristPos.y + indexOffset * Math.cos(Math.PI - flexionRad);
+    const indexX = wristPos.x + indexOffset * Math.sin(Math.PI - flexionRad);
+
+    landmarks[LANDMARK_INDICES.LEFT_INDEX] = createLandmark(indexX, indexY, 0);
+    landmarks[LANDMARK_INDICES.RIGHT_INDEX] = createLandmark(
+      indexX + 0.2,
+      indexY,
+      0,
+    );
+
+    frames.push(createFrame(frameIdx, landmarks));
+  }
+
+  return frames;
+}
+
+describe("detectSetPoint", () => {
+  const defaultConfig: Required<KeyframeDetectorConfig> = {
+    visibilityThreshold: 0.5,
+    ballLowPointSearchWindow: 0.4,
+    legBendSearchWindow: 0.5,
+    riseSearchWindow: 0.6,
+    smoothingWindowSize: 3,
+    minConsecutiveFrames: 2,
+    kneeVelocityThreshold: 0.5,
+    wristVelocityThreshold: -0.005,
+    setPointSearchWindow: 0.7,
+    setPointMaxElbowAngle: 160,
+    releaseSearchWindow: 0.5,
+  };
+
+  it("detects frame with highest wrist position and bent elbow", () => {
+    const frames = createSetPointReleaseSequence(0, 30, 10, 15);
+    const result = detectSetPoint(frames, 0, 29, defaultConfig);
+
+    expect(result).not.toBeNull();
+    // Should detect set point around frame 10
+    expect(result!).toBeGreaterThanOrEqual(8);
+    expect(result!).toBeLessThanOrEqual(12);
+  });
+
+  it("returns null when no valid frames exist", () => {
+    const frames: Frame[] = [
+      createFrame(0, null),
+      createFrame(1, null),
+      createFrame(2, null),
+    ];
+    const result = detectSetPoint(frames, 0, 2, defaultConfig);
+    expect(result).toBeNull();
+  });
+
+  it("respects search window", () => {
+    // Create sequence with set point at frame 25 (beyond 70% search window of 30 frames)
+    const frames = createSetPointReleaseSequence(0, 30, 25, 28);
+
+    const config: Required<KeyframeDetectorConfig> = {
+      ...defaultConfig,
+      setPointSearchWindow: 0.5, // Only search first 50%
+    };
+
+    const result = detectSetPoint(frames, 0, 29, config);
+
+    // Should find a frame in the search window, not frame 25
+    if (result !== null) {
+      expect(result).toBeLessThan(25);
+    }
+  });
+
+  it("skips frames with low visibility landmarks", () => {
+    const frames = createSetPointReleaseSequence(0, 20, 10, 15);
+
+    // Make frame 10 have low visibility wrists
+    const landmarks = [...(frames[10]!.landmarks as TestLandmark[])];
+    landmarks[LANDMARK_INDICES.LEFT_WRIST] = createLandmark(0.4, 0.35, 0, 0.2);
+    landmarks[LANDMARK_INDICES.RIGHT_WRIST] = createLandmark(0.6, 0.35, 0, 0.2);
+    frames[10] = createFrame(10, landmarks);
+
+    const result = detectSetPoint(frames, 0, 19, defaultConfig);
+
+    // Should not select frame 10 due to low visibility
+    expect(result).not.toBe(10);
+  });
+
+  it("prefers frames with bent elbow when wrist is at similar height", () => {
+    const frames = createSetPointReleaseSequence(0, 20, 8, 15);
+
+    // Verify set point is detected near frame 8 where elbow is still bent
+    const result = detectSetPoint(frames, 0, 19, defaultConfig);
+
+    expect(result).not.toBeNull();
+    // Should be around the set point frame where elbow is bent
+    expect(result!).toBeGreaterThanOrEqual(6);
+    expect(result!).toBeLessThanOrEqual(12);
+  });
+});
+
+describe("detectRelease", () => {
+  const defaultConfig: Required<KeyframeDetectorConfig> = {
+    visibilityThreshold: 0.5,
+    ballLowPointSearchWindow: 0.4,
+    legBendSearchWindow: 0.5,
+    riseSearchWindow: 0.6,
+    smoothingWindowSize: 3,
+    minConsecutiveFrames: 2,
+    kneeVelocityThreshold: 0.5,
+    wristVelocityThreshold: -0.005,
+    setPointSearchWindow: 0.7,
+    setPointMaxElbowAngle: 160,
+    releaseSearchWindow: 0.5,
+  };
+
+  it("detects frame with maximum wrist flexion", () => {
+    const frames = createSetPointReleaseSequence(0, 30, 10, 15);
+    const result = detectRelease(frames, 10, 29, defaultConfig);
+
+    expect(result).not.toBeNull();
+    // Release should be detected somewhere after the set point (frame 10)
+    // The exact frame depends on the generated wrist flexion pattern
+    expect(result!).toBeGreaterThan(10);
+    expect(result!).toBeLessThanOrEqual(20);
+  });
+
+  it("returns null when no valid frames exist", () => {
+    const frames: Frame[] = [
+      createFrame(10, null),
+      createFrame(11, null),
+      createFrame(12, null),
+    ];
+    const result = detectRelease(frames, 10, 12, defaultConfig);
+    expect(result).toBeNull();
+  });
+
+  it("respects search window", () => {
+    // Create sequence with release at frame 25
+    const frames = createSetPointReleaseSequence(0, 30, 10, 25);
+
+    const config: Required<KeyframeDetectorConfig> = {
+      ...defaultConfig,
+      releaseSearchWindow: 0.3, // Only search first 30% after set point
+    };
+
+    const result = detectRelease(frames, 10, 29, config);
+
+    // Should not find frame 25 (outside search window)
+    if (result !== null) {
+      expect(result).toBeLessThan(20);
+    }
+  });
+
+  it("skips frames with low visibility landmarks", () => {
+    const frames = createSetPointReleaseSequence(0, 20, 8, 12);
+
+    // Make frame 12 have low visibility index finger
+    const landmarks = [...(frames[12]!.landmarks as TestLandmark[])];
+    landmarks[LANDMARK_INDICES.LEFT_INDEX] = createLandmark(0.45, 0.5, 0, 0.2);
+    landmarks[LANDMARK_INDICES.RIGHT_INDEX] = createLandmark(0.65, 0.5, 0, 0.2);
+    frames[12] = createFrame(12, landmarks);
+
+    const result = detectRelease(frames, 8, 19, defaultConfig);
+
+    // Should not select frame 12 due to low visibility
+    expect(result).not.toBe(12);
+  });
+
+  it("finds release after set point", () => {
+    const frames = createSetPointReleaseSequence(0, 30, 10, 18);
+    const result = detectRelease(frames, 10, 29, defaultConfig);
+
+    expect(result).not.toBeNull();
+    // Release should be after set point
+    expect(result!).toBeGreaterThan(10);
+  });
+});
+
+describe("KeyframeDetector.detectSetPointReleaseKeyframes", () => {
+  it("detects both set_point and release", () => {
+    const frames = createSetPointReleaseSequence(0, 30, 10, 18);
+    const detector = createKeyframeDetector();
+
+    const result = detector.detectSetPointReleaseKeyframes(frames, 0, 29);
+
+    expect(result.keyframes).toHaveLength(2);
+
+    const setPoint = result.keyframes.find((k) => k.keyframeId === "set_point");
+    const release = result.keyframes.find((k) => k.keyframeId === "release");
+
+    expect(setPoint).toBeDefined();
+    expect(release).toBeDefined();
+    expect(setPoint!.frameIndex).not.toBeNull();
+    expect(release!.frameIndex).not.toBeNull();
+  });
+
+  it("returns confidence of 1.0 when both keyframes detected", () => {
+    const frames = createSetPointReleaseSequence(0, 30, 10, 18);
+    const detector = createKeyframeDetector();
+
+    const result = detector.detectSetPointReleaseKeyframes(frames, 0, 29);
+
+    expect(result.confidence).toBe(1.0);
+  });
+
+  it("returns confidence of 0.0 when no keyframes detected", () => {
+    const frames: Frame[] = [
+      createFrame(0, null),
+      createFrame(1, null),
+      createFrame(2, null),
+    ];
+    const detector = createKeyframeDetector();
+
+    const result = detector.detectSetPointReleaseKeyframes(frames, 0, 2);
+
+    expect(result.confidence).toBe(0);
+  });
+
+  it("ensures release occurs after set_point", () => {
+    const frames = createSetPointReleaseSequence(0, 30, 8, 15);
+    const detector = createKeyframeDetector();
+
+    const result = detector.detectSetPointReleaseKeyframes(frames, 0, 29);
+
+    const setPoint = result.keyframes.find((k) => k.keyframeId === "set_point");
+    const release = result.keyframes.find((k) => k.keyframeId === "release");
+
+    expect(setPoint!.frameIndex).not.toBeNull();
+    expect(release!.frameIndex).not.toBeNull();
+    // Release must come after set point
+    expect(release!.frameIndex!).toBeGreaterThan(setPoint!.frameIndex!);
+  });
+
+  it("returns null release when set_point is not detected", () => {
+    // Create frames where set point cannot be detected (no valid wrist data)
+    const frames: Frame[] = [];
+    for (let i = 0; i < 10; i++) {
+      const landmarks = createDefaultLandmarks();
+      // Make wrist landmarks low visibility
+      landmarks[LANDMARK_INDICES.LEFT_WRIST] = createLandmark(0.4, 0.5, 0, 0.2);
+      landmarks[LANDMARK_INDICES.RIGHT_WRIST] = createLandmark(
+        0.6,
+        0.5,
+        0,
+        0.2,
+      );
+      frames.push(createFrame(i, landmarks));
+    }
+
+    const detector = createKeyframeDetector();
+    const result = detector.detectSetPointReleaseKeyframes(frames, 0, 9);
+
+    const release = result.keyframes.find((k) => k.keyframeId === "release");
+    expect(release!.frameIndex).toBeNull();
+  });
+
+  it("uses custom setPointMaxElbowAngle", () => {
+    const frames = createSetPointReleaseSequence(0, 30, 10, 18);
+
+    // With very low threshold, most frames should be rejected
+    const detector1 = createKeyframeDetector({ setPointMaxElbowAngle: 90 });
+    // With high threshold, all frames should be valid candidates
+    const detector2 = createKeyframeDetector({ setPointMaxElbowAngle: 180 });
+
+    const result1 = detector1.detectSetPointReleaseKeyframes(frames, 0, 29);
+    const result2 = detector2.detectSetPointReleaseKeyframes(frames, 0, 29);
+
+    // Both should detect something (we still fall back if no bent elbow frames)
+    const setPoint1 = result1.keyframes.find(
+      (k) => k.keyframeId === "set_point",
+    );
+    const setPoint2 = result2.keyframes.find(
+      (k) => k.keyframeId === "set_point",
+    );
+
+    expect(setPoint2!.frameIndex).not.toBeNull();
+    // With stricter threshold, may get different result
+    if (setPoint1!.frameIndex !== null && setPoint2!.frameIndex !== null) {
+      // Both should find a set point (may differ)
+      expect(typeof setPoint1!.frameIndex).toBe("number");
+    }
+  });
+});
+
+describe("Set/Release edge cases", () => {
+  it("handles quick release with set_point and release close together", () => {
+    // Create sequence with very quick release (set_point and release only 2 frames apart)
+    const frames = createSetPointReleaseSequence(0, 20, 8, 10);
+    const detector = createKeyframeDetector();
+
+    const result = detector.detectSetPointReleaseKeyframes(frames, 0, 19);
+
+    const setPoint = result.keyframes.find((k) => k.keyframeId === "set_point");
+    const release = result.keyframes.find((k) => k.keyframeId === "release");
+
+    // Both should be detected even when close together
+    expect(setPoint!.frameIndex).not.toBeNull();
+    expect(release!.frameIndex).not.toBeNull();
+  });
+
+  it("handles empty frame array", () => {
+    const detector = createKeyframeDetector();
+    const result = detector.detectSetPointReleaseKeyframes([], 0, 0);
+
+    expect(result.keyframes).toHaveLength(2);
+    expect(result.keyframes.every((k) => k.frameIndex === null)).toBe(true);
+    expect(result.confidence).toBe(0);
+  });
+
+  it("handles single frame", () => {
+    const frames = createSetPointReleaseSequence(5, 1, 0, 0);
+    const detector = createKeyframeDetector();
+
+    const result = detector.detectSetPointReleaseKeyframes(frames, 5, 5);
+
+    // May or may not detect (single frame limits what can be found)
+    expect(result.keyframes).toHaveLength(2);
+  });
+
+  it("handles non-contiguous frame indices", () => {
+    // Simulate dropped frames
+    const allFrames = createSetPointReleaseSequence(0, 20, 8, 12);
+    const frames: Frame[] = [
+      allFrames[0]!,
+      allFrames[2]!,
+      allFrames[5]!,
+      allFrames[8]!,
+      allFrames[12]!,
+      allFrames[15]!,
+    ];
+
+    const detector = createKeyframeDetector();
+    const result = detector.detectSetPointReleaseKeyframes(frames, 0, 15);
+
+    // Should still be able to detect keyframes from available frames
+    const setPoint = result.keyframes.find((k) => k.keyframeId === "set_point");
+    expect(setPoint!.frameIndex).not.toBeNull();
   });
 });

@@ -3,7 +3,7 @@
 		"name": "all-frame-keypoint-detection",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-07-02T12:00:00.000Z",
-		"updated_at": "2026-07-05T18:34:24.897Z"
+		"updated_at": "2026-07-05T18:53:07.633Z"
 	},
 	"status": "in_progress",
 	"global_constraints": {
@@ -285,8 +285,8 @@
 				{
 					"id": "2.2",
 					"name": "Rise Phase Keyframe Detection",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want to detect the Rise phase keyframes (legs_start_extending, ball_starts_upward) so that I can identify when the shooting motion begins.",
@@ -322,7 +322,8 @@
 							"id": "2.2.4",
 							"description": "Add unit tests for Rise phase detection"
 						}
-					]
+					],
+					"commit_hash": "e2cbe1b2cc24ddaad4ace3fcd7565529503d4057"
 				},
 				{
 					"id": "2.3",
