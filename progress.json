@@ -3,9 +3,9 @@
 		"name": "all-frame-keypoint-detection",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-07-02T12:00:00.000Z",
-		"updated_at": "2026-07-02T12:00:00.000Z"
+		"updated_at": "2026-07-03T20:52:19.915Z"
 	},
-	"status": "pending",
+	"status": "in_progress",
 	"global_constraints": {
 		"CRITICAL_RULE": "Labels are IMMUTABLE ground truth. The algorithm must be tuned to match the labels, NEVER the other way around.",
 		"forbidden_actions": [
@@ -71,8 +71,8 @@
 				{
 					"id": "1.1",
 					"name": "Update Label Schema for All Keyframes",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want the label schema to include all 10 keyframe fields so that I can validate the algorithm against complete ground truth data.",
@@ -93,12 +93,28 @@
 						"technical_notes": "The keyframe field names match exactly with video-tagger output and metrics-by-phase.md. Note that video-tagger labels use the OLD schema which has arms_most_acute and legs_fully_extended instead of release. The conversion script (Task 1.2) will handle mapping."
 					},
 					"subtasks": [
-						{ "id": "1.1.1", "description": "Add 10 keyframe fields to LabeledShot interface in types.ts" },
-						{ "id": "1.1.2", "description": "Update labeledShotSchema with optional keyframe field validators" },
-						{ "id": "1.1.3", "description": "Add type definitions for KeyframeId union type" },
-						{ "id": "1.1.4", "description": "Write unit tests for schema validation with keyframe fields" },
-						{ "id": "1.1.5", "description": "Verify existing test data still loads (backward compatibility)" }
-					]
+						{
+							"id": "1.1.1",
+							"description": "Add 10 keyframe fields to LabeledShot interface in types.ts"
+						},
+						{
+							"id": "1.1.2",
+							"description": "Update labeledShotSchema with optional keyframe field validators"
+						},
+						{
+							"id": "1.1.3",
+							"description": "Add type definitions for KeyframeId union type"
+						},
+						{
+							"id": "1.1.4",
+							"description": "Write unit tests for schema validation with keyframe fields"
+						},
+						{
+							"id": "1.1.5",
+							"description": "Verify existing test data still loads (backward compatibility)"
+						}
+					],
+					"commit_hash": "f245655afd6731ac3e52b15a283f7ddba00f331a"
 				},
 				{
 					"id": "1.2",
@@ -129,12 +145,30 @@
 						"technical_notes": "Video-tagger files are at: /mnt/c/Users/calin/OneDrive - Soul Focused Group/Personal Photos/basketball clips/{player}/*_labels.json. Players: chris, cody, cole, jax, edmond. The script should be in scripts/ directory. Map shot_number to shotNumber, orientation to cameraOrientation, keypoints.legs_start_bending to both legs_start_bending field AND startFrame for compatibility."
 					},
 					"subtasks": [
-						{ "id": "1.2.1", "description": "Create scripts/convert-video-tagger-labels.ts" },
-						{ "id": "1.2.2", "description": "Implement reading video-tagger JSON format" },
-						{ "id": "1.2.3", "description": "Implement mapping old keyframe names to new schema" },
-						{ "id": "1.2.4", "description": "Implement output in test-data labels.json format" },
-						{ "id": "1.2.5", "description": "Run conversion for all 8 video-tagger label files" },
-						{ "id": "1.2.6", "description": "Verify converted labels load correctly with updated schema" }
+						{
+							"id": "1.2.1",
+							"description": "Create scripts/convert-video-tagger-labels.ts"
+						},
+						{
+							"id": "1.2.2",
+							"description": "Implement reading video-tagger JSON format"
+						},
+						{
+							"id": "1.2.3",
+							"description": "Implement mapping old keyframe names to new schema"
+						},
+						{
+							"id": "1.2.4",
+							"description": "Implement output in test-data labels.json format"
+						},
+						{
+							"id": "1.2.5",
+							"description": "Run conversion for all 8 video-tagger label files"
+						},
+						{
+							"id": "1.2.6",
+							"description": "Verify converted labels load correctly with updated schema"
+						}
 					]
 				},
 				{
@@ -164,12 +198,30 @@
 						"technical_notes": "Build on existing compareResults() logic. The tolerance check is: Math.abs(detected - labeled) <= 8. For console output, show: '✓ set_point: 65 (diff: +2)' or '✗ release: 73 (expected 70, diff: +3, EXCEEDS TOLERANCE)'"
 					},
 					"subtasks": [
-						{ "id": "1.3.1", "description": "Add KeyframeComparisonResult type to types.ts" },
-						{ "id": "1.3.2", "description": "Extend ShotComparisonResult with keyframes array" },
-						{ "id": "1.3.3", "description": "Implement compareKeyframes() function in detection.ts" },
-						{ "id": "1.3.4", "description": "Update compareResults() to call compareKeyframes()" },
-						{ "id": "1.3.5", "description": "Update reporting.ts to display per-keyframe results" },
-						{ "id": "1.3.6", "description": "Write unit tests for keyframe comparison logic" }
+						{
+							"id": "1.3.1",
+							"description": "Add KeyframeComparisonResult type to types.ts"
+						},
+						{
+							"id": "1.3.2",
+							"description": "Extend ShotComparisonResult with keyframes array"
+						},
+						{
+							"id": "1.3.3",
+							"description": "Implement compareKeyframes() function in detection.ts"
+						},
+						{
+							"id": "1.3.4",
+							"description": "Update compareResults() to call compareKeyframes()"
+						},
+						{
+							"id": "1.3.5",
+							"description": "Update reporting.ts to display per-keyframe results"
+						},
+						{
+							"id": "1.3.6",
+							"description": "Write unit tests for keyframe comparison logic"
+						}
 					]
 				}
 			]
@@ -205,11 +257,26 @@
 						"technical_notes": "Create new file src/keyframe-detector.ts. Knee angle = angle between hip-knee and knee-ankle vectors. Lower angle = more bent. Wrist Y in normalized coords (0=top, 1=bottom), so 'lower' position means higher Y value."
 					},
 					"subtasks": [
-						{ "id": "2.1.1", "description": "Create src/keyframe-detector.ts with KeyframeDetector class" },
-						{ "id": "2.1.2", "description": "Implement calculateKneeAngle() helper function" },
-						{ "id": "2.1.3", "description": "Implement detectLegBendLowPoint() - find minimum knee angle frame" },
-						{ "id": "2.1.4", "description": "Implement detectBallLowPoint() - find maximum wrist Y frame in first half" },
-						{ "id": "2.1.5", "description": "Add unit tests for Load phase detection" }
+						{
+							"id": "2.1.1",
+							"description": "Create src/keyframe-detector.ts with KeyframeDetector class"
+						},
+						{
+							"id": "2.1.2",
+							"description": "Implement calculateKneeAngle() helper function"
+						},
+						{
+							"id": "2.1.3",
+							"description": "Implement detectLegBendLowPoint() - find minimum knee angle frame"
+						},
+						{
+							"id": "2.1.4",
+							"description": "Implement detectBallLowPoint() - find maximum wrist Y frame in first half"
+						},
+						{
+							"id": "2.1.5",
+							"description": "Add unit tests for Load phase detection"
+						}
 					]
 				},
 				{
@@ -236,10 +303,22 @@
 						"technical_notes": "Look for sustained direction change, not single-frame spikes. Consider requiring 2-3 consecutive frames of positive velocity to confirm. The ball_starts_upward detection can reuse wrist tracking from existing shot detector."
 					},
 					"subtasks": [
-						{ "id": "2.2.1", "description": "Implement detectLegsStartExtending() - find knee angle inflection point" },
-						{ "id": "2.2.2", "description": "Implement detectBallStartsUpward() - find wrist Y inflection point" },
-						{ "id": "2.2.3", "description": "Add velocity smoothing for noise reduction" },
-						{ "id": "2.2.4", "description": "Add unit tests for Rise phase detection" }
+						{
+							"id": "2.2.1",
+							"description": "Implement detectLegsStartExtending() - find knee angle inflection point"
+						},
+						{
+							"id": "2.2.2",
+							"description": "Implement detectBallStartsUpward() - find wrist Y inflection point"
+						},
+						{
+							"id": "2.2.3",
+							"description": "Add velocity smoothing for noise reduction"
+						},
+						{
+							"id": "2.2.4",
+							"description": "Add unit tests for Rise phase detection"
+						}
 					]
 				},
 				{
@@ -266,11 +345,26 @@
 						"technical_notes": "The set_point is the 'cocking' position where the ball is held at highest point before the forward/upward release motion. The release is when the wrist snaps (maximum wrist flexion angle) which is when the ball leaves the hand."
 					},
 					"subtasks": [
-						{ "id": "2.3.1", "description": "Implement calculateElbowAngle() helper function" },
-						{ "id": "2.3.2", "description": "Implement calculateWristAngle() helper function" },
-						{ "id": "2.3.3", "description": "Implement detectSetPoint() - find wrist high point with bent elbow" },
-						{ "id": "2.3.4", "description": "Implement detectRelease() - find maximum wrist flexion after set_point" },
-						{ "id": "2.3.5", "description": "Add unit tests for Set/Release detection" }
+						{
+							"id": "2.3.1",
+							"description": "Implement calculateElbowAngle() helper function"
+						},
+						{
+							"id": "2.3.2",
+							"description": "Implement calculateWristAngle() helper function"
+						},
+						{
+							"id": "2.3.3",
+							"description": "Implement detectSetPoint() - find wrist high point with bent elbow"
+						},
+						{
+							"id": "2.3.4",
+							"description": "Implement detectRelease() - find maximum wrist flexion after set_point"
+						},
+						{
+							"id": "2.3.5",
+							"description": "Add unit tests for Set/Release detection"
+						}
 					]
 				},
 				{
@@ -299,11 +393,26 @@
 						"technical_notes": "The arms_fully_extended frame is typically the follow-through hold position. For ground detection, establish a baseline from the first few frames and detect significant deviation. This may already be similar to existing shot end detection."
 					},
 					"subtasks": [
-						{ "id": "2.4.1", "description": "Implement detectArmsFullyExtended() - find maximum elbow extension" },
-						{ "id": "2.4.2", "description": "Implement establishGroundBaseline() - get ankle Y at shot start" },
-						{ "id": "2.4.3", "description": "Implement detectFeetLeaveGround() - find ankle lift above baseline" },
-						{ "id": "2.4.4", "description": "Implement detectFeetLand() - find ankle return to baseline" },
-						{ "id": "2.4.5", "description": "Add unit tests for Follow-through detection" }
+						{
+							"id": "2.4.1",
+							"description": "Implement detectArmsFullyExtended() - find maximum elbow extension"
+						},
+						{
+							"id": "2.4.2",
+							"description": "Implement establishGroundBaseline() - get ankle Y at shot start"
+						},
+						{
+							"id": "2.4.3",
+							"description": "Implement detectFeetLeaveGround() - find ankle lift above baseline"
+						},
+						{
+							"id": "2.4.4",
+							"description": "Implement detectFeetLand() - find ankle return to baseline"
+						},
+						{
+							"id": "2.4.5",
+							"description": "Add unit tests for Follow-through detection"
+						}
 					]
 				}
 			]
@@ -337,11 +446,26 @@
 						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris\". First video is chosen as simplest case (1 shot, good pose quality, side-right orientation). Algorithm Tuning Process: (1) Run test, note which keyframes fail. (2) Read poses.json around labeled keyframe (±10 frames). (3) Identify what makes labeled frame distinct. (4) Implement hypothesis, test. (5) Document findings."
 					},
 					"subtasks": [
-						{ "id": "3.1.1", "description": "Run keyframe detection on chris 5 and analyze initial results" },
-						{ "id": "3.1.2", "description": "For each failing keyframe: Examine poses.json around labeled frame" },
-						{ "id": "3.1.3", "description": "Tune detection algorithms based on pose analysis" },
-						{ "id": "3.1.4", "description": "Document algorithm changes in algorithm-learnings.md" },
-						{ "id": "3.1.5", "description": "Verify all 10 keyframes pass within ±8 tolerance" }
+						{
+							"id": "3.1.1",
+							"description": "Run keyframe detection on chris 5 and analyze initial results"
+						},
+						{
+							"id": "3.1.2",
+							"description": "For each failing keyframe: Examine poses.json around labeled frame"
+						},
+						{
+							"id": "3.1.3",
+							"description": "Tune detection algorithms based on pose analysis"
+						},
+						{
+							"id": "3.1.4",
+							"description": "Document algorithm changes in algorithm-learnings.md"
+						},
+						{
+							"id": "3.1.5",
+							"description": "Verify all 10 keyframes pass within ±8 tolerance"
+						}
 					]
 				},
 				{
@@ -367,11 +491,26 @@
 						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212\". This is the second single-shot video, also side-right orientation. Check for consistency with chris 5 patterns."
 					},
 					"subtasks": [
-						{ "id": "3.2.1", "description": "Run test on videos 1-2 and analyze results" },
-						{ "id": "3.2.2", "description": "Verify video 1 (chris 5) still passes (no regression)" },
-						{ "id": "3.2.3", "description": "If video 2 fails: Analyze and fix without breaking video 1" },
-						{ "id": "3.2.4", "description": "Document any changes in algorithm-learnings.md" },
-						{ "id": "3.2.5", "description": "Verify both videos pass all keyframe thresholds" }
+						{
+							"id": "3.2.1",
+							"description": "Run test on videos 1-2 and analyze results"
+						},
+						{
+							"id": "3.2.2",
+							"description": "Verify video 1 (chris 5) still passes (no regression)"
+						},
+						{
+							"id": "3.2.3",
+							"description": "If video 2 fails: Analyze and fix without breaking video 1"
+						},
+						{
+							"id": "3.2.4",
+							"description": "Document any changes in algorithm-learnings.md"
+						},
+						{
+							"id": "3.2.5",
+							"description": "Verify both videos pass all keyframe thresholds"
+						}
 					]
 				},
 				{
@@ -397,11 +536,26 @@
 						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419\". First video with multiple shots. May reveal issues with shot boundary detection affecting keyframe detection."
 					},
 					"subtasks": [
-						{ "id": "3.3.1", "description": "Run test on videos 1-3 and analyze results" },
-						{ "id": "3.3.2", "description": "Verify videos 1-2 still pass (no regression)" },
-						{ "id": "3.3.3", "description": "If video 3 fails: Analyze both shots for patterns" },
-						{ "id": "3.3.4", "description": "Document any changes in algorithm-learnings.md" },
-						{ "id": "3.3.5", "description": "Verify all 3 videos pass all keyframe thresholds" }
+						{
+							"id": "3.3.1",
+							"description": "Run test on videos 1-3 and analyze results"
+						},
+						{
+							"id": "3.3.2",
+							"description": "Verify videos 1-2 still pass (no regression)"
+						},
+						{
+							"id": "3.3.3",
+							"description": "If video 3 fails: Analyze both shots for patterns"
+						},
+						{
+							"id": "3.3.4",
+							"description": "Document any changes in algorithm-learnings.md"
+						},
+						{
+							"id": "3.3.5",
+							"description": "Verify all 3 videos pass all keyframe thresholds"
+						}
 					]
 				},
 				{
@@ -427,11 +581,26 @@
 						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419,20190103_180930\". Total of 7 shots across 4 videos."
 					},
 					"subtasks": [
-						{ "id": "3.4.1", "description": "Run test on videos 1-4 and analyze results" },
-						{ "id": "3.4.2", "description": "Verify videos 1-3 still pass (no regression)" },
-						{ "id": "3.4.3", "description": "If video 4 fails: Analyze and fix detection issues" },
-						{ "id": "3.4.4", "description": "Document any changes in algorithm-learnings.md" },
-						{ "id": "3.4.5", "description": "Verify all 4 videos pass all keyframe thresholds" }
+						{
+							"id": "3.4.1",
+							"description": "Run test on videos 1-4 and analyze results"
+						},
+						{
+							"id": "3.4.2",
+							"description": "Verify videos 1-3 still pass (no regression)"
+						},
+						{
+							"id": "3.4.3",
+							"description": "If video 4 fails: Analyze and fix detection issues"
+						},
+						{
+							"id": "3.4.4",
+							"description": "Document any changes in algorithm-learnings.md"
+						},
+						{
+							"id": "3.4.5",
+							"description": "Verify all 4 videos pass all keyframe thresholds"
+						}
 					]
 				},
 				{
@@ -458,12 +627,30 @@
 						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419,20190103_180930,20190818\". First video from different shooter. Total 10 shots."
 					},
 					"subtasks": [
-						{ "id": "3.5.1", "description": "Run test on videos 1-5 and analyze results" },
-						{ "id": "3.5.2", "description": "Verify videos 1-4 still pass (no regression)" },
-						{ "id": "3.5.3", "description": "Verify null keyframes are skipped in comparison" },
-						{ "id": "3.5.4", "description": "If video 5 fails: Analyze and fix detection issues" },
-						{ "id": "3.5.5", "description": "Document any changes in algorithm-learnings.md" },
-						{ "id": "3.5.6", "description": "Verify all 5 videos pass all keyframe thresholds" }
+						{
+							"id": "3.5.1",
+							"description": "Run test on videos 1-5 and analyze results"
+						},
+						{
+							"id": "3.5.2",
+							"description": "Verify videos 1-4 still pass (no regression)"
+						},
+						{
+							"id": "3.5.3",
+							"description": "Verify null keyframes are skipped in comparison"
+						},
+						{
+							"id": "3.5.4",
+							"description": "If video 5 fails: Analyze and fix detection issues"
+						},
+						{
+							"id": "3.5.5",
+							"description": "Document any changes in algorithm-learnings.md"
+						},
+						{
+							"id": "3.5.6",
+							"description": "Verify all 5 videos pass all keyframe thresholds"
+						}
 					]
 				},
 				{
@@ -488,11 +675,26 @@
 						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419,20190103_180930,20190818,20190804\". Total 13 shots across 6 videos."
 					},
 					"subtasks": [
-						{ "id": "3.6.1", "description": "Run test on videos 1-6 and analyze results" },
-						{ "id": "3.6.2", "description": "Verify videos 1-5 still pass (no regression)" },
-						{ "id": "3.6.3", "description": "If video 6 fails: Analyze and fix detection issues" },
-						{ "id": "3.6.4", "description": "Document any changes in algorithm-learnings.md" },
-						{ "id": "3.6.5", "description": "Verify all 6 videos pass all keyframe thresholds" }
+						{
+							"id": "3.6.1",
+							"description": "Run test on videos 1-6 and analyze results"
+						},
+						{
+							"id": "3.6.2",
+							"description": "Verify videos 1-5 still pass (no regression)"
+						},
+						{
+							"id": "3.6.3",
+							"description": "If video 6 fails: Analyze and fix detection issues"
+						},
+						{
+							"id": "3.6.4",
+							"description": "Document any changes in algorithm-learnings.md"
+						},
+						{
+							"id": "3.6.5",
+							"description": "Verify all 6 videos pass all keyframe thresholds"
+						}
 					]
 				},
 				{
@@ -518,11 +720,26 @@
 						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419,20190103_180930,20190818,20190804_140617,20181219_173607\". Total 17 shots across 7 videos."
 					},
 					"subtasks": [
-						{ "id": "3.7.1", "description": "Run test on videos 1-7 and analyze results" },
-						{ "id": "3.7.2", "description": "Verify videos 1-6 still pass (no regression)" },
-						{ "id": "3.7.3", "description": "If video 7 fails: Analyze and fix detection issues" },
-						{ "id": "3.7.4", "description": "Document any changes in algorithm-learnings.md" },
-						{ "id": "3.7.5", "description": "Verify all 7 videos pass all keyframe thresholds" }
+						{
+							"id": "3.7.1",
+							"description": "Run test on videos 1-7 and analyze results"
+						},
+						{
+							"id": "3.7.2",
+							"description": "Verify videos 1-6 still pass (no regression)"
+						},
+						{
+							"id": "3.7.3",
+							"description": "If video 7 fails: Analyze and fix detection issues"
+						},
+						{
+							"id": "3.7.4",
+							"description": "Document any changes in algorithm-learnings.md"
+						},
+						{
+							"id": "3.7.5",
+							"description": "Verify all 7 videos pass all keyframe thresholds"
+						}
 					]
 				},
 				{
@@ -549,11 +766,26 @@
 						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris,20201212,20190103_181419,20190103_180930,20190818,20190804_140617,20181219_173607,edmond_20190804\". Total 24 shots across 8 videos."
 					},
 					"subtasks": [
-						{ "id": "3.8.1", "description": "Run test on videos 1-8 and analyze results" },
-						{ "id": "3.8.2", "description": "Verify videos 1-7 still pass (no regression)" },
-						{ "id": "3.8.3", "description": "If video 8 fails: Analyze and fix detection issues" },
-						{ "id": "3.8.4", "description": "Document any changes in algorithm-learnings.md" },
-						{ "id": "3.8.5", "description": "Verify all 8 videos pass all keyframe thresholds" }
+						{
+							"id": "3.8.1",
+							"description": "Run test on videos 1-8 and analyze results"
+						},
+						{
+							"id": "3.8.2",
+							"description": "Verify videos 1-7 still pass (no regression)"
+						},
+						{
+							"id": "3.8.3",
+							"description": "If video 8 fails: Analyze and fix detection issues"
+						},
+						{
+							"id": "3.8.4",
+							"description": "Document any changes in algorithm-learnings.md"
+						},
+						{
+							"id": "3.8.5",
+							"description": "Verify all 8 videos pass all keyframe thresholds"
+						}
 					]
 				},
 				{
@@ -578,12 +810,30 @@
 						"technical_notes": "Create summary section in algorithm-learnings.md with: (1) What works for each keyframe type, (2) Key observations about keyframe detection, (3) Configuration parameter values, (4) Total shots tested (24), pass rate."
 					},
 					"subtasks": [
-						{ "id": "3.9.1", "description": "Run final test on all 8 videos" },
-						{ "id": "3.9.2", "description": "Calculate per-keyframe accuracy statistics" },
-						{ "id": "3.9.3", "description": "Document 'What Works' for keyframe detection in algorithm-learnings.md" },
-						{ "id": "3.9.4", "description": "Document 'Key Observations' for keyframe detection" },
-						{ "id": "3.9.5", "description": "Document final configuration parameters" },
-						{ "id": "3.9.6", "description": "Create summary table of test results" }
+						{
+							"id": "3.9.1",
+							"description": "Run final test on all 8 videos"
+						},
+						{
+							"id": "3.9.2",
+							"description": "Calculate per-keyframe accuracy statistics"
+						},
+						{
+							"id": "3.9.3",
+							"description": "Document 'What Works' for keyframe detection in algorithm-learnings.md"
+						},
+						{
+							"id": "3.9.4",
+							"description": "Document 'Key Observations' for keyframe detection"
+						},
+						{
+							"id": "3.9.5",
+							"description": "Document final configuration parameters"
+						},
+						{
+							"id": "3.9.6",
+							"description": "Create summary table of test results"
+						}
 					]
 				}
 			]
