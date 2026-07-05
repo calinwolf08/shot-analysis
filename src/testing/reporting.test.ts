@@ -25,6 +25,24 @@ import type { ComparisonResult } from "./detection";
 // ============================================================================
 
 /**
+ * Creates default keyframe comparisons (all not labeled/passed).
+ */
+function createDefaultKeyframes() {
+  return [
+    { keyframeId: "legs_start_bending" as const, labeled: null, detected: null, diff: null, passed: true },
+    { keyframeId: "leg_bend_low_point" as const, labeled: null, detected: null, diff: null, passed: true },
+    { keyframeId: "ball_low_point" as const, labeled: null, detected: null, diff: null, passed: true },
+    { keyframeId: "legs_start_extending" as const, labeled: null, detected: null, diff: null, passed: true },
+    { keyframeId: "ball_starts_upward" as const, labeled: null, detected: null, diff: null, passed: true },
+    { keyframeId: "set_point" as const, labeled: null, detected: null, diff: null, passed: true },
+    { keyframeId: "release" as const, labeled: null, detected: null, diff: null, passed: true },
+    { keyframeId: "arms_fully_extended" as const, labeled: null, detected: null, diff: null, passed: true },
+    { keyframeId: "feet_leave_ground" as const, labeled: null, detected: null, diff: null, passed: true },
+    { keyframeId: "feet_land" as const, labeled: null, detected: null, diff: null, passed: true },
+  ];
+}
+
+/**
  * Creates a passing comparison result for testing.
  */
 function createPassingResult(
@@ -39,6 +57,7 @@ function createPassingResult(
         startFrame: { detected: 10, expected: 10, diff: 0, pass: true },
         endFrame: { detected: 50, expected: 50, diff: 0, pass: true },
         orientation: { detected: "front", expected: "front", match: true },
+        keyframes: createDefaultKeyframes(),
       },
     ],
   };
@@ -59,6 +78,7 @@ function createFailingResult(
         startFrame: { detected: 10, expected: 10, diff: 0, pass: true },
         endFrame: { detected: 60, expected: 50, diff: 10, pass: false },
         orientation: { detected: "front", expected: "front", match: true },
+        keyframes: createDefaultKeyframes(),
       },
     ],
     failureReason: "shot 1 end: diff 10 exceeds tolerance",
@@ -80,6 +100,7 @@ function createOrientationMismatchResult(
         startFrame: { detected: 10, expected: 10, diff: 0, pass: true },
         endFrame: { detected: 50, expected: 50, diff: 0, pass: true },
         orientation: { detected: "side-left", expected: "front", match: false },
+        keyframes: createDefaultKeyframes(),
       },
     ],
     failureReason:

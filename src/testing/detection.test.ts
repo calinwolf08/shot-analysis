@@ -12,14 +12,17 @@ import {
   runDetection,
   compareResults,
   runAndCompare,
+  compareKeyframes,
   type DetectionResult,
 } from "./detection";
 import type {
   PoseData,
   LabelData,
+  LabeledShot,
   Frame,
   TestLandmark,
   Orientation,
+  KeyframeId,
 } from "./types";
 
 // ============================================================================
@@ -681,5 +684,330 @@ describe("runDetection", () => {
     const result = runDetection(poseData);
 
     expect(result.shots).toHaveLength(0);
+  });
+});
+
+// ============================================================================
+// Tests: compareKeyframes
+// ============================================================================
+
+describe("compareKeyframes", () => {
+  /**
+   * Creates a labeled shot with specified keyframe values.
+   */
+  function createLabeledShotWithKeyframes(
+    keyframes: Partial<Record<KeyframeId, number | null>>,
+  ): LabeledShot {
+    return {
+      shotNumber: 1,
+      startFrame: 0,
+      endFrame: 100,
+      cameraOrientation: "front",
+      ...keyframes,
+    };
+  }
+
+  it("returns 10 keyframe comparison results", () => {
+    const labeledShot = createLabeledShotWithKeyframes({});
+    const result = compareKeyframes(labeledShot);
+    expect(result).toHaveLength(10);
+  });
+
+  it("returns all keyframe IDs in order", () => {
+    const labeledShot = createLabeledShotWithKeyframes({});
+    const result = compareKeyframes(labeledShot);
+
+    const keyframeIds = result.map((r) => r.keyframeId);
+    expect(keyframeIds).toEqual([
+      "legs_start_bending",
+      "leg_bend_low_point",
+      "ball_low_point",
+      "legs_start_extending",
+      "ball_starts_upward",
+      "set_point",
+      "release",
+      "arms_fully_extended",
+      "feet_leave_ground",
+      "feet_land",
+    ]);
+  });
+
+  describe("edge cases", () => {
+    it("passes when labeled keyframe is null (not labeled = not tested)", () => {
+      const labeledShot = createLabeledShotWithKeyframes({
+        set_point: null,
+      });
+      const result = compareKeyframes(labeledShot);
+
+      const setPoint = result.find((r) => r.keyframeId === "set_point");
+      expect(setPoint).toBeDefined();
+      expect(setPoint!.labeled).toBeNull();
+      expect(setPoint!.passed).toBe(true);
+    });
+
+    it("passes when labeled keyframe is undefined (not labeled = not tested)", () => {
+      const labeledShot = createLabeledShotWithKeyframes({
+        // release is not defined
+      });
+      const result = compareKeyframes(labeledShot);
+
+      const release = result.find((r) => r.keyframeId === "release");
+      expect(release).toBeDefined();
+      expect(release!.labeled).toBeNull();
+      expect(release!.passed).toBe(true);
+    });
+
+    it("fails when detected is null but label exists (missed detection)", () => {
+      const labeledShot = createLabeledShotWithKeyframes({
+        release: 50, // Labeled at frame 50
+      });
+      // No detected keyframes provided (all null)
+      const result = compareKeyframes(labeledShot);
+
+      const release = result.find((r) => r.keyframeId === "release");
+      expect(release).toBeDefined();
+      expect(release!.labeled).toBe(50);
+      expect(release!.detected).toBeNull();
+      expect(release!.diff).toBeNull();
+      expect(release!.passed).toBe(false);
+    });
+
+    it("passes when detected exists but no label (cannot validate without ground truth)", () => {
+      const labeledShot = createLabeledShotWithKeyframes({
+        // set_point not labeled
+      });
+      const detectedKeyframes = new Map<KeyframeId, number | null>([
+        ["set_point", 45], // Detected but not labeled
+      ]);
+      const result = compareKeyframes(labeledShot, detectedKeyframes);
+
+      const setPoint = result.find((r) => r.keyframeId === "set_point");
+      expect(setPoint).toBeDefined();
+      expect(setPoint!.labeled).toBeNull();
+      expect(setPoint!.detected).toBe(45);
+      expect(setPoint!.passed).toBe(true); // Cannot fail without ground truth
+    });
+  });
+
+  describe("tolerance check (±8 frames)", () => {
+    it("passes when diff is within tolerance (diff = 0)", () => {
+      const labeledShot = createLabeledShotWithKeyframes({
+        release: 50,
+      });
+      const detectedKeyframes = new Map<KeyframeId, number | null>([
+        ["release", 50], // Exact match
+      ]);
+      const result = compareKeyframes(labeledShot, detectedKeyframes);
+
+      const release = result.find((r) => r.keyframeId === "release");
+      expect(release!.diff).toBe(0);
+      expect(release!.passed).toBe(true);
+    });
+
+    it("passes when diff is at tolerance boundary (diff = 8)", () => {
+      const labeledShot = createLabeledShotWithKeyframes({
+        release: 50,
+      });
+      const detectedKeyframes = new Map<KeyframeId, number | null>([
+        ["release", 58], // diff = 8
+      ]);
+      const result = compareKeyframes(labeledShot, detectedKeyframes);
+
+      const release = result.find((r) => r.keyframeId === "release");
+      expect(release!.diff).toBe(8);
+      expect(release!.passed).toBe(true);
+    });
+
+    it("fails when diff exceeds tolerance (diff = 9)", () => {
+      const labeledShot = createLabeledShotWithKeyframes({
+        release: 50,
+      });
+      const detectedKeyframes = new Map<KeyframeId, number | null>([
+        ["release", 59], // diff = 9
+      ]);
+      const result = compareKeyframes(labeledShot, detectedKeyframes);
+
+      const release = result.find((r) => r.keyframeId === "release");
+      expect(release!.diff).toBe(9);
+      expect(release!.passed).toBe(false);
+    });
+
+    it("handles negative differences correctly", () => {
+      const labeledShot = createLabeledShotWithKeyframes({
+        release: 50,
+      });
+      const detectedKeyframes = new Map<KeyframeId, number | null>([
+        ["release", 45], // diff = -5 (absolute = 5)
+      ]);
+      const result = compareKeyframes(labeledShot, detectedKeyframes);
+
+      const release = result.find((r) => r.keyframeId === "release");
+      expect(release!.diff).toBe(5);
+      expect(release!.passed).toBe(true);
+    });
+  });
+
+  describe("multiple keyframes", () => {
+    it("reports all failures, not just the first", () => {
+      const labeledShot = createLabeledShotWithKeyframes({
+        set_point: 45,
+        release: 50,
+        arms_fully_extended: 55,
+      });
+      // All labeled keyframes will fail (not detected)
+      const result = compareKeyframes(labeledShot);
+
+      const failures = result.filter((r) => !r.passed);
+      expect(failures).toHaveLength(3);
+      expect(failures.map((r) => r.keyframeId)).toContain("set_point");
+      expect(failures.map((r) => r.keyframeId)).toContain("release");
+      expect(failures.map((r) => r.keyframeId)).toContain("arms_fully_extended");
+    });
+
+    it("can have mixed pass/fail results", () => {
+      const labeledShot = createLabeledShotWithKeyframes({
+        set_point: 45,
+        release: 50,
+      });
+      const detectedKeyframes = new Map<KeyframeId, number | null>([
+        ["set_point", 47], // Pass (diff = 2)
+        ["release", 70], // Fail (diff = 20)
+      ]);
+      const result = compareKeyframes(labeledShot, detectedKeyframes);
+
+      const setPoint = result.find((r) => r.keyframeId === "set_point");
+      const release = result.find((r) => r.keyframeId === "release");
+
+      expect(setPoint!.passed).toBe(true);
+      expect(release!.passed).toBe(false);
+    });
+  });
+});
+
+// ============================================================================
+// Tests: compareResults with keyframes
+// ============================================================================
+
+describe("compareResults - keyframe integration", () => {
+  const frontShoulderOptions = {
+    leftShoulderX: 0.65,
+    rightShoulderX: 0.35,
+    leftHipX: 0.6,
+    rightHipX: 0.4,
+  };
+
+  /**
+   * Creates label data with keyframe annotations.
+   */
+  function createLabelDataWithKeyframes(
+    shots: Array<{
+      startFrame: number;
+      endFrame: number;
+      keyframes?: Partial<Record<KeyframeId, number | null>>;
+    }>,
+  ): LabelData {
+    return {
+      video: "test-video.mp4",
+      labeledBy: "test",
+      labeledAt: new Date().toISOString(),
+      shots: shots.map((shot, index) => ({
+        shotNumber: index + 1,
+        startFrame: shot.startFrame,
+        endFrame: shot.endFrame,
+        cameraOrientation: "front" as const,
+        ...shot.keyframes,
+      })),
+    };
+  }
+
+  it("includes keyframe comparisons in shot results", () => {
+    const detection: DetectionResult = {
+      shots: [{ startFrame: 10, endFrame: 50 }],
+      orientation: "front",
+    };
+    const labels = createLabelDataWithKeyframes([
+      { startFrame: 10, endFrame: 50, keyframes: { release: 40 } },
+    ]);
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 10, endFrame: 50 }],
+      frontShoulderOptions,
+    );
+
+    const result = compareResults(detection, labels, poseData);
+
+    expect(result.shots[0]!.keyframes).toBeDefined();
+    expect(result.shots[0]!.keyframes).toHaveLength(10);
+  });
+
+  it("fails overall when any labeled keyframe fails", () => {
+    const detection: DetectionResult = {
+      shots: [{ startFrame: 10, endFrame: 50 }],
+      orientation: "front",
+    };
+    const labels = createLabelDataWithKeyframes([
+      {
+        startFrame: 10,
+        endFrame: 50,
+        keyframes: { release: 40 }, // Labeled but won't be detected
+      },
+    ]);
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 10, endFrame: 50 }],
+      frontShoulderOptions,
+    );
+
+    const result = compareResults(detection, labels, poseData);
+
+    // Should fail because release keyframe is labeled but not detected
+    expect(result.status).toBe("fail");
+    expect(result.failureReason).toContain("keyframe");
+    expect(result.failureReason).toContain("release");
+  });
+
+  it("passes when no keyframes are labeled", () => {
+    const detection: DetectionResult = {
+      shots: [{ startFrame: 10, endFrame: 50 }],
+      orientation: "front",
+    };
+    const labels = createLabelDataWithKeyframes([
+      { startFrame: 10, endFrame: 50 }, // No keyframes
+    ]);
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 10, endFrame: 50 }],
+      frontShoulderOptions,
+    );
+
+    const result = compareResults(detection, labels, poseData);
+
+    expect(result.status).toBe("pass");
+    expect(result.shots[0]!.keyframes.every((kf) => kf.passed)).toBe(true);
+  });
+
+  it("includes keyframe failure details in failure reason", () => {
+    const detection: DetectionResult = {
+      shots: [{ startFrame: 10, endFrame: 50 }],
+      orientation: "front",
+    };
+    const labels = createLabelDataWithKeyframes([
+      {
+        startFrame: 10,
+        endFrame: 50,
+        keyframes: {
+          set_point: 35,
+          release: 40,
+        },
+      },
+    ]);
+    const poseData = createMinimalPoseData(
+      [{ startFrame: 10, endFrame: 50 }],
+      frontShoulderOptions,
+    );
+
+    const result = compareResults(detection, labels, poseData);
+
+    expect(result.status).toBe("fail");
+    expect(result.failureReason).toContain("set_point");
+    expect(result.failureReason).toContain("release");
+    expect(result.failureReason).toContain("not detected");
   });
 });

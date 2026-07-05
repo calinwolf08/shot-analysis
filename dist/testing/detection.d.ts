@@ -11,7 +11,7 @@
  * @see Task 9.2 - Detection Execution & Comparison
  */
 import type { PoseLandmarks } from "../pose/types";
-import type { PoseData, LabelData, Orientation, Frame } from "./types";
+import type { PoseData, LabelData, LabeledShot, Orientation, Frame, KeyframeId, KeyframeComparisonResult } from "./types";
 /**
  * A detected shot from the algorithm.
  */
@@ -66,6 +66,8 @@ export interface ShotComparison {
     readonly endFrame: FrameComparison;
     /** Orientation comparison for this shot */
     readonly orientation: OrientationComparison;
+    /** Per-keyframe comparison results */
+    readonly keyframes: readonly KeyframeComparisonResult[];
 }
 /**
  * Overall comparison result for a video.
@@ -143,6 +145,19 @@ export declare function detectOrientationForShot(poseData: PoseData, startFrame:
  * @returns Detection result with detected shots and orientation
  */
 export declare function runDetection(poseData: PoseData): DetectionResult;
+/**
+ * Compares all keyframes for a labeled shot.
+ *
+ * Edge cases handled:
+ * - Labeled keyframe is null/undefined: Skip comparison, passed = true (not labeled = not tested)
+ * - Detected keyframe is null but label exists: Failure (missed detection)
+ * - Keyframe detected but no label: Cannot validate, passed = true (no ground truth)
+ *
+ * @param labeledShot - The labeled shot with keyframe annotations
+ * @param detectedKeyframes - Map of keyframe IDs to detected frame numbers (currently unused, placeholder for future keyframe detection)
+ * @returns Array of KeyframeComparisonResult for all 10 keyframes
+ */
+export declare function compareKeyframes(labeledShot: LabeledShot, detectedKeyframes?: Map<KeyframeId, number | null>): KeyframeComparisonResult[];
 /**
  * Compares detection results against labeled ground truth.
  * Orientation is compared per-shot, not per-video.

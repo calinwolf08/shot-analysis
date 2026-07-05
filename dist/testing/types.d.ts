@@ -442,6 +442,26 @@ export declare const labelDataSchema: z.ZodObject<{
     labeledAt: string;
 }>;
 /**
+ * Result of comparing a single keyframe between detected and labeled values.
+ *
+ * Edge cases:
+ * - labeled = null: Skip comparison, passed = true (not labeled = not tested)
+ * - detected = null but labeled exists: Failure (missed detection)
+ * - detected exists but no label: Cannot validate without ground truth (passed = true)
+ */
+export interface KeyframeComparisonResult {
+    /** Which keyframe this comparison is for */
+    readonly keyframeId: KeyframeId;
+    /** Ground truth labeled frame number (null if not labeled) */
+    readonly labeled: number | null;
+    /** Detected frame number (null if not detected) */
+    readonly detected: number | null;
+    /** Absolute difference between detected and labeled (null if either is null) */
+    readonly diff: number | null;
+    /** Whether this keyframe passed comparison */
+    readonly passed: boolean;
+}
+/**
  * A discovered test case with its data.
  */
 export interface TestCase {

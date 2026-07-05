@@ -12,6 +12,23 @@ import { formatConsoleOutput, formatFailureDetails, saveJsonReport, createTestRe
 // Test Helpers
 // ============================================================================
 /**
+ * Creates default keyframe comparisons (all not labeled/passed).
+ */
+function createDefaultKeyframes() {
+    return [
+        { keyframeId: "legs_start_bending", labeled: null, detected: null, diff: null, passed: true },
+        { keyframeId: "leg_bend_low_point", labeled: null, detected: null, diff: null, passed: true },
+        { keyframeId: "ball_low_point", labeled: null, detected: null, diff: null, passed: true },
+        { keyframeId: "legs_start_extending", labeled: null, detected: null, diff: null, passed: true },
+        { keyframeId: "ball_starts_upward", labeled: null, detected: null, diff: null, passed: true },
+        { keyframeId: "set_point", labeled: null, detected: null, diff: null, passed: true },
+        { keyframeId: "release", labeled: null, detected: null, diff: null, passed: true },
+        { keyframeId: "arms_fully_extended", labeled: null, detected: null, diff: null, passed: true },
+        { keyframeId: "feet_leave_ground", labeled: null, detected: null, diff: null, passed: true },
+        { keyframeId: "feet_land", labeled: null, detected: null, diff: null, passed: true },
+    ];
+}
+/**
  * Creates a passing comparison result for testing.
  */
 function createPassingResult(video = "test-video.mp4") {
@@ -24,6 +41,7 @@ function createPassingResult(video = "test-video.mp4") {
                 startFrame: { detected: 10, expected: 10, diff: 0, pass: true },
                 endFrame: { detected: 50, expected: 50, diff: 0, pass: true },
                 orientation: { detected: "front", expected: "front", match: true },
+                keyframes: createDefaultKeyframes(),
             },
         ],
     };
@@ -41,6 +59,7 @@ function createFailingResult(video = "failing-video.mp4") {
                 startFrame: { detected: 10, expected: 10, diff: 0, pass: true },
                 endFrame: { detected: 60, expected: 50, diff: 10, pass: false },
                 orientation: { detected: "front", expected: "front", match: true },
+                keyframes: createDefaultKeyframes(),
             },
         ],
         failureReason: "shot 1 end: diff 10 exceeds tolerance",
@@ -59,6 +78,7 @@ function createOrientationMismatchResult(video = "orientation-mismatch.mp4") {
                 startFrame: { detected: 10, expected: 10, diff: 0, pass: true },
                 endFrame: { detected: 50, expected: 50, diff: 0, pass: true },
                 orientation: { detected: "side-left", expected: "front", match: false },
+                keyframes: createDefaultKeyframes(),
             },
         ],
         failureReason: "shot 1 orientation: detected 'side-left', expected 'front'",

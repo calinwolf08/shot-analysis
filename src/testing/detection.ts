@@ -14,7 +14,16 @@
 import type { PoseLandmarks, Landmark } from "../pose/types";
 import { LANDMARK_INDEX } from "../pose/types";
 import { createShotBoundaryDetector } from "../detection/shot-detector";
-import type { PoseData, LabelData, Orientation, Frame } from "./types";
+import type {
+  PoseData,
+  LabelData,
+  LabeledShot,
+  Orientation,
+  Frame,
+  KeyframeId,
+  KeyframeComparisonResult,
+} from "./types";
+import { KEYFRAME_IDS } from "./types";
 
 // ============================================================================
 // Types
@@ -78,6 +87,8 @@ export interface ShotComparison {
   readonly endFrame: FrameComparison;
   /** Orientation comparison for this shot */
   readonly orientation: OrientationComparison;
+  /** Per-keyframe comparison results */
+  readonly keyframes: readonly KeyframeComparisonResult[];
 }
 
 /**
@@ -749,6 +760,66 @@ function compareFrame(
 }
 
 /**
+ * Keyframe comparison tolerance (±8 frames).
+ */
+const KEYFRAME_TOLERANCE = 8;
+
+/**
+ * Compares all keyframes for a labeled shot.
+ *
+ * Edge cases handled:
+ * - Labeled keyframe is null/undefined: Skip comparison, passed = true (not labeled = not tested)
+ * - Detected keyframe is null but label exists: Failure (missed detection)
+ * - Keyframe detected but no label: Cannot validate, passed = true (no ground truth)
+ *
+ * @param labeledShot - The labeled shot with keyframe annotations
+ * @param detectedKeyframes - Map of keyframe IDs to detected frame numbers (currently unused, placeholder for future keyframe detection)
+ * @returns Array of KeyframeComparisonResult for all 10 keyframes
+ */
+export function compareKeyframes(
+  labeledShot: LabeledShot,
+  detectedKeyframes: Map<KeyframeId, number | null> = new Map(),
+): KeyframeComparisonResult[] {
+  const results: KeyframeComparisonResult[] = [];
+
+  for (const keyframeId of KEYFRAME_IDS) {
+    // Get labeled value (may be null, undefined, or a frame number)
+    const labeledValue = labeledShot[keyframeId];
+    const labeled =
+      labeledValue === null || labeledValue === undefined ? null : labeledValue;
+
+    // Get detected value (currently placeholder - will be populated by keyframe detection)
+    const detected = detectedKeyframes.get(keyframeId) ?? null;
+
+    // Determine diff and pass status based on edge cases
+    let diff: number | null = null;
+    let passed: boolean;
+
+    if (labeled === null) {
+      // Not labeled = not tested, automatically passes
+      passed = true;
+    } else if (detected === null) {
+      // Labeled but not detected = failure (missed detection)
+      passed = false;
+    } else {
+      // Both exist, compare with tolerance
+      diff = Math.abs(detected - labeled);
+      passed = diff <= KEYFRAME_TOLERANCE;
+    }
+
+    results.push({
+      keyframeId,
+      labeled,
+      detected,
+      diff,
+      passed,
+    });
+  }
+
+  return results;
+}
+
+/**
  * Compares detection results against labeled ground truth.
  * Orientation is compared per-shot, not per-video.
  *
@@ -804,6 +875,10 @@ export function compareResults(
       detected.endFrame,
     );
 
+    // Compare keyframes for this shot
+    // Note: Currently no detected keyframes - this will be populated when keyframe detection is implemented
+    const keyframeComparisons = compareKeyframes(labeled);
+
     const comparison: ShotComparison = {
       shotNumber: labeled.shotNumber,
       startFrame: compareFrame(
@@ -821,15 +896,20 @@ export function compareResults(
         expected: labeled.cameraOrientation,
         match: detectedOrientation === labeled.cameraOrientation,
       },
+      keyframes: keyframeComparisons,
     };
 
     shotComparisons.push(comparison);
   }
 
   // Determine overall pass/fail
+  // Shot passes only if: start/end frames pass, orientation matches, AND all labeled keyframes pass
   const allShotsPass = shotComparisons.every(
     (shot) =>
-      shot.startFrame.pass && shot.endFrame.pass && shot.orientation.match,
+      shot.startFrame.pass &&
+      shot.endFrame.pass &&
+      shot.orientation.match &&
+      shot.keyframes.every((kf) => kf.passed),
   );
 
   // Build result based on pass/fail
@@ -858,6 +938,20 @@ export function compareResults(
       reasons.push(
         `shot ${shot.shotNumber} end: diff ${shot.endFrame.diff} exceeds tolerance`,
       );
+    }
+    // Add keyframe failures
+    for (const kf of shot.keyframes) {
+      if (!kf.passed) {
+        if (kf.detected === null && kf.labeled !== null) {
+          reasons.push(
+            `shot ${shot.shotNumber} keyframe ${kf.keyframeId}: not detected (expected ${kf.labeled})`,
+          );
+        } else if (kf.diff !== null) {
+          reasons.push(
+            `shot ${shot.shotNumber} keyframe ${kf.keyframeId}: diff ${kf.diff} exceeds tolerance`,
+          );
+        }
+      }
     }
   }
 

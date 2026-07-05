@@ -127,12 +127,43 @@ export function formatConsoleOutput(results, testDataDir = "test-data") {
 // Failure Details Formatting
 // ============================================================================
 /**
+ * Formats a single keyframe comparison result.
+ *
+ * Output formats based on Technical Notes:
+ * - Pass: '✓ set_point: 65 (diff: +2)'
+ * - Fail: '✗ release: 73 (expected 70, diff: +3, EXCEEDS TOLERANCE)'
+ * - Not detected: '✗ release: -- (expected 70, NOT DETECTED)'
+ * - Not labeled: '- set_point: -- (not labeled)'
+ *
+ * @param kf - Keyframe comparison result
+ * @returns Formatted string for this keyframe
+ */
+function formatKeyframeResult(kf) {
+    // Not labeled - skip display (not tested)
+    if (kf.labeled === null) {
+        return `      ${COLORS.gray}- ${kf.keyframeId}: -- (not labeled)${COLORS.reset}`;
+    }
+    // Labeled but not detected - failure
+    if (kf.detected === null) {
+        return `      ${COLORS.red}${SYMBOLS.fail} ${kf.keyframeId}: -- (expected ${kf.labeled}, NOT DETECTED)${COLORS.reset}`;
+    }
+    // Both exist - show comparison
+    const diffSign = kf.detected >= kf.labeled ? "+" : "-";
+    const diffStr = `${diffSign}${kf.diff}`;
+    if (kf.passed) {
+        return `      ${COLORS.green}${SYMBOLS.pass} ${kf.keyframeId}: ${kf.detected} (diff: ${diffStr})${COLORS.reset}`;
+    }
+    else {
+        return `      ${COLORS.red}${SYMBOLS.fail} ${kf.keyframeId}: ${kf.detected} (expected ${kf.labeled}, diff: ${diffStr}, EXCEEDS TOLERANCE)${COLORS.reset}`;
+    }
+}
+/**
  * Formats frame comparison details for a single shot.
  *
- * Shows detected vs expected frames, the difference, and orientation.
+ * Shows detected vs expected frames, the difference, orientation, and keyframe results.
  *
  * @param shot - Shot comparison data
- * @returns Formatted string with frame differences and orientation
+ * @returns Formatted string with frame differences, orientation, and keyframes
  */
 function formatShotComparison(shot) {
     const lines = [];
@@ -152,6 +183,14 @@ function formatShotComparison(shot) {
     lines.push(`      Start: ${startStatus}detected ${shot.startFrame.detected}, expected ${shot.startFrame.expected} (${startDiffStr})${COLORS.reset}`);
     lines.push(`      End:   ${endStatus}detected ${shot.endFrame.detected}, expected ${shot.endFrame.expected} (${endDiffStr})${COLORS.reset}`);
     lines.push(`      Orientation: ${orientationStatus}detected '${shot.orientation.detected}', expected '${shot.orientation.expected}'${shot.orientation.match ? " (match)" : ""}${COLORS.reset}`);
+    // Add keyframe results (only show labeled keyframes to reduce noise)
+    const labeledKeyframes = shot.keyframes.filter((kf) => kf.labeled !== null);
+    if (labeledKeyframes.length > 0) {
+        lines.push(`      ${COLORS.bold}Keyframes:${COLORS.reset}`);
+        for (const kf of labeledKeyframes) {
+            lines.push(formatKeyframeResult(kf));
+        }
+    }
     return lines.join("\n");
 }
 /**
