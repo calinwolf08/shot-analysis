@@ -17,6 +17,16 @@ export interface KeyframeDetectorConfig {
     readonly ballLowPointSearchWindow?: number;
     /** Search window as percentage of shot duration for leg_bend_low_point. Default: 0.5 (first 50%) */
     readonly legBendSearchWindow?: number;
+    /** Search window as percentage of shot duration for Rise phase detection. Default: 0.6 */
+    readonly riseSearchWindow?: number;
+    /** Window size for smoothing velocity calculations. Default: 3 */
+    readonly smoothingWindowSize?: number;
+    /** Minimum consecutive frames with positive velocity to confirm knee extension. Default: 2 */
+    readonly minConsecutiveFrames?: number;
+    /** Minimum knee angle velocity (degrees per frame) to detect extension. Default: 0.5 */
+    readonly kneeVelocityThreshold?: number;
+    /** Minimum wrist Y velocity (normalized units per frame) to detect upward motion. Default: -0.005 */
+    readonly wristVelocityThreshold?: number;
 }
 /**
  * Result of detecting a single keyframe.
@@ -80,11 +90,57 @@ export declare function detectLegBendLowPoint(frames: readonly Frame[], startFra
  */
 export declare function detectBallLowPoint(frames: readonly Frame[], startFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 /**
+ * Calculates velocity (frame-to-frame change) from a sequence of values.
+ *
+ * @param values - Array of numeric values
+ * @returns Array of velocities (one element shorter than input)
+ */
+export declare function calculateVelocity(values: number[]): number[];
+/**
+ * Calculates smoothed velocity from a sequence of values.
+ *
+ * Applies moving average smoothing to the values first,
+ * then calculates frame-to-frame velocity.
+ *
+ * @param values - Array of numeric values
+ * @param windowSize - Smoothing window size
+ * @returns Array of smoothed velocities (one element shorter than input)
+ */
+export declare function calculateSmoothedVelocity(values: number[], windowSize: number): number[];
+/**
+ * Detects the frame where legs start extending (knee angle starts increasing).
+ *
+ * This corresponds to the "legs_start_extending" keyframe in the Rise phase.
+ * The detection looks for sustained positive knee angle velocity after the
+ * leg_bend_low_point, indicating the knees are straightening.
+ *
+ * @param frames - Array of frames with pose data
+ * @param legBendLowPointFrame - Frame index of the leg bend low point (from Load phase)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index where knee extension starts, or null if not detectable
+ */
+export declare function detectLegsStartExtending(frames: readonly Frame[], legBendLowPointFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
+/**
+ * Detects the frame where the ball starts moving upward (wrist Y starts decreasing).
+ *
+ * This corresponds to the "ball_starts_upward" keyframe in the Rise phase.
+ * The detection looks for sustained negative wrist Y velocity after the
+ * ball_low_point, indicating the ball is rising (since Y=0 is top of frame).
+ *
+ * @param frames - Array of frames with pose data
+ * @param ballLowPointFrame - Frame index of the ball low point (from Load phase)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index where upward ball motion starts, or null if not detectable
+ */
+export declare function detectBallStartsUpward(frames: readonly Frame[], ballLowPointFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
+/**
  * KeyframeDetector class for detecting keyframes within basketball shots.
  *
- * Currently implements Load phase keyframe detection:
- * - leg_bend_low_point: Frame with deepest knee bend
- * - ball_low_point: Frame with lowest ball position (highest wrist Y)
+ * Implements keyframe detection for:
+ * - Load phase: leg_bend_low_point, ball_low_point
+ * - Rise phase: legs_start_extending, ball_starts_upward
  */
 export declare class KeyframeDetector {
     private readonly config;
@@ -98,6 +154,19 @@ export declare class KeyframeDetector {
      * @returns Detection result with keyframes and confidence
      */
     detectLoadPhaseKeyframes(frames: readonly Frame[], startFrame: number, endFrame: number): KeyframeDetectionResult;
+    /**
+     * Detects Rise phase keyframes for a shot.
+     *
+     * Requires Load phase keyframes to have been detected first,
+     * as Rise phase detection starts from the Load phase low points.
+     *
+     * @param frames - Array of frames with pose data
+     * @param legBendLowPointFrame - Frame index of leg bend low point (from Load phase)
+     * @param ballLowPointFrame - Frame index of ball low point (from Load phase)
+     * @param endFrame - Shot end frame index (inclusive)
+     * @returns Detection result with keyframes and confidence
+     */
+    detectRisePhaseKeyframes(frames: readonly Frame[], legBendLowPointFrame: number, ballLowPointFrame: number, endFrame: number): KeyframeDetectionResult;
     /**
      * Get the current configuration.
      */

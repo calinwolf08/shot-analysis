@@ -3,7 +3,7 @@
 		"name": "all-frame-keypoint-detection",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-07-02T12:00:00.000Z",
-		"updated_at": "2026-07-05T18:28:31.699Z"
+		"updated_at": "2026-07-05T18:34:24.897Z"
 	},
 	"status": "in_progress",
 	"global_constraints": {
@@ -237,8 +237,8 @@
 				{
 					"id": "2.1",
 					"name": "Load Phase Keyframe Detection",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want to detect the Load phase keyframes (leg_bend_low_point, ball_low_point) so that I can identify the dip/gather phase of the shot.",
@@ -279,7 +279,8 @@
 							"id": "2.1.5",
 							"description": "Add unit tests for Load phase detection"
 						}
-					]
+					],
+					"commit_hash": "c914c2078adae10eb677d0dfd07b87cdd39bea22"
 				},
 				{
 					"id": "2.2",

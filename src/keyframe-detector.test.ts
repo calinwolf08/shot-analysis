@@ -12,10 +12,28 @@ import {
   calculateKneeAngle,
   detectLegBendLowPoint,
   detectBallLowPoint,
+  detectLegsStartExtending,
+  detectBallStartsUpward,
+  calculateVelocity,
+  calculateSmoothedVelocity,
   type KeyframeDetectorConfig,
 } from "./keyframe-detector";
 import type { Frame, TestLandmark } from "./testing/types";
 import { LANDMARK_INDICES } from "./types";
+
+/**
+ * Default config for Load phase detection tests.
+ */
+const LOAD_PHASE_CONFIG: Required<KeyframeDetectorConfig> = {
+  visibilityThreshold: 0.5,
+  ballLowPointSearchWindow: 0.4,
+  legBendSearchWindow: 0.5,
+  riseSearchWindow: 0.6,
+  smoothingWindowSize: 3,
+  minConsecutiveFrames: 2,
+  kneeVelocityThreshold: 0.5,
+  wristVelocityThreshold: -0.005,
+};
 
 /**
  * Helper to create a single landmark with default values.
@@ -223,13 +241,7 @@ describe("detectLegBendLowPoint", () => {
   it("finds frame with minimum knee angle", () => {
     // Create sequence with clear bend at frame 5
     const frames = createLoadPhaseSequence(0, 20, 5, 5);
-    const config = {
-      visibilityThreshold: 0.5,
-      ballLowPointSearchWindow: 0.4,
-      legBendSearchWindow: 0.5,
-    };
-
-    const result = detectLegBendLowPoint(frames, 0, 19, config);
+    const result = detectLegBendLowPoint(frames, 0, 19, LOAD_PHASE_CONFIG);
 
     expect(result).not.toBeNull();
     // Should find the frame around the bend point
@@ -244,26 +256,14 @@ describe("detectLegBendLowPoint", () => {
       createFrame(1, null),
       createFrame(2, null),
     ];
-    const config = {
-      visibilityThreshold: 0.5,
-      ballLowPointSearchWindow: 0.4,
-      legBendSearchWindow: 0.5,
-    };
-
-    const result = detectLegBendLowPoint(frames, 0, 2, config);
+    const result = detectLegBendLowPoint(frames, 0, 2, LOAD_PHASE_CONFIG);
     expect(result).toBeNull();
   });
 
   it("respects search window and only looks in first portion of shot", () => {
     // Create sequence with bend at frame 15 (beyond 50% search window)
     const frames = createLoadPhaseSequence(0, 30, 20, 5);
-    const config = {
-      visibilityThreshold: 0.5,
-      ballLowPointSearchWindow: 0.4,
-      legBendSearchWindow: 0.5, // Search only first 50%
-    };
-
-    const result = detectLegBendLowPoint(frames, 0, 29, config);
+    const result = detectLegBendLowPoint(frames, 0, 29, LOAD_PHASE_CONFIG);
 
     // Should find a frame in the first half, not frame 20
     expect(result).not.toBeNull();
@@ -290,13 +290,7 @@ describe("detectLegBendLowPoint", () => {
     );
     frames[5] = createFrame(5, lowVisLandmarks);
 
-    const config = {
-      visibilityThreshold: 0.5,
-      ballLowPointSearchWindow: 0.4,
-      legBendSearchWindow: 0.5,
-    };
-
-    const result = detectLegBendLowPoint(frames, 0, 9, config);
+    const result = detectLegBendLowPoint(frames, 0, 9, LOAD_PHASE_CONFIG);
 
     // Should not select frame 5 due to low visibility
     expect(result).not.toBe(5);
@@ -322,13 +316,7 @@ describe("detectLegBendLowPoint", () => {
     );
     frames[25] = createFrame(25, deepBendLandmarks);
 
-    const config = {
-      visibilityThreshold: 0.5,
-      ballLowPointSearchWindow: 0.4,
-      legBendSearchWindow: 0.5,
-    };
-
-    const result = detectLegBendLowPoint(frames, 0, 29, config);
+    const result = detectLegBendLowPoint(frames, 0, 29, LOAD_PHASE_CONFIG);
 
     // Should find frame in first 50%, not frame 25
     expect(result).not.toBeNull();
@@ -338,13 +326,7 @@ describe("detectLegBendLowPoint", () => {
   it("handles shot boundaries correctly", () => {
     // Create longer sequence, but shot is only frames 10-20
     const frames = createLoadPhaseSequence(0, 30, 15, 15);
-    const config = {
-      visibilityThreshold: 0.5,
-      ballLowPointSearchWindow: 0.4,
-      legBendSearchWindow: 0.5,
-    };
-
-    const result = detectLegBendLowPoint(frames, 10, 20, config);
+    const result = detectLegBendLowPoint(frames, 10, 20, LOAD_PHASE_CONFIG);
 
     // Result should be within shot boundaries
     expect(result).not.toBeNull();
@@ -357,13 +339,7 @@ describe("detectBallLowPoint", () => {
   it("finds frame with maximum wrist Y (lowest ball position)", () => {
     // Create sequence with ball dip at frame 5
     const frames = createLoadPhaseSequence(0, 20, 5, 5);
-    const config = {
-      visibilityThreshold: 0.5,
-      ballLowPointSearchWindow: 0.4,
-      legBendSearchWindow: 0.5,
-    };
-
-    const result = detectBallLowPoint(frames, 0, 19, config);
+    const result = detectBallLowPoint(frames, 0, 19, LOAD_PHASE_CONFIG);
 
     expect(result).not.toBeNull();
     // Should find the frame around the dip point
@@ -377,26 +353,14 @@ describe("detectBallLowPoint", () => {
       createFrame(1, null),
       createFrame(2, null),
     ];
-    const config = {
-      visibilityThreshold: 0.5,
-      ballLowPointSearchWindow: 0.4,
-      legBendSearchWindow: 0.5,
-    };
-
-    const result = detectBallLowPoint(frames, 0, 2, config);
+    const result = detectBallLowPoint(frames, 0, 2, LOAD_PHASE_CONFIG);
     expect(result).toBeNull();
   });
 
   it("respects search window and only looks in first portion of shot", () => {
     // Create sequence with dip at frame 25 (beyond 40% search window)
     const frames = createLoadPhaseSequence(0, 30, 5, 25);
-    const config = {
-      visibilityThreshold: 0.5,
-      ballLowPointSearchWindow: 0.4,
-      legBendSearchWindow: 0.5,
-    };
-
-    const result = detectBallLowPoint(frames, 0, 29, config);
+    const result = detectBallLowPoint(frames, 0, 29, LOAD_PHASE_CONFIG);
 
     // Should find a frame in the first 40%, not frame 25
     expect(result).not.toBeNull();
@@ -423,13 +387,7 @@ describe("detectBallLowPoint", () => {
     );
     frames[5] = createFrame(5, lowVisLandmarks);
 
-    const config = {
-      visibilityThreshold: 0.5,
-      ballLowPointSearchWindow: 0.4,
-      legBendSearchWindow: 0.5,
-    };
-
-    const result = detectBallLowPoint(frames, 0, 9, config);
+    const result = detectBallLowPoint(frames, 0, 9, LOAD_PHASE_CONFIG);
 
     // Should not select frame 5 due to low visibility
     expect(result).not.toBe(5);
@@ -453,10 +411,9 @@ describe("detectBallLowPoint", () => {
       frames.push(createFrame(i, landmarks));
     }
 
-    const config = {
-      visibilityThreshold: 0.5,
+    const config: Required<KeyframeDetectorConfig> = {
+      ...LOAD_PHASE_CONFIG,
       ballLowPointSearchWindow: 0.6,
-      legBendSearchWindow: 0.5,
     };
 
     const result = detectBallLowPoint(frames, 0, 7, config);
@@ -703,5 +660,459 @@ describe("edge cases", () => {
       (k) => k.keyframeId === "ball_low_point",
     );
     expect(ballLow!.frameIndex).toBe(2); // Frame index 2 has max wrist Y
+  });
+});
+
+/**
+ * Creates a frame sequence simulating the Rise phase of a basketball shot.
+ * After the low point, the knee angle increases (legs extend) and wrist Y
+ * decreases (ball rises).
+ *
+ * @param startFrame - Starting frame index (typically the low point)
+ * @param frameCount - Number of frames in the sequence
+ * @param extensionStartFrame - Frame where knee extension starts (relative to start)
+ * @param riseStartFrame - Frame where ball starts rising (relative to start)
+ */
+function createRisePhaseSequence(
+  startFrame: number,
+  frameCount: number,
+  extensionStartFrame: number,
+  riseStartFrame: number,
+): Frame[] {
+  const frames: Frame[] = [];
+
+  for (let i = 0; i < frameCount; i++) {
+    const frameIdx = startFrame + i;
+    const landmarks = createDefaultLandmarks();
+
+    // Calculate knee angle: starts at bent position, extends after extensionStartFrame
+    // Before extension: angle ~120 degrees (bent)
+    // After extension: angle increases linearly toward 170 degrees
+    let kneeAngleTarget: number;
+    if (i < extensionStartFrame) {
+      // Before extension starts: maintain bent position
+      kneeAngleTarget = 120;
+    } else {
+      // After extension starts: gradually extend
+      const extensionProgress =
+        (i - extensionStartFrame) / (frameCount - extensionStartFrame);
+      kneeAngleTarget = 120 + extensionProgress * 50; // 120 -> 170 degrees
+    }
+
+    // Convert target angle to ankle position
+    // For a larger angle (more extended), ankle moves more vertical (less X offset)
+    const maxAnkleXOffset = 0.15;
+    const normalizedBend = 1 - (kneeAngleTarget - 90) / 90; // 0 at 180, 1 at 90
+    const ankleXOffset = maxAnkleXOffset * normalizedBend;
+
+    const hipX = 0.5;
+    const hipY = 0.4;
+    const kneeX = 0.5;
+    const kneeY = 0.55;
+    const ankleX = 0.5 + ankleXOffset;
+    const ankleY = 0.7;
+
+    landmarks[LANDMARK_INDICES.LEFT_HIP] = createLandmark(hipX - 0.1, hipY, 0);
+    landmarks[LANDMARK_INDICES.RIGHT_HIP] = createLandmark(hipX + 0.1, hipY, 0);
+    landmarks[LANDMARK_INDICES.LEFT_KNEE] = createLandmark(
+      kneeX - 0.1,
+      kneeY,
+      0,
+    );
+    landmarks[LANDMARK_INDICES.RIGHT_KNEE] = createLandmark(
+      kneeX + 0.1,
+      kneeY,
+      0,
+    );
+    landmarks[LANDMARK_INDICES.LEFT_ANKLE] = createLandmark(
+      ankleX - 0.1,
+      ankleY,
+      0,
+    );
+    landmarks[LANDMARK_INDICES.RIGHT_ANKLE] = createLandmark(
+      ankleX + 0.1,
+      ankleY,
+      0,
+    );
+
+    // Calculate wrist Y: starts at low position (high Y), rises after riseStartFrame
+    // Before rise: wrist at Y = 0.7 (low position)
+    // After rise: wrist Y decreases (ball rises)
+    let wristY: number;
+    if (i < riseStartFrame) {
+      // Before rise starts: maintain low position
+      wristY = 0.7;
+    } else {
+      // After rise starts: ball rises (Y decreases)
+      const riseProgress = (i - riseStartFrame) / (frameCount - riseStartFrame);
+      wristY = 0.7 - riseProgress * 0.4; // 0.7 -> 0.3
+    }
+
+    landmarks[LANDMARK_INDICES.LEFT_WRIST] = createLandmark(0.4, wristY, 0);
+    landmarks[LANDMARK_INDICES.RIGHT_WRIST] = createLandmark(0.6, wristY, 0);
+
+    frames.push(createFrame(frameIdx, landmarks));
+  }
+
+  return frames;
+}
+
+describe("calculateVelocity", () => {
+  it("calculates frame-to-frame differences", () => {
+    const values = [10, 12, 15, 13, 14];
+    const velocities = calculateVelocity(values);
+
+    expect(velocities).toHaveLength(4);
+    expect(velocities[0]).toBe(2); // 12 - 10
+    expect(velocities[1]).toBe(3); // 15 - 12
+    expect(velocities[2]).toBe(-2); // 13 - 15
+    expect(velocities[3]).toBe(1); // 14 - 13
+  });
+
+  it("returns empty array for single value", () => {
+    const velocities = calculateVelocity([10]);
+    expect(velocities).toHaveLength(0);
+  });
+
+  it("returns empty array for empty input", () => {
+    const velocities = calculateVelocity([]);
+    expect(velocities).toHaveLength(0);
+  });
+});
+
+describe("calculateSmoothedVelocity", () => {
+  it("applies smoothing before calculating velocity", () => {
+    // Values with a spike
+    const values = [10, 10, 100, 10, 10]; // Spike at index 2
+    const velocities = calculateSmoothedVelocity(values, 3);
+
+    // Smoothed velocities should be less extreme
+    expect(velocities).toHaveLength(4);
+    // The spike gets smoothed, so velocities are moderated
+    expect(Math.abs(velocities[1]!)).toBeLessThan(90); // Would be 90 without smoothing
+  });
+
+  it("handles window size of 1 (no smoothing)", () => {
+    const values = [10, 12, 15];
+    const velocities = calculateSmoothedVelocity(values, 1);
+
+    expect(velocities).toHaveLength(2);
+    expect(velocities[0]).toBe(2);
+    expect(velocities[1]).toBe(3);
+  });
+
+  it("returns empty for short arrays", () => {
+    const velocities = calculateSmoothedVelocity([10], 3);
+    expect(velocities).toHaveLength(0);
+  });
+});
+
+describe("detectLegsStartExtending", () => {
+  const defaultConfig: Required<KeyframeDetectorConfig> = {
+    visibilityThreshold: 0.5,
+    ballLowPointSearchWindow: 0.4,
+    legBendSearchWindow: 0.5,
+    riseSearchWindow: 0.6,
+    smoothingWindowSize: 3,
+    minConsecutiveFrames: 2,
+    kneeVelocityThreshold: 0.5,
+    wristVelocityThreshold: -0.005,
+  };
+
+  it("detects frame where knee starts extending", () => {
+    // Create sequence where extension starts at frame 5 (relative index 5)
+    const frames = createRisePhaseSequence(0, 20, 5, 8);
+
+    const result = detectLegsStartExtending(frames, 0, 19, defaultConfig);
+
+    expect(result).not.toBeNull();
+    // Should detect extension starting around frame 5-7
+    expect(result!).toBeGreaterThanOrEqual(5);
+    expect(result!).toBeLessThanOrEqual(8);
+  });
+
+  it("returns null when no clear extension detected", () => {
+    // Create frames where knee angle stays constant (no extension)
+    const frames: Frame[] = [];
+    for (let i = 0; i < 10; i++) {
+      const landmarks = createDefaultLandmarks();
+      // Keep constant knee position (bent at same angle)
+      landmarks[LANDMARK_INDICES.LEFT_HIP] = createLandmark(0.4, 0.4, 0);
+      landmarks[LANDMARK_INDICES.RIGHT_HIP] = createLandmark(0.6, 0.4, 0);
+      landmarks[LANDMARK_INDICES.LEFT_KNEE] = createLandmark(0.4, 0.55, 0);
+      landmarks[LANDMARK_INDICES.RIGHT_KNEE] = createLandmark(0.6, 0.55, 0);
+      landmarks[LANDMARK_INDICES.LEFT_ANKLE] = createLandmark(0.55, 0.7, 0);
+      landmarks[LANDMARK_INDICES.RIGHT_ANKLE] = createLandmark(0.65, 0.7, 0);
+      frames.push(createFrame(i, landmarks));
+    }
+
+    const result = detectLegsStartExtending(frames, 0, 9, defaultConfig);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when not enough frames", () => {
+    const frames = createRisePhaseSequence(0, 2, 0, 0);
+    const result = detectLegsStartExtending(frames, 0, 1, defaultConfig);
+    expect(result).toBeNull();
+  });
+
+  it("respects search window", () => {
+    // Create sequence where extension starts at frame 15 (outside search window)
+    const frames = createRisePhaseSequence(0, 30, 15, 15);
+
+    const config: Required<KeyframeDetectorConfig> = {
+      ...defaultConfig,
+      riseSearchWindow: 0.3, // Only search first 30%
+    };
+
+    const result = detectLegsStartExtending(frames, 0, 29, config);
+
+    // Should not find extension at frame 15 (outside search window)
+    if (result !== null) {
+      expect(result).toBeLessThan(15);
+    }
+  });
+
+  it("skips frames with low visibility landmarks", () => {
+    const frames = createRisePhaseSequence(0, 15, 5, 8);
+
+    // Make frames 5-7 have low visibility
+    for (let i = 5; i <= 7; i++) {
+      const landmarks = [...(frames[i]!.landmarks as TestLandmark[])];
+      landmarks[LANDMARK_INDICES.LEFT_KNEE] = createLandmark(
+        0.4,
+        0.55,
+        0,
+        0.2,
+      );
+      landmarks[LANDMARK_INDICES.RIGHT_KNEE] = createLandmark(
+        0.6,
+        0.55,
+        0,
+        0.2,
+      );
+      frames[i] = createFrame(i, landmarks);
+    }
+
+    const result = detectLegsStartExtending(frames, 0, 14, defaultConfig);
+
+    // Should find extension after the low visibility frames
+    if (result !== null) {
+      expect(result).toBeGreaterThanOrEqual(8);
+    }
+  });
+});
+
+describe("detectBallStartsUpward", () => {
+  const defaultConfig: Required<KeyframeDetectorConfig> = {
+    visibilityThreshold: 0.5,
+    ballLowPointSearchWindow: 0.4,
+    legBendSearchWindow: 0.5,
+    riseSearchWindow: 0.6,
+    smoothingWindowSize: 3,
+    minConsecutiveFrames: 2,
+    kneeVelocityThreshold: 0.5,
+    wristVelocityThreshold: -0.005,
+  };
+
+  it("detects frame where ball starts rising", () => {
+    // Create sequence where ball rises starting at frame 8 (relative index 8)
+    const frames = createRisePhaseSequence(0, 20, 5, 8);
+
+    const result = detectBallStartsUpward(frames, 0, 19, defaultConfig);
+
+    expect(result).not.toBeNull();
+    // Should detect rise starting around frame 8-10
+    expect(result!).toBeGreaterThanOrEqual(8);
+    expect(result!).toBeLessThanOrEqual(11);
+  });
+
+  it("returns null when ball stays stationary", () => {
+    // Create frames where wrist Y stays constant (ball doesn't rise)
+    const frames: Frame[] = [];
+    for (let i = 0; i < 10; i++) {
+      const landmarks = createDefaultLandmarks();
+      // Keep constant wrist position
+      landmarks[LANDMARK_INDICES.LEFT_WRIST] = createLandmark(0.4, 0.6, 0);
+      landmarks[LANDMARK_INDICES.RIGHT_WRIST] = createLandmark(0.6, 0.6, 0);
+      frames.push(createFrame(i, landmarks));
+    }
+
+    const result = detectBallStartsUpward(frames, 0, 9, defaultConfig);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when ball moves downward", () => {
+    // Create frames where wrist Y increases (ball moves down)
+    const frames: Frame[] = [];
+    for (let i = 0; i < 10; i++) {
+      const landmarks = createDefaultLandmarks();
+      const wristY = 0.5 + i * 0.02; // Y increases over time
+      landmarks[LANDMARK_INDICES.LEFT_WRIST] = createLandmark(0.4, wristY, 0);
+      landmarks[LANDMARK_INDICES.RIGHT_WRIST] = createLandmark(0.6, wristY, 0);
+      frames.push(createFrame(i, landmarks));
+    }
+
+    const result = detectBallStartsUpward(frames, 0, 9, defaultConfig);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when not enough frames", () => {
+    const frames = createRisePhaseSequence(0, 2, 0, 0);
+    const result = detectBallStartsUpward(frames, 0, 1, defaultConfig);
+    expect(result).toBeNull();
+  });
+
+  it("respects search window", () => {
+    // Create sequence where rise starts at frame 18 (outside search window)
+    const frames = createRisePhaseSequence(0, 30, 5, 18);
+
+    const config: Required<KeyframeDetectorConfig> = {
+      ...defaultConfig,
+      riseSearchWindow: 0.5, // Only search first 50%
+    };
+
+    const result = detectBallStartsUpward(frames, 0, 29, config);
+
+    // Should not find rise at frame 18 (outside search window)
+    if (result !== null) {
+      expect(result).toBeLessThan(18);
+    }
+  });
+
+  it("skips frames with low visibility wrist landmarks", () => {
+    const frames = createRisePhaseSequence(0, 15, 5, 8);
+
+    // Make frames 8-10 have low visibility wrists
+    for (let i = 8; i <= 10; i++) {
+      const landmarks = [...(frames[i]!.landmarks as TestLandmark[])];
+      landmarks[LANDMARK_INDICES.LEFT_WRIST] = createLandmark(0.4, 0.5, 0, 0.2);
+      landmarks[LANDMARK_INDICES.RIGHT_WRIST] = createLandmark(
+        0.6,
+        0.5,
+        0,
+        0.2,
+      );
+      frames[i] = createFrame(i, landmarks);
+    }
+
+    const result = detectBallStartsUpward(frames, 0, 14, defaultConfig);
+
+    // Should find rise after the low visibility frames, or not at all
+    if (result !== null) {
+      expect(result).toBeGreaterThan(10);
+    }
+  });
+});
+
+describe("KeyframeDetector.detectRisePhaseKeyframes", () => {
+  it("detects both legs_start_extending and ball_starts_upward", () => {
+    const frames = createRisePhaseSequence(0, 25, 5, 8);
+    const detector = createKeyframeDetector();
+
+    const result = detector.detectRisePhaseKeyframes(frames, 0, 0, 24);
+
+    expect(result.keyframes).toHaveLength(2);
+
+    const legsExtending = result.keyframes.find(
+      (k) => k.keyframeId === "legs_start_extending",
+    );
+    const ballUpward = result.keyframes.find(
+      (k) => k.keyframeId === "ball_starts_upward",
+    );
+
+    expect(legsExtending).toBeDefined();
+    expect(ballUpward).toBeDefined();
+    expect(legsExtending!.frameIndex).not.toBeNull();
+    expect(ballUpward!.frameIndex).not.toBeNull();
+  });
+
+  it("returns confidence of 1.0 when both keyframes detected", () => {
+    const frames = createRisePhaseSequence(0, 25, 5, 8);
+    const detector = createKeyframeDetector();
+
+    const result = detector.detectRisePhaseKeyframes(frames, 0, 0, 24);
+
+    expect(result.confidence).toBe(1.0);
+  });
+
+  it("returns confidence of 0.0 when no keyframes detected", () => {
+    // Create frames with no movement
+    const frames: Frame[] = [];
+    for (let i = 0; i < 5; i++) {
+      const landmarks = createDefaultLandmarks();
+      frames.push(createFrame(i, landmarks));
+    }
+    const detector = createKeyframeDetector();
+
+    const result = detector.detectRisePhaseKeyframes(frames, 0, 0, 4);
+
+    expect(result.confidence).toBe(0);
+  });
+
+  it("allows legs_start_extending before ball_starts_upward", () => {
+    // Create sequence where legs extend first, ball rises later
+    const frames = createRisePhaseSequence(0, 25, 3, 10);
+    const detector = createKeyframeDetector();
+
+    const result = detector.detectRisePhaseKeyframes(frames, 0, 0, 24);
+
+    const legsExtending = result.keyframes.find(
+      (k) => k.keyframeId === "legs_start_extending",
+    );
+    const ballUpward = result.keyframes.find(
+      (k) => k.keyframeId === "ball_starts_upward",
+    );
+
+    expect(legsExtending!.frameIndex).not.toBeNull();
+    expect(ballUpward!.frameIndex).not.toBeNull();
+    expect(legsExtending!.frameIndex!).toBeLessThan(ballUpward!.frameIndex!);
+  });
+
+  it("allows ball_starts_upward before legs_start_extending", () => {
+    // Create sequence where ball rises first, legs extend later
+    const frames = createRisePhaseSequence(0, 25, 12, 3);
+    const detector = createKeyframeDetector();
+
+    const result = detector.detectRisePhaseKeyframes(frames, 0, 0, 24);
+
+    const legsExtending = result.keyframes.find(
+      (k) => k.keyframeId === "legs_start_extending",
+    );
+    const ballUpward = result.keyframes.find(
+      (k) => k.keyframeId === "ball_starts_upward",
+    );
+
+    expect(ballUpward!.frameIndex).not.toBeNull();
+    expect(legsExtending!.frameIndex).not.toBeNull();
+    expect(ballUpward!.frameIndex!).toBeLessThan(legsExtending!.frameIndex!);
+  });
+
+  it("uses custom smoothing window size", () => {
+    const frames = createRisePhaseSequence(0, 25, 5, 8);
+
+    // Test with different smoothing window sizes
+    const detector1 = createKeyframeDetector({ smoothingWindowSize: 2 });
+    const detector2 = createKeyframeDetector({ smoothingWindowSize: 5 });
+
+    const result1 = detector1.detectRisePhaseKeyframes(frames, 0, 0, 24);
+    const result2 = detector2.detectRisePhaseKeyframes(frames, 0, 0, 24);
+
+    // Both should detect keyframes (may differ slightly due to smoothing)
+    expect(result1.confidence).toBeGreaterThan(0);
+    expect(result2.confidence).toBeGreaterThan(0);
+  });
+
+  it("uses custom minConsecutiveFrames", () => {
+    const frames = createRisePhaseSequence(0, 25, 5, 8);
+
+    const detector1 = createKeyframeDetector({ minConsecutiveFrames: 2 });
+    const detector2 = createKeyframeDetector({ minConsecutiveFrames: 5 });
+
+    const result1 = detector1.detectRisePhaseKeyframes(frames, 0, 0, 24);
+    const result2 = detector2.detectRisePhaseKeyframes(frames, 0, 0, 24);
+
+    // With fewer required consecutive frames, detection should be more sensitive
+    expect(result1.confidence).toBeGreaterThanOrEqual(result2.confidence);
   });
 });

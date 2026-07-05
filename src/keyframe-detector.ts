@@ -9,6 +9,7 @@
 
 import type { Frame, TestLandmark, KeyframeId } from "./testing/types";
 import { LANDMARK_INDICES, type Point3D } from "./types";
+import { movingAverage } from "./utils/smoothing";
 
 /**
  * Configuration for keyframe detection.
@@ -20,6 +21,16 @@ export interface KeyframeDetectorConfig {
   readonly ballLowPointSearchWindow?: number;
   /** Search window as percentage of shot duration for leg_bend_low_point. Default: 0.5 (first 50%) */
   readonly legBendSearchWindow?: number;
+  /** Search window as percentage of shot duration for Rise phase detection. Default: 0.6 */
+  readonly riseSearchWindow?: number;
+  /** Window size for smoothing velocity calculations. Default: 3 */
+  readonly smoothingWindowSize?: number;
+  /** Minimum consecutive frames with positive velocity to confirm knee extension. Default: 2 */
+  readonly minConsecutiveFrames?: number;
+  /** Minimum knee angle velocity (degrees per frame) to detect extension. Default: 0.5 */
+  readonly kneeVelocityThreshold?: number;
+  /** Minimum wrist Y velocity (normalized units per frame) to detect upward motion. Default: -0.005 */
+  readonly wristVelocityThreshold?: number;
 }
 
 /**
@@ -29,6 +40,11 @@ const DEFAULT_CONFIG: Required<KeyframeDetectorConfig> = {
   visibilityThreshold: 0.5,
   ballLowPointSearchWindow: 0.4,
   legBendSearchWindow: 0.5,
+  riseSearchWindow: 0.6,
+  smoothingWindowSize: 3,
+  minConsecutiveFrames: 2,
+  kneeVelocityThreshold: 0.5,
+  wristVelocityThreshold: -0.005,
 };
 
 /**
@@ -339,11 +355,203 @@ export function detectBallLowPoint(
 }
 
 /**
+ * Calculates velocity (frame-to-frame change) from a sequence of values.
+ *
+ * @param values - Array of numeric values
+ * @returns Array of velocities (one element shorter than input)
+ */
+export function calculateVelocity(values: number[]): number[] {
+  const velocities: number[] = [];
+  for (let i = 1; i < values.length; i++) {
+    velocities.push(values[i]! - values[i - 1]!);
+  }
+  return velocities;
+}
+
+/**
+ * Calculates smoothed velocity from a sequence of values.
+ *
+ * Applies moving average smoothing to the values first,
+ * then calculates frame-to-frame velocity.
+ *
+ * @param values - Array of numeric values
+ * @param windowSize - Smoothing window size
+ * @returns Array of smoothed velocities (one element shorter than input)
+ */
+export function calculateSmoothedVelocity(
+  values: number[],
+  windowSize: number,
+): number[] {
+  if (values.length < 2) {
+    return [];
+  }
+  const smoothedValues = movingAverage(values, windowSize);
+  return calculateVelocity(smoothedValues);
+}
+
+/**
+ * Detects the frame where legs start extending (knee angle starts increasing).
+ *
+ * This corresponds to the "legs_start_extending" keyframe in the Rise phase.
+ * The detection looks for sustained positive knee angle velocity after the
+ * leg_bend_low_point, indicating the knees are straightening.
+ *
+ * @param frames - Array of frames with pose data
+ * @param legBendLowPointFrame - Frame index of the leg bend low point (from Load phase)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index where knee extension starts, or null if not detectable
+ */
+export function detectLegsStartExtending(
+  frames: readonly Frame[],
+  legBendLowPointFrame: number,
+  endFrame: number,
+  config: Required<KeyframeDetectorConfig> = DEFAULT_CONFIG,
+): number | null {
+  const shotDuration = endFrame - legBendLowPointFrame + 1;
+  const searchEndFrame =
+    legBendLowPointFrame + Math.floor(shotDuration * config.riseSearchWindow);
+
+  // Extract knee angles for frames in the search window
+  const frameAngles: Array<{ frameIndex: number; angle: number }> = [];
+
+  for (const frame of frames) {
+    const frameIdx = frame.frameIndex;
+
+    // Only search from the low point forward
+    if (frameIdx < legBendLowPointFrame || frameIdx > searchEndFrame) {
+      continue;
+    }
+
+    const kneeAngle = getFrameKneeAngle(frame, config.visibilityThreshold);
+    if (kneeAngle !== null) {
+      frameAngles.push({ frameIndex: frameIdx, angle: kneeAngle });
+    }
+  }
+
+  if (frameAngles.length < config.minConsecutiveFrames + 1) {
+    return null;
+  }
+
+  // Sort by frame index to ensure proper order
+  frameAngles.sort((a, b) => a.frameIndex - b.frameIndex);
+
+  // Extract angles and calculate smoothed velocity
+  const angles = frameAngles.map((fa) => fa.angle);
+  const smoothedVelocities = calculateSmoothedVelocity(
+    angles,
+    config.smoothingWindowSize,
+  );
+
+  // Find first frame with sustained positive velocity
+  let consecutivePositive = 0;
+
+  for (let i = 0; i < smoothedVelocities.length; i++) {
+    const velocity = smoothedVelocities[i]!;
+
+    if (velocity > config.kneeVelocityThreshold) {
+      consecutivePositive++;
+
+      if (consecutivePositive >= config.minConsecutiveFrames) {
+        // Return the frame where the extension started
+        // (subtract minConsecutiveFrames - 1 to get the start)
+        const startIdx = i - config.minConsecutiveFrames + 1;
+        // Add 1 because velocity[i] is between frame[i] and frame[i+1]
+        return frameAngles[startIdx + 1]!.frameIndex;
+      }
+    } else {
+      consecutivePositive = 0;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Detects the frame where the ball starts moving upward (wrist Y starts decreasing).
+ *
+ * This corresponds to the "ball_starts_upward" keyframe in the Rise phase.
+ * The detection looks for sustained negative wrist Y velocity after the
+ * ball_low_point, indicating the ball is rising (since Y=0 is top of frame).
+ *
+ * @param frames - Array of frames with pose data
+ * @param ballLowPointFrame - Frame index of the ball low point (from Load phase)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index where upward ball motion starts, or null if not detectable
+ */
+export function detectBallStartsUpward(
+  frames: readonly Frame[],
+  ballLowPointFrame: number,
+  endFrame: number,
+  config: Required<KeyframeDetectorConfig> = DEFAULT_CONFIG,
+): number | null {
+  const shotDuration = endFrame - ballLowPointFrame + 1;
+  const searchEndFrame =
+    ballLowPointFrame + Math.floor(shotDuration * config.riseSearchWindow);
+
+  // Extract wrist Y positions for frames in the search window
+  const framePositions: Array<{ frameIndex: number; wristY: number }> = [];
+
+  for (const frame of frames) {
+    const frameIdx = frame.frameIndex;
+
+    // Only search from the low point forward
+    if (frameIdx < ballLowPointFrame || frameIdx > searchEndFrame) {
+      continue;
+    }
+
+    const wristY = getFrameWristY(frame, config.visibilityThreshold);
+    if (wristY !== null) {
+      framePositions.push({ frameIndex: frameIdx, wristY: wristY });
+    }
+  }
+
+  if (framePositions.length < config.minConsecutiveFrames + 1) {
+    return null;
+  }
+
+  // Sort by frame index to ensure proper order
+  framePositions.sort((a, b) => a.frameIndex - b.frameIndex);
+
+  // Extract wrist Y values and calculate smoothed velocity
+  const wristYValues = framePositions.map((fp) => fp.wristY);
+  const smoothedVelocities = calculateSmoothedVelocity(
+    wristYValues,
+    config.smoothingWindowSize,
+  );
+
+  // Find first frame with sustained negative velocity (upward motion)
+  // Negative velocity means Y is decreasing, which means the ball is rising
+  let consecutiveNegative = 0;
+
+  for (let i = 0; i < smoothedVelocities.length; i++) {
+    const velocity = smoothedVelocities[i]!;
+
+    // Note: threshold is negative, so velocity < threshold means moving up fast enough
+    if (velocity < config.wristVelocityThreshold) {
+      consecutiveNegative++;
+
+      if (consecutiveNegative >= config.minConsecutiveFrames) {
+        // Return the frame where upward motion started
+        const startIdx = i - config.minConsecutiveFrames + 1;
+        // Add 1 because velocity[i] is between frame[i] and frame[i+1]
+        return framePositions[startIdx + 1]!.frameIndex;
+      }
+    } else {
+      consecutiveNegative = 0;
+    }
+  }
+
+  return null;
+}
+
+/**
  * KeyframeDetector class for detecting keyframes within basketball shots.
  *
- * Currently implements Load phase keyframe detection:
- * - leg_bend_low_point: Frame with deepest knee bend
- * - ball_low_point: Frame with lowest ball position (highest wrist Y)
+ * Implements keyframe detection for:
+ * - Load phase: leg_bend_low_point, ball_low_point
+ * - Rise phase: legs_start_extending, ball_starts_upward
  */
 export class KeyframeDetector {
   private readonly config: Required<KeyframeDetectorConfig>;
@@ -394,6 +602,62 @@ export class KeyframeDetector {
       keyframeId: "ball_low_point",
       frameIndex: ballLowFrame,
       confidence: ballLowFrame !== null ? 0.8 : 0.0,
+    });
+
+    // Overall confidence based on successful detections
+    const successCount = keyframes.filter((k) => k.frameIndex !== null).length;
+    const overallConfidence = successCount / keyframes.length;
+
+    return {
+      keyframes,
+      confidence: overallConfidence,
+    };
+  }
+
+  /**
+   * Detects Rise phase keyframes for a shot.
+   *
+   * Requires Load phase keyframes to have been detected first,
+   * as Rise phase detection starts from the Load phase low points.
+   *
+   * @param frames - Array of frames with pose data
+   * @param legBendLowPointFrame - Frame index of leg bend low point (from Load phase)
+   * @param ballLowPointFrame - Frame index of ball low point (from Load phase)
+   * @param endFrame - Shot end frame index (inclusive)
+   * @returns Detection result with keyframes and confidence
+   */
+  detectRisePhaseKeyframes(
+    frames: readonly Frame[],
+    legBendLowPointFrame: number,
+    ballLowPointFrame: number,
+    endFrame: number,
+  ): KeyframeDetectionResult {
+    const keyframes: DetectedKeyframe[] = [];
+
+    // Detect legs_start_extending
+    const legsExtendingFrame = detectLegsStartExtending(
+      frames,
+      legBendLowPointFrame,
+      endFrame,
+      this.config,
+    );
+    keyframes.push({
+      keyframeId: "legs_start_extending",
+      frameIndex: legsExtendingFrame,
+      confidence: legsExtendingFrame !== null ? 0.8 : 0.0,
+    });
+
+    // Detect ball_starts_upward
+    const ballUpwardFrame = detectBallStartsUpward(
+      frames,
+      ballLowPointFrame,
+      endFrame,
+      this.config,
+    );
+    keyframes.push({
+      keyframeId: "ball_starts_upward",
+      frameIndex: ballUpwardFrame,
+      confidence: ballUpwardFrame !== null ? 0.8 : 0.0,
     });
 
     // Overall confidence based on successful detections
