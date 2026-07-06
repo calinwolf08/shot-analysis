@@ -1,10 +1,10 @@
 /**
- * Unit tests for KeyframeDetector - Load, Rise, Set Point, and Release phase detection.
+ * Unit tests for KeyframeDetector - Load, Rise, Set Point, Release, and Follow-through phase detection.
  *
  * Tests detection functions for identifying keyframes in basketball shots.
  */
 import { describe, it, expect } from "vitest";
-import { KeyframeDetector, createKeyframeDetector, calculateKneeAngle, calculateElbowAngle, calculateWristAngle, detectLegBendLowPoint, detectBallLowPoint, detectLegsStartExtending, detectBallStartsUpward, detectSetPoint, detectRelease, calculateVelocity, calculateSmoothedVelocity, } from "./keyframe-detector";
+import { KeyframeDetector, createKeyframeDetector, calculateKneeAngle, calculateElbowAngle, calculateWristAngle, detectLegBendLowPoint, detectBallLowPoint, detectLegsStartExtending, detectBallStartsUpward, detectSetPoint, detectRelease, calculateVelocity, calculateSmoothedVelocity, establishGroundBaseline, detectArmsFullyExtended, detectFeetLeaveGround, detectFeetLand, } from "./keyframe-detector";
 import { LANDMARK_INDICES } from "./types";
 /**
  * Default config for Load phase detection tests.
@@ -21,6 +21,9 @@ const LOAD_PHASE_CONFIG = {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
+    groundBaselineFrames: 3,
+    ankleGroundThreshold: 0.03,
+    followThroughSearchWindow: 0.5,
 };
 /**
  * Helper to create a single landmark with default values.
@@ -575,6 +578,9 @@ describe("detectLegsStartExtending", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
+        groundBaselineFrames: 3,
+        ankleGroundThreshold: 0.03,
+        followThroughSearchWindow: 0.5,
     };
     it("detects frame where knee starts extending", () => {
         // Create sequence where extension starts at frame 5 (relative index 5)
@@ -649,6 +655,9 @@ describe("detectBallStartsUpward", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
+        groundBaselineFrames: 3,
+        ankleGroundThreshold: 0.03,
+        followThroughSearchWindow: 0.5,
     };
     it("detects frame where ball starts rising", () => {
         // Create sequence where ball rises starting at frame 8 (relative index 8)
@@ -989,6 +998,9 @@ describe("detectSetPoint", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
+        groundBaselineFrames: 3,
+        ankleGroundThreshold: 0.03,
+        followThroughSearchWindow: 0.5,
     };
     it("detects frame with highest wrist position and bent elbow", () => {
         const frames = createSetPointReleaseSequence(0, 30, 10, 15);
@@ -1054,6 +1066,9 @@ describe("detectRelease", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
+        groundBaselineFrames: 3,
+        ankleGroundThreshold: 0.03,
+        followThroughSearchWindow: 0.5,
     };
     it("detects frame with maximum wrist flexion", () => {
         const frames = createSetPointReleaseSequence(0, 30, 10, 15);
@@ -1221,6 +1236,476 @@ describe("Set/Release edge cases", () => {
         // Should still be able to detect keyframes from available frames
         const setPoint = result.keyframes.find((k) => k.keyframeId === "set_point");
         expect(setPoint.frameIndex).not.toBeNull();
+    });
+});
+// ============================================================================
+// Follow-through Phase Tests
+// ============================================================================
+/**
+ * Creates a frame sequence simulating the Follow-through phase.
+ * Arms extend to full extension, and optionally feet leave and return to ground.
+ *
+ * @param startFrame - Starting frame index
+ * @param frameCount - Number of frames
+ * @param armsFullyExtendedFrame - Frame where arms reach full extension (relative to start)
+ * @param feetLeaveFrame - Frame where feet leave ground, or null for set shot (relative to start)
+ * @param feetLandFrame - Frame where feet land, or null for set shot (relative to start)
+ * @param groundY - Ground baseline Y position (default 0.85)
+ * @param jumpHeight - How much ankle Y drops during jump (default 0.1)
+ */
+function createFollowThroughSequence(startFrame, frameCount, armsFullyExtendedFrame, feetLeaveFrame, feetLandFrame, groundY = 0.85, jumpHeight = 0.1) {
+    const frames = [];
+    for (let i = 0; i < frameCount; i++) {
+        const frameIdx = startFrame + i;
+        const landmarks = createDefaultLandmarks();
+        // Elbow angle: starts bent (~130), extends to maximum (~175) at armsFullyExtendedFrame
+        // then may relax slightly
+        let elbowAngleTarget;
+        if (i < armsFullyExtendedFrame) {
+            // Extending toward full extension
+            const progress = i / armsFullyExtendedFrame;
+            elbowAngleTarget = 130 + progress * 45; // 130 -> 175
+        }
+        else {
+            // After full extension, slightly relax
+            const progress = (i - armsFullyExtendedFrame) / (frameCount - armsFullyExtendedFrame);
+            elbowAngleTarget = 175 - progress * 10; // 175 -> 165
+        }
+        // Position arm landmarks to achieve target elbow angle
+        const shoulderY = 0.3;
+        const elbowY = 0.35;
+        // For extended elbow, wrist is more in line with shoulder-elbow
+        const normalizedBend = 1 - (elbowAngleTarget - 90) / 90;
+        const wristXOffset = normalizedBend * 0.1;
+        const wristY = 0.25; // Arms up in follow-through
+        landmarks[LANDMARK_INDICES.LEFT_SHOULDER] = createLandmark(0.4, shoulderY, 0);
+        landmarks[LANDMARK_INDICES.RIGHT_SHOULDER] = createLandmark(0.6, shoulderY, 0);
+        landmarks[LANDMARK_INDICES.LEFT_ELBOW] = createLandmark(0.38, elbowY, 0);
+        landmarks[LANDMARK_INDICES.RIGHT_ELBOW] = createLandmark(0.62, elbowY, 0);
+        landmarks[LANDMARK_INDICES.LEFT_WRIST] = createLandmark(0.38 + wristXOffset, wristY, 0);
+        landmarks[LANDMARK_INDICES.RIGHT_WRIST] = createLandmark(0.62 + wristXOffset, wristY, 0);
+        // Ankle Y position: determines if feet are on ground or in air
+        let ankleY;
+        if (feetLeaveFrame === null || feetLandFrame === null) {
+            // Set shot: feet stay on ground
+            ankleY = groundY;
+        }
+        else if (i < feetLeaveFrame) {
+            // Before jump: on ground
+            ankleY = groundY;
+        }
+        else if (i >= feetLeaveFrame && i < feetLandFrame) {
+            // In air: ankle Y is lower (higher in frame)
+            // Peak of jump is in the middle
+            const jumpDuration = feetLandFrame - feetLeaveFrame;
+            const jumpProgress = (i - feetLeaveFrame) / jumpDuration;
+            // Parabolic arc: highest at middle
+            const arc = 4 * jumpProgress * (1 - jumpProgress);
+            ankleY = groundY - jumpHeight * arc;
+        }
+        else {
+            // After landing: back on ground
+            ankleY = groundY;
+        }
+        landmarks[LANDMARK_INDICES.LEFT_ANKLE] = createLandmark(0.45, ankleY, 0);
+        landmarks[LANDMARK_INDICES.RIGHT_ANKLE] = createLandmark(0.55, ankleY, 0);
+        // Leg landmarks for complete pose
+        landmarks[LANDMARK_INDICES.LEFT_HIP] = createLandmark(0.45, 0.5, 0);
+        landmarks[LANDMARK_INDICES.RIGHT_HIP] = createLandmark(0.55, 0.5, 0);
+        landmarks[LANDMARK_INDICES.LEFT_KNEE] = createLandmark(0.45, 0.68, 0);
+        landmarks[LANDMARK_INDICES.RIGHT_KNEE] = createLandmark(0.55, 0.68, 0);
+        frames.push(createFrame(frameIdx, landmarks));
+    }
+    return frames;
+}
+describe("establishGroundBaseline", () => {
+    const defaultConfig = {
+        visibilityThreshold: 0.5,
+        ballLowPointSearchWindow: 0.4,
+        legBendSearchWindow: 0.5,
+        riseSearchWindow: 0.6,
+        smoothingWindowSize: 3,
+        minConsecutiveFrames: 2,
+        kneeVelocityThreshold: 0.5,
+        wristVelocityThreshold: -0.005,
+        setPointSearchWindow: 0.7,
+        setPointMaxElbowAngle: 160,
+        releaseSearchWindow: 0.5,
+        groundBaselineFrames: 3,
+        ankleGroundThreshold: 0.03,
+        followThroughSearchWindow: 0.5,
+    };
+    it("calculates average ankle Y from first N frames", () => {
+        const groundY = 0.85;
+        const frames = createFollowThroughSequence(0, 10, 5, null, null, groundY);
+        const baseline = establishGroundBaseline(frames, 0, 3, defaultConfig.visibilityThreshold);
+        expect(baseline).not.toBeNull();
+        expect(baseline).toBeCloseTo(groundY, 2);
+    });
+    it("returns null when no valid frames exist", () => {
+        const frames = [
+            createFrame(0, null),
+            createFrame(1, null),
+            createFrame(2, null),
+        ];
+        const baseline = establishGroundBaseline(frames, 0, 3, defaultConfig.visibilityThreshold);
+        expect(baseline).toBeNull();
+    });
+    it("handles frames with low visibility ankle landmarks", () => {
+        const frames = createFollowThroughSequence(0, 10, 5, null, null);
+        // Make first frame have low visibility ankles
+        const landmarks = [...frames[0].landmarks];
+        landmarks[LANDMARK_INDICES.LEFT_ANKLE] = createLandmark(0.45, 0.85, 0, 0.2);
+        landmarks[LANDMARK_INDICES.RIGHT_ANKLE] = createLandmark(0.55, 0.85, 0, 0.2);
+        frames[0] = createFrame(0, landmarks);
+        const baseline = establishGroundBaseline(frames, 0, 3, defaultConfig.visibilityThreshold);
+        // Should still calculate from frames 1 and 2
+        expect(baseline).not.toBeNull();
+    });
+    it("only uses frames within the specified range", () => {
+        const frames = createFollowThroughSequence(0, 20, 10, 5, 15, 0.85, 0.15);
+        // Establish baseline from frames 0-2 (before jump)
+        const baseline = establishGroundBaseline(frames, 0, 3, defaultConfig.visibilityThreshold);
+        expect(baseline).not.toBeNull();
+        expect(baseline).toBeCloseTo(0.85, 2);
+    });
+    it("works with different start frames", () => {
+        const frames = createFollowThroughSequence(10, 15, 5, null, null, 0.82);
+        const baseline = establishGroundBaseline(frames, 10, 3, defaultConfig.visibilityThreshold);
+        expect(baseline).not.toBeNull();
+        expect(baseline).toBeCloseTo(0.82, 2);
+    });
+});
+describe("detectArmsFullyExtended", () => {
+    const defaultConfig = {
+        visibilityThreshold: 0.5,
+        ballLowPointSearchWindow: 0.4,
+        legBendSearchWindow: 0.5,
+        riseSearchWindow: 0.6,
+        smoothingWindowSize: 3,
+        minConsecutiveFrames: 2,
+        kneeVelocityThreshold: 0.5,
+        wristVelocityThreshold: -0.005,
+        setPointSearchWindow: 0.7,
+        setPointMaxElbowAngle: 160,
+        releaseSearchWindow: 0.5,
+        groundBaselineFrames: 3,
+        ankleGroundThreshold: 0.03,
+        followThroughSearchWindow: 0.5,
+    };
+    it("detects frame with maximum elbow extension", () => {
+        const frames = createFollowThroughSequence(0, 20, 10, null, null);
+        const result = detectArmsFullyExtended(frames, 5, 19, defaultConfig);
+        expect(result).not.toBeNull();
+        // Should detect around frame 10 (max extension)
+        expect(result).toBeGreaterThanOrEqual(8);
+        expect(result).toBeLessThanOrEqual(12);
+    });
+    it("returns null when no valid frames exist", () => {
+        const frames = [
+            createFrame(5, null),
+            createFrame(6, null),
+            createFrame(7, null),
+        ];
+        const result = detectArmsFullyExtended(frames, 5, 7, defaultConfig);
+        expect(result).toBeNull();
+    });
+    it("searches only from release frame forward", () => {
+        const frames = createFollowThroughSequence(0, 20, 3, null, null);
+        // Release at frame 10, full extension was at frame 3 (before release)
+        const result = detectArmsFullyExtended(frames, 10, 19, defaultConfig);
+        // Should find the maximum extension AFTER frame 10
+        if (result !== null) {
+            expect(result).toBeGreaterThanOrEqual(10);
+        }
+    });
+    it("respects follow-through search window", () => {
+        const frames = createFollowThroughSequence(0, 30, 20, null, null);
+        const config = {
+            ...defaultConfig,
+            followThroughSearchWindow: 0.3, // Only search first 30% after release
+        };
+        const result = detectArmsFullyExtended(frames, 5, 29, config);
+        // Should find something in the search window
+        if (result !== null) {
+            expect(result).toBeLessThanOrEqual(12); // 5 + (24 * 0.3) ≈ 12
+        }
+    });
+    it("skips frames with low visibility landmarks", () => {
+        const frames = createFollowThroughSequence(0, 20, 10, null, null);
+        // Make frame 10 have low visibility elbows
+        const landmarks = [...frames[10].landmarks];
+        landmarks[LANDMARK_INDICES.LEFT_ELBOW] = createLandmark(0.38, 0.35, 0, 0.2);
+        landmarks[LANDMARK_INDICES.RIGHT_ELBOW] = createLandmark(0.62, 0.35, 0, 0.2);
+        frames[10] = createFrame(10, landmarks);
+        const result = detectArmsFullyExtended(frames, 5, 19, defaultConfig);
+        // Should not select frame 10 due to low visibility
+        expect(result).not.toBe(10);
+    });
+});
+describe("detectFeetLeaveGround", () => {
+    const defaultConfig = {
+        visibilityThreshold: 0.5,
+        ballLowPointSearchWindow: 0.4,
+        legBendSearchWindow: 0.5,
+        riseSearchWindow: 0.6,
+        smoothingWindowSize: 3,
+        minConsecutiveFrames: 2,
+        kneeVelocityThreshold: 0.5,
+        wristVelocityThreshold: -0.005,
+        setPointSearchWindow: 0.7,
+        setPointMaxElbowAngle: 160,
+        releaseSearchWindow: 0.5,
+        groundBaselineFrames: 3,
+        ankleGroundThreshold: 0.03,
+        followThroughSearchWindow: 0.5,
+    };
+    it("detects frame where ankles rise above baseline", () => {
+        const groundY = 0.85;
+        const frames = createFollowThroughSequence(0, 30, 15, 8, 22, groundY, 0.1);
+        const result = detectFeetLeaveGround(frames, groundY, 0, 29, defaultConfig);
+        expect(result).not.toBeNull();
+        // Should detect around frame 8
+        expect(result).toBeGreaterThanOrEqual(8);
+        expect(result).toBeLessThanOrEqual(12);
+    });
+    it("returns null for set shot (no jump)", () => {
+        const groundY = 0.85;
+        const frames = createFollowThroughSequence(0, 20, 10, null, null, groundY);
+        const result = detectFeetLeaveGround(frames, groundY, 0, 19, defaultConfig);
+        expect(result).toBeNull();
+    });
+    it("respects ankle ground threshold", () => {
+        const groundY = 0.85;
+        // Small jump that barely crosses the threshold
+        const frames = createFollowThroughSequence(0, 20, 10, 5, 15, groundY, 0.02);
+        // With default threshold (0.03), should not detect
+        const result1 = detectFeetLeaveGround(frames, groundY, 0, 19, defaultConfig);
+        // With lower threshold, should detect
+        const config2 = {
+            ...defaultConfig,
+            ankleGroundThreshold: 0.01,
+        };
+        const result2 = detectFeetLeaveGround(frames, groundY, 0, 19, config2);
+        // result1 may or may not be null depending on exact values
+        // result2 should be more likely to detect with lower threshold
+        if (result1 === null && result2 !== null) {
+            expect(result2).toBeGreaterThanOrEqual(5);
+        }
+    });
+    it("skips frames with low visibility landmarks", () => {
+        const groundY = 0.85;
+        const frames = createFollowThroughSequence(0, 20, 10, 8, 15, groundY, 0.1);
+        // Make frame 8 have low visibility ankles
+        const landmarks = [...frames[8].landmarks];
+        landmarks[LANDMARK_INDICES.LEFT_ANKLE] = createLandmark(0.45, 0.75, 0, 0.2);
+        landmarks[LANDMARK_INDICES.RIGHT_ANKLE] = createLandmark(0.55, 0.75, 0, 0.2);
+        frames[8] = createFrame(8, landmarks);
+        const result = detectFeetLeaveGround(frames, groundY, 0, 19, defaultConfig);
+        // Should find the jump at a later frame
+        if (result !== null) {
+            expect(result).toBeGreaterThan(8);
+        }
+    });
+    it("searches within specified frame range", () => {
+        const groundY = 0.85;
+        const frames = createFollowThroughSequence(0, 30, 15, 5, 25, groundY, 0.1);
+        // Search only from frame 10 onward (jump started at 5)
+        const result = detectFeetLeaveGround(frames, groundY, 10, 29, defaultConfig);
+        // Should find the point where we're already in the air
+        if (result !== null) {
+            expect(result).toBeGreaterThanOrEqual(10);
+        }
+    });
+});
+describe("detectFeetLand", () => {
+    const defaultConfig = {
+        visibilityThreshold: 0.5,
+        ballLowPointSearchWindow: 0.4,
+        legBendSearchWindow: 0.5,
+        riseSearchWindow: 0.6,
+        smoothingWindowSize: 3,
+        minConsecutiveFrames: 2,
+        kneeVelocityThreshold: 0.5,
+        wristVelocityThreshold: -0.005,
+        setPointSearchWindow: 0.7,
+        setPointMaxElbowAngle: 160,
+        releaseSearchWindow: 0.5,
+        groundBaselineFrames: 3,
+        ankleGroundThreshold: 0.03,
+        followThroughSearchWindow: 0.5,
+    };
+    it("detects frame where ankles return to baseline", () => {
+        const groundY = 0.85;
+        const frames = createFollowThroughSequence(0, 30, 15, 8, 22, groundY, 0.1);
+        const result = detectFeetLand(frames, groundY, 8, 29, defaultConfig);
+        expect(result).not.toBeNull();
+        // Should detect around frame 22
+        expect(result).toBeGreaterThanOrEqual(20);
+        expect(result).toBeLessThanOrEqual(24);
+    });
+    it("returns null when feetLeaveGround is null (set shot)", () => {
+        const groundY = 0.85;
+        const frames = createFollowThroughSequence(0, 20, 10, null, null, groundY);
+        const result = detectFeetLand(frames, groundY, null, 19, defaultConfig);
+        expect(result).toBeNull();
+    });
+    it("returns end frame if landing not detected but was in air", () => {
+        const groundY = 0.85;
+        // Jump starts at frame 15, never lands within the shot
+        const frames = createFollowThroughSequence(0, 25, 10, 15, 30, groundY, 0.1);
+        const result = detectFeetLand(frames, groundY, 15, 24, defaultConfig);
+        // Should return the end frame since we were in air but didn't detect landing
+        expect(result).toBe(24);
+    });
+    it("skips frames with low visibility landmarks", () => {
+        const groundY = 0.85;
+        const frames = createFollowThroughSequence(0, 30, 15, 8, 22, groundY, 0.1);
+        // Make frame 22 have low visibility ankles
+        const landmarks = [...frames[22].landmarks];
+        landmarks[LANDMARK_INDICES.LEFT_ANKLE] = createLandmark(0.45, 0.85, 0, 0.2);
+        landmarks[LANDMARK_INDICES.RIGHT_ANKLE] = createLandmark(0.55, 0.85, 0, 0.2);
+        frames[22] = createFrame(22, landmarks);
+        const result = detectFeetLand(frames, groundY, 8, 29, defaultConfig);
+        // Should find landing at a different frame
+        if (result !== null) {
+            expect(result).not.toBe(22);
+        }
+    });
+    it("requires being in air before detecting landing", () => {
+        const groundY = 0.85;
+        // Create frames where ankle Y is always at ground level
+        const frames = [];
+        for (let i = 0; i < 20; i++) {
+            const landmarks = createDefaultLandmarks();
+            landmarks[LANDMARK_INDICES.LEFT_ANKLE] = createLandmark(0.45, groundY, 0);
+            landmarks[LANDMARK_INDICES.RIGHT_ANKLE] = createLandmark(0.55, groundY, 0);
+            frames.push(createFrame(i, landmarks));
+        }
+        // Provide feetLeaveFrame but never actually be in air
+        const result = detectFeetLand(frames, groundY, 5, 19, defaultConfig);
+        // Since we were never "in air", should not detect landing
+        expect(result).toBeNull();
+    });
+});
+describe("KeyframeDetector.detectFollowThroughKeyframes", () => {
+    it("detects arms_fully_extended, feet_leave_ground, and feet_land", () => {
+        const frames = createFollowThroughSequence(0, 30, 10, 5, 25, 0.85, 0.1);
+        const detector = createKeyframeDetector();
+        const result = detector.detectFollowThroughKeyframes(frames, 3, 0, 29);
+        expect(result.keyframes).toHaveLength(3);
+        const armsExtended = result.keyframes.find((k) => k.keyframeId === "arms_fully_extended");
+        const feetLeave = result.keyframes.find((k) => k.keyframeId === "feet_leave_ground");
+        const feetLand = result.keyframes.find((k) => k.keyframeId === "feet_land");
+        expect(armsExtended).toBeDefined();
+        expect(feetLeave).toBeDefined();
+        expect(feetLand).toBeDefined();
+        expect(armsExtended.frameIndex).not.toBeNull();
+        expect(feetLeave.frameIndex).not.toBeNull();
+        expect(feetLand.frameIndex).not.toBeNull();
+    });
+    it("handles set shot (no jump)", () => {
+        const frames = createFollowThroughSequence(0, 20, 10, null, null, 0.85);
+        const detector = createKeyframeDetector();
+        const result = detector.detectFollowThroughKeyframes(frames, 5, 0, 19);
+        const armsExtended = result.keyframes.find((k) => k.keyframeId === "arms_fully_extended");
+        const feetLeave = result.keyframes.find((k) => k.keyframeId === "feet_leave_ground");
+        const feetLand = result.keyframes.find((k) => k.keyframeId === "feet_land");
+        expect(armsExtended.frameIndex).not.toBeNull();
+        expect(feetLeave.frameIndex).toBeNull(); // No jump
+        expect(feetLand.frameIndex).toBeNull(); // No landing
+    });
+    it("returns high confidence when all keyframes detected", () => {
+        const frames = createFollowThroughSequence(0, 30, 10, 5, 25, 0.85, 0.1);
+        const detector = createKeyframeDetector();
+        const result = detector.detectFollowThroughKeyframes(frames, 3, 0, 29);
+        // Confidence formula: (armsConfidence * 0.6 + feetConfidence * 0.4)
+        // All detected: 1 * 0.6 + 1 * 0.4 = 1.0
+        expect(result.confidence).toBe(1.0);
+    });
+    it("returns partial confidence for set shot", () => {
+        const frames = createFollowThroughSequence(0, 20, 10, null, null, 0.85);
+        const detector = createKeyframeDetector();
+        const result = detector.detectFollowThroughKeyframes(frames, 5, 0, 19);
+        // arms detected (1 * 0.6) + feet not detected (0.5 * 0.4) = 0.8
+        expect(result.confidence).toBeCloseTo(0.8, 1);
+    });
+    it("returns low confidence when no keyframes detected", () => {
+        const frames = [
+            createFrame(0, null),
+            createFrame(1, null),
+            createFrame(2, null),
+        ];
+        const detector = createKeyframeDetector();
+        const result = detector.detectFollowThroughKeyframes(frames, 0, 0, 2);
+        // arms not detected (0 * 0.6) + feet not detected (0.5 * 0.4) = 0.2
+        expect(result.confidence).toBeCloseTo(0.2, 1);
+    });
+    it("establishes ground baseline from first frames", () => {
+        // Create frames with varying ground position
+        const frames = createFollowThroughSequence(0, 30, 15, 10, 25, 0.82, 0.1);
+        const detector = createKeyframeDetector({ groundBaselineFrames: 5 });
+        const result = detector.detectFollowThroughKeyframes(frames, 5, 0, 29);
+        // Should detect feet leaving and landing based on baseline from first 5 frames
+        const feetLeave = result.keyframes.find((k) => k.keyframeId === "feet_leave_ground");
+        expect(feetLeave.frameIndex).not.toBeNull();
+    });
+    it("provides per-keyframe confidence scores", () => {
+        const frames = createFollowThroughSequence(0, 30, 10, 5, 25, 0.85, 0.1);
+        const detector = createKeyframeDetector();
+        const result = detector.detectFollowThroughKeyframes(frames, 3, 0, 29);
+        for (const keyframe of result.keyframes) {
+            expect(keyframe.confidence).toBeGreaterThanOrEqual(0);
+            expect(keyframe.confidence).toBeLessThanOrEqual(1);
+        }
+    });
+});
+describe("Follow-through edge cases", () => {
+    it("handles empty frame array", () => {
+        const detector = createKeyframeDetector();
+        const result = detector.detectFollowThroughKeyframes([], 0, 0, 0);
+        expect(result.keyframes).toHaveLength(3);
+        // With empty frames, all keyframes should be null
+        expect(result.keyframes.every((k) => k.frameIndex === null)).toBe(true);
+    });
+    it("handles single frame", () => {
+        const frames = createFollowThroughSequence(5, 1, 0, null, null);
+        const detector = createKeyframeDetector();
+        const result = detector.detectFollowThroughKeyframes(frames, 5, 5, 5);
+        expect(result.keyframes).toHaveLength(3);
+    });
+    it("handles non-contiguous frame indices", () => {
+        const allFrames = createFollowThroughSequence(0, 30, 15, 8, 25, 0.85, 0.1);
+        const frames = [
+            allFrames[0],
+            allFrames[5],
+            allFrames[10],
+            allFrames[15],
+            allFrames[20],
+            allFrames[25],
+        ];
+        const detector = createKeyframeDetector();
+        const result = detector.detectFollowThroughKeyframes(frames, 0, 0, 25);
+        const armsExtended = result.keyframes.find((k) => k.keyframeId === "arms_fully_extended");
+        expect(armsExtended.frameIndex).not.toBeNull();
+    });
+    it("handles asymmetric feet positions (fade-away shot)", () => {
+        const frames = createFollowThroughSequence(0, 20, 10, 5, 15, 0.85, 0.08);
+        // Make one ankle higher than the other (asymmetric)
+        for (let i = 5; i < 15; i++) {
+            const landmarks = [...frames[i].landmarks];
+            const leftAnkle = landmarks[LANDMARK_INDICES.LEFT_ANKLE];
+            // Left ankle stays lower (more on ground), right ankle is higher (more off ground)
+            landmarks[LANDMARK_INDICES.LEFT_ANKLE] = createLandmark(leftAnkle.x, leftAnkle.y + 0.02, 0);
+            landmarks[LANDMARK_INDICES.RIGHT_ANKLE] = createLandmark(landmarks[LANDMARK_INDICES.RIGHT_ANKLE].x, leftAnkle.y - 0.02, 0);
+            frames[i] = createFrame(i, landmarks);
+        }
+        const detector = createKeyframeDetector();
+        const result = detector.detectFollowThroughKeyframes(frames, 3, 0, 19);
+        // Should still detect feet leaving ground (using average of both ankles)
+        const feetLeave = result.keyframes.find((k) => k.keyframeId === "feet_leave_ground");
+        // May or may not detect depending on threshold, but should not crash
+        expect(feetLeave).toBeDefined();
     });
 });
 //# sourceMappingURL=keyframe-detector.test.js.map

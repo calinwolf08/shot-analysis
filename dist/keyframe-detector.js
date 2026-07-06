@@ -23,6 +23,9 @@ const DEFAULT_CONFIG = {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
+    groundBaselineFrames: 3,
+    ankleGroundThreshold: 0.03,
+    followThroughSearchWindow: 0.5,
 };
 /**
  * Calculates the angle between three points at a joint (vertex).
@@ -680,6 +683,183 @@ export function detectRelease(frames, setPointFrame, endFrame, config = DEFAULT_
     return releaseFrame;
 }
 /**
+ * Gets the average ankle Y position for a frame.
+ *
+ * In normalized coordinates, Y=0 is top of frame, Y=1 is bottom.
+ * Higher ankle Y means feet are lower (on ground), lower Y means feet are higher (jumping).
+ *
+ * @param frame - The frame with pose landmarks
+ * @param visibilityThreshold - Minimum visibility for landmarks to be valid
+ * @returns Average ankle Y, or single ankle Y if one is not visible, or null if neither is valid
+ */
+function getFrameAnkleY(frame, visibilityThreshold) {
+    if (!frame.landmarks) {
+        return null;
+    }
+    const landmarks = frame.landmarks;
+    const leftAnkle = landmarks[LANDMARK_INDICES.LEFT_ANKLE];
+    const rightAnkle = landmarks[LANDMARK_INDICES.RIGHT_ANKLE];
+    const leftVisible = leftAnkle && leftAnkle.visibility >= visibilityThreshold;
+    const rightVisible = rightAnkle && rightAnkle.visibility >= visibilityThreshold;
+    if (leftVisible && rightVisible) {
+        return (leftAnkle.y + rightAnkle.y) / 2;
+    }
+    else if (leftVisible) {
+        return leftAnkle.y;
+    }
+    else if (rightVisible) {
+        return rightAnkle.y;
+    }
+    return null;
+}
+/**
+ * Establishes the ground baseline by averaging ankle Y position from the first few frames.
+ *
+ * The baseline represents the "standing" position at the start of the shot.
+ * This is used to detect when feet leave and return to the ground during a jump shot.
+ *
+ * @param frames - Array of frames with pose data
+ * @param startFrame - Shot start frame index (inclusive)
+ * @param baselineFrameCount - Number of frames to average for baseline
+ * @param visibilityThreshold - Minimum visibility for landmarks to be valid
+ * @returns Average ankle Y from the first N frames, or null if not enough valid frames
+ */
+export function establishGroundBaseline(frames, startFrame, baselineFrameCount, visibilityThreshold) {
+    const ankleYValues = [];
+    const searchEndFrame = startFrame + baselineFrameCount - 1;
+    for (const frame of frames) {
+        const frameIdx = frame.frameIndex;
+        if (frameIdx < startFrame || frameIdx > searchEndFrame) {
+            continue;
+        }
+        const ankleY = getFrameAnkleY(frame, visibilityThreshold);
+        if (ankleY !== null) {
+            ankleYValues.push(ankleY);
+        }
+    }
+    if (ankleYValues.length === 0) {
+        return null;
+    }
+    // Return average ankle Y from baseline frames
+    const sum = ankleYValues.reduce((acc, val) => acc + val, 0);
+    return sum / ankleYValues.length;
+}
+/**
+ * Detects the frame with maximum arm extension (arms fully extended).
+ *
+ * This corresponds to the "arms_fully_extended" keyframe in the Follow-through phase.
+ * The detection looks for the frame with the highest elbow angle (closest to 180°)
+ * after the release frame.
+ *
+ * @param frames - Array of frames with pose data
+ * @param releaseFrame - Frame index of the release
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index of maximum arm extension, or null if not detectable
+ */
+export function detectArmsFullyExtended(frames, releaseFrame, endFrame, config = DEFAULT_CONFIG) {
+    const shotDuration = endFrame - releaseFrame + 1;
+    const searchEndFrame = releaseFrame + Math.floor(shotDuration * config.followThroughSearchWindow);
+    let maxElbowAngle = -Infinity;
+    let maxElbowAngleFrame = null;
+    for (const frame of frames) {
+        const frameIdx = frame.frameIndex;
+        // Search from release frame forward (arms extend during follow-through)
+        if (frameIdx < releaseFrame || frameIdx > searchEndFrame) {
+            continue;
+        }
+        const elbowAngle = getFrameElbowAngle(frame, config.visibilityThreshold);
+        if (elbowAngle !== null && elbowAngle > maxElbowAngle) {
+            maxElbowAngle = elbowAngle;
+            maxElbowAngleFrame = frameIdx;
+        }
+    }
+    return maxElbowAngleFrame;
+}
+/**
+ * Detects the frame where feet leave the ground (jump detected).
+ *
+ * This corresponds to the "feet_leave_ground" keyframe.
+ * The detection looks for the first frame where ankle Y drops below
+ * the established ground baseline by more than the threshold.
+ *
+ * In normalized coordinates, lower Y = higher in frame = feet off ground.
+ *
+ * @param frames - Array of frames with pose data
+ * @param groundBaseline - Ground baseline ankle Y from establishGroundBaseline()
+ * @param startFrame - Shot start frame index (inclusive)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index where feet leave ground, or null if no jump detected
+ */
+export function detectFeetLeaveGround(frames, groundBaseline, startFrame, endFrame, config = DEFAULT_CONFIG) {
+    // Look for first frame where ankle Y is significantly below baseline
+    // (lower Y = higher position = feet off ground)
+    for (const frame of frames) {
+        const frameIdx = frame.frameIndex;
+        if (frameIdx < startFrame || frameIdx > endFrame) {
+            continue;
+        }
+        const ankleY = getFrameAnkleY(frame, config.visibilityThreshold);
+        if (ankleY !== null) {
+            // Check if ankles have risen above baseline (Y decreased)
+            const deviation = groundBaseline - ankleY;
+            if (deviation > config.ankleGroundThreshold) {
+                return frameIdx;
+            }
+        }
+    }
+    // No jump detected - this could be a set shot
+    return null;
+}
+/**
+ * Detects the frame where feet land (return to ground).
+ *
+ * This corresponds to the "feet_land" keyframe.
+ * The detection looks for the frame where ankle Y returns to near
+ * the established ground baseline after having left the ground.
+ *
+ * @param frames - Array of frames with pose data
+ * @param groundBaseline - Ground baseline ankle Y from establishGroundBaseline()
+ * @param feetLeaveGroundFrame - Frame where feet left ground (or null if no jump)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index where feet land, or null if no landing detected
+ */
+export function detectFeetLand(frames, groundBaseline, feetLeaveGroundFrame, endFrame, config = DEFAULT_CONFIG) {
+    // If no jump was detected, there's no landing
+    if (feetLeaveGroundFrame === null) {
+        return null;
+    }
+    // Look for frame where ankle Y returns to baseline (or close to it)
+    // Search from after feet_leave_ground
+    let wasInAir = false;
+    for (const frame of frames) {
+        const frameIdx = frame.frameIndex;
+        if (frameIdx <= feetLeaveGroundFrame || frameIdx > endFrame) {
+            continue;
+        }
+        const ankleY = getFrameAnkleY(frame, config.visibilityThreshold);
+        if (ankleY !== null) {
+            const deviation = groundBaseline - ankleY;
+            // Still in the air
+            if (deviation > config.ankleGroundThreshold) {
+                wasInAir = true;
+            }
+            else if (wasInAir) {
+                // Was in air and now back on ground
+                return frameIdx;
+            }
+        }
+    }
+    // If we were in the air but never detected landing,
+    // the end frame is likely the landing
+    if (wasInAir) {
+        return endFrame;
+    }
+    return null;
+}
+/**
  * KeyframeDetector class for detecting keyframes within basketball shots.
  *
  * Implements keyframe detection for:
@@ -797,6 +977,60 @@ export class KeyframeDetector {
         // Overall confidence based on successful detections
         const successCount = keyframes.filter((k) => k.frameIndex !== null).length;
         const overallConfidence = successCount / keyframes.length;
+        return {
+            keyframes,
+            confidence: overallConfidence,
+        };
+    }
+    /**
+     * Detects Follow-through phase keyframes for a shot.
+     *
+     * Requires previous phases to have been detected first,
+     * as Follow-through detection uses the release frame and ground baseline.
+     *
+     * @param frames - Array of frames with pose data
+     * @param releaseFrame - Frame index of the release
+     * @param startFrame - Shot start frame index (for ground baseline)
+     * @param endFrame - Shot end frame index (inclusive)
+     * @returns Detection result with keyframes and confidence
+     */
+    detectFollowThroughKeyframes(frames, releaseFrame, startFrame, endFrame) {
+        const keyframes = [];
+        // Establish ground baseline from the first few frames
+        const groundBaseline = establishGroundBaseline(frames, startFrame, this.config.groundBaselineFrames, this.config.visibilityThreshold);
+        // Detect arms_fully_extended
+        const armsExtendedFrame = detectArmsFullyExtended(frames, releaseFrame, endFrame, this.config);
+        keyframes.push({
+            keyframeId: "arms_fully_extended",
+            frameIndex: armsExtendedFrame,
+            confidence: armsExtendedFrame !== null ? 0.8 : 0.0,
+        });
+        // Detect feet_leave_ground (only if we have a valid ground baseline)
+        let feetLeaveGroundFrame = null;
+        if (groundBaseline !== null) {
+            feetLeaveGroundFrame = detectFeetLeaveGround(frames, groundBaseline, startFrame, endFrame, this.config);
+        }
+        keyframes.push({
+            keyframeId: "feet_leave_ground",
+            frameIndex: feetLeaveGroundFrame,
+            // Lower confidence for feet detection since it may be null for set shots
+            confidence: feetLeaveGroundFrame !== null ? 0.7 : 0.0,
+        });
+        // Detect feet_land
+        let feetLandFrame = null;
+        if (groundBaseline !== null) {
+            feetLandFrame = detectFeetLand(frames, groundBaseline, feetLeaveGroundFrame, endFrame, this.config);
+        }
+        keyframes.push({
+            keyframeId: "feet_land",
+            frameIndex: feetLandFrame,
+            confidence: feetLandFrame !== null ? 0.7 : 0.0,
+        });
+        // Overall confidence: arms_fully_extended is most important for follow-through
+        // feet keyframes may be null for set shots (non-jump shots)
+        const armsConfidence = armsExtendedFrame !== null ? 1 : 0;
+        const feetConfidence = feetLeaveGroundFrame !== null && feetLandFrame !== null ? 1 : 0.5;
+        const overallConfidence = (armsConfidence * 0.6 + feetConfidence * 0.4);
         return {
             keyframes,
             confidence: overallConfidence,

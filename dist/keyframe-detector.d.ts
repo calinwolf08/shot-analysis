@@ -33,6 +33,12 @@ export interface KeyframeDetectorConfig {
     readonly setPointMaxElbowAngle?: number;
     /** Search window as percentage of remaining shot for release detection. Default: 0.5 */
     readonly releaseSearchWindow?: number;
+    /** Number of frames at shot start to use for establishing ground baseline. Default: 3 */
+    readonly groundBaselineFrames?: number;
+    /** Threshold (normalized units) for ankle Y deviation to detect leaving ground. Default: 0.03 */
+    readonly ankleGroundThreshold?: number;
+    /** Search window as percentage of shot for follow-through detection (from release). Default: 0.5 */
+    readonly followThroughSearchWindow?: number;
 }
 /**
  * Result of detecting a single keyframe.
@@ -198,6 +204,65 @@ export declare function detectSetPoint(frames: readonly Frame[], ballStartsUpwar
  */
 export declare function detectRelease(frames: readonly Frame[], setPointFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 /**
+ * Establishes the ground baseline by averaging ankle Y position from the first few frames.
+ *
+ * The baseline represents the "standing" position at the start of the shot.
+ * This is used to detect when feet leave and return to the ground during a jump shot.
+ *
+ * @param frames - Array of frames with pose data
+ * @param startFrame - Shot start frame index (inclusive)
+ * @param baselineFrameCount - Number of frames to average for baseline
+ * @param visibilityThreshold - Minimum visibility for landmarks to be valid
+ * @returns Average ankle Y from the first N frames, or null if not enough valid frames
+ */
+export declare function establishGroundBaseline(frames: readonly Frame[], startFrame: number, baselineFrameCount: number, visibilityThreshold: number): number | null;
+/**
+ * Detects the frame with maximum arm extension (arms fully extended).
+ *
+ * This corresponds to the "arms_fully_extended" keyframe in the Follow-through phase.
+ * The detection looks for the frame with the highest elbow angle (closest to 180°)
+ * after the release frame.
+ *
+ * @param frames - Array of frames with pose data
+ * @param releaseFrame - Frame index of the release
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index of maximum arm extension, or null if not detectable
+ */
+export declare function detectArmsFullyExtended(frames: readonly Frame[], releaseFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
+/**
+ * Detects the frame where feet leave the ground (jump detected).
+ *
+ * This corresponds to the "feet_leave_ground" keyframe.
+ * The detection looks for the first frame where ankle Y drops below
+ * the established ground baseline by more than the threshold.
+ *
+ * In normalized coordinates, lower Y = higher in frame = feet off ground.
+ *
+ * @param frames - Array of frames with pose data
+ * @param groundBaseline - Ground baseline ankle Y from establishGroundBaseline()
+ * @param startFrame - Shot start frame index (inclusive)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index where feet leave ground, or null if no jump detected
+ */
+export declare function detectFeetLeaveGround(frames: readonly Frame[], groundBaseline: number, startFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
+/**
+ * Detects the frame where feet land (return to ground).
+ *
+ * This corresponds to the "feet_land" keyframe.
+ * The detection looks for the frame where ankle Y returns to near
+ * the established ground baseline after having left the ground.
+ *
+ * @param frames - Array of frames with pose data
+ * @param groundBaseline - Ground baseline ankle Y from establishGroundBaseline()
+ * @param feetLeaveGroundFrame - Frame where feet left ground (or null if no jump)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index where feet land, or null if no landing detected
+ */
+export declare function detectFeetLand(frames: readonly Frame[], groundBaseline: number, feetLeaveGroundFrame: number | null, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
+/**
  * KeyframeDetector class for detecting keyframes within basketball shots.
  *
  * Implements keyframe detection for:
@@ -243,6 +308,19 @@ export declare class KeyframeDetector {
      * @returns Detection result with keyframes and confidence
      */
     detectSetPointReleaseKeyframes(frames: readonly Frame[], ballStartsUpwardFrame: number, endFrame: number): KeyframeDetectionResult;
+    /**
+     * Detects Follow-through phase keyframes for a shot.
+     *
+     * Requires previous phases to have been detected first,
+     * as Follow-through detection uses the release frame and ground baseline.
+     *
+     * @param frames - Array of frames with pose data
+     * @param releaseFrame - Frame index of the release
+     * @param startFrame - Shot start frame index (for ground baseline)
+     * @param endFrame - Shot end frame index (inclusive)
+     * @returns Detection result with keyframes and confidence
+     */
+    detectFollowThroughKeyframes(frames: readonly Frame[], releaseFrame: number, startFrame: number, endFrame: number): KeyframeDetectionResult;
     /**
      * Get the current configuration.
      */
