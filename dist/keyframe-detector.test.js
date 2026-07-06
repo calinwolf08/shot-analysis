@@ -21,7 +21,7 @@ const LOAD_PHASE_CONFIG = {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
-    groundBaselineFrames: 3,
+    groundBaselineSearchWindow: 0.4,
     ankleGroundThreshold: 0.03,
     followThroughSearchWindow: 0.5,
 };
@@ -578,7 +578,7 @@ describe("detectLegsStartExtending", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
-        groundBaselineFrames: 3,
+        groundBaselineSearchWindow: 0.4,
         ankleGroundThreshold: 0.03,
         followThroughSearchWindow: 0.5,
     };
@@ -655,7 +655,7 @@ describe("detectBallStartsUpward", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
-        groundBaselineFrames: 3,
+        groundBaselineSearchWindow: 0.4,
         ankleGroundThreshold: 0.03,
         followThroughSearchWindow: 0.5,
     };
@@ -998,7 +998,7 @@ describe("detectSetPoint", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
-        groundBaselineFrames: 3,
+        groundBaselineSearchWindow: 0.4,
         ankleGroundThreshold: 0.03,
         followThroughSearchWindow: 0.5,
     };
@@ -1066,7 +1066,7 @@ describe("detectRelease", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
-        groundBaselineFrames: 3,
+        groundBaselineSearchWindow: 0.4,
         ankleGroundThreshold: 0.03,
         followThroughSearchWindow: 0.5,
     };
@@ -1331,14 +1331,14 @@ describe("establishGroundBaseline", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
-        groundBaselineFrames: 3,
+        groundBaselineSearchWindow: 0.4,
         ankleGroundThreshold: 0.03,
         followThroughSearchWindow: 0.5,
     };
     it("calculates average ankle Y from first N frames", () => {
         const groundY = 0.85;
         const frames = createFollowThroughSequence(0, 10, 5, null, null, groundY);
-        const baseline = establishGroundBaseline(frames, 0, 3, defaultConfig.visibilityThreshold);
+        const baseline = establishGroundBaseline(frames, 0, 9, defaultConfig.groundBaselineSearchWindow, defaultConfig.visibilityThreshold);
         expect(baseline).not.toBeNull();
         expect(baseline).toBeCloseTo(groundY, 2);
     });
@@ -1348,7 +1348,7 @@ describe("establishGroundBaseline", () => {
             createFrame(1, null),
             createFrame(2, null),
         ];
-        const baseline = establishGroundBaseline(frames, 0, 3, defaultConfig.visibilityThreshold);
+        const baseline = establishGroundBaseline(frames, 0, 2, defaultConfig.groundBaselineSearchWindow, defaultConfig.visibilityThreshold);
         expect(baseline).toBeNull();
     });
     it("handles frames with low visibility ankle landmarks", () => {
@@ -1358,20 +1358,20 @@ describe("establishGroundBaseline", () => {
         landmarks[LANDMARK_INDICES.LEFT_ANKLE] = createLandmark(0.45, 0.85, 0, 0.2);
         landmarks[LANDMARK_INDICES.RIGHT_ANKLE] = createLandmark(0.55, 0.85, 0, 0.2);
         frames[0] = createFrame(0, landmarks);
-        const baseline = establishGroundBaseline(frames, 0, 3, defaultConfig.visibilityThreshold);
+        const baseline = establishGroundBaseline(frames, 0, 9, defaultConfig.groundBaselineSearchWindow, defaultConfig.visibilityThreshold);
         // Should still calculate from frames 1 and 2
         expect(baseline).not.toBeNull();
     });
     it("only uses frames within the specified range", () => {
         const frames = createFollowThroughSequence(0, 20, 10, 5, 15, 0.85, 0.15);
-        // Establish baseline from frames 0-2 (before jump)
-        const baseline = establishGroundBaseline(frames, 0, 3, defaultConfig.visibilityThreshold);
+        // Establish baseline from frames 0-19
+        const baseline = establishGroundBaseline(frames, 0, 19, defaultConfig.groundBaselineSearchWindow, defaultConfig.visibilityThreshold);
         expect(baseline).not.toBeNull();
         expect(baseline).toBeCloseTo(0.85, 2);
     });
     it("works with different start frames", () => {
         const frames = createFollowThroughSequence(10, 15, 5, null, null, 0.82);
-        const baseline = establishGroundBaseline(frames, 10, 3, defaultConfig.visibilityThreshold);
+        const baseline = establishGroundBaseline(frames, 10, 24, defaultConfig.groundBaselineSearchWindow, defaultConfig.visibilityThreshold);
         expect(baseline).not.toBeNull();
         expect(baseline).toBeCloseTo(0.82, 2);
     });
@@ -1389,7 +1389,7 @@ describe("detectArmsFullyExtended", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
-        groundBaselineFrames: 3,
+        groundBaselineSearchWindow: 0.4,
         ankleGroundThreshold: 0.03,
         followThroughSearchWindow: 0.5,
     };
@@ -1456,7 +1456,7 @@ describe("detectFeetLeaveGround", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
-        groundBaselineFrames: 3,
+        groundBaselineSearchWindow: 0.4,
         ankleGroundThreshold: 0.03,
         followThroughSearchWindow: 0.5,
     };
@@ -1531,7 +1531,7 @@ describe("detectFeetLand", () => {
         setPointSearchWindow: 0.7,
         setPointMaxElbowAngle: 160,
         releaseSearchWindow: 0.5,
-        groundBaselineFrames: 3,
+        groundBaselineSearchWindow: 0.4,
         ankleGroundThreshold: 0.03,
         followThroughSearchWindow: 0.5,
     };
@@ -1644,7 +1644,7 @@ describe("KeyframeDetector.detectFollowThroughKeyframes", () => {
     it("establishes ground baseline from first frames", () => {
         // Create frames with varying ground position
         const frames = createFollowThroughSequence(0, 30, 15, 10, 25, 0.82, 0.1);
-        const detector = createKeyframeDetector({ groundBaselineFrames: 5 });
+        const detector = createKeyframeDetector({ groundBaselineSearchWindow: 0.4 });
         const result = detector.detectFollowThroughKeyframes(frames, 5, 0, 29);
         // Should detect feet leaving and landing based on baseline from first 5 frames
         const feetLeave = result.keyframes.find((k) => k.keyframeId === "feet_leave_ground");

@@ -23,7 +23,7 @@ const DEFAULT_CONFIG = {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
-    groundBaselineFrames: 3,
+    groundBaselineSearchWindow: 0.4,
     ankleGroundThreshold: 0.025,
     followThroughSearchWindow: 0.5,
 };
@@ -713,36 +713,66 @@ function getFrameAnkleY(frame, visibilityThreshold) {
     return null;
 }
 /**
- * Establishes the ground baseline by averaging ankle Y position from the first few frames.
+ * Establishes the ground baseline for jump detection by finding the local maximum
+ * ankle Y position (deepest squat) that occurs before the minimum (jump peak).
  *
- * The baseline represents the "standing" position at the start of the shot.
- * This is used to detect when feet leave and return to the ground during a jump shot.
+ * This approach handles cases where:
+ * - The detected shot start is during walking/movement before the actual stance
+ * - The deepest squat (ground position) occurs mid-shot before the jump
+ *
+ * The baseline is the "ground" reference point from which we measure the jump.
  *
  * @param frames - Array of frames with pose data
  * @param startFrame - Shot start frame index (inclusive)
- * @param baselineFrameCount - Number of frames to average for baseline
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param _baselineSearchWindow - DEPRECATED: Not used, kept for API compatibility
  * @param visibilityThreshold - Minimum visibility for landmarks to be valid
- * @returns Average ankle Y from the first N frames, or null if not enough valid frames
+ * @returns Maximum ankle Y (ground level before jump), or null if no valid frames
  */
-export function establishGroundBaseline(frames, startFrame, baselineFrameCount, visibilityThreshold) {
-    const ankleYValues = [];
-    const searchEndFrame = startFrame + baselineFrameCount - 1;
+export function establishGroundBaseline(frames, startFrame, endFrame, _baselineSearchWindow, visibilityThreshold) {
+    // Collect all ankle Y values with frame indices
+    const ankleData = [];
     for (const frame of frames) {
         const frameIdx = frame.frameIndex;
-        if (frameIdx < startFrame || frameIdx > searchEndFrame) {
+        if (frameIdx < startFrame || frameIdx > endFrame) {
             continue;
         }
         const ankleY = getFrameAnkleY(frame, visibilityThreshold);
         if (ankleY !== null) {
-            ankleYValues.push(ankleY);
+            ankleData.push({ frameIndex: frameIdx, ankleY });
         }
     }
-    if (ankleYValues.length === 0) {
+    if (ankleData.length === 0) {
         return null;
     }
-    // Return average ankle Y from baseline frames
-    const sum = ankleYValues.reduce((acc, val) => acc + val, 0);
-    return sum / ankleYValues.length;
+    // Sort by frame index
+    ankleData.sort((a, b) => a.frameIndex - b.frameIndex);
+    // Find the global minimum (jump peak) and its index
+    let minAnkleY = Infinity;
+    let minIdx = 0;
+    for (let i = 0; i < ankleData.length; i++) {
+        if (ankleData[i].ankleY < minAnkleY) {
+            minAnkleY = ankleData[i].ankleY;
+            minIdx = i;
+        }
+    }
+    // Find the maximum ankle Y BEFORE the jump peak (ground position before jump)
+    // Search in the first half of the shot up to the jump peak
+    let maxAnkleY = -Infinity;
+    for (let i = 0; i < minIdx; i++) {
+        if (ankleData[i].ankleY > maxAnkleY) {
+            maxAnkleY = ankleData[i].ankleY;
+        }
+    }
+    // If no frames before minimum, or no valid maximum found, use the maximum from entire shot
+    if (maxAnkleY === -Infinity) {
+        for (const data of ankleData) {
+            if (data.ankleY > maxAnkleY) {
+                maxAnkleY = data.ankleY;
+            }
+        }
+    }
+    return maxAnkleY === -Infinity ? null : maxAnkleY;
 }
 /**
  * Detects the frame with maximum arm extension (arms fully extended).
@@ -996,8 +1026,11 @@ export class KeyframeDetector {
      */
     detectFollowThroughKeyframes(frames, releaseFrame, startFrame, endFrame) {
         const keyframes = [];
-        // Establish ground baseline from the first few frames
-        const groundBaseline = establishGroundBaseline(frames, startFrame, this.config.groundBaselineFrames, this.config.visibilityThreshold);
+        // Establish ground baseline from the area around the release frame
+        // This handles shots where the person walks into position at shot start
+        // Jump typically happens around set_point/release, so baseline should be local
+        const jumpSearchStart = Math.max(startFrame, releaseFrame - 15); // Look up to 15 frames before release
+        const groundBaseline = establishGroundBaseline(frames, jumpSearchStart, endFrame, this.config.groundBaselineSearchWindow, this.config.visibilityThreshold);
         // Detect arms_fully_extended
         const armsExtendedFrame = detectArmsFullyExtended(frames, releaseFrame, endFrame, this.config);
         keyframes.push({
@@ -1006,9 +1039,10 @@ export class KeyframeDetector {
             confidence: armsExtendedFrame !== null ? 0.8 : 0.0,
         });
         // Detect feet_leave_ground (only if we have a valid ground baseline)
+        // Search from the local area around release, not from shot start
         let feetLeaveGroundFrame = null;
         if (groundBaseline !== null) {
-            feetLeaveGroundFrame = detectFeetLeaveGround(frames, groundBaseline, startFrame, endFrame, this.config);
+            feetLeaveGroundFrame = detectFeetLeaveGround(frames, groundBaseline, jumpSearchStart, endFrame, this.config);
         }
         keyframes.push({
             keyframeId: "feet_leave_ground",

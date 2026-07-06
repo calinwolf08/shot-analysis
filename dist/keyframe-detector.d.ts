@@ -33,8 +33,8 @@ export interface KeyframeDetectorConfig {
     readonly setPointMaxElbowAngle?: number;
     /** Search window as percentage of remaining shot for release detection. Default: 0.5 */
     readonly releaseSearchWindow?: number;
-    /** Number of frames at shot start to use for establishing ground baseline. Default: 3 */
-    readonly groundBaselineFrames?: number;
+    /** Search window as percentage of shot duration for ground baseline. Default: 0.4 */
+    readonly groundBaselineSearchWindow?: number;
     /** Threshold (normalized units) for ankle Y deviation to detect leaving ground. Default: 0.03 */
     readonly ankleGroundThreshold?: number;
     /** Search window as percentage of shot for follow-through detection (from release). Default: 0.5 */
@@ -204,18 +204,23 @@ export declare function detectSetPoint(frames: readonly Frame[], ballStartsUpwar
  */
 export declare function detectRelease(frames: readonly Frame[], setPointFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 /**
- * Establishes the ground baseline by averaging ankle Y position from the first few frames.
+ * Establishes the ground baseline for jump detection by finding the local maximum
+ * ankle Y position (deepest squat) that occurs before the minimum (jump peak).
  *
- * The baseline represents the "standing" position at the start of the shot.
- * This is used to detect when feet leave and return to the ground during a jump shot.
+ * This approach handles cases where:
+ * - The detected shot start is during walking/movement before the actual stance
+ * - The deepest squat (ground position) occurs mid-shot before the jump
+ *
+ * The baseline is the "ground" reference point from which we measure the jump.
  *
  * @param frames - Array of frames with pose data
  * @param startFrame - Shot start frame index (inclusive)
- * @param baselineFrameCount - Number of frames to average for baseline
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param _baselineSearchWindow - DEPRECATED: Not used, kept for API compatibility
  * @param visibilityThreshold - Minimum visibility for landmarks to be valid
- * @returns Average ankle Y from the first N frames, or null if not enough valid frames
+ * @returns Maximum ankle Y (ground level before jump), or null if no valid frames
  */
-export declare function establishGroundBaseline(frames: readonly Frame[], startFrame: number, baselineFrameCount: number, visibilityThreshold: number): number | null;
+export declare function establishGroundBaseline(frames: readonly Frame[], startFrame: number, endFrame: number, _baselineSearchWindow: number, visibilityThreshold: number): number | null;
 /**
  * Detects the frame with maximum arm extension (arms fully extended).
  *

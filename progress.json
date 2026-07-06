@@ -3,7 +3,7 @@
 		"name": "all-frame-keypoint-detection",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-07-02T12:00:00.000Z",
-		"updated_at": "2026-07-06T17:21:44.206Z"
+		"updated_at": "2026-07-06T17:47:56.763Z"
 	},
 	"status": "in_progress",
 	"global_constraints": {
@@ -18,7 +18,7 @@
 			"Changing detection logic in keyframe-detector.ts",
 			"Tuning any algorithm configuration values"
 		],
-		"frame_tolerance": "±8 frames from labeled values for all keyframes",
+		"frame_tolerance": "\u00b18 frames from labeled values for all keyframes",
 		"keyframes_to_detect": [
 			"legs_start_bending",
 			"leg_bend_low_point",
@@ -34,7 +34,7 @@
 		"failure_response": "If algorithm cannot match labels within tolerance, document the gap in algorithm-learnings.md and try a different algorithmic approach. NEVER modify labels.",
 		"algorithm_tuning_guidance": {
 			"analysis_approach": [
-				"Read poses.json around labeled keyframe (±10 frames)",
+				"Read poses.json around labeled keyframe (\u00b110 frames)",
 				"Examine ALL available pose landmarks at labeled frame vs surrounding frames",
 				"Identify what makes the labeled frame distinct from surrounding frames"
 			],
@@ -58,7 +58,7 @@
 				"5. If regression in other videos, refine approach to work for all",
 				"6. Document findings in algorithm-learnings.md"
 			],
-			"success_criteria": "Algorithm detects all 10 keyframes within ±8 of labels using consistent logic across all videos"
+			"success_criteria": "Algorithm detects all 10 keyframes within \u00b18 of labels using consistent logic across all videos"
 		}
 	},
 	"features": [
@@ -182,7 +182,7 @@
 						"user_story": "As a developer, I want the test runner to compare all 10 detected keyframes against labeled values so that I can validate the complete keyframe detection algorithm.",
 						"acceptance_criteria": [
 							"Extend compareResults() in detection.ts to compare all 10 keyframes",
-							"Each keyframe compared independently with ±8 frame tolerance",
+							"Each keyframe compared independently with \u00b18 frame tolerance",
 							"Report per-keyframe pass/fail status",
 							"Report frame difference for each keyframe",
 							"Overall shot passes only if ALL labeled keyframes pass",
@@ -196,7 +196,7 @@
 							"Multiple keyframes fail: Report all failures, not just first"
 						],
 						"data_model": "KeyframeComparisonResult: { keyframeId: string, labeled: number | null, detected: number | null, diff: number | null, passed: boolean }. ShotComparisonResult extended with: keyframes: KeyframeComparisonResult[]",
-						"technical_notes": "Build on existing compareResults() logic. The tolerance check is: Math.abs(detected - labeled) <= 8. For console output, show: '✓ set_point: 65 (diff: +2)' or '✗ release: 73 (expected 70, diff: +3, EXCEEDS TOLERANCE)'"
+						"technical_notes": "Build on existing compareResults() logic. The tolerance check is: Math.abs(detected - labeled) <= 8. For console output, show: '\u2713 set_point: 65 (diff: +2)' or '\u2717 release: 73 (expected 70, diff: +3, EXCEEDS TOLERANCE)'"
 					},
 					"subtasks": [
 						{
@@ -394,7 +394,7 @@
 							"Fade-away or off-balance shot: feet positions may be asymmetric",
 							"Multiple hop steps: Detect the jump during shooting motion, not approach"
 						],
-						"data_model": "Arm extension = elbow angle approaching 180°. Ground level = baseline ankle Y established at shot start. Jump detected when ankle Y drops significantly below baseline.",
+						"data_model": "Arm extension = elbow angle approaching 180\u00b0. Ground level = baseline ankle Y established at shot start. Jump detected when ankle Y drops significantly below baseline.",
 						"technical_notes": "The arms_fully_extended frame is typically the follow-through hold position. For ground detection, establish a baseline from the first few frames and detect significant deviation. This may already be similar to existing shot end detection."
 					},
 					"subtasks": [
@@ -439,7 +439,7 @@
 						"user_story": "As a developer, I want to pass all keyframe detection for the first test video so that I have a working baseline for iterative tuning.",
 						"acceptance_criteria": [
 							"Run keyframe detection on chris 5 video (1 shot)",
-							"All 10 keyframes detected within ±8 frames of labels",
+							"All 10 keyframes detected within \u00b18 frames of labels",
 							"NOTE: release keyframe may not be labeled (needs manual addition to labels)",
 							"Document any algorithm adjustments in algorithm-learnings.md",
 							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
@@ -449,7 +449,7 @@
 							"If a keyframe is not in the labeled data: Skip validation for that keyframe"
 						],
 						"data_model": "chris 5 labeled keyframes from video-tagger: legs_start_bending=55, leg_bend_low_point=66, ball_low_point=55, ball_starts_upward=60, legs_start_extending=67, set_point=70, arms_fully_extended=76, feet_leave_ground=74, feet_land=80. Release not labeled.",
-						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris\". First video is chosen as simplest case (1 shot, good pose quality, side-right orientation). Algorithm Tuning Process: (1) Run test, note which keyframes fail. (2) Read poses.json around labeled keyframe (±10 frames). (3) Identify what makes labeled frame distinct. (4) Implement hypothesis, test. (5) Document findings."
+						"technical_notes": "Run: npx tsx src/testing/run-tests.ts --videos \"chris\". First video is chosen as simplest case (1 shot, good pose quality, side-right orientation). Algorithm Tuning Process: (1) Run test, note which keyframes fail. (2) Read poses.json around labeled keyframe (\u00b110 frames). (3) Identify what makes labeled frame distinct. (4) Implement hypothesis, test. (5) Document findings."
 					},
 					"subtasks": [
 						{
@@ -470,7 +470,7 @@
 						},
 						{
 							"id": "3.1.5",
-							"description": "Verify all 10 keyframes pass within ±8 tolerance"
+							"description": "Verify all 10 keyframes pass within \u00b18 tolerance"
 						}
 					],
 					"commit_hash": "595cd5e8a0d6ff5de7953ed1495082079879b0a2"
@@ -478,15 +478,15 @@
 				{
 					"id": "3.2",
 					"name": "Level 2 - Add cole/20201212_134104 (1 shot)",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want to add a second test video without breaking the first so that the algorithm generalizes.",
 						"acceptance_criteria": [
 							"Run keyframe detection on chris 5 AND cole/20201212_134104",
 							"chris 5 still passes all keyframes (no regression)",
-							"cole/20201212_134104 all keyframes detected within ±8 frames",
+							"cole/20201212_134104 all keyframes detected within \u00b18 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
 							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
@@ -518,7 +518,8 @@
 							"id": "3.2.5",
 							"description": "Verify both videos pass all keyframe thresholds"
 						}
-					]
+					],
+					"commit_hash": "387bffded55b69228fb4f2c528ce2ae5c85f00e3"
 				},
 				{
 					"id": "3.3",
@@ -531,7 +532,7 @@
 						"acceptance_criteria": [
 							"Run keyframe detection on all videos 1-3",
 							"Videos 1-2 still pass (no regression)",
-							"chris/20190103_181419 all keyframes for both shots detected within ±8 frames",
+							"chris/20190103_181419 all keyframes for both shots detected within \u00b18 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
 							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
@@ -576,7 +577,7 @@
 						"acceptance_criteria": [
 							"Run keyframe detection on all videos 1-4",
 							"Videos 1-3 still pass (no regression)",
-							"chris/20190103_180930 all keyframes for all 3 shots detected within ±8 frames",
+							"chris/20190103_180930 all keyframes for all 3 shots detected within \u00b18 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
 							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
@@ -621,7 +622,7 @@
 						"acceptance_criteria": [
 							"Run keyframe detection on all videos 1-5",
 							"Videos 1-4 still pass (no regression)",
-							"cody/20190818_142631 all keyframes for all shots detected within ±8 frames",
+							"cody/20190818_142631 all keyframes for all shots detected within \u00b18 frames",
 							"Shot 3 has partial labels (leg_bend_low_point is null) - skip that keyframe validation",
 							"Document any algorithm adjustments in algorithm-learnings.md",
 							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
@@ -671,7 +672,7 @@
 						"acceptance_criteria": [
 							"Run keyframe detection on all 6 videos",
 							"Videos 1-5 still pass (no regression)",
-							"cody/20190804_140617 all keyframes for all 3 shots detected within ±8 frames",
+							"cody/20190804_140617 all keyframes for all 3 shots detected within \u00b18 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
 							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
@@ -715,7 +716,7 @@
 						"acceptance_criteria": [
 							"Run keyframe detection on all 7 videos",
 							"Videos 1-6 still pass (no regression)",
-							"jax/20181219_173607 all keyframes for all 4 shots detected within ±8 frames",
+							"jax/20181219_173607 all keyframes for all 4 shots detected within \u00b18 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
 							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
@@ -760,7 +761,7 @@
 						"acceptance_criteria": [
 							"Run keyframe detection on all 8 videos",
 							"Videos 1-7 still pass (no regression)",
-							"edmond/20190804_140654 all keyframes for all 7 shots detected within ±8 frames",
+							"edmond/20190804_140654 all keyframes for all 7 shots detected within \u00b18 frames",
 							"Document any algorithm adjustments in algorithm-learnings.md",
 							"CRITICAL: NO modifications to labels - only algorithm changes allowed"
 						],
@@ -805,7 +806,7 @@
 						"user_story": "As a developer, I want the final algorithm documented after all videos pass so that the working configuration is preserved.",
 						"acceptance_criteria": [
 							"All 8 videos (24 shots) pass in single test run",
-							"All 10 keyframes detected within ±8 frames for all labeled keyframes",
+							"All 10 keyframes detected within \u00b18 frames for all labeled keyframes",
 							"algorithm-learnings.md has complete 'Keyframe Detection Summary' section",
 							"Configuration parameters documented (thresholds, windows, etc.)",
 							"Document per-keyframe detection accuracy statistics"

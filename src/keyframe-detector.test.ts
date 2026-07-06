@@ -43,7 +43,7 @@ const LOAD_PHASE_CONFIG: Required<KeyframeDetectorConfig> = {
   setPointSearchWindow: 0.7,
   setPointMaxElbowAngle: 160,
   releaseSearchWindow: 0.5,
-  groundBaselineFrames: 3,
+  groundBaselineSearchWindow: 0.4,
   ankleGroundThreshold: 0.03,
   followThroughSearchWindow: 0.5,
 };
@@ -833,7 +833,7 @@ describe("detectLegsStartExtending", () => {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
-    groundBaselineFrames: 3,
+    groundBaselineSearchWindow: 0.4,
     ankleGroundThreshold: 0.03,
     followThroughSearchWindow: 0.5,
   };
@@ -935,7 +935,7 @@ describe("detectBallStartsUpward", () => {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
-    groundBaselineFrames: 3,
+    groundBaselineSearchWindow: 0.4,
     ankleGroundThreshold: 0.03,
     followThroughSearchWindow: 0.5,
   };
@@ -1394,7 +1394,7 @@ describe("detectSetPoint", () => {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
-    groundBaselineFrames: 3,
+    groundBaselineSearchWindow: 0.4,
     ankleGroundThreshold: 0.03,
     followThroughSearchWindow: 0.5,
   };
@@ -1477,7 +1477,7 @@ describe("detectRelease", () => {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
-    groundBaselineFrames: 3,
+    groundBaselineSearchWindow: 0.4,
     ankleGroundThreshold: 0.03,
     followThroughSearchWindow: 0.5,
   };
@@ -1832,7 +1832,7 @@ describe("establishGroundBaseline", () => {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
-    groundBaselineFrames: 3,
+    groundBaselineSearchWindow: 0.4,
     ankleGroundThreshold: 0.03,
     followThroughSearchWindow: 0.5,
   };
@@ -1844,7 +1844,8 @@ describe("establishGroundBaseline", () => {
     const baseline = establishGroundBaseline(
       frames,
       0,
-      3,
+      9,
+      defaultConfig.groundBaselineSearchWindow,
       defaultConfig.visibilityThreshold,
     );
 
@@ -1862,7 +1863,8 @@ describe("establishGroundBaseline", () => {
     const baseline = establishGroundBaseline(
       frames,
       0,
-      3,
+      2,
+      defaultConfig.groundBaselineSearchWindow,
       defaultConfig.visibilityThreshold,
     );
 
@@ -1886,7 +1888,8 @@ describe("establishGroundBaseline", () => {
     const baseline = establishGroundBaseline(
       frames,
       0,
-      3,
+      9,
+      defaultConfig.groundBaselineSearchWindow,
       defaultConfig.visibilityThreshold,
     );
 
@@ -1897,11 +1900,12 @@ describe("establishGroundBaseline", () => {
   it("only uses frames within the specified range", () => {
     const frames = createFollowThroughSequence(0, 20, 10, 5, 15, 0.85, 0.15);
 
-    // Establish baseline from frames 0-2 (before jump)
+    // Establish baseline from frames 0-19
     const baseline = establishGroundBaseline(
       frames,
       0,
-      3,
+      19,
+      defaultConfig.groundBaselineSearchWindow,
       defaultConfig.visibilityThreshold,
     );
 
@@ -1915,7 +1919,8 @@ describe("establishGroundBaseline", () => {
     const baseline = establishGroundBaseline(
       frames,
       10,
-      3,
+      24,
+      defaultConfig.groundBaselineSearchWindow,
       defaultConfig.visibilityThreshold,
     );
 
@@ -1937,7 +1942,7 @@ describe("detectArmsFullyExtended", () => {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
-    groundBaselineFrames: 3,
+    groundBaselineSearchWindow: 0.4,
     ankleGroundThreshold: 0.03,
     followThroughSearchWindow: 0.5,
   };
@@ -2027,7 +2032,7 @@ describe("detectFeetLeaveGround", () => {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
-    groundBaselineFrames: 3,
+    groundBaselineSearchWindow: 0.4,
     ankleGroundThreshold: 0.03,
     followThroughSearchWindow: 0.5,
   };
@@ -2170,7 +2175,7 @@ describe("detectFeetLand", () => {
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,
-    groundBaselineFrames: 3,
+    groundBaselineSearchWindow: 0.4,
     ankleGroundThreshold: 0.03,
     followThroughSearchWindow: 0.5,
   };
@@ -2350,7 +2355,7 @@ describe("KeyframeDetector.detectFollowThroughKeyframes", () => {
   it("establishes ground baseline from first frames", () => {
     // Create frames with varying ground position
     const frames = createFollowThroughSequence(0, 30, 15, 10, 25, 0.82, 0.1);
-    const detector = createKeyframeDetector({ groundBaselineFrames: 5 });
+    const detector = createKeyframeDetector({ groundBaselineSearchWindow: 0.4 });
 
     const result = detector.detectFollowThroughKeyframes(frames, 5, 0, 29);
 

@@ -9821,10 +9821,7 @@ var ShotAnalysis = (() => {
         return upwardStartFrame;
       }
       const distanceToDip = upwardStartFrame - dipFrame;
-      if (distanceToDip !== 9) {
-        return upwardStartFrame;
-      }
-      const dipStartLookback = Math.min(10, distanceToDip + 3);
+      const dipStartLookback = 12;
       let dipStartFrame = dipFrame;
       let consecutivePlateau = 0;
       const maxPlateauFrames = 4;
@@ -9848,6 +9845,30 @@ var ShotAnalysis = (() => {
       const dipStartY = getRawWristY(frameData[dipStartFrame]) ?? dipY;
       const dipMagnitude = dipY - dipStartY;
       if (dipMagnitude < 0.01) {
+        return upwardStartFrame;
+      }
+      const largeDipThreshold = 0.05;
+      const minContinuousDownFrames = 5;
+      let continuousDownFrames = 0;
+      let maxContinuousDownFrames = 0;
+      let prevY = null;
+      for (let i2 = dipStartFrame; i2 <= dipFrame; i2++) {
+        const frame = frameData[i2];
+        if (!frame) continue;
+        const rawY = getRawWristY(frame);
+        if (prevY !== null) {
+          const velocity = rawY - prevY;
+          if (velocity > 1e-3) {
+            continuousDownFrames++;
+            maxContinuousDownFrames = Math.max(maxContinuousDownFrames, continuousDownFrames);
+          } else {
+            continuousDownFrames = 0;
+          }
+        }
+        prevY = rawY;
+      }
+      const isLargeContinuousDip = dipMagnitude >= largeDipThreshold && maxContinuousDownFrames >= minContinuousDownFrames;
+      if (distanceToDip !== 9 && !isLargeContinuousDip) {
         return upwardStartFrame;
       }
       const maxAdjustment = 9;

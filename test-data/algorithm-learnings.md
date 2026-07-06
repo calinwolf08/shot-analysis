@@ -604,3 +604,78 @@ Both videos pass all 10 keyframe thresholds within ±8 frames tolerance.
 - arms_fully_extended: detected 102, labeled 99, diff: +3
 - feet_leave_ground: detected 99, labeled 97, diff: +2
 - feet_land: detected 104, labeled 107, diff: -3
+
+---
+
+## Iterative Testing - Level 3 (Multi-Shot Video)
+
+**2026-07-06 - Video 20190103_181419 Testing (Level 3)**
+
+45. **Multi-Shot Video Handling**: Video 20190103_181419 is the first video with multiple shots (2 shots). This tests that:
+    - Shot boundary detection correctly finds and separates multiple shots
+    - Keyframe detection resets between shots
+    - Each shot is evaluated independently
+
+46. **Ground Baseline Localization for Feet Detection**: Shot 2 revealed an issue with feet keyframe detection when the person walks into position:
+    - Detected shot start: frame 117 (person still approaching shooting position)
+    - Labeled shot start: frame 121
+    - Global ankle Y minimum: 0.6667 at frame 117 (person walking, ankles high)
+    - Local squat position (ground): ~0.7648 at frame 131 (deepest squat before jump)
+    - Actual jump peak: ~0.7161 at frame 139
+
+    The original algorithm used the first few frames of the shot to establish ground baseline. For shot 2, this meant frames 117-119 where the person was still walking, resulting in an artificially low baseline. Any frame after that appeared "in the air" compared to the walking position.
+
+47. **Local Baseline Strategy**: Fixed feet detection by establishing ground baseline from the area around the release frame, not from shot start:
+    - Jump typically happens around set_point/release (frames 130-145 for shot 2)
+    - New search starts from `max(startFrame, releaseFrame - 15)` to capture the squat before jump
+    - Uses maximum ankle Y (lowest position = deepest squat) as baseline
+    - For shot 2: baseline from frames 125-142, capturing the squat at frame 131
+
+48. **Shot 2 Feet Detection After Fix**:
+    - Ground baseline: ~0.7648 (from frame 131 area)
+    - feet_leave_ground: detected 135, labeled 134, diff: +1 ✓
+    - feet_land: detected 142, labeled 143, diff: -1 ✓
+    - Jump magnitude: ~0.049 (above 0.025 threshold)
+
+### Configuration Changes for Level 3
+
+| Parameter | Old Value | New Value | Reason | Videos Affected |
+|-----------|-----------|-----------|--------|-----------------|
+| groundBaselineSearchWindow | First 3 frames | Area around release (releaseFrame - 15 to endFrame) | Handle walking approach at shot start | 20190103_181419 shot 2 |
+| Ground baseline strategy | Average of first N frames | Maximum ankle Y (deepest squat) in search window | Find actual ground position before jump | 20190103_181419 shot 2 |
+
+### Test Results Summary (Level 3)
+
+| Video | Status | Shots | Notes |
+|-------|--------|-------|-------|
+| chris-5 | PASS | 1 | No regression from Level 2 |
+| 20201212_134104 | PASS | 1 | No regression from Level 2 |
+| 20190103_181419 | PASS | 2 | First multi-shot video; both shots pass all keyframes |
+
+### Keyframe Results (Level 3)
+
+All 3 videos pass all 10 keyframe thresholds within ±8 frames tolerance.
+
+**20190103_181419 Shot 1 keyframes:**
+- legs_start_bending: detected 16, labeled 11, diff: +5
+- leg_bend_low_point: detected 20, labeled 20, diff: 0 (perfect)
+- ball_low_point: detected 16, labeled 10, diff: +6
+- legs_start_extending: detected 21, labeled 21, diff: 0 (perfect)
+- ball_starts_upward: detected 19, labeled 16, diff: +3
+- set_point: detected 28, labeled 23, diff: +5
+- release: detected 29, labeled 27, diff: +2
+- arms_fully_extended: detected 31, labeled 28, diff: +3
+- feet_leave_ground: detected 25, labeled 26, diff: -1
+- feet_land: detected 34, labeled 35, diff: -1
+
+**20190103_181419 Shot 2 keyframes:**
+- legs_start_bending: detected 117, labeled 121, diff: -4
+- leg_bend_low_point: detected 127, labeled 127, diff: 0 (perfect)
+- ball_low_point: detected 124, labeled 118, diff: +6
+- legs_start_extending: detected 128, labeled 129, diff: -1
+- ball_starts_upward: detected 127, labeled 123, diff: +4
+- set_point: detected 137, labeled 131, diff: +6
+- release: detected 140, labeled 136, diff: +4
+- arms_fully_extended: detected 140, labeled 136, diff: +4
+- feet_leave_ground: detected 135, labeled 134, diff: +1
+- feet_land: detected 142, labeled 143, diff: -1
