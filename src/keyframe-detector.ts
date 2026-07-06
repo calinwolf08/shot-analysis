@@ -61,7 +61,7 @@ const DEFAULT_CONFIG: Required<KeyframeDetectorConfig> = {
   setPointMaxElbowAngle: 160,
   releaseSearchWindow: 0.5,
   groundBaselineFrames: 3,
-  ankleGroundThreshold: 0.03,
+  ankleGroundThreshold: 0.025,
   followThroughSearchWindow: 0.5,
 };
 

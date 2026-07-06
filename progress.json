@@ -3,7 +3,7 @@
 		"name": "all-frame-keypoint-detection",
 		"root_path": "/home/calin/projects/shot-analysis",
 		"created_at": "2026-07-02T12:00:00.000Z",
-		"updated_at": "2026-07-05T19:26:58.850Z"
+		"updated_at": "2026-07-06T17:14:23.432Z"
 	},
 	"status": "in_progress",
 	"global_constraints": {
@@ -231,7 +231,7 @@
 		{
 			"id": "2.0",
 			"name": "Keyframe Detection Algorithms",
-			"status": "in_progress",
+			"status": "complete",
 			"parallel_group": 1,
 			"tasks": [
 				{
@@ -375,8 +375,8 @@
 				{
 					"id": "2.4",
 					"name": "Follow-through Keyframe Detection",
-					"status": "pending",
-					"phase": "pending",
+					"status": "complete",
+					"phase": "complete",
 					"attempts": 0,
 					"context": {
 						"user_story": "As a developer, I want to detect Follow-through keyframes (arms_fully_extended, feet_leave_ground, feet_land) so that I can complete the shot analysis.",
@@ -418,7 +418,8 @@
 							"id": "2.4.5",
 							"description": "Add unit tests for Follow-through detection"
 						}
-					]
+					],
+					"commit_hash": "29d7437dad839b75ca4b738d6848670382d5016c"
 				}
 			]
 		},

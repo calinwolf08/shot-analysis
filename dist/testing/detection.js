@@ -12,6 +12,7 @@
  */
 import { LANDMARK_INDEX } from "../pose/types";
 import { createShotBoundaryDetector } from "../detection/shot-detector";
+import { createKeyframeDetector } from "../keyframe-detector";
 import { KEYFRAME_IDS } from "./types";
 /**
  * Converts a TestLandmark (from test data) to a Landmark (for shot detector).
@@ -498,6 +499,86 @@ export function runDetection(poseData) {
     return { shots, orientation };
 }
 // ============================================================================
+// Keyframe Detection for Test Comparison
+// ============================================================================
+/**
+ * Runs keyframe detection on a single shot and returns a Map of keyframe IDs to frame numbers.
+ *
+ * @param poseData - Full pose data for the video
+ * @param startFrame - Shot start frame index (inclusive)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @returns Map of keyframe IDs to detected frame numbers (or null if not detected)
+ */
+export function detectKeyframesForShot(poseData, startFrame, endFrame) {
+    const keyframeDetector = createKeyframeDetector();
+    const frames = poseData.frames;
+    const detectedKeyframes = new Map();
+    // Phase 1: Load phase keyframes
+    const loadResult = keyframeDetector.detectLoadPhaseKeyframes(frames, startFrame, endFrame);
+    // Extract leg_bend_low_point and ball_low_point from Load phase
+    let legBendLowPointFrame = null;
+    let ballLowPointFrame = null;
+    for (const kf of loadResult.keyframes) {
+        detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+        if (kf.keyframeId === "leg_bend_low_point") {
+            legBendLowPointFrame = kf.frameIndex;
+        }
+        if (kf.keyframeId === "ball_low_point") {
+            ballLowPointFrame = kf.frameIndex;
+        }
+    }
+    // Phase 2: Rise phase keyframes (depends on Load phase)
+    let ballStartsUpwardFrame = null;
+    if (legBendLowPointFrame !== null && ballLowPointFrame !== null) {
+        const riseResult = keyframeDetector.detectRisePhaseKeyframes(frames, legBendLowPointFrame, ballLowPointFrame, endFrame);
+        for (const kf of riseResult.keyframes) {
+            detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+            if (kf.keyframeId === "ball_starts_upward") {
+                ballStartsUpwardFrame = kf.frameIndex;
+            }
+        }
+    }
+    else {
+        // Cannot detect Rise phase without Load phase
+        detectedKeyframes.set("legs_start_extending", null);
+        detectedKeyframes.set("ball_starts_upward", null);
+    }
+    // Phase 3: Set Point and Release (depends on Rise phase)
+    let releaseFrame = null;
+    if (ballStartsUpwardFrame !== null) {
+        const setPointReleaseResult = keyframeDetector.detectSetPointReleaseKeyframes(frames, ballStartsUpwardFrame, endFrame);
+        for (const kf of setPointReleaseResult.keyframes) {
+            detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+            if (kf.keyframeId === "release") {
+                releaseFrame = kf.frameIndex;
+            }
+        }
+    }
+    else {
+        // Cannot detect Set Point/Release without Rise phase
+        detectedKeyframes.set("set_point", null);
+        detectedKeyframes.set("release", null);
+    }
+    // Phase 4: Follow-through (depends on Release)
+    if (releaseFrame !== null) {
+        const followThroughResult = keyframeDetector.detectFollowThroughKeyframes(frames, releaseFrame, startFrame, endFrame);
+        for (const kf of followThroughResult.keyframes) {
+            detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+        }
+    }
+    else {
+        // Cannot detect Follow-through without Release
+        detectedKeyframes.set("arms_fully_extended", null);
+        detectedKeyframes.set("feet_leave_ground", null);
+        detectedKeyframes.set("feet_land", null);
+    }
+    // Also add the "legs_start_bending" keyframe - this is the shot start
+    // The labels seem to use this to indicate when the shooting motion begins
+    // For now, we'll set it to the start frame since it's the beginning of the load phase
+    detectedKeyframes.set("legs_start_bending", startFrame);
+    return detectedKeyframes;
+}
+// ============================================================================
 // Tolerance Logic
 // ============================================================================
 /**
@@ -652,9 +733,9 @@ export function compareResults(detection, labelData, poseData) {
         const labeled = labelData.shots[i];
         // Detect orientation for this specific shot
         const detectedOrientation = detectOrientationForShot(poseData, detected.startFrame, detected.endFrame);
-        // Compare keyframes for this shot
-        // Note: Currently no detected keyframes - this will be populated when keyframe detection is implemented
-        const keyframeComparisons = compareKeyframes(labeled);
+        // Detect and compare keyframes for this shot
+        const detectedKeyframes = detectKeyframesForShot(poseData, detected.startFrame, detected.endFrame);
+        const keyframeComparisons = compareKeyframes(labeled, detectedKeyframes);
         const comparison = {
             shotNumber: labeled.shotNumber,
             startFrame: compareFrame(detected.startFrame, labeled.startFrame, useExpandedTolerance),

@@ -146,6 +146,15 @@ export declare function detectOrientationForShot(poseData: PoseData, startFrame:
  */
 export declare function runDetection(poseData: PoseData): DetectionResult;
 /**
+ * Runs keyframe detection on a single shot and returns a Map of keyframe IDs to frame numbers.
+ *
+ * @param poseData - Full pose data for the video
+ * @param startFrame - Shot start frame index (inclusive)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @returns Map of keyframe IDs to detected frame numbers (or null if not detected)
+ */
+export declare function detectKeyframesForShot(poseData: PoseData, startFrame: number, endFrame: number): Map<KeyframeId, number | null>;
+/**
  * Compares all keyframes for a labeled shot.
  *
  * Edge cases handled:

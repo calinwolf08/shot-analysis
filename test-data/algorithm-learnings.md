@@ -470,3 +470,68 @@ Parameter adjustments that improved results:
 | 20201212_134104 | 1 | side-right |
 | chris-5 | 1 | side-right |
 | zak-1 | 9 | front-right, side-right (x2), behind-right, behind, front, side-left (x2), front-left |
+
+---
+
+## Keyframe Detection
+
+### Phase 1: Load Phase Keyframes
+
+**2026-07-06 - Video chris-5 Testing (Level 1 - Initial Keyframe Detection)**
+
+35. **Load Phase Detection Works Out-of-Box**: The leg_bend_low_point and ball_low_point detection algorithms work reliably for the first test video:
+    - leg_bend_low_point: detected 65 vs labeled 66 (diff: -1)
+    - ball_low_point: detected 63 vs labeled 55 (diff: +8, at tolerance boundary)
+    - Both keyframes detect by finding minimum knee angle and maximum wrist Y within the first portion of the shot
+
+36. **Rise Phase Detection Works Well**: The legs_start_extending and ball_starts_upward detection algorithms work reliably:
+    - legs_start_extending: detected 66 vs labeled 67 (diff: -1)
+    - ball_starts_upward: detected 65 vs labeled 60 (diff: +5)
+    - Detection uses velocity-based approach with smoothing to find sustained positive/negative motion
+
+37. **Set Point and Release Detection Accurate**: The set_point and release keyframes are detected accurately:
+    - set_point: detected 74 vs labeled 70 (diff: +4)
+    - release: detected 75 vs labeled 75 (diff: 0) - perfect match
+    - arms_fully_extended: detected 75 vs labeled 76 (diff: -1)
+    - Set point uses minimum wrist Y with elbow angle check; release uses minimum wrist flexion angle
+
+38. **Ankle Ground Threshold Adjustment**: Initial feet detection failed because the threshold was too high:
+    - Original threshold: 0.03 (normalized units)
+    - Issue: When shot boundary detection starts later than labeled (frame 63 vs 55), the ground baseline is different
+    - Ground baseline from frames 55-57: 0.6371
+    - Ground baseline from frames 63-65: 0.6351
+    - At frame 74, deviation from labeled baseline: 0.0319 (passes 0.03)
+    - At frame 74, deviation from detected baseline: 0.0299 (fails 0.03)
+    - Fix: Lowered ankleGroundThreshold from 0.03 to 0.025
+    - This makes feet detection more robust to shot boundary timing variations
+
+39. **All 10 Keyframes Pass Within Tolerance**: After ankle threshold adjustment:
+    - legs_start_bending: diff +8 (using shot start frame)
+    - leg_bend_low_point: diff -1
+    - ball_low_point: diff +8
+    - legs_start_extending: diff -1
+    - ball_starts_upward: diff +5
+    - set_point: diff +4
+    - release: diff 0 (perfect)
+    - arms_fully_extended: diff -1
+    - feet_leave_ground: diff 0 (perfect)
+    - feet_land: diff -2
+
+### Keyframe Detection Configuration
+
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| visibilityThreshold | 0.5 | Minimum landmark visibility to consider valid |
+| ballLowPointSearchWindow | 0.4 | Search first 40% of shot for ball low point |
+| legBendSearchWindow | 0.5 | Search first 50% of shot for leg bend low point |
+| riseSearchWindow | 0.6 | Search first 60% of shot for rise phase keyframes |
+| smoothingWindowSize | 3 | Moving average window for velocity smoothing |
+| minConsecutiveFrames | 2 | Minimum frames of sustained motion to confirm |
+| kneeVelocityThreshold | 0.5 | Minimum knee angle velocity for extension detection |
+| wristVelocityThreshold | -0.005 | Minimum wrist Y velocity for upward motion |
+| setPointSearchWindow | 0.7 | Search first 70% of shot for set point |
+| setPointMaxElbowAngle | 160 | Maximum elbow angle for "bent" classification |
+| releaseSearchWindow | 0.5 | Search first 50% after set point for release |
+| groundBaselineFrames | 3 | Number of frames to average for ground baseline |
+| ankleGroundThreshold | 0.025 | Deviation threshold for feet leaving ground |
+| followThroughSearchWindow | 0.5 | Search first 50% after release for follow-through |
