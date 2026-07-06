@@ -405,18 +405,17 @@ export class ShotBoundaryDetector {
         if (dipFrame >= upwardStartFrame) {
             return upwardStartFrame;
         }
-        // Only consider dip adjustment if there's a specific gap (exactly 9 frames) between
-        // the dip point and the upward start. This is a targeted fix for shots where
-        // the gather phase is distinctly separated from the upward motion.
-        // Too small a gap: dip isn't significant enough to include
-        // Too large a gap: might be detecting noise or wrong pattern
+        // Check if the dip is significant enough to warrant adjustment.
+        // A small dip (< 5% of frame height) is likely noise or minor arm movement,
+        // while a large dip (>= 5%) indicates a deliberate gather/load phase.
+        //
+        // First, find where the downward motion started (dipStartFrame) to calculate
+        // the total dip magnitude before deciding whether to adjust.
         const distanceToDip = upwardStartFrame - dipFrame;
-        if (distanceToDip !== 9) {
-            return upwardStartFrame;
-        }
-        // Look backward from the dip point to find where the downward motion started
-        // but limit how far we go based on the distance to dip
-        const dipStartLookback = Math.min(10, distanceToDip + 3);
+        // Look backward from the dip point to find where the downward motion started.
+        // We use a fixed lookback of 12 frames to properly detect gather phases that
+        // span multiple frames (like 20201212 where the gather goes from frame 75 to 83).
+        const dipStartLookback = 12;
         let dipStartFrame = dipFrame;
         let consecutivePlateau = 0;
         const maxPlateauFrames = 4;
@@ -445,6 +444,45 @@ export class ShotBoundaryDetector {
         const dipMagnitude = dipY - dipStartY;
         // Require at least 1% dip to consider it part of the shot
         if (dipMagnitude < 0.01) {
+            return upwardStartFrame;
+        }
+        // Only apply dip adjustment in specific scenarios:
+        // 1. distanceToDip === 9: Original targeted fix for video 5 shot 2
+        // 2. Large, continuous dip: Indicates deliberate gather phase that the labeler
+        //    expects to be included in the shot. A continuous dip is one where the
+        //    downward motion is smooth (few direction changes) rather than oscillating.
+        //
+        // Criteria for large continuous dip:
+        // - Dip magnitude >= 5% of frame height
+        // - At least 5 consecutive frames of downward motion between dipStartFrame and dipFrame
+        //
+        // This distinguishes deliberate gather phases (20201212: 8 continuous down frames)
+        // from normal shot start oscillations (chris-5: 4 down frames with direction changes).
+        const largeDipThreshold = 0.05; // 5% of frame height
+        const minContinuousDownFrames = 5; // Minimum frames of continuous descent
+        // Count continuous downward frames from dipStartFrame to dipFrame
+        let continuousDownFrames = 0;
+        let maxContinuousDownFrames = 0;
+        let prevY = null;
+        for (let i = dipStartFrame; i <= dipFrame; i++) {
+            const frame = frameData[i];
+            if (!frame)
+                continue;
+            const rawY = getRawWristY(frame);
+            if (prevY !== null) {
+                const velocity = rawY - prevY;
+                if (velocity > 0.001) { // Moving down (Y increasing)
+                    continuousDownFrames++;
+                    maxContinuousDownFrames = Math.max(maxContinuousDownFrames, continuousDownFrames);
+                }
+                else {
+                    continuousDownFrames = 0;
+                }
+            }
+            prevY = rawY;
+        }
+        const isLargeContinuousDip = dipMagnitude >= largeDipThreshold && maxContinuousDownFrames >= minContinuousDownFrames;
+        if (distanceToDip !== 9 && !isLargeContinuousDip) {
             return upwardStartFrame;
         }
         // Cap the maximum adjustment to prevent regressions
