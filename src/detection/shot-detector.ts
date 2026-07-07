@@ -224,17 +224,20 @@ export class ShotBoundaryDetector {
    * Removes false positives that have body orientations inconsistent with shooting position.
    *
    * Filter criteria:
-   * 1. Large shoulder separation (>0.12) with positive shoulderDiffX (back view) indicates
-   *    the camera is behind the shooter but body is facing away - unlikely shooting position
+   * 1. Moderate shoulder separation (0.12-0.20) with positive shoulderDiffX (appearing as back view)
+   *    indicates potential false positive. True behind views have larger shoulderSep (>0.20).
+   *    The filtering also considers Z-asymmetry: high Z-asymmetry (>0.35) = side view with rotation.
+   *
    * 2. Extreme positive Z-depth (>0.55) indicates the left shoulder is much farther from
-   *    camera than right - extreme side angle rarely seen in actual shots
+   *    camera than right - extreme side angle rarely seen in actual shots.
    */
   private filterByOrientation(
     shots: DetectedShot[],
     sequence: readonly PoseLandmarks[],
     _originalFrameIndices?: readonly number[],
   ): DetectedShot[] {
-    const MAX_SHOULDER_SEP_FOR_BACK_VIEW = 0.12;
+    const MAX_SHOULDER_SEP_FOR_BACK_VIEW_FILTER = 0.18; // Below this, filter if positive shoulderDiffX
+    const MIN_SHOULDER_SEP_FOR_FILTER = 0.12; // Below this, not a back view concern
     const MAX_POSITIVE_Z_DEPTH = 0.55;
 
     return shots.filter((shot) => {
@@ -264,10 +267,16 @@ export class ShotBoundaryDetector {
       const avgShoulderZ = totalShoulderZ / validSamples;
       const shoulderSep = Math.abs(avgShoulderDiffX);
 
-      // Filter 1: Large shoulder separation with positive shoulderDiffX (back view)
-      // This indicates the shooter is facing away from camera at an extreme angle
-      if (shoulderSep > MAX_SHOULDER_SEP_FOR_BACK_VIEW && avgShoulderDiffX > 0) {
-        return false; // Reject this shot
+      // Filter 1: Moderate shoulder separation (0.12-0.18) with positive shoulderDiffX
+      // indicates a "back view"-like pose but with moderate separation, which is often
+      // a false positive from side views with body rotation. True behind views typically
+      // have larger shoulderSep (>0.18) because both shoulders are clearly visible from behind.
+      if (
+        avgShoulderDiffX > 0 &&
+        shoulderSep > MIN_SHOULDER_SEP_FOR_FILTER &&
+        shoulderSep < MAX_SHOULDER_SEP_FOR_BACK_VIEW_FILTER
+      ) {
+        return false; // Reject: likely side/rotated view, not true behind
       }
 
       // Filter 2: Extreme positive Z-depth
@@ -543,9 +552,10 @@ export class ShotBoundaryDetector {
         const significantDrop = dropFromPeak >= 0.08;
 
         if (moderateDrop || significantDrop) {
-          // Shot ended - use peak frame + small buffer as the end frame
-          // The labeled end is typically a few frames after the peak
-          const endFrameIndex = Math.min(peakFrame + 3, i);
+          // Shot ended - use peak frame + buffer as the end frame
+          // The buffer captures some follow-through after the peak
+          const endFrameBuffer = 4;
+          const endFrameIndex = Math.min(peakFrame + endFrameBuffer, i);
 
           boundaries.push({
             type: "end",

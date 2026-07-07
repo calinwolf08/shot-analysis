@@ -115,10 +115,12 @@ export declare class ShotBoundaryDetector {
      * Removes false positives that have body orientations inconsistent with shooting position.
      *
      * Filter criteria:
-     * 1. Large shoulder separation (>0.12) with positive shoulderDiffX (back view) indicates
-     *    the camera is behind the shooter but body is facing away - unlikely shooting position
+     * 1. Moderate shoulder separation (0.12-0.20) with positive shoulderDiffX (appearing as back view)
+     *    indicates potential false positive. True behind views have larger shoulderSep (>0.20).
+     *    The filtering also considers Z-asymmetry: high Z-asymmetry (>0.35) = side view with rotation.
+     *
      * 2. Extreme positive Z-depth (>0.55) indicates the left shoulder is much farther from
-     *    camera than right - extreme side angle rarely seen in actual shots
+     *    camera than right - extreme side angle rarely seen in actual shots.
      */
     private filterByOrientation;
     /**

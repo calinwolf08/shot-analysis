@@ -1019,3 +1019,148 @@ All 5 videos pass all keyframe thresholds within ±8 frames tolerance.
 ### Lesson Learned
 
 When adding orientation-based filtering to production code, ensure synthetic test data uses realistic body orientations. The `filterByOrientation` method was designed to remove false positives from real video data, but the test data used positions that resembled "back view" rather than the typical "front view" camera angle.
+
+---
+
+## Iterative Testing - Level 7 (Multiple Orientations - Jax)
+
+**2026-07-07 - Video 20181219_173607 Testing (Level 7)**
+
+62. **Low Visibility Wrist Data in "Behind" Orientation**: Shot 3 (behind view) has extremely low wrist visibility during early frames when ball_low_point should be detected:
+    - Expected ball_low_point: frame 561
+    - Frame 561: wristY=0.629, visibility=0.02 (below 0.3 threshold)
+    - First frame with visibility > 0.3: frame 571 (wristY=0.416)
+    - With normal visibility threshold, algorithm detected frame 571 (diff: +10, exceeds tolerance)
+
+    The issue is that in "behind" views, the shooter's back faces the camera, so wrists/hands are occluded by the body during the early load phase. As the arms come up for the shot, visibility improves, but by then the ball is no longer at its low point.
+
+63. **Adaptive Visibility Threshold for Ball Keyframes**: Added fallback logic to detectBallLowPoint and detectBallStartsUpward:
+    - First pass: Use normal visibility threshold (0.3)
+    - If detected frame is in latter half of search window (suggesting missed early frames), retry with very low threshold (0.01)
+    - Use the earlier result if found with low visibility
+
+    This allows detecting ball keyframes in "behind" views where early frames have low visibility but valid Y positions.
+
+64. **Very Subtle Jumps in Front-Right and Side-Left Orientations**: Shots 1 and 2 had feet_leave_ground and feet_land not detected:
+    - Shot 1 (front-right): ankle Y deviation = 0.014 (just below 0.015 threshold)
+    - Shot 2 (side-left): ankle Y deviation = 0.015 (right at threshold edge)
+
+    These are very small jumps where the shooter barely leaves the ground. The current threshold was set at 0.015 based on previous videos, but Jax's shooting form involves smaller vertical movement.
+
+    Fix: Lowered ankleGroundThreshold from 0.015 to 0.01 to detect these subtle jumps.
+
+65. **Noisy Ankle Data in "Behind" Views**: Shot 3 (behind) had incorrect feet_leave_ground detection (frame 568 vs expected 582):
+    - The lowered ankle threshold (0.01) combined with noisy ankle tracking in behind views caused early false detection
+    - Ankle Y fluctuates significantly (1.006-1.048) due to partial occlusion
+    - The algorithm's ground baseline search (releaseFrame - 15) picked up an early fluctuation as the "squat"
+
+    Fix: Narrowed the jump search window from (releaseFrame - 15) to (releaseFrame - 10):
+    - For shot 3: release=581, search starts at frame 571 instead of 566
+    - This avoids the noisy early frames (567-570) while still capturing the real squat (frame 580)
+    - The real jump happens very close to release, so a tighter window is appropriate
+
+### Configuration Changes for Level 7
+
+| Parameter | Old Value | New Value | Reason | Videos Affected |
+|-----------|-----------|-----------|--------|-----------------|
+| ankleGroundThreshold | 0.015 | 0.01 | Detect very subtle jumps in front-right/side-left views | 20181219_173607 shots 1, 2 |
+| ballLowPoint fallback visibility | N/A | 0.01 | Detect ball keyframes with low-visibility early frames in behind views | 20181219_173607 shot 3 |
+| ballStartsUpward fallback visibility | N/A | 0.01 | Detect ball keyframes with low-visibility early frames in behind views | 20181219_173607 shot 3 |
+| jumpSearchStart | releaseFrame - 15 | releaseFrame - 10 | Avoid noisy ankle data in behind views | 20181219_173607 shot 3 |
+
+### Test Results Summary (Level 7)
+
+| Video | Status | Shots | Notes |
+|-------|--------|-------|-------|
+| chris-5 | PASS | 1 | No regression from Level 6 |
+| 20201212_134104 | PASS | 1 | No regression from Level 6 |
+| 20190103_181419 | PASS | 2 | No regression from Level 6 |
+| 20190103_180930 | PASS | 3 | No regression from Level 6 |
+| 20190818_142631 | PASS | 3 | No regression from Level 6 |
+| 20190804_140617 | PASS | 3 | No regression from Level 6 |
+| 20181219_173607 | PASS | 4 | New video; all shots pass after fixes |
+
+### Keyframe Results (Level 7)
+
+All 7 videos pass all keyframe thresholds within ±8 frames tolerance.
+
+**20181219_173607 Shot 1 (front-right) keyframes:**
+- legs_start_bending: detected 32, labeled 28, diff: +4
+- leg_bend_low_point: detected 41, labeled 38, diff: +3
+- ball_low_point: detected 32, labeled 27, diff: +5
+- legs_start_extending: detected 42, labeled 40, diff: +2
+- ball_starts_upward: detected 35, labeled 28, diff: +7
+- set_point: detected 50, labeled 44, diff: +6
+- release: detected 53, labeled 51, diff: +2
+- arms_fully_extended: detected 53, labeled 52, diff: +1
+- feet_leave_ground: detected 51, labeled 49, diff: +2
+- feet_land: detected 53, labeled 55, diff: -2
+
+**20181219_173607 Shot 2 (side-left) keyframes:**
+- legs_start_bending: detected 320, labeled 314, diff: +6
+- leg_bend_low_point: detected 327, labeled 327, diff: 0 (perfect)
+- ball_low_point: detected 320, labeled 312, diff: +8
+- legs_start_extending: detected 328, labeled 331, diff: -3
+- ball_starts_upward: detected 321, labeled 315, diff: +6
+- set_point: detected 339, labeled 337, diff: +2
+- release: detected 342, labeled 343, diff: -1
+- arms_fully_extended: detected 342, labeled 344, diff: -2
+- feet_leave_ground: detected 342, labeled 343, diff: -1
+- feet_land: detected 344, labeled 346, diff: -2
+
+**20181219_173607 Shot 3 (behind) keyframes:**
+- legs_start_bending: detected 561, labeled 561, diff: 0 (perfect)
+- leg_bend_low_point: detected 565, labeled 571, diff: -6
+- ball_low_point: detected 561, labeled 561, diff: 0 (perfect - after fallback visibility fix)
+- legs_start_extending: detected 568, labeled 571, diff: -3
+- ball_starts_upward: detected 562, labeled 562, diff: 0 (perfect - after fallback visibility fix)
+- set_point: detected 580, labeled 576, diff: +4
+- release: detected 581, labeled 585, diff: -4
+- arms_fully_extended: detected 581, labeled 586, diff: -5
+- feet_leave_ground: detected 580, labeled 582, diff: -2
+- feet_land: detected 588, labeled 591, diff: -3
+
+**20181219_173607 Shot 4 (side-right) keyframes:**
+- legs_start_bending: detected 835, labeled 830, diff: +5
+- leg_bend_low_point: detected 849, labeled 844, diff: +5
+- ball_low_point: detected 835, labeled 830, diff: +5
+- legs_start_extending: detected 850, labeled 847, diff: +3
+- ball_starts_upward: detected 836, labeled 833, diff: +3
+- set_point: detected 857, labeled 850, diff: +7
+- release: detected 859, labeled 858, diff: +1
+- arms_fully_extended: detected 862, labeled 859, diff: +3
+- feet_leave_ground: detected 853, labeled 856, diff: -3
+- feet_land: detected 859, labeled 859, diff: 0 (perfect)
+
+### Key Learnings (Level 7)
+
+1. **"Behind" view orientation creates unique challenges**: When the camera is behind the shooter, wrists/hands are occluded during the early load phase, resulting in low visibility scores. The algorithm must handle these cases with adaptive visibility thresholds.
+
+2. **Low visibility doesn't mean bad Y data**: Even with visibility scores of 0.01-0.02, the wrist Y coordinates can still provide useful positional information. A fallback to very low visibility threshold can capture these frames when higher thresholds fail.
+
+3. **Jump detection is highly sensitive to threshold tuning**: Different shooters and orientations produce different ankle movement magnitudes. Jax's shots have subtle jumps (0.01-0.015 deviation) compared to previous test videos.
+
+4. **Narrower search windows reduce noise**: When ankle data is noisy (as in behind views), reducing the search window helps avoid picking up spurious fluctuations as the ground baseline. The jump typically happens close to release, so a 10-frame lookback is often sufficient.
+
+5. **Multiple orientations in one video stress-test the algorithm**: This video covers front-right, side-left, behind, and side-right orientations in 4 shots, testing the algorithm's ability to adapt to different camera angles within the same video.
+
+66. **Low-Visibility Fallback Must Respect User-Configured Thresholds**: During Level 7 Attempt 2, unit tests revealed that the low-visibility fallback (using 0.01 threshold) was overriding user-configured visibility thresholds:
+    - Test setup: All landmarks have visibility 0.6, user sets visibilityThreshold to 0.8
+    - Expected: No detections (0.6 < 0.8)
+    - Actual: Detections found because fallback tried with 0.01 threshold
+
+    Fix: The low-visibility fallback should only apply when:
+    - The configured threshold is at or below the default (0.3)
+    - This respects user intent when they explicitly set a stricter threshold
+
+    Modified `detectBallLowPoint` and `detectBallStartsUpward` to check `config.visibilityThreshold <= 0.3` before applying fallback logic.
+
+67. **Fallback Timing Logic for "Late in Window" Detection**: The fallback logic needs to check if the detected frame is "late" in the search window to help with behind views:
+    - First pass: Normal visibility threshold
+    - If frame detected in latter half of search window: Retry with 0.01 visibility
+    - Use earlier result if found with low visibility
+
+    This two-pass approach ensures:
+    - Normal shots use the configured visibility threshold
+    - Behind views get the fallback only when the initial detection is suspiciously late
+    - User-configured thresholds (>0.3) are always respected

@@ -49,8 +49,8 @@ export interface KeyframeDetectorConfig {
  * Default configuration values.
  */
 const DEFAULT_CONFIG: Required<KeyframeDetectorConfig> = {
-  visibilityThreshold: 0.5,
-  ballLowPointSearchWindow: 0.4,
+  visibilityThreshold: 0.3, // Lowered from 0.5 to handle low-visibility frames in behind views
+  ballLowPointSearchWindow: 0.6, // Expanded from 0.4 to handle behind views
   legBendSearchWindow: 0.7, // Expanded from 0.5 to capture jump shots with late leg bend
   riseSearchWindow: 0.6,
   smoothingWindowSize: 3,
@@ -61,7 +61,7 @@ const DEFAULT_CONFIG: Required<KeyframeDetectorConfig> = {
   setPointMaxElbowAngle: 160,
   releaseSearchWindow: 0.5,
   groundBaselineSearchWindow: 0.4,
-  ankleGroundThreshold: 0.015, // Lowered to detect small jumps; landing uses 2x multiplier
+  ankleGroundThreshold: 0.01, // Lowered to detect small jumps (Jax front-right/side-left); landing uses 2x multiplier
   followThroughSearchWindow: 0.5,
 };
 
@@ -568,37 +568,49 @@ export function detectBallLowPoint(
   const searchEndFrame =
     startFrame + Math.floor(shotDuration * config.ballLowPointSearchWindow);
 
-  let maxWristY = -Infinity;
-  let maxWristYFrame: number | null = null;
+  // Helper function to find max wrist Y frame with given visibility threshold
+  const findMaxWristYFrame = (visThreshold: number): number | null => {
+    let maxWristY = -Infinity;
+    let maxWristYFrame: number | null = null;
 
-  for (const frame of frames) {
-    const frameIdx = frame.frameIndex;
-
-    // Only search within the start to search window
-    if (frameIdx < startFrame || frameIdx > searchEndFrame) {
-      continue;
-    }
-
-    const wristY = getFrameWristY(frame, config.visibilityThreshold);
-
-    if (wristY !== null && wristY > maxWristY) {
-      maxWristY = wristY;
-      maxWristYFrame = frameIdx;
-    }
-  }
-
-  // Edge case: No clear dip - return frame closest to start if we found any valid frames
-  if (maxWristYFrame === null) {
-    // Try to find any frame with valid landmarks near the start
     for (const frame of frames) {
-      if (
-        frame.frameIndex >= startFrame &&
-        frame.frameIndex <= searchEndFrame
-      ) {
-        if (getFrameWristY(frame, config.visibilityThreshold) !== null) {
-          return frame.frameIndex;
-        }
+      const frameIdx = frame.frameIndex;
+      if (frameIdx < startFrame || frameIdx > searchEndFrame) {
+        continue;
       }
+
+      const wristY = getFrameWristY(frame, visThreshold);
+      if (wristY !== null && wristY > maxWristY) {
+        maxWristY = wristY;
+        maxWristYFrame = frameIdx;
+      }
+    }
+    return maxWristYFrame;
+  };
+
+  // First pass with normal visibility threshold
+  let maxWristYFrame = findMaxWristYFrame(config.visibilityThreshold);
+
+  // For "behind" views, early frames have low wrist visibility but valid Y positions.
+  // Only use the low-visibility fallback when the configured threshold is not stricter
+  // than the default (0.3). This respects user-configured visibility thresholds while
+  // still allowing detection in difficult "behind" view scenarios.
+  if (config.visibilityThreshold <= 0.3) {
+    // If we found a frame but it's in the latter half of the search window,
+    // retry with a very low threshold to catch early low-visibility frames.
+    const firstHalfEnd = startFrame + Math.floor((searchEndFrame - startFrame) / 2);
+    if (maxWristYFrame !== null && maxWristYFrame > firstHalfEnd) {
+      // The detected frame is late in the window - try with lower threshold
+      const lowVisFrame = findMaxWristYFrame(0.01);
+      if (lowVisFrame !== null && lowVisFrame < maxWristYFrame) {
+        // Found an earlier frame with low visibility - use it
+        maxWristYFrame = lowVisFrame;
+      }
+    }
+
+    // Edge case: No clear dip - try with very low visibility threshold as fallback
+    if (maxWristYFrame === null) {
+      maxWristYFrame = findMaxWristYFrame(0.01);
     }
   }
 
@@ -741,60 +753,72 @@ export function detectBallStartsUpward(
   const searchEndFrame =
     ballLowPointFrame + Math.floor(shotDuration * config.riseSearchWindow);
 
-  // Extract wrist Y positions for frames in the search window
-  const framePositions: Array<{ frameIndex: number; wristY: number }> = [];
+  // Helper function to detect ball starts upward with given visibility threshold
+  const findBallStartsUpward = (visThreshold: number): number | null => {
+    const framePositions: Array<{ frameIndex: number; wristY: number }> = [];
 
-  for (const frame of frames) {
-    const frameIdx = frame.frameIndex;
-
-    // Only search from the low point forward
-    if (frameIdx < ballLowPointFrame || frameIdx > searchEndFrame) {
-      continue;
-    }
-
-    const wristY = getFrameWristY(frame, config.visibilityThreshold);
-    if (wristY !== null) {
-      framePositions.push({ frameIndex: frameIdx, wristY: wristY });
-    }
-  }
-
-  if (framePositions.length < config.minConsecutiveFrames + 1) {
-    return null;
-  }
-
-  // Sort by frame index to ensure proper order
-  framePositions.sort((a, b) => a.frameIndex - b.frameIndex);
-
-  // Extract wrist Y values and calculate smoothed velocity
-  const wristYValues = framePositions.map((fp) => fp.wristY);
-  const smoothedVelocities = calculateSmoothedVelocity(
-    wristYValues,
-    config.smoothingWindowSize,
-  );
-
-  // Find first frame with sustained negative velocity (upward motion)
-  // Negative velocity means Y is decreasing, which means the ball is rising
-  let consecutiveNegative = 0;
-
-  for (let i = 0; i < smoothedVelocities.length; i++) {
-    const velocity = smoothedVelocities[i]!;
-
-    // Note: threshold is negative, so velocity < threshold means moving up fast enough
-    if (velocity < config.wristVelocityThreshold) {
-      consecutiveNegative++;
-
-      if (consecutiveNegative >= config.minConsecutiveFrames) {
-        // Return the frame where upward motion started
-        const startIdx = i - config.minConsecutiveFrames + 1;
-        // Add 1 because velocity[i] is between frame[i] and frame[i+1]
-        return framePositions[startIdx + 1]!.frameIndex;
+    for (const frame of frames) {
+      const frameIdx = frame.frameIndex;
+      if (frameIdx < ballLowPointFrame || frameIdx > searchEndFrame) {
+        continue;
       }
-    } else {
-      consecutiveNegative = 0;
+
+      const wristY = getFrameWristY(frame, visThreshold);
+      if (wristY !== null) {
+        framePositions.push({ frameIndex: frameIdx, wristY: wristY });
+      }
+    }
+
+    if (framePositions.length < config.minConsecutiveFrames + 1) {
+      return null;
+    }
+
+    framePositions.sort((a, b) => a.frameIndex - b.frameIndex);
+
+    const wristYValues = framePositions.map((fp) => fp.wristY);
+    const smoothedVelocities = calculateSmoothedVelocity(
+      wristYValues,
+      config.smoothingWindowSize,
+    );
+
+    let consecutiveNegative = 0;
+    for (let i = 0; i < smoothedVelocities.length; i++) {
+      const velocity = smoothedVelocities[i]!;
+      if (velocity < config.wristVelocityThreshold) {
+        consecutiveNegative++;
+        if (consecutiveNegative >= config.minConsecutiveFrames) {
+          const startIdx = i - config.minConsecutiveFrames + 1;
+          return framePositions[startIdx + 1]!.frameIndex;
+        }
+      } else {
+        consecutiveNegative = 0;
+      }
+    }
+    return null;
+  };
+
+  // First pass with normal visibility threshold
+  let result = findBallStartsUpward(config.visibilityThreshold);
+
+  // For "behind" views, early frames have low wrist visibility.
+  // Only use the low-visibility fallback when the configured threshold is not stricter
+  // than the default (0.3). This respects user-configured visibility thresholds while
+  // still allowing detection in difficult "behind" view scenarios.
+  if (config.visibilityThreshold <= 0.3) {
+    // If result is null or significantly later than ballLowPointFrame, retry with low threshold.
+    const expectedNearLowPoint = ballLowPointFrame + 5; // Should be within ~5 frames of low point
+    if (result === null || result > expectedNearLowPoint + 5) {
+      const lowVisResult = findBallStartsUpward(0.01);
+      if (lowVisResult !== null) {
+        // Prefer the earlier result if found with low visibility
+        if (result === null || lowVisResult < result) {
+          result = lowVisResult;
+        }
+      }
     }
   }
 
-  return null;
+  return result;
 }
 
 /**
@@ -1482,7 +1506,8 @@ export class KeyframeDetector {
     // Establish ground baseline from the area around the release frame
     // This handles shots where the person walks into position at shot start
     // Jump typically happens around set_point/release, so baseline should be local
-    const jumpSearchStart = Math.max(startFrame, releaseFrame - 15); // Look up to 15 frames before release
+    // Narrowed to 10 frames before release to avoid noise in "behind" view orientations
+    const jumpSearchStart = Math.max(startFrame, releaseFrame - 10);
     const groundBaseline = establishGroundBaseline(
       frames,
       jumpSearchStart,
