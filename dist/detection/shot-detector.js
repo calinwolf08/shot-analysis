@@ -438,7 +438,6 @@ export class ShotBoundaryDetector {
         //
         // First, find where the downward motion started (dipStartFrame) to calculate
         // the total dip magnitude before deciding whether to adjust.
-        const distanceToDip = upwardStartFrame - dipFrame;
         // Look backward from the dip point to find where the downward motion started.
         // We use a fixed lookback of 12 frames to properly detect gather phases that
         // span multiple frames (like 20201212 where the gather goes from frame 75 to 83).
@@ -509,12 +508,16 @@ export class ShotBoundaryDetector {
             prevY = rawY;
         }
         const isLargeContinuousDip = dipMagnitude >= largeDipThreshold && maxContinuousDownFrames >= minContinuousDownFrames;
-        if (distanceToDip !== 9 && !isLargeContinuousDip) {
+        // Only apply dip adjustment if it's a large, continuous dip (deliberate gather phase)
+        // This ensures we don't include minor oscillations before the actual shot
+        // The isLargeContinuousDip criterion requires:
+        // - dipMagnitude >= 5% of frame height (significant ball/wrist movement)
+        // - At least 5 consecutive frames of downward motion (deliberate gather, not noise)
+        if (!isLargeContinuousDip) {
             return upwardStartFrame;
         }
         // Cap the maximum adjustment to prevent regressions
-        // Using 9 to allow video 5 shot 2 to just pass (needs exactly 9 frame adjustment)
-        const maxAdjustment = 9;
+        const maxAdjustment = 12;
         if (upwardStartFrame - dipStartFrame > maxAdjustment) {
             return upwardStartFrame - maxAdjustment;
         }

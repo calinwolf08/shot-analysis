@@ -214,13 +214,19 @@ export interface GroundBaselineResult {
 }
 /**
  * Establishes the ground baseline for jump detection by finding the local maximum
- * ankle Y position (deepest squat) that occurs before the minimum (jump peak).
+ * ankle Y position (deepest squat) that has a significant descent AFTER it.
  *
  * This approach handles cases where:
  * - The detected shot start is during walking/movement before the actual stance
  * - The deepest squat (ground position) occurs mid-shot before the jump
+ * - The shot starts with low ankle Y before squatting down
  *
  * The baseline is the "ground" reference point from which we measure the jump.
+ *
+ * Algorithm:
+ * 1. Find all local maxima (peaks) in the ankle Y data
+ * 2. For each peak, calculate how much the ankle Y drops after it
+ * 3. Choose the peak with the largest descent (deepest squat before biggest jump)
  *
  * @param frames - Array of frames with pose data
  * @param startFrame - Shot start frame index (inclusive)

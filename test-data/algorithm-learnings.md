@@ -790,3 +790,134 @@ All 4 videos pass all 10 keyframe thresholds within ±8 frames tolerance.
 3. **Separate thresholds for leave vs land**: Leaving ground needs a sensitive threshold to catch small jumps. Landing can use a more forgiving threshold because body position shifts during the shot.
 
 4. **Peak-based landing detection**: Don't just look for "return to baseline" - first find the jump peak (minimum ankle Y), THEN look for landing after the peak. This prevents early false positives when deviation briefly dips below threshold during ascent.
+
+---
+
+## Iterative Testing - Level 5 (Different Shooter - Cody)
+
+**2026-07-06 - Video 20190818_142631 Testing (Level 5)**
+
+54. **Different Shooter Characteristics**: Video 20190818_142631 is from a different shooter (Cody) compared to previous videos (Chris and Cole). This tests algorithm generalization to different body types and shooting forms.
+
+55. **Orientation Detection - Side-Left with High Z-Depth**: Shot 3 was incorrectly classified as "front" instead of "side-left":
+    - avgShoulderDiffX: -0.0426 (isFrontView = true)
+    - avgZDiff: 0.4941 (very high, > 0.45)
+    - avgHipZDiff: 0.3423 (high, > 0.30)
+    - shoulderSeparation: 0.0426
+    - shoulderHipZRatio: 1.44 (<1.6)
+    - shoulderHipXRatio: 1.30 (>1.2)
+
+    The CASE 3a check (front with small shoulder separation) was triggering because all conditions were met. However, the very high Z-depth AND consistent hip Z following shoulder Z clearly indicates a true side view camera angle.
+
+    Fix: Added exception to CASE 3a - when `absZDiff > sideViewZThreshold` (0.45) AND `absHipZDiff > 0.30` AND signs match (both shoulders and hips show consistent Z-depth in same direction), classify as side view:
+    - `strongHipZFollows = absHipZDiff > 0.30 && Math.sign(avgHipZDiff) === Math.sign(avgZDiff)`
+    - `isTrueSideView = absZDiff > sideViewZThreshold && strongHipZFollows`
+    - If `isTrueSideView && isFrontView`: return side-left (positive Z) or side-right (negative Z)
+
+56. **Ground Baseline Detection - Descent-Based Approach**: Shot 1 failed feet detection because the algorithm couldn't find the ground baseline correctly:
+    - Detected shot start: frame 35 (ankleY = 0.5522)
+    - Deepest squat (ground): frame 41 (ankleY = 0.5789)
+    - Jump peak: frame 49 (ankleY = 0.5564)
+    - Original issue: Algorithm found frame 35 as "minimum" because it searched for global min first, then looked for max BEFORE the min. But frame 35 is BEFORE the squat, not after!
+
+    The original `establishGroundBaseline` algorithm:
+    1. Find global minimum ankle Y (assumed to be jump peak)
+    2. Find maximum ankle Y BEFORE that minimum (assumed to be squat)
+
+    This fails when the shot starts with low ankle Y (before squatting down), because the global minimum ends up at the start, not at the jump peak.
+
+    Fix: Changed to descent-based approach:
+    1. For each frame, calculate how much ankle Y descends AFTER that frame (descent = currentY - minAfterCurrent)
+    2. The frame with the largest descent is the squat position (high Y before big drop to jump peak)
+    3. This correctly identifies frame 41 as the ground baseline (descent = 0.5789 - 0.5564 = 0.0225)
+
+57. **Shot Boundary Detection - Dip Adjustment Generalization**: Shot 2 had start frame detected at 278 vs labeled 287 (diff: -9):
+    - The `findDipStart` function had a special case `distanceToDip === 9` that was incorrectly triggering
+    - This was originally added for a different video's specific pattern
+    - Cody shot 2 has very small dip magnitude (0.0247, < 5% threshold) vs 20201212 (0.0533, >= 5%)
+
+    Fix: Removed the `distanceToDip === 9` special case. Now only `isLargeContinuousDip` criterion applies:
+    - `dipMagnitude >= 0.05` (5% of frame height)
+    - `maxContinuousDownFrames >= 5` (deliberate gather, not noise)
+
+    This correctly:
+    - Includes gather phase for 20201212 (magnitude 5.3%, 8 continuous down frames)
+    - Excludes noise for Cody shot 2 (magnitude 2.5%, fails magnitude check)
+
+58. **Behind-Right Threshold Adjustment**: The orientation fix for Shot 3 caused a regression in 20190103_181419 Shot 2 (detected "behind-right" instead of "side-right"):
+    - 20190103_181419 Shot 2: shoulderSeparation = 0.0416
+    - Original behind-right threshold: shoulderSeparation > 0.04
+    - 0.0416 > 0.04 triggered behind-right classification
+
+    Fix: Increased behind-right shoulder separation threshold from 0.04 to 0.05:
+    - 0.0416 < 0.05 → falls through to side-right (correct)
+    - Actual behind-right shots have much larger separation (e.g., 0.186 in previous test videos)
+
+### Configuration Changes for Level 5
+
+| Parameter | Old Value | New Value | Reason | Videos Affected |
+|-----------|-----------|-----------|--------|-----------------|
+| isTrueSideView check | N/A | absZDiff > 0.45 AND absHipZDiff > 0.30 AND same sign | Detect true side views even when CASE 3a conditions partially match | 20190818_142631 shot 3 |
+| behind-right shoulderSep threshold | 0.04 | 0.05 | Prevent false behind-right for borderline shoulder separation | 20190103_181419 shot 2 |
+| establishGroundBaseline | Find global min, then max before min | Find frame with largest descent after it | Handle shots starting with low ankle Y before squat | 20190818_142631 shot 1 |
+| distanceToDip === 9 check | Included | Removed | Was too specific; rely on isLargeContinuousDip instead | 20190818_142631 shot 2 |
+
+### Test Results Summary (Level 5)
+
+| Video | Status | Shots | Notes |
+|-------|--------|-------|-------|
+| chris-5 | PASS | 1 | No regression from Level 4 |
+| 20201212_134104 | PASS | 1 | No regression from Level 4 |
+| 20190103_181419 | PASS | 2 | No regression; behind-right threshold fix |
+| 20190103_180930 | PASS | 3 | No regression from Level 4 |
+| 20190818_142631 | PASS | 3 | New video; all shots pass after fixes |
+
+### Keyframe Results (Level 5)
+
+All 5 videos pass all keyframe thresholds within ±8 frames tolerance.
+
+**20190818_142631 Shot 1 keyframes:**
+- legs_start_bending: detected 35, labeled 32, diff: +3
+- leg_bend_low_point: detected 36, labeled 35, diff: +1
+- ball_low_point: detected 35, labeled 32, diff: +3
+- legs_start_extending: detected 39, labeled 38, diff: +1
+- ball_starts_upward: detected 37, labeled 34, diff: +3
+- set_point: detected 48, labeled 42, diff: +6
+- release: detected 49, labeled 47, diff: +2
+- arms_fully_extended: detected 49, labeled 48, diff: +1
+- feet_leave_ground: detected 46, labeled 46, diff: 0 (perfect)
+- feet_land: detected 50, labeled 53, diff: -3
+
+**20190818_142631 Shot 2 keyframes:**
+- legs_start_bending: detected 287, labeled 287, diff: 0 (perfect - after dip fix removed)
+- leg_bend_low_point: detected 288, labeled 292, diff: -4
+- ball_low_point: detected 287, labeled 280, diff: +7
+- legs_start_extending: detected 289, labeled 294, diff: -5
+- ball_starts_upward: detected 290, labeled 285, diff: +5
+- set_point: detected 302, labeled 298, diff: +4
+- release: detected 305, labeled 303, diff: +2
+- arms_fully_extended: detected 305, labeled 303, diff: +2
+- feet_leave_ground: detected 302, labeled 303, diff: -1
+- feet_land: detected 306, labeled 306, diff: 0 (perfect)
+
+**20190818_142631 Shot 3 keyframes:**
+- legs_start_bending: detected 555, labeled 556, diff: -1
+- leg_bend_low_point: detected 557, labeled 559, diff: -2
+- ball_low_point: detected 555, labeled 553, diff: +2
+- legs_start_extending: detected 558, labeled 560, diff: -2
+- ball_starts_upward: detected 558, labeled 556, diff: +2
+- set_point: detected 569, labeled 564, diff: +5
+- release: detected 570, labeled 569, diff: +1
+- arms_fully_extended: detected 571, labeled 570, diff: +1
+- feet_leave_ground: detected 566, labeled 568, diff: -2
+- feet_land: detected 573, labeled 573, diff: 0 (perfect)
+
+### Key Learnings (Level 5)
+
+1. **High Z-depth with consistent hip Z indicates side view**: When both shoulders AND hips show consistent Z-depth in the same direction (>0.30 for hips), this indicates a true camera position offset, not just shoulder rotation from shooting motion.
+
+2. **Ground baseline needs descent analysis**: Finding the squat position (ground baseline) requires looking at what happens AFTER each frame, not just finding global min/max. The squat is where the ankle Y is high AND is followed by a significant descent.
+
+3. **Specific distance-based conditions are fragile**: The `distanceToDip === 9` condition was too specific to one video's pattern. The `isLargeContinuousDip` criterion (magnitude >= 5% AND >= 5 continuous down frames) is more robust and generalizes better.
+
+4. **Different shooters have different characteristics**: Cody's shooting form differs from Chris and Cole. The algorithm successfully generalizes with the fixes applied.

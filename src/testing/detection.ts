@@ -390,10 +390,12 @@ export function detectOrientationFromFrames(
         if (avgZDiff > 0) {
           return "behind-left";
         } else {
-          // For behind-right: require larger shoulder separation (> 0.04) to distinguish from side-right
+          // For behind-right: require larger shoulder separation to distinguish from side-right
           // Shot 7 (side-right): shoulderSep=0.034, hipSep=0.025 - should NOT be behind-right
-          // Shot 5 (behind-right): shoulderSep=0.186, hipSep=0.111 - much larger
-          if (shoulderSeparation > 0.04) {
+          // Shot 5 (behind-right): shoulderSep=0.186, hipSep=0.111 - clearly behind
+          // 20190103_181419 shot 2 (side-right): shoulderSep=0.0416 - should NOT be behind-right
+          // Raised threshold from 0.04 to 0.05 to avoid false behind-right classification
+          if (shoulderSeparation > 0.05) {
             return "behind-right";
           }
           // Small shoulder separation with negative Z → side-right
@@ -421,13 +423,32 @@ export function detectOrientationFromFrames(
     // - Z-ratio < 1.6: hip Z follows shoulder Z (not pure shoulder rotation)
     // - X-ratio > 1.2: shoulders distinctly more separated than hips (front view characteristic)
     // - Small shoulder separation (< 0.05): shoulders nearly aligned = front-ish view
+    //
+    // EXCEPTION: When Z-depth is very high (>0.45) AND hip Z strongly follows shoulder Z
+    // in the same direction (hip Z > 0.30), this indicates true camera angle offset
+    // rather than shoulder rotation. In this case, it's a side view not front.
+    // This distinguishes side-left views with moderate shoulder separation from
+    // true front views with shoulder rotation during shooting.
+    const strongHipZFollows = absHipZDiff > 0.30 && Math.sign(avgHipZDiff) === Math.sign(avgZDiff);
+    const isTrueSideView = absZDiff > sideViewZThreshold && strongHipZFollows;
+
     if (
       isFrontView &&
       shoulderSeparation < 0.05 &&
       shoulderHipZRatio < 1.6 &&
-      shoulderHipXRatio > 1.2
+      shoulderHipXRatio > 1.2 &&
+      !isTrueSideView
     ) {
       return "front";
+    }
+
+    // True side view with high Z-depth and consistent hip Z
+    if (isTrueSideView && isFrontView) {
+      if (avgZDiff > 0) {
+        return "side-left";
+      } else {
+        return "side-right";
+      }
     }
 
     // If shoulder separation is moderate AND shoulder/hip Z ratio is low,

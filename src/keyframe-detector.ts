@@ -1003,13 +1003,19 @@ export interface GroundBaselineResult {
 
 /**
  * Establishes the ground baseline for jump detection by finding the local maximum
- * ankle Y position (deepest squat) that occurs before the minimum (jump peak).
+ * ankle Y position (deepest squat) that has a significant descent AFTER it.
  *
  * This approach handles cases where:
  * - The detected shot start is during walking/movement before the actual stance
  * - The deepest squat (ground position) occurs mid-shot before the jump
+ * - The shot starts with low ankle Y before squatting down
  *
  * The baseline is the "ground" reference point from which we measure the jump.
+ *
+ * Algorithm:
+ * 1. Find all local maxima (peaks) in the ankle Y data
+ * 2. For each peak, calculate how much the ankle Y drops after it
+ * 3. Choose the peak with the largest descent (deepest squat before biggest jump)
  *
  * @param frames - Array of frames with pose data
  * @param startFrame - Shot start frame index (inclusive)
@@ -1048,46 +1054,52 @@ export function establishGroundBaseline(
   // Sort by frame index
   ankleData.sort((a, b) => a.frameIndex - b.frameIndex);
 
-  // Find the global minimum (jump peak) and its index
-  let minAnkleY = Infinity;
-  let minIdx = 0;
+  // Find the best local maximum that has a significant descent after it
+  // This identifies the "squat" position before the jump
+  let bestMaxIdx = -1;
+  let bestDescent = -Infinity;
+  let bestMaxAnkleY = -Infinity;
 
   for (let i = 0; i < ankleData.length; i++) {
-    if (ankleData[i]!.ankleY < minAnkleY) {
-      minAnkleY = ankleData[i]!.ankleY;
-      minIdx = i;
+    const currentY = ankleData[i]!.ankleY;
+
+    // Find the minimum ankle Y AFTER this point (the jump peak)
+    let minAfter = Infinity;
+    for (let j = i + 1; j < ankleData.length; j++) {
+      if (ankleData[j]!.ankleY < minAfter) {
+        minAfter = ankleData[j]!.ankleY;
+      }
+    }
+
+    // Calculate descent (how much ankle Y drops after this point)
+    const descent = currentY - minAfter;
+
+    // Track the best (largest) descent that is also a high ankle Y position
+    // This ensures we find the squat position (high Y) before the jump (low Y)
+    if (descent > bestDescent && currentY > 0) {
+      bestDescent = descent;
+      bestMaxIdx = i;
+      bestMaxAnkleY = currentY;
     }
   }
 
-  // Find the maximum ankle Y BEFORE the jump peak (ground position before jump)
-  // Search in the first half of the shot up to the jump peak
-  let maxAnkleY = -Infinity;
-  let maxIdx = -1;
-
-  for (let i = 0; i < minIdx; i++) {
-    if (ankleData[i]!.ankleY > maxAnkleY) {
-      maxAnkleY = ankleData[i]!.ankleY;
-      maxIdx = i;
-    }
-  }
-
-  // If no frames before minimum, or no valid maximum found, use the maximum from entire shot
-  if (maxAnkleY === -Infinity) {
+  // Fallback: if no significant descent found, use the global maximum
+  if (bestMaxIdx === -1 || bestDescent <= 0) {
     for (let i = 0; i < ankleData.length; i++) {
-      if (ankleData[i]!.ankleY > maxAnkleY) {
-        maxAnkleY = ankleData[i]!.ankleY;
-        maxIdx = i;
+      if (ankleData[i]!.ankleY > bestMaxAnkleY) {
+        bestMaxAnkleY = ankleData[i]!.ankleY;
+        bestMaxIdx = i;
       }
     }
   }
 
-  if (maxAnkleY === -Infinity || maxIdx === -1) {
+  if (bestMaxAnkleY === -Infinity || bestMaxIdx === -1) {
     return null;
   }
 
   return {
-    ankleY: maxAnkleY,
-    frameIndex: ankleData[maxIdx]!.frameIndex,
+    ankleY: bestMaxAnkleY,
+    frameIndex: ankleData[bestMaxIdx]!.frameIndex,
   };
 }
 
