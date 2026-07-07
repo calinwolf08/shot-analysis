@@ -24,7 +24,16 @@ import {
   detectFeetLeaveGround,
   detectFeetLand,
   type KeyframeDetectorConfig,
+  type GroundBaselineResult,
 } from "./keyframe-detector";
+
+/**
+ * Helper to create a GroundBaselineResult for testing.
+ * Uses frame 0 as the baseline frame by default.
+ */
+function createBaselineResult(ankleY: number, frameIndex: number = 0): GroundBaselineResult {
+  return { ankleY, frameIndex };
+}
 import type { Frame, TestLandmark } from "./testing/types";
 import { LANDMARK_INDICES } from "./types";
 
@@ -1850,7 +1859,7 @@ describe("establishGroundBaseline", () => {
     );
 
     expect(baseline).not.toBeNull();
-    expect(baseline!).toBeCloseTo(groundY, 2);
+    expect(baseline!.ankleY).toBeCloseTo(groundY, 2);
   });
 
   it("returns null when no valid frames exist", () => {
@@ -1910,7 +1919,7 @@ describe("establishGroundBaseline", () => {
     );
 
     expect(baseline).not.toBeNull();
-    expect(baseline!).toBeCloseTo(0.85, 2);
+    expect(baseline!.ankleY).toBeCloseTo(0.85, 2);
   });
 
   it("works with different start frames", () => {
@@ -1925,7 +1934,7 @@ describe("establishGroundBaseline", () => {
     );
 
     expect(baseline).not.toBeNull();
-    expect(baseline!).toBeCloseTo(0.82, 2);
+    expect(baseline!.ankleY).toBeCloseTo(0.82, 2);
   });
 });
 
@@ -2051,7 +2060,7 @@ describe("detectFeetLeaveGround", () => {
 
     const result = detectFeetLeaveGround(
       frames,
-      groundY,
+      createBaselineResult(groundY, 0),
       0,
       29,
       defaultConfig,
@@ -2076,7 +2085,7 @@ describe("detectFeetLeaveGround", () => {
 
     const result = detectFeetLeaveGround(
       frames,
-      groundY,
+      createBaselineResult(groundY, 0),
       0,
       19,
       defaultConfig,
@@ -2093,7 +2102,7 @@ describe("detectFeetLeaveGround", () => {
     // With default threshold (0.03), should not detect
     const result1 = detectFeetLeaveGround(
       frames,
-      groundY,
+      createBaselineResult(groundY, 0),
       0,
       19,
       defaultConfig,
@@ -2104,7 +2113,7 @@ describe("detectFeetLeaveGround", () => {
       ...defaultConfig,
       ankleGroundThreshold: 0.01,
     };
-    const result2 = detectFeetLeaveGround(frames, groundY, 0, 19, config2);
+    const result2 = detectFeetLeaveGround(frames, createBaselineResult(groundY, 0), 0, 19, config2);
 
     // result1 may or may not be null depending on exact values
     // result2 should be more likely to detect with lower threshold
@@ -2130,7 +2139,7 @@ describe("detectFeetLeaveGround", () => {
 
     const result = detectFeetLeaveGround(
       frames,
-      groundY,
+      createBaselineResult(groundY, 0),
       0,
       19,
       defaultConfig,
@@ -2149,7 +2158,7 @@ describe("detectFeetLeaveGround", () => {
     // Search only from frame 10 onward (jump started at 5)
     const result = detectFeetLeaveGround(
       frames,
-      groundY,
+      createBaselineResult(groundY, 0),
       10,
       29,
       defaultConfig,
@@ -2192,7 +2201,7 @@ describe("detectFeetLand", () => {
       0.1,
     );
 
-    const result = detectFeetLand(frames, groundY, 8, 29, defaultConfig);
+    const result = detectFeetLand(frames, createBaselineResult(groundY, 0), 8, 29, defaultConfig);
 
     expect(result).not.toBeNull();
     // Should detect around frame 22
@@ -2211,7 +2220,7 @@ describe("detectFeetLand", () => {
       groundY,
     );
 
-    const result = detectFeetLand(frames, groundY, null, 19, defaultConfig);
+    const result = detectFeetLand(frames, createBaselineResult(groundY, 0), null, 19, defaultConfig);
 
     expect(result).toBeNull();
   });
@@ -2221,7 +2230,7 @@ describe("detectFeetLand", () => {
     // Jump starts at frame 15, never lands within the shot
     const frames = createFollowThroughSequence(0, 25, 10, 15, 30, groundY, 0.1);
 
-    const result = detectFeetLand(frames, groundY, 15, 24, defaultConfig);
+    const result = detectFeetLand(frames, createBaselineResult(groundY, 0), 15, 24, defaultConfig);
 
     // Should return the end frame since we were in air but didn't detect landing
     expect(result).toBe(24);
@@ -2242,7 +2251,7 @@ describe("detectFeetLand", () => {
     );
     frames[22] = createFrame(22, landmarks);
 
-    const result = detectFeetLand(frames, groundY, 8, 29, defaultConfig);
+    const result = detectFeetLand(frames, createBaselineResult(groundY, 0), 8, 29, defaultConfig);
 
     // Should find landing at a different frame
     if (result !== null) {
@@ -2250,7 +2259,7 @@ describe("detectFeetLand", () => {
     }
   });
 
-  it("requires being in air before detecting landing", () => {
+  it("returns landing when feetLeaveGround was detected even with minimal jump", () => {
     const groundY = 0.85;
     // Create frames where ankle Y is always at ground level
     const frames: Frame[] = [];
@@ -2265,11 +2274,15 @@ describe("detectFeetLand", () => {
       frames.push(createFrame(i, landmarks));
     }
 
-    // Provide feetLeaveFrame but never actually be in air
-    const result = detectFeetLand(frames, groundY, 5, 19, defaultConfig);
+    // If feetLeaveFrame was provided (feet left ground was detected),
+    // the algorithm will find landing after the "peak" (which is the same as baseline here)
+    // Since deviation is 0 throughout (always at groundY), landing is detected at first frame after peak
+    const result = detectFeetLand(frames, createBaselineResult(groundY, 0), 5, 19, defaultConfig);
 
-    // Since we were never "in air", should not detect landing
-    expect(result).toBeNull();
+    // Since deviation is always 0 (<= landingThreshold), landing is detected immediately after peak
+    // Peak search: looks after feetLeaveFrame (5), finds min at frame 6, so peakFrame = 6
+    // Landing search: looks after peakFrame (6), finds landing at frame 7
+    expect(result).toBe(7);
   });
 });
 

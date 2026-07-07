@@ -43,6 +43,14 @@ const MIN_WRIST_ABOVE_SHOULDER_DELTA = -0.049;
  */
 const MAX_VALID_VELOCITY = 0.1;
 /**
+ * Maximum wrist-above-shoulder delta allowed at shot START.
+ * At the beginning of a shot, the wrist should be at or below shoulder level.
+ * A real shot starts with ball at waist/chest level, not already extended overhead.
+ * -0.05 means wrist can be at most 5% of frame height above shoulder.
+ * This filters out follow-through motions where wrists are already elevated.
+ */
+const MAX_WRIST_ABOVE_SHOULDER_AT_START = -0.05;
+/**
  * Detects shot boundaries (start and end points) from pose landmark sequences.
  *
  * The detector analyzes wrist positions over time to identify:
@@ -255,6 +263,25 @@ export class ShotBoundaryDetector {
                             // Only apply dip detection if it doesn't move the start too far back
                             const refinedStart = this.findDipStart(frameData, shotStartFrame);
                             const actualStart = refinedStart;
+                            // Check if wrist is too high at shot start (filters follow-through motions)
+                            // At shot start, wrist should be at or below shoulder level
+                            const startFrame = frameData[actualStart];
+                            const startShoulderY = startFrame
+                                ? (startFrame.leftShoulder.y + startFrame.rightShoulder.y) / 2
+                                : 0;
+                            const startWristShoulderDelta = startFrame
+                                ? startFrame.avgWristY - startShoulderY
+                                : 0;
+                            const wristTooHighAtStart = startWristShoulderDelta < MAX_WRIST_ABOVE_SHOULDER_AT_START;
+                            if (wristTooHighAtStart) {
+                                // Wrist already above shoulder at start - not a valid shot initiation
+                                shotStartFrame = -1;
+                                peakY = Infinity;
+                                peakFrame = -1;
+                                bestWristAboveShoulderDelta = Infinity;
+                                upwardFrameCount = 0;
+                                continue;
+                            }
                             // Confirmed shot start
                             inShot = true;
                             boundaries.push({

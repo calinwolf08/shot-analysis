@@ -204,6 +204,15 @@ export declare function detectSetPoint(frames: readonly Frame[], ballStartsUpwar
  */
 export declare function detectRelease(frames: readonly Frame[], setPointFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 /**
+ * Result from establishing the ground baseline.
+ */
+export interface GroundBaselineResult {
+    /** The ground baseline ankle Y value (maximum = deepest squat) */
+    readonly ankleY: number;
+    /** The frame index where the baseline was established */
+    readonly frameIndex: number;
+}
+/**
  * Establishes the ground baseline for jump detection by finding the local maximum
  * ankle Y position (deepest squat) that occurs before the minimum (jump peak).
  *
@@ -218,9 +227,9 @@ export declare function detectRelease(frames: readonly Frame[], setPointFrame: n
  * @param endFrame - Shot end frame index (inclusive)
  * @param _baselineSearchWindow - DEPRECATED: Not used, kept for API compatibility
  * @param visibilityThreshold - Minimum visibility for landmarks to be valid
- * @returns Maximum ankle Y (ground level before jump), or null if no valid frames
+ * @returns Ground baseline result with ankle Y and frame index, or null if no valid frames
  */
-export declare function establishGroundBaseline(frames: readonly Frame[], startFrame: number, endFrame: number, _baselineSearchWindow: number, visibilityThreshold: number): number | null;
+export declare function establishGroundBaseline(frames: readonly Frame[], startFrame: number, endFrame: number, _baselineSearchWindow: number, visibilityThreshold: number): GroundBaselineResult | null;
 /**
  * Detects the frame with maximum arm extension (arms fully extended).
  *
@@ -245,13 +254,13 @@ export declare function detectArmsFullyExtended(frames: readonly Frame[], releas
  * In normalized coordinates, lower Y = higher in frame = feet off ground.
  *
  * @param frames - Array of frames with pose data
- * @param groundBaseline - Ground baseline ankle Y from establishGroundBaseline()
- * @param startFrame - Shot start frame index (inclusive)
+ * @param groundBaselineResult - Ground baseline result from establishGroundBaseline()
+ * @param startFrame - Shot start frame index (inclusive, but search starts after baseline frame)
  * @param endFrame - Shot end frame index (inclusive)
  * @param config - Detection configuration
  * @returns Frame index where feet leave ground, or null if no jump detected
  */
-export declare function detectFeetLeaveGround(frames: readonly Frame[], groundBaseline: number, startFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
+export declare function detectFeetLeaveGround(frames: readonly Frame[], groundBaselineResult: GroundBaselineResult, startFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 /**
  * Detects the frame where feet land (return to ground).
  *
@@ -260,13 +269,13 @@ export declare function detectFeetLeaveGround(frames: readonly Frame[], groundBa
  * the established ground baseline after having left the ground.
  *
  * @param frames - Array of frames with pose data
- * @param groundBaseline - Ground baseline ankle Y from establishGroundBaseline()
+ * @param groundBaselineResult - Ground baseline result from establishGroundBaseline()
  * @param feetLeaveGroundFrame - Frame where feet left ground (or null if no jump)
  * @param endFrame - Shot end frame index (inclusive)
  * @param config - Detection configuration
  * @returns Frame index where feet land, or null if no landing detected
  */
-export declare function detectFeetLand(frames: readonly Frame[], groundBaseline: number, feetLeaveGroundFrame: number | null, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
+export declare function detectFeetLand(frames: readonly Frame[], groundBaselineResult: GroundBaselineResult, feetLeaveGroundFrame: number | null, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 /**
  * KeyframeDetector class for detecting keyframes within basketball shots.
  *

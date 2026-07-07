@@ -61,7 +61,7 @@ const DEFAULT_CONFIG: Required<KeyframeDetectorConfig> = {
   setPointMaxElbowAngle: 160,
   releaseSearchWindow: 0.5,
   groundBaselineSearchWindow: 0.4,
-  ankleGroundThreshold: 0.025,
+  ankleGroundThreshold: 0.015, // Lowered to detect small jumps; landing uses 2x multiplier
   followThroughSearchWindow: 0.5,
 };
 
@@ -992,6 +992,16 @@ function getFrameAnkleY(
 }
 
 /**
+ * Result from establishing the ground baseline.
+ */
+export interface GroundBaselineResult {
+  /** The ground baseline ankle Y value (maximum = deepest squat) */
+  readonly ankleY: number;
+  /** The frame index where the baseline was established */
+  readonly frameIndex: number;
+}
+
+/**
  * Establishes the ground baseline for jump detection by finding the local maximum
  * ankle Y position (deepest squat) that occurs before the minimum (jump peak).
  *
@@ -1006,7 +1016,7 @@ function getFrameAnkleY(
  * @param endFrame - Shot end frame index (inclusive)
  * @param _baselineSearchWindow - DEPRECATED: Not used, kept for API compatibility
  * @param visibilityThreshold - Minimum visibility for landmarks to be valid
- * @returns Maximum ankle Y (ground level before jump), or null if no valid frames
+ * @returns Ground baseline result with ankle Y and frame index, or null if no valid frames
  */
 export function establishGroundBaseline(
   frames: readonly Frame[],
@@ -1014,7 +1024,7 @@ export function establishGroundBaseline(
   endFrame: number,
   _baselineSearchWindow: number,
   visibilityThreshold: number,
-): number | null {
+): GroundBaselineResult | null {
   // Collect all ankle Y values with frame indices
   const ankleData: Array<{ frameIndex: number; ankleY: number }> = [];
 
@@ -1052,23 +1062,33 @@ export function establishGroundBaseline(
   // Find the maximum ankle Y BEFORE the jump peak (ground position before jump)
   // Search in the first half of the shot up to the jump peak
   let maxAnkleY = -Infinity;
+  let maxIdx = -1;
 
   for (let i = 0; i < minIdx; i++) {
     if (ankleData[i]!.ankleY > maxAnkleY) {
       maxAnkleY = ankleData[i]!.ankleY;
+      maxIdx = i;
     }
   }
 
   // If no frames before minimum, or no valid maximum found, use the maximum from entire shot
   if (maxAnkleY === -Infinity) {
-    for (const data of ankleData) {
-      if (data.ankleY > maxAnkleY) {
-        maxAnkleY = data.ankleY;
+    for (let i = 0; i < ankleData.length; i++) {
+      if (ankleData[i]!.ankleY > maxAnkleY) {
+        maxAnkleY = ankleData[i]!.ankleY;
+        maxIdx = i;
       }
     }
   }
 
-  return maxAnkleY === -Infinity ? null : maxAnkleY;
+  if (maxAnkleY === -Infinity || maxIdx === -1) {
+    return null;
+  }
+
+  return {
+    ankleY: maxAnkleY,
+    frameIndex: ankleData[maxIdx]!.frameIndex,
+  };
 }
 
 /**
@@ -1126,25 +1146,29 @@ export function detectArmsFullyExtended(
  * In normalized coordinates, lower Y = higher in frame = feet off ground.
  *
  * @param frames - Array of frames with pose data
- * @param groundBaseline - Ground baseline ankle Y from establishGroundBaseline()
- * @param startFrame - Shot start frame index (inclusive)
+ * @param groundBaselineResult - Ground baseline result from establishGroundBaseline()
+ * @param startFrame - Shot start frame index (inclusive, but search starts after baseline frame)
  * @param endFrame - Shot end frame index (inclusive)
  * @param config - Detection configuration
  * @returns Frame index where feet leave ground, or null if no jump detected
  */
 export function detectFeetLeaveGround(
   frames: readonly Frame[],
-  groundBaseline: number,
+  groundBaselineResult: GroundBaselineResult,
   startFrame: number,
   endFrame: number,
   config: Required<KeyframeDetectorConfig> = DEFAULT_CONFIG,
 ): number | null {
+  // Start searching AFTER the baseline frame (deepest squat)
+  // The feet can only "leave ground" after the squat phase
+  const searchStart = Math.max(startFrame, groundBaselineResult.frameIndex);
+
   // Look for first frame where ankle Y is significantly below baseline
   // (lower Y = higher position = feet off ground)
   for (const frame of frames) {
     const frameIdx = frame.frameIndex;
 
-    if (frameIdx < startFrame || frameIdx > endFrame) {
+    if (frameIdx < searchStart || frameIdx > endFrame) {
       continue;
     }
 
@@ -1152,7 +1176,7 @@ export function detectFeetLeaveGround(
 
     if (ankleY !== null) {
       // Check if ankles have risen above baseline (Y decreased)
-      const deviation = groundBaseline - ankleY;
+      const deviation = groundBaselineResult.ankleY - ankleY;
       if (deviation > config.ankleGroundThreshold) {
         return frameIdx;
       }
@@ -1171,7 +1195,7 @@ export function detectFeetLeaveGround(
  * the established ground baseline after having left the ground.
  *
  * @param frames - Array of frames with pose data
- * @param groundBaseline - Ground baseline ankle Y from establishGroundBaseline()
+ * @param groundBaselineResult - Ground baseline result from establishGroundBaseline()
  * @param feetLeaveGroundFrame - Frame where feet left ground (or null if no jump)
  * @param endFrame - Shot end frame index (inclusive)
  * @param config - Detection configuration
@@ -1179,7 +1203,7 @@ export function detectFeetLeaveGround(
  */
 export function detectFeetLand(
   frames: readonly Frame[],
-  groundBaseline: number,
+  groundBaselineResult: GroundBaselineResult,
   feetLeaveGroundFrame: number | null,
   endFrame: number,
   config: Required<KeyframeDetectorConfig> = DEFAULT_CONFIG,
@@ -1189,9 +1213,14 @@ export function detectFeetLand(
     return null;
   }
 
-  // Look for frame where ankle Y returns to baseline (or close to it)
-  // Search from after feet_leave_ground
-  let wasInAir = false;
+  // Use a more forgiving threshold for landing (2x the leave threshold)
+  // Landing doesn't need to return to exact baseline - body position shifts
+  const landingThreshold = config.ankleGroundThreshold * 2;
+
+  // First, find the jump peak (minimum ankle Y after feet_leave_ground)
+  // We need to pass the peak before detecting landing
+  let minAnkleY = Infinity;
+  let peakFrame = feetLeaveGroundFrame;
 
   for (const frame of frames) {
     const frameIdx = frame.frameIndex;
@@ -1201,27 +1230,38 @@ export function detectFeetLand(
     }
 
     const ankleY = getFrameAnkleY(frame, config.visibilityThreshold);
+    if (ankleY !== null && ankleY < minAnkleY) {
+      minAnkleY = ankleY;
+      peakFrame = frameIdx;
+    }
+  }
+
+  // Now look for landing AFTER the peak
+  // Since we already detected feet_leave_ground, we know there was a jump
+  // Landing occurs when ankle Y returns to within landingThreshold of baseline
+  for (const frame of frames) {
+    const frameIdx = frame.frameIndex;
+
+    // Only search after the peak
+    if (frameIdx <= peakFrame || frameIdx > endFrame) {
+      continue;
+    }
+
+    const ankleY = getFrameAnkleY(frame, config.visibilityThreshold);
 
     if (ankleY !== null) {
-      const deviation = groundBaseline - ankleY;
+      const deviation = groundBaselineResult.ankleY - ankleY;
 
-      // Still in the air
-      if (deviation > config.ankleGroundThreshold) {
-        wasInAir = true;
-      } else if (wasInAir) {
-        // Was in air and now back on ground
+      // If deviation is within landing threshold, we've landed
+      if (deviation <= landingThreshold) {
         return frameIdx;
       }
     }
   }
 
-  // If we were in the air but never detected landing,
-  // the end frame is likely the landing
-  if (wasInAir) {
-    return endFrame;
-  }
-
-  return null;
+  // If we never detected landing (maybe still in air at end of shot)
+  // but we did detect feet leaving ground, use end frame
+  return endFrame;
 }
 
 /**

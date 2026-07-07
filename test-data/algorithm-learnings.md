@@ -679,3 +679,114 @@ All 3 videos pass all 10 keyframe thresholds within ±8 frames tolerance.
 - arms_fully_extended: detected 140, labeled 136, diff: +4
 - feet_leave_ground: detected 135, labeled 134, diff: +1
 - feet_land: detected 142, labeled 143, diff: -1
+
+---
+
+## Iterative Testing - Level 4 (Three-Shot Video with Multiple Issues)
+
+**2026-07-06 - Video 20190103_180930 Testing (Level 4)**
+
+49. **False Positive Shot Detection - Follow-Through Motion**: Video 20190103_180930 has 3 labeled shots but the algorithm initially detected 4 shots:
+    - Shots 1-3: correctly detected
+    - Shot 4 (false positive): frames 430-445 at end of video
+
+    Analysis revealed this was a follow-through motion after shot 3 ends:
+    - Shot 3 ends at frame 418 (labeled)
+    - False positive starts at frame 430 (wrists still elevated from shot 3 follow-through)
+
+50. **Wrist Position at Shot Start Validation**: The key distinguishing feature between real shots and follow-through:
+    - Real shot starts: wrist at or below shoulder level (wrist-shoulder delta: +0.097 to +0.157)
+    - False positive: wrist already ABOVE shoulder (wrist-shoulder delta: -0.106)
+
+    Fix: Added `MAX_WRIST_ABOVE_SHOULDER_AT_START` threshold of -0.05. At shot start, if wrist-shoulder delta is more negative than -0.05 (wrist significantly above shoulder), reject the detection as not a valid shot initiation.
+
+51. **Ground Baseline Frame Index Tracking**: The original `establishGroundBaseline` function only returned the baseline ankle Y value. For proper feet detection, we also need to know WHEN (which frame) that baseline was established:
+    - Problem: Searching for feet_leave_ground from shot start could find the ascending motion BEFORE the squat
+    - Example: Shot 3 starts at frame 397, baseline (deepest squat) at frame 404
+    - At frame 397: ankleY = 0.8002, deviation from baseline (0.8254) = 0.0252 > 0.025 threshold
+    - This triggered false "feet leaving ground" detection at shot start
+
+    Fix: Changed `establishGroundBaseline` to return `GroundBaselineResult` with both `ankleY` and `frameIndex`. Then `detectFeetLeaveGround` searches only AFTER the baseline frame.
+
+52. **Sensitive Ankle Threshold for Small Jumps**: Shot 3 has minimal vertical ankle movement:
+    - Baseline (deepest squat): 0.8254 at frame 404
+    - Jump peak: 0.8087 at frame 408
+    - Movement: 0.0167 (only 1.67% of frame height)
+
+    With original threshold of 0.025, this jump was not detected. Lowered `ankleGroundThreshold` to 0.015 to detect small jumps while using a 2x multiplier (0.03) for landing threshold.
+
+53. **Peak-Based Landing Detection**: Landing detection required rethinking to handle both large and small jumps:
+    - Problem: With low leave threshold (0.015), some landings were detected too early
+    - Cole video: detected landing at frame 96 (expected 107) because deviation dropped below threshold
+
+    Fix: After detecting feet_leave_ground, find the jump PEAK (minimum ankle Y), then search for landing only AFTER the peak. Landing is when ankle Y returns to within `landingThreshold` (2x leave threshold) of baseline.
+
+### Configuration Changes for Level 4
+
+| Parameter | Old Value | New Value | Reason | Videos Affected |
+|-----------|-----------|-----------|--------|-----------------|
+| MAX_WRIST_ABOVE_SHOULDER_AT_START | N/A | -0.05 | Filter follow-through motions that start with elevated wrists | 20190103_180930 |
+| ankleGroundThreshold | 0.025 | 0.015 | Detect smaller jumps (1.67% frame height movement) | 20190103_180930 shot 3 |
+| landingThreshold | Same as leave | 2x leave threshold | More forgiving for landing (body position shifts) | All videos |
+| establishGroundBaseline | Returns number | Returns GroundBaselineResult | Track baseline frame for proper search range | All videos |
+| detectFeetLeaveGround | Search from startFrame | Search from baseline frameIndex | Only detect lift after squat phase | 20190103_180930 shot 3 |
+| detectFeetLand | Check if in air | Peak-based detection | Find peak first, then landing after peak | 20201212_134104 |
+
+### Test Results Summary (Level 4)
+
+| Video | Status | Shots | Notes |
+|-------|--------|-------|-------|
+| chris-5 | PASS | 1 | No regression from Level 3 |
+| 20201212_134104 | PASS | 1 | No regression; landing detection improved |
+| 20190103_181419 | PASS | 2 | No regression from Level 3 |
+| 20190103_180930 | PASS | 3 | New video; false positive eliminated, all keyframes pass |
+
+### Keyframe Results (Level 4)
+
+All 4 videos pass all 10 keyframe thresholds within ±8 frames tolerance.
+
+**20190103_180930 Shot 1 keyframes:**
+- legs_start_bending: detected 89, labeled 81, diff: +8 (at tolerance)
+- leg_bend_low_point: detected 93, labeled 93, diff: 0 (perfect)
+- ball_low_point: detected 89, labeled 86, diff: +3
+- legs_start_extending: detected 94, labeled 94, diff: 0 (perfect)
+- ball_starts_upward: detected 90, labeled 88, diff: +2
+- set_point: detected 102, labeled 96, diff: +6
+- release: detected 105, labeled 102, diff: +3
+- arms_fully_extended: detected 106, labeled 103, diff: +3
+- feet_leave_ground: detected 98, labeled 102, diff: -4
+- feet_land: detected 108, labeled 106, diff: +2
+
+**20190103_180930 Shot 2 keyframes:**
+- legs_start_bending: detected 249, labeled 243, diff: +6
+- leg_bend_low_point: detected 249, labeled 253, diff: -4
+- ball_low_point: detected 249, labeled 246, diff: +3
+- legs_start_extending: detected 250, labeled 254, diff: -4
+- ball_starts_upward: detected 250, labeled 249, diff: +1
+- set_point: detected 261, labeled 256, diff: +5
+- release: detected 264, labeled 262, diff: +2
+- arms_fully_extended: detected 265, labeled 263, diff: +2
+- feet_leave_ground: detected 258, labeled 262, diff: -4
+- feet_land: detected 265, labeled 265, diff: 0 (perfect)
+
+**20190103_180930 Shot 3 keyframes:**
+- legs_start_bending: detected 397, labeled 397, diff: 0 (perfect)
+- leg_bend_low_point: detected 401, labeled 399, diff: +2
+- ball_low_point: detected 397, labeled 394, diff: +3
+- legs_start_extending: detected 402, labeled 400, diff: +2
+- ball_starts_upward: detected 398, labeled 396, diff: +2
+- set_point: detected 409, labeled 404, diff: +5
+- release: detected 411, labeled 409, diff: +2
+- arms_fully_extended: detected 412, labeled 411, diff: +1
+- feet_leave_ground: detected 408, labeled 409, diff: -1
+- feet_land: detected 413, labeled 413, diff: 0 (perfect)
+
+### Key Learnings (Level 4)
+
+1. **Follow-through motion can look like shot initiation**: After a shot, the wrists may stay elevated and continue moving upward (walking toward basket, preparing for rebound). The key differentiator is that real shots START with wrists at waist/chest level.
+
+2. **Ground baseline timing matters**: For feet detection, we need to know both the baseline VALUE and the baseline FRAME. The person may be in motion at shot start (walking, approaching), and the squat (baseline) happens mid-shot.
+
+3. **Separate thresholds for leave vs land**: Leaving ground needs a sensitive threshold to catch small jumps. Landing can use a more forgiving threshold because body position shifts during the shot.
+
+4. **Peak-based landing detection**: Don't just look for "return to baseline" - first find the jump peak (minimum ankle Y), THEN look for landing after the peak. This prevents early false positives when deviation briefly dips below threshold during ascent.
