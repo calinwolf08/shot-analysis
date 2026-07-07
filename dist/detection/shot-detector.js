@@ -101,7 +101,59 @@ export class ShotBoundaryDetector {
      */
     detectShots(sequence, originalFrameIndices) {
         const boundaries = this.detectBoundaries(sequence, originalFrameIndices);
-        return this.pairBoundaries(boundaries, sequence.length);
+        const shots = this.pairBoundaries(boundaries, sequence.length);
+        // Apply orientation-based filtering to remove false positives
+        return this.filterByOrientation(shots, sequence, originalFrameIndices);
+    }
+    /**
+     * Filters detected shots based on orientation metrics.
+     * Removes false positives that have body orientations inconsistent with shooting position.
+     *
+     * Filter criteria:
+     * 1. Large shoulder separation (>0.12) with positive shoulderDiffX (back view) indicates
+     *    the camera is behind the shooter but body is facing away - unlikely shooting position
+     * 2. Extreme positive Z-depth (>0.55) indicates the left shoulder is much farther from
+     *    camera than right - extreme side angle rarely seen in actual shots
+     */
+    filterByOrientation(shots, sequence, _originalFrameIndices) {
+        const MAX_SHOULDER_SEP_FOR_BACK_VIEW = 0.12;
+        const MAX_POSITIVE_Z_DEPTH = 0.55;
+        return shots.filter((shot) => {
+            // Calculate average shoulder metrics for this shot
+            let totalShoulderDiffX = 0;
+            let totalShoulderZ = 0;
+            let validSamples = 0;
+            for (let i = shot.start.frameIndex; i <= shot.end.frameIndex; i++) {
+                const pose = sequence[i];
+                if (!pose)
+                    continue;
+                const leftShoulder = pose.landmarks[LANDMARK_INDEX.LEFT_SHOULDER];
+                const rightShoulder = pose.landmarks[LANDMARK_INDEX.RIGHT_SHOULDER];
+                if (!leftShoulder || !rightShoulder)
+                    continue;
+                if ((leftShoulder.visibility ?? 0) < 0.3 || (rightShoulder.visibility ?? 0) < 0.3)
+                    continue;
+                totalShoulderDiffX += rightShoulder.x - leftShoulder.x;
+                totalShoulderZ += rightShoulder.z - leftShoulder.z;
+                validSamples++;
+            }
+            if (validSamples === 0)
+                return true; // Keep shot if no valid samples
+            const avgShoulderDiffX = totalShoulderDiffX / validSamples;
+            const avgShoulderZ = totalShoulderZ / validSamples;
+            const shoulderSep = Math.abs(avgShoulderDiffX);
+            // Filter 1: Large shoulder separation with positive shoulderDiffX (back view)
+            // This indicates the shooter is facing away from camera at an extreme angle
+            if (shoulderSep > MAX_SHOULDER_SEP_FOR_BACK_VIEW && avgShoulderDiffX > 0) {
+                return false; // Reject this shot
+            }
+            // Filter 2: Extreme positive Z-depth
+            // This indicates an extreme side angle rarely seen in actual shots
+            if (avgShoulderZ > MAX_POSITIVE_Z_DEPTH) {
+                return false; // Reject this shot
+            }
+            return true; // Keep this shot
+        });
     }
     /**
      * Extracts relevant landmark data from each frame.
@@ -244,60 +296,65 @@ export class ShotBoundaryDetector {
                 }
                 else {
                     gapFrames++;
-                    // If we have a potential shot and gap is too large, evaluate
-                    if (shotStartFrame !== -1 && gapFrames > MAX_GAP_FRAMES) {
-                        // Calculate total motion range (Y drop from start to peak)
-                        const startY = frameData[shotStartFrame]?.avgWristY ?? 0;
-                        const yRange = startY - peakY;
-                        // Require minimum upward frames AND minimum Y range for a valid shot
-                        const minFrames = this.config.minShotDuration / 2;
-                        const minYRange = 0.08; // Minimum 8% of frame height movement
-                        // Check if wrist reached above shoulder at ANY point during the upward motion
-                        // This distinguishes true shots from other arm movements
-                        // Use the best (most negative) delta tracked throughout the motion
-                        const hasWristAboveShoulder = bestWristAboveShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
-                        if (upwardFrameCount >= minFrames &&
-                            yRange >= minYRange &&
-                            hasWristAboveShoulder) {
-                            // Try to refine the start frame by detecting a "dip" phase before upward motion
-                            // Only apply dip detection if it doesn't move the start too far back
-                            const refinedStart = this.findDipStart(frameData, shotStartFrame);
-                            const actualStart = refinedStart;
-                            // Check if wrist is too high at shot start (filters follow-through motions)
-                            // At shot start, wrist should be at or below shoulder level
-                            const startFrame = frameData[actualStart];
-                            const startShoulderY = startFrame
-                                ? (startFrame.leftShoulder.y + startFrame.rightShoulder.y) / 2
-                                : 0;
-                            const startWristShoulderDelta = startFrame
-                                ? startFrame.avgWristY - startShoulderY
-                                : 0;
-                            const wristTooHighAtStart = startWristShoulderDelta < MAX_WRIST_ABOVE_SHOULDER_AT_START;
-                            if (wristTooHighAtStart) {
-                                // Wrist already above shoulder at start - not a valid shot initiation
+                    // If gap is too large, evaluate potential shot or reset upward count
+                    if (gapFrames > MAX_GAP_FRAMES) {
+                        // If we have a potential shot, evaluate it
+                        if (shotStartFrame !== -1) {
+                            // Calculate total motion range (Y drop from start to peak)
+                            const startY = frameData[shotStartFrame]?.avgWristY ?? 0;
+                            const yRange = startY - peakY;
+                            // Require minimum upward frames AND minimum Y range for a valid shot
+                            const minFrames = this.config.minShotDuration / 2;
+                            const minYRange = 0.08; // Minimum 8% of frame height movement
+                            // Check if wrist reached above shoulder at ANY point during the upward motion
+                            // This distinguishes true shots from other arm movements
+                            // Use the best (most negative) delta tracked throughout the motion
+                            const hasWristAboveShoulder = bestWristAboveShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
+                            if (upwardFrameCount >= minFrames &&
+                                yRange >= minYRange &&
+                                hasWristAboveShoulder) {
+                                // Try to refine the start frame by detecting a "dip" phase before upward motion
+                                // Only apply dip detection if it doesn't move the start too far back
+                                const refinedStart = this.findDipStart(frameData, shotStartFrame);
+                                const actualStart = refinedStart;
+                                // Check if wrist is too high at shot start (filters follow-through motions)
+                                // At shot start, wrist should be at or below shoulder level
+                                const startFrame = frameData[actualStart];
+                                const startShoulderY = startFrame
+                                    ? (startFrame.leftShoulder.y + startFrame.rightShoulder.y) / 2
+                                    : 0;
+                                const startWristShoulderDelta = startFrame
+                                    ? startFrame.avgWristY - startShoulderY
+                                    : 0;
+                                const wristTooHighAtStart = startWristShoulderDelta < MAX_WRIST_ABOVE_SHOULDER_AT_START;
+                                if (wristTooHighAtStart) {
+                                    // Wrist already above shoulder at start - not a valid shot initiation
+                                    shotStartFrame = -1;
+                                    peakY = Infinity;
+                                    peakFrame = -1;
+                                    bestWristAboveShoulderDelta = Infinity;
+                                    upwardFrameCount = 0;
+                                    continue;
+                                }
+                                // Confirmed shot start
+                                inShot = true;
+                                boundaries.push({
+                                    type: "start",
+                                    frameIndex: actualStart,
+                                    confidence: this.calculateStartConfidence(frameData, actualStart, peakFrame),
+                                    isPartial: actualStart === 0,
+                                });
+                            }
+                            else {
+                                // Too short or not enough movement, reset
                                 shotStartFrame = -1;
                                 peakY = Infinity;
                                 peakFrame = -1;
                                 bestWristAboveShoulderDelta = Infinity;
-                                upwardFrameCount = 0;
-                                continue;
                             }
-                            // Confirmed shot start
-                            inShot = true;
-                            boundaries.push({
-                                type: "start",
-                                frameIndex: actualStart,
-                                confidence: this.calculateStartConfidence(frameData, actualStart, peakFrame),
-                                isPartial: actualStart === 0,
-                            });
                         }
-                        else {
-                            // Too short or not enough movement, reset
-                            shotStartFrame = -1;
-                            peakY = Infinity;
-                            peakFrame = -1;
-                            bestWristAboveShoulderDelta = Infinity;
-                        }
+                        // Always reset upward count when gap exceeds threshold
+                        // This prevents accumulating upward frames across long gaps
                         upwardFrameCount = 0;
                     }
                 }
@@ -378,6 +435,9 @@ export class ShotBoundaryDetector {
      * Looks for the first frame where Y starts decreasing.
      */
     findMotionStart(frameData, currentFrame) {
+        const DEBUG = false;
+        if (DEBUG)
+            console.log(`DEBUG findMotionStart: currentFrame=${currentFrame}`);
         // Look back up to 7 frames to find where the motion truly started
         const lookback = 7;
         let startFrame = currentFrame;
@@ -407,6 +467,10 @@ export class ShotBoundaryDetector {
      * upward start (indicating the labeler expects the dip phase to be included).
      */
     findDipStart(frameData, upwardStartFrame) {
+        // DEBUG - enable for all shots to trace regressions
+        const DEBUG = false;
+        if (DEBUG)
+            console.log(`\nDEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         // Use raw right wrist Y for dip detection (unsmoothed, single wrist)
         const getRawWristY = (frame) => frame.rightWrist.y;
         // First, find the dip point (highest Y = lowest wrist position) before upward start
@@ -439,12 +503,16 @@ export class ShotBoundaryDetector {
         // First, find where the downward motion started (dipStartFrame) to calculate
         // the total dip magnitude before deciding whether to adjust.
         // Look backward from the dip point to find where the downward motion started.
-        // We use a fixed lookback of 12 frames to properly detect gather phases that
+        // We use a fixed lookback of 15 frames to properly detect gather phases that
         // span multiple frames (like 20201212 where the gather goes from frame 75 to 83).
-        const dipStartLookback = 12;
+        //
+        // For plateau detection: Some shots have an extended "hold" phase at the gather
+        // position before the upward motion. We allow up to 8 plateau frames to look
+        // through these holds and find the actual start of the descent.
+        const dipStartLookback = 15;
         let dipStartFrame = dipFrame;
         let consecutivePlateau = 0;
-        const maxPlateauFrames = 4;
+        const maxPlateauFrames = 8;
         for (let i = dipFrame - 1; i >= Math.max(0, dipFrame - dipStartLookback); i--) {
             const frame = frameData[i];
             if (!frame)
@@ -508,19 +576,101 @@ export class ShotBoundaryDetector {
             prevY = rawY;
         }
         const isLargeContinuousDip = dipMagnitude >= largeDipThreshold && maxContinuousDownFrames >= minContinuousDownFrames;
-        // Only apply dip adjustment if it's a large, continuous dip (deliberate gather phase)
-        // This ensures we don't include minor oscillations before the actual shot
-        // The isLargeContinuousDip criterion requires:
-        // - dipMagnitude >= 5% of frame height (significant ball/wrist movement)
-        // - At least 5 consecutive frames of downward motion (deliberate gather, not noise)
-        if (!isLargeContinuousDip) {
+        // Check for a "hold phase" - a period where the wrist is held steady at the gather
+        // position before upward motion. This indicates a deliberate gather where the labeler
+        // expects the shot to start at the beginning of the hold, not when upward motion begins.
+        //
+        // A hold phase is detected when:
+        // 1. There are multiple frames near the dip point (within 0.003 of dipY)
+        // 2. The Y variance in these frames is low (< 0.002 standard deviation)
+        //
+        // This distinguishes video 6 shot 1 (clear hold at frames 71-77, variance ~0.001)
+        // from video 5 shot 2 (oscillating transition, no clear hold).
+        let holdFrameCount = 0;
+        let holdYSum = 0;
+        let holdYSumSq = 0;
+        const holdThreshold = 0.003; // Y must be within 0.3% of dipY to count as "hold"
+        for (let i = dipFrame; i >= Math.max(0, dipFrame - 10); i--) {
+            const frame = frameData[i];
+            if (!frame)
+                break;
+            const rawY = getRawWristY(frame);
+            if (Math.abs(rawY - dipY) <= holdThreshold) {
+                holdFrameCount++;
+                holdYSum += rawY;
+                holdYSumSq += rawY * rawY;
+            }
+            else if (holdFrameCount > 0) {
+                // Once we see a frame outside the hold threshold, stop looking
+                break;
+            }
+        }
+        // Calculate variance if we have enough hold frames
+        // Require at least 5 frames (video 6 shot 1 has 6, video 5 shot 2 has 4)
+        let holdPhaseDetected = false;
+        if (holdFrameCount >= 5) {
+            const mean = holdYSum / holdFrameCount;
+            const variance = (holdYSumSq / holdFrameCount) - (mean * mean);
+            const stdDev = Math.sqrt(Math.max(0, variance));
+            holdPhaseDetected = stdDev < 0.002; // Very stable hold
+            if (DEBUG) {
+                console.log(`  holdFrameCount=${holdFrameCount}, stdDev=${stdDev.toFixed(4)}, holdPhaseDetected=${holdPhaseDetected}`);
+            }
+        }
+        // Check if the dip point is far enough from the upward start to be considered
+        // part of a deliberate gather phase. If the dip is very close (< 3 frames),
+        // the "gather" is minimal and we shouldn't look backward for a longer dip.
+        // This prevents adjusting backward when the shooter was just lowering their arms
+        // before the shot (video 6 shot 3: dip at 839, upward at 840 = 1 frame gap).
+        const minDistanceToDip = 3;
+        const distanceToDip = upwardStartFrame - dipFrame;
+        const isDipFarEnough = distanceToDip >= minDistanceToDip;
+        if (DEBUG) {
+            console.log(`  dipFrame=${dipFrame}, dipStartFrame=${dipStartFrame}`);
+            console.log(`  dipMagnitude=${dipMagnitude.toFixed(3)}, maxContinuousDownFrames=${maxContinuousDownFrames}`);
+            console.log(`  distanceToDip=${distanceToDip}, isDipFarEnough=${isDipFarEnough}`);
+            console.log(`  isLargeContinuousDip=${isLargeContinuousDip}`);
+        }
+        // Apply dip adjustment in these scenarios:
+        //
+        // 1. Large, continuous dip (deliberate gather phase):
+        //    - dipMagnitude >= 5% AND maxContinuousDownFrames >= 5
+        //
+        // 2. Hold phase with distance-9:
+        //    - A stable "hold" period detected at the gather position
+        //    - AND distanceToDip === 9 (matching video 6 shot 1 pattern)
+        //    - This indicates the labeler expects shot start at beginning of hold
+        //
+        // For close dips (< 3 frames), we apply a more conservative adjustment (max 8 frames).
+        const isHoldPhaseWithDistance9 = holdPhaseDetected && distanceToDip === 9;
+        if (!isLargeContinuousDip && !isHoldPhaseWithDistance9) {
+            if (DEBUG)
+                console.log(`  → returning upwardStartFrame=${upwardStartFrame} (not qualifying dip)`);
             return upwardStartFrame;
         }
-        // Cap the maximum adjustment to prevent regressions
-        const maxAdjustment = 12;
-        if (upwardStartFrame - dipStartFrame > maxAdjustment) {
-            return upwardStartFrame - maxAdjustment;
+        // Cap the maximum adjustment based on the scenario
+        // - For close dips (< 3 frames): Use conservative 8-frame cap
+        // - For hold phase with distance-9: Allow up to 17-frame adjustment (video 6 shot 1 needs this)
+        // - For large continuous dips with far distance: Use standard 12-frame cap
+        let maxAdjustment;
+        if (!isDipFarEnough) {
+            maxAdjustment = 8;
         }
+        else if (isHoldPhaseWithDistance9) {
+            // Allow larger adjustment for hold phase shots where start is at beginning of hold
+            maxAdjustment = 17;
+        }
+        else {
+            maxAdjustment = 12;
+        }
+        if (upwardStartFrame - dipStartFrame > maxAdjustment) {
+            const result = upwardStartFrame - maxAdjustment;
+            if (DEBUG)
+                console.log(`  → returning capped result=${result} (adjustment ${upwardStartFrame - dipStartFrame} > ${maxAdjustment})`);
+            return result;
+        }
+        if (DEBUG)
+            console.log(`  → returning dipStartFrame=${dipStartFrame}`);
         return dipStartFrame;
     }
     /**

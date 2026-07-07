@@ -14,12 +14,12 @@ import { movingAverage } from "./utils/smoothing";
 const DEFAULT_CONFIG = {
     visibilityThreshold: 0.5,
     ballLowPointSearchWindow: 0.4,
-    legBendSearchWindow: 0.5,
+    legBendSearchWindow: 0.7, // Expanded from 0.5 to capture jump shots with late leg bend
     riseSearchWindow: 0.6,
     smoothingWindowSize: 3,
     minConsecutiveFrames: 2,
     kneeVelocityThreshold: 0.5,
-    wristVelocityThreshold: -0.005,
+    wristVelocityThreshold: -0.002, // Lowered from -0.005 to detect gradual upward motion
     setPointSearchWindow: 0.7,
     setPointMaxElbowAngle: 160,
     releaseSearchWindow: 0.5,

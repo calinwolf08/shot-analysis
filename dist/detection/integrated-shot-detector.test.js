@@ -37,23 +37,25 @@ function createFrameSequenceWithWrists(wristPositions) {
     return wristPositions.map(([leftY, rightY]) => {
         const landmarks = createDefaultLandmarks();
         // Set shoulder positions for reference
-        landmarks[LANDMARK_INDEX.LEFT_SHOULDER] = createLandmark(0.4, 0.3);
-        landmarks[LANDMARK_INDEX.RIGHT_SHOULDER] = createLandmark(0.6, 0.3);
+        // Front-facing camera: right shoulder appears to LEFT of left shoulder in image coords
+        // This gives negative shoulderDiffX (rightShoulder.x - leftShoulder.x < 0)
+        landmarks[LANDMARK_INDEX.LEFT_SHOULDER] = createLandmark(0.6, 0.3);
+        landmarks[LANDMARK_INDEX.RIGHT_SHOULDER] = createLandmark(0.4, 0.3);
         // Set wrist positions
-        landmarks[LANDMARK_INDEX.LEFT_WRIST] = createLandmark(0.4, leftY);
-        landmarks[LANDMARK_INDEX.RIGHT_WRIST] = createLandmark(0.6, rightY);
+        landmarks[LANDMARK_INDEX.LEFT_WRIST] = createLandmark(0.6, leftY);
+        landmarks[LANDMARK_INDEX.RIGHT_WRIST] = createLandmark(0.4, rightY);
         // Set hand positions similar to wrist
-        landmarks[LANDMARK_INDEX.LEFT_INDEX] = createLandmark(0.4, leftY - 0.02);
-        landmarks[LANDMARK_INDEX.RIGHT_INDEX] = createLandmark(0.6, rightY - 0.02);
+        landmarks[LANDMARK_INDEX.LEFT_INDEX] = createLandmark(0.6, leftY - 0.02);
+        landmarks[LANDMARK_INDEX.RIGHT_INDEX] = createLandmark(0.4, rightY - 0.02);
         // Set hip positions
-        landmarks[LANDMARK_INDEX.LEFT_HIP] = createLandmark(0.4, 0.55);
-        landmarks[LANDMARK_INDEX.RIGHT_HIP] = createLandmark(0.6, 0.55);
+        landmarks[LANDMARK_INDEX.LEFT_HIP] = createLandmark(0.6, 0.55);
+        landmarks[LANDMARK_INDEX.RIGHT_HIP] = createLandmark(0.4, 0.55);
         // Set knee positions
-        landmarks[LANDMARK_INDEX.LEFT_KNEE] = createLandmark(0.4, 0.75);
-        landmarks[LANDMARK_INDEX.RIGHT_KNEE] = createLandmark(0.6, 0.75);
+        landmarks[LANDMARK_INDEX.LEFT_KNEE] = createLandmark(0.6, 0.75);
+        landmarks[LANDMARK_INDEX.RIGHT_KNEE] = createLandmark(0.4, 0.75);
         // Set ankle positions
-        landmarks[LANDMARK_INDEX.LEFT_ANKLE] = createLandmark(0.4, 0.95);
-        landmarks[LANDMARK_INDEX.RIGHT_ANKLE] = createLandmark(0.6, 0.95);
+        landmarks[LANDMARK_INDEX.LEFT_ANKLE] = createLandmark(0.6, 0.95);
+        landmarks[LANDMARK_INDEX.RIGHT_ANKLE] = createLandmark(0.4, 0.95);
         return createPoseLandmarks(landmarks);
     });
 }
