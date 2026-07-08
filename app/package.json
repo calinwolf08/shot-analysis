@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "cap:sync": "npm run build && npx cap sync",
-    "verify": "npm run check && npm run lint && npm run test && npm run build"
+    "verify": "npm run check && npm run lint && npm run test && npm run build",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@capacitor-community/keep-awake": "^7.1.0",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@capacitor/cli": "^7.6.7",
     "@eslint/js": "^9.18.0",
+    "@playwright/test": "1.58.2",
     "@sveltejs/adapter-static": "^3.0.8",
     "@sveltejs/kit": "^2.16.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
