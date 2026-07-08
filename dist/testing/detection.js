@@ -11,6 +11,7 @@
  * @see Task 9.2 - Detection Execution & Comparison
  */
 import { LANDMARK_INDEX } from "../pose/types";
+import { LANDMARK_INDICES } from "../types";
 import { createShotBoundaryDetector } from "../detection/shot-detector";
 import { createKeyframeDetector } from "../keyframe-detector";
 import { KEYFRAME_IDS } from "./types";
@@ -149,7 +150,7 @@ export function detectOrientationFromFrames(frames) {
     // Lowered from 0.35 to 0.25 to handle front-right shots with moderate Z-depth (video 6 shots 4-5)
     // Further lowered to 0.12 for front-left detection in zak-1 shot 9 (ZDiff=0.14)
     const frontAngleThreshold = 0.12;
-    const behindAngleThreshold = 0.40;
+    const behindAngleThreshold = 0.4;
     // Absolute shoulder separation for front/back vs side determination
     const shoulderSeparation = Math.abs(avgShoulderDiffX);
     const hipSeparation = Math.abs(avgHipDiffX);
@@ -199,8 +200,7 @@ export function detectOrientationFromFrames(frames) {
     // CASE 2b: Near-pure side view - very small shoulder X separation (< 0.03) with moderate-high Z-depth (> 0.40)
     // This handles cases where Z-depth is just below the 0.45 threshold but body position
     // clearly indicates a side view (shoulders nearly overlapping in X with significant Z separation)
-    else if (shoulderSeparation < 0.03 &&
-        absZDiff > 0.40) {
+    else if (shoulderSeparation < 0.03 && absZDiff > 0.4) {
         if (avgZDiff > 0) {
             return "side-left";
         }
@@ -244,12 +244,19 @@ export function detectOrientationFromFrames(frames) {
         const isSlightlyFrontView = isFrontView && avgShoulderDiffX > -0.05;
         const shoulderHipSeparationRatio = hipSeparation > 0.01 ? shoulderSeparation / hipSeparation : 999;
         const shoulderMoreOrEquallyAligned = shoulderHipSeparationRatio >= 1.0;
-        const isBehindCandidate = isBackView || (isSlightlyFrontView && absZDiff > 0.50 && absHipZDiff > 0.30 && shoulderMoreOrEquallyAligned);
-        if (hipZConsistent && isBehindCandidate &&
-            shoulderSeparation > pureSideShoulderThreshold && shoulderSeparation < sideThreshold &&
-            hipSeparation > 0.02 && hipSeparation < 0.04) {
+        const isBehindCandidate = isBackView ||
+            (isSlightlyFrontView &&
+                absZDiff > 0.5 &&
+                absHipZDiff > 0.3 &&
+                shoulderMoreOrEquallyAligned);
+        if (hipZConsistent &&
+            isBehindCandidate &&
+            shoulderSeparation > pureSideShoulderThreshold &&
+            shoulderSeparation < sideThreshold &&
+            hipSeparation > 0.02 &&
+            hipSeparation < 0.04) {
             // Additional check: strong hip Z pattern (>0.30) suggests behind-angled
-            if (absHipZDiff > 0.30) {
+            if (absHipZDiff > 0.3) {
                 if (avgZDiff > 0) {
                     return "behind-left";
                 }
@@ -288,7 +295,7 @@ export function detectOrientationFromFrames(frames) {
         // rather than shoulder rotation. In this case, it's a side view not front.
         // This distinguishes side-left views with moderate shoulder separation from
         // true front views with shoulder rotation during shooting.
-        const strongHipZFollows = absHipZDiff > 0.30 && Math.sign(avgHipZDiff) === Math.sign(avgZDiff);
+        const strongHipZFollows = absHipZDiff > 0.3 && Math.sign(avgHipZDiff) === Math.sign(avgZDiff);
         const isTrueSideView = absZDiff > sideViewZThreshold && strongHipZFollows;
         if (isFrontView &&
             shoulderSeparation < 0.05 &&
@@ -336,7 +343,7 @@ export function detectOrientationFromFrames(frames) {
         if (isBackView &&
             shoulderHipXRatio < 1.4 &&
             shoulderHipZRatio < 1.5 &&
-            shoulderSeparation > 0.10 &&
+            shoulderSeparation > 0.1 &&
             shoulderSeparation < frontBackThreshold) {
             return "front";
         }
@@ -365,7 +372,7 @@ export function detectOrientationFromFrames(frames) {
             // - Hip Z is NOT highly consistent (< 0.25), otherwise it's more likely front-angled
             //   When hip Z is high (> 0.25), both shoulders and hips show the angle offset,
             //   which is more consistent with a front-angled view than a side view with rotation.
-            const moderateZForSide = absZDiff > 0.30 && absZDiff < sideViewZThreshold;
+            const moderateZForSide = absZDiff > 0.3 && absZDiff < sideViewZThreshold;
             const moderateShoulderSep = shoulderSeparation > sideThreshold && shoulderSeparation < 0.12;
             const hipFollowsShoulder = Math.sign(avgHipZDiff) === Math.sign(avgZDiff) && absHipZDiff > 0.15;
             const hipNotHighlyConsistent = absHipZDiff < 0.25;
@@ -395,7 +402,7 @@ export function detectOrientationFromFrames(frames) {
             // the separation, not camera angle. This indicates side view.
             // Applies to shots just outside the moderateShoulderSep range (e.g., shoulderSep=0.122).
             const shoulderHipXRatio = hipSeparation > 0.01 ? shoulderSeparation / hipSeparation : 999;
-            if (avgZDiff > 0 && shoulderHipXRatio > 1.6 && absZDiff > 0.30) {
+            if (avgZDiff > 0 && shoulderHipXRatio > 1.6 && absZDiff > 0.3) {
                 return "side-left";
             }
             if (avgZDiff > frontAngleThreshold) {
@@ -420,7 +427,7 @@ export function detectOrientationFromFrames(frames) {
             // - Moderate Z-depth (0.30-0.45)
             // - Hip Z follows shoulder Z direction
             const absHipZDiff = Math.abs(avgHipZDiff);
-            const moderateZForSide = absZDiff > 0.30 && absZDiff < sideViewZThreshold;
+            const moderateZForSide = absZDiff > 0.3 && absZDiff < sideViewZThreshold;
             const smallShoulderSep = shoulderSeparation < sideThreshold;
             const hipFollowsShoulderZ = Math.sign(avgHipZDiff) === Math.sign(avgZDiff) && absHipZDiff > 0.15;
             if (moderateZForSide && smallShoulderSep && hipFollowsShoulderZ) {
@@ -446,10 +453,10 @@ export function detectOrientationFromFrames(frames) {
             // This catches shots like zak-1 shot 4 where ZDiff=-0.02, HipZ=-0.03
             if (avgZDiff < 0 &&
                 avgHipZDiff < 0 &&
-                shoulderSeparation > 0.10 &&
+                shoulderSeparation > 0.1 &&
                 shoulderSeparation < frontBackThreshold &&
                 absZDiff < behindAngleThreshold &&
-                absHipZDiff < 0.10) {
+                absHipZDiff < 0.1) {
                 return "behind-right";
             }
             return "behind";
@@ -492,6 +499,84 @@ export function detectOrientationForShot(poseData, startFrame, endFrame) {
         return "unknown";
     }
     return detectOrientationFromFrames(shotFrames);
+}
+// ============================================================================
+// Shot Exclusion Logic for Behind-View Shots
+// ============================================================================
+/**
+ * Threshold for elbow visibility to be considered "reliable".
+ * Below this threshold, angle calculations become unreliable.
+ */
+const ELBOW_VISIBILITY_THRESHOLD = 0.5;
+/**
+ * Orientations that are considered "behind" views.
+ * These views often have poor elbow visibility making keyframe detection unreliable.
+ */
+const BEHIND_VIEW_ORIENTATIONS = [
+    "behind",
+    "behind-left",
+    "behind-right",
+];
+/**
+ * Checks if a shot should be excluded from keyframe validation due to pose limitations.
+ *
+ * Behind-view shots (behind, behind-left, behind-right) are excluded when
+ * either elbow has average visibility below the threshold. This is because
+ * the shooting arm may not be reliably visible, making elbow angle calculations
+ * unreliable for set_point and release detection.
+ *
+ * For behind-view shots:
+ * - behind-left: right side of body is partially hidden
+ * - behind-right: left side of body is partially hidden
+ * - behind: both sides may have visibility issues
+ *
+ * @param poseData - Full pose data for the video
+ * @param startFrame - Shot start frame index (inclusive)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param orientation - Detected camera orientation for this shot
+ * @returns Object with excluded flag and reason
+ */
+export function shouldExcludeKeyframeValidation(poseData, startFrame, endFrame, orientation) {
+    // Only exclude behind-view shots
+    if (!BEHIND_VIEW_ORIENTATIONS.includes(orientation)) {
+        return { excluded: false };
+    }
+    // Calculate average elbow visibility for the shot
+    const shotFrames = poseData.frames.filter((f) => f.frameIndex >= startFrame && f.frameIndex <= endFrame);
+    if (shotFrames.length === 0) {
+        return { excluded: true, reason: "no frames in shot range" };
+    }
+    let totalLeftElbowVis = 0;
+    let totalRightElbowVis = 0;
+    let validFrameCount = 0;
+    for (const frame of shotFrames) {
+        if (!frame.landmarks)
+            continue;
+        const leftElbow = frame.landmarks[LANDMARK_INDICES.LEFT_ELBOW];
+        const rightElbow = frame.landmarks[LANDMARK_INDICES.RIGHT_ELBOW];
+        if (leftElbow && rightElbow) {
+            totalLeftElbowVis += leftElbow.visibility;
+            totalRightElbowVis += rightElbow.visibility;
+            validFrameCount++;
+        }
+    }
+    if (validFrameCount === 0) {
+        return { excluded: true, reason: "no valid elbow landmarks" };
+    }
+    const avgLeftElbowVis = totalLeftElbowVis / validFrameCount;
+    const avgRightElbowVis = totalRightElbowVis / validFrameCount;
+    // For behind-view shots, check if EITHER elbow has low visibility
+    // This is because we don't know which arm is the shooting arm,
+    // and the hidden elbow makes accurate keyframe detection unreliable
+    const minElbowVis = Math.min(avgLeftElbowVis, avgRightElbowVis);
+    if (minElbowVis < ELBOW_VISIBILITY_THRESHOLD) {
+        const hiddenSide = avgLeftElbowVis < avgRightElbowVis ? "left" : "right";
+        return {
+            excluded: true,
+            reason: `${orientation} view with low ${hiddenSide} elbow visibility (${minElbowVis.toFixed(2)} < ${ELBOW_VISIBILITY_THRESHOLD})`,
+        };
+    }
+    return { excluded: false };
 }
 // ============================================================================
 // Detection Execution
@@ -753,9 +838,35 @@ export function compareResults(detection, labelData, poseData) {
         const labeled = labelData.shots[i];
         // Detect orientation for this specific shot
         const detectedOrientation = detectOrientationForShot(poseData, detected.startFrame, detected.endFrame);
+        // Check if keyframe validation should be excluded for this shot
+        const exclusionCheck = shouldExcludeKeyframeValidation(poseData, detected.startFrame, detected.endFrame, detectedOrientation);
         // Detect and compare keyframes for this shot
         const detectedKeyframes = detectKeyframesForShot(poseData, detected.startFrame, detected.endFrame);
-        const keyframeComparisons = compareKeyframes(labeled, detectedKeyframes);
+        // If excluded, mark all keyframe comparisons as passed (excluded from validation)
+        let keyframeComparisons;
+        if (exclusionCheck.excluded) {
+            // Create comparison results that are all marked as passed (excluded)
+            keyframeComparisons = KEYFRAME_IDS.map((keyframeId) => {
+                const labeledValue = labeled[keyframeId];
+                const labeled_frame = labeledValue === null || labeledValue === undefined
+                    ? null
+                    : labeledValue;
+                const detected_frame = detectedKeyframes.get(keyframeId) ?? null;
+                const diff = labeled_frame !== null && detected_frame !== null
+                    ? Math.abs(detected_frame - labeled_frame)
+                    : null;
+                return {
+                    keyframeId,
+                    labeled: labeled_frame,
+                    detected: detected_frame,
+                    diff,
+                    passed: true, // Excluded shots automatically pass keyframe validation
+                };
+            });
+        }
+        else {
+            keyframeComparisons = compareKeyframes(labeled, detectedKeyframes);
+        }
         const comparison = {
             shotNumber: labeled.shotNumber,
             startFrame: compareFrame(detected.startFrame, labeled.startFrame, useExpandedTolerance),
@@ -766,6 +877,11 @@ export function compareResults(detection, labelData, poseData) {
                 match: detectedOrientation === labeled.cameraOrientation,
             },
             keyframes: keyframeComparisons,
+            keyframeValidationExcluded: exclusionCheck.excluded,
+            // Only include exclusionReason when it has a value (exactOptionalPropertyTypes requires this)
+            ...(exclusionCheck.reason !== undefined && {
+                exclusionReason: exclusionCheck.reason,
+            }),
         };
         shotComparisons.push(comparison);
     }

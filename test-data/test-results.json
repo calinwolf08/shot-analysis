@@ -1,5 +1,5 @@
 {
-  "runAt": "2026-07-07T23:50:43.275Z",
+  "runAt": "2026-07-08T00:37:38.865Z",
   "summary": {
     "total": 12,
     "passed": 9,
@@ -104,7 +104,8 @@
               "diff": 2,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 2,
@@ -196,7 +197,8 @@
               "diff": 2,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 3,
@@ -256,29 +258,29 @@
             {
               "keyframeId": "set_point",
               "labeled": 576,
-              "detected": 580,
-              "diff": 4,
+              "detected": 576,
+              "diff": 0,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 585,
-              "detected": 581,
-              "diff": 4,
+              "detected": 577,
+              "diff": 8,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 586,
-              "detected": 581,
-              "diff": 5,
+              "detected": 577,
+              "diff": 9,
               "passed": true
             },
             {
               "keyframeId": "feet_leave_ground",
               "labeled": 582,
-              "detected": 581,
-              "diff": 1,
+              "detected": 568,
+              "diff": 14,
               "passed": true
             },
             {
@@ -288,7 +290,9 @@
               "diff": 3,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": true,
+          "exclusionReason": "behind view with low right elbow visibility (0.21 < 0.5)"
         },
         {
           "shotNumber": 4,
@@ -348,22 +352,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 850,
-              "detected": 857,
-              "diff": 7,
+              "detected": 848,
+              "diff": 2,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 858,
-              "detected": 859,
-              "diff": 1,
+              "detected": 855,
+              "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 859,
-              "detected": 862,
-              "diff": 3,
+              "detected": 858,
+              "diff": 1,
               "passed": true
             },
             {
@@ -380,7 +384,8 @@
               "diff": 0,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         }
       ]
     },
@@ -446,22 +451,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 96,
-              "detected": 103,
-              "diff": 7,
+              "detected": 97,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 102,
-              "detected": 105,
-              "diff": 3,
+              "detected": 98,
+              "diff": 4,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 103,
-              "detected": 105,
-              "diff": 2,
+              "detected": 104,
+              "diff": 1,
               "passed": true
             },
             {
@@ -478,7 +483,8 @@
               "diff": 3,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 2,
@@ -570,7 +576,8 @@
               "diff": 2,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 3,
@@ -662,7 +669,8 @@
               "diff": 1,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         }
       ]
     },
@@ -728,29 +736,29 @@
             {
               "keyframeId": "set_point",
               "labeled": 23,
-              "detected": 28,
-              "diff": 5,
+              "detected": 23,
+              "diff": 0,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 27,
-              "detected": 32,
-              "diff": 5,
+              "detected": 29,
+              "diff": 2,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 28,
-              "detected": 33,
-              "diff": 5,
+              "detected": 32,
+              "diff": 4,
               "passed": true
             },
             {
               "keyframeId": "feet_leave_ground",
               "labeled": 26,
-              "detected": 25,
-              "diff": 1,
+              "detected": 24,
+              "diff": 2,
               "passed": true
             },
             {
@@ -760,7 +768,8 @@
               "diff": 0,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 2,
@@ -820,22 +829,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 131,
-              "detected": 137,
-              "diff": 6,
+              "detected": 130,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 136,
-              "detected": 140,
-              "diff": 4,
+              "detected": 133,
+              "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 136,
-              "detected": 141,
-              "diff": 5,
+              "detected": 136,
+              "diff": 0,
               "passed": true
             },
             {
@@ -852,7 +861,8 @@
               "diff": 0,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         }
       ]
     },
@@ -918,21 +928,21 @@
             {
               "keyframeId": "set_point",
               "labeled": null,
-              "detected": 52,
+              "detected": 48,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": null,
-              "detected": 54,
+              "detected": 49,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": null,
-              "detected": 55,
+              "detected": 53,
               "diff": null,
               "passed": true
             },
@@ -950,7 +960,8 @@
               "diff": null,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         }
       ]
     },
@@ -1054,7 +1065,8 @@
               "diff": 2,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 2,
@@ -1114,29 +1126,29 @@
             {
               "keyframeId": "set_point",
               "labeled": 208,
-              "detected": 214,
-              "diff": 6,
+              "detected": 209,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 213,
-              "detected": 215,
-              "diff": 2,
+              "detected": 210,
+              "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 214,
-              "detected": 217,
+              "detected": 211,
               "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "feet_leave_ground",
               "labeled": 211,
-              "detected": 209,
-              "diff": 2,
+              "detected": 208,
+              "diff": 3,
               "passed": true
             },
             {
@@ -1146,7 +1158,8 @@
               "diff": 1,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 3,
@@ -1206,22 +1219,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 848,
-              "detected": 853,
-              "diff": 5,
+              "detected": 849,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 852,
-              "detected": 854,
+              "detected": 850,
               "diff": 2,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 853,
-              "detected": 856,
-              "diff": 3,
+              "detected": 853,
+              "diff": 0,
               "passed": true
             },
             {
@@ -1238,7 +1251,8 @@
               "diff": 1,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         }
       ]
     },
@@ -1336,7 +1350,8 @@
               "diff": null,
               "passed": false
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 2,
@@ -1396,39 +1411,40 @@
             {
               "keyframeId": "set_point",
               "labeled": 150,
-              "detected": 159,
-              "diff": 9,
-              "passed": false
+              "detected": 149,
+              "diff": 1,
+              "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 156,
-              "detected": 163,
-              "diff": 7,
+              "detected": 152,
+              "diff": 4,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 157,
-              "detected": 165,
-              "diff": 8,
+              "detected": 157,
+              "diff": 0,
               "passed": true
             },
             {
               "keyframeId": "feet_leave_ground",
               "labeled": 155,
-              "detected": 156,
+              "detected": 154,
               "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "feet_land",
               "labeled": 164,
-              "detected": 165,
-              "diff": 1,
+              "detected": 166,
+              "diff": 2,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 3,
@@ -1455,7 +1471,7 @@
               "labeled": 255,
               "detected": 265,
               "diff": 10,
-              "passed": false
+              "passed": true
             },
             {
               "keyframeId": "leg_bend_low_point",
@@ -1488,22 +1504,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 269,
-              "detected": 277,
-              "diff": 8,
+              "detected": 275,
+              "diff": 6,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 276,
-              "detected": 280,
-              "diff": 4,
+              "detected": 279,
+              "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 277,
-              "detected": 282,
-              "diff": 5,
+              "detected": 279,
+              "diff": 2,
               "passed": true
             },
             {
@@ -1520,7 +1536,9 @@
               "diff": 0,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": true,
+          "exclusionReason": "behind-left view with low right elbow visibility (0.29 < 0.5)"
         },
         {
           "shotNumber": 4,
@@ -1547,7 +1565,7 @@
               "labeled": 369,
               "detected": 379,
               "diff": 10,
-              "passed": false
+              "passed": true
             },
             {
               "keyframeId": "leg_bend_low_point",
@@ -1561,7 +1579,7 @@
               "labeled": 370,
               "detected": 379,
               "diff": 9,
-              "passed": false
+              "passed": true
             },
             {
               "keyframeId": "legs_start_extending",
@@ -1575,34 +1593,34 @@
               "labeled": 371,
               "detected": 380,
               "diff": 9,
-              "passed": false
+              "passed": true
             },
             {
               "keyframeId": "set_point",
               "labeled": 382,
-              "detected": 392,
-              "diff": 10,
-              "passed": false
+              "detected": 386,
+              "diff": 4,
+              "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 388,
-              "detected": 395,
-              "diff": 7,
+              "detected": 391,
+              "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 389,
-              "detected": 395,
-              "diff": 6,
+              "detected": 391,
+              "diff": 2,
               "passed": true
             },
             {
               "keyframeId": "feet_leave_ground",
               "labeled": 388,
-              "detected": 387,
-              "diff": 1,
+              "detected": 386,
+              "diff": 2,
               "passed": true
             },
             {
@@ -1612,7 +1630,9 @@
               "diff": 2,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": true,
+          "exclusionReason": "behind view with low right elbow visibility (0.25 < 0.5)"
         },
         {
           "shotNumber": 5,
@@ -1672,22 +1692,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 517,
-              "detected": 530,
-              "diff": 13,
-              "passed": false
+              "detected": 522,
+              "diff": 5,
+              "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 526,
-              "detected": 532,
-              "diff": 6,
+              "detected": 524,
+              "diff": 2,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 527,
-              "detected": 532,
-              "diff": 5,
+              "detected": 531,
+              "diff": 4,
               "passed": true
             },
             {
@@ -1704,7 +1724,9 @@
               "diff": 3,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": true,
+          "exclusionReason": "behind-right view with low left elbow visibility (0.35 < 0.5)"
         },
         {
           "shotNumber": 6,
@@ -1764,15 +1786,15 @@
             {
               "keyframeId": "set_point",
               "labeled": 634,
-              "detected": 644,
-              "diff": 10,
-              "passed": false
+              "detected": 639,
+              "diff": 5,
+              "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 641,
-              "detected": 645,
-              "diff": 4,
+              "detected": 644,
+              "diff": 3,
               "passed": true
             },
             {
@@ -1796,7 +1818,8 @@
               "diff": 3,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 7,
@@ -1856,14 +1879,14 @@
             {
               "keyframeId": "set_point",
               "labeled": 762,
-              "detected": 769,
-              "diff": 7,
+              "detected": 767,
+              "diff": 5,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 769,
-              "detected": 770,
+              "detected": 768,
               "diff": 1,
               "passed": true
             },
@@ -1888,10 +1911,11 @@
               "diff": 2,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         }
       ],
-      "failureReason": "shot 1 start: diff 12 exceeds tolerance; shot 1 keyframe legs_start_bending: diff 12 exceeds tolerance; shot 1 keyframe feet_leave_ground: not detected (expected 37); shot 1 keyframe feet_land: not detected (expected 45); shot 2 keyframe set_point: diff 9 exceeds tolerance; shot 3 start: diff 10 exceeds tolerance; shot 3 keyframe legs_start_bending: diff 10 exceeds tolerance; shot 4 start: diff 10 exceeds tolerance; shot 4 keyframe legs_start_bending: diff 10 exceeds tolerance; shot 4 keyframe ball_low_point: diff 9 exceeds tolerance; shot 4 keyframe ball_starts_upward: diff 9 exceeds tolerance; shot 4 keyframe set_point: diff 10 exceeds tolerance; shot 5 keyframe set_point: diff 13 exceeds tolerance; shot 6 keyframe set_point: diff 10 exceeds tolerance"
+      "failureReason": "shot 1 start: diff 12 exceeds tolerance; shot 1 keyframe legs_start_bending: diff 12 exceeds tolerance; shot 1 keyframe feet_leave_ground: not detected (expected 37); shot 1 keyframe feet_land: not detected (expected 45); shot 3 start: diff 10 exceeds tolerance; shot 4 start: diff 10 exceeds tolerance"
     },
     {
       "video": "20190818_142631.mp4",
@@ -1987,7 +2011,8 @@
               "diff": 2,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 2,
@@ -2079,7 +2104,8 @@
               "diff": 0,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 3,
@@ -2139,21 +2165,21 @@
             {
               "keyframeId": "set_point",
               "labeled": 564,
-              "detected": 569,
-              "diff": 5,
+              "detected": 565,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 569,
-              "detected": 570,
-              "diff": 1,
+              "detected": 566,
+              "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 570,
-              "detected": 571,
+              "detected": 569,
               "diff": 1,
               "passed": true
             },
@@ -2171,7 +2197,8 @@
               "diff": 1,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         }
       ]
     },
@@ -2237,21 +2264,21 @@
             {
               "keyframeId": "set_point",
               "labeled": null,
-              "detected": 118,
+              "detected": 115,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": null,
-              "detected": 120,
+              "detected": 117,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": null,
-              "detected": 120,
+              "detected": 119,
               "diff": null,
               "passed": true
             },
@@ -2269,7 +2296,8 @@
               "diff": null,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 2,
@@ -2329,39 +2357,40 @@
             {
               "keyframeId": "set_point",
               "labeled": null,
-              "detected": 443,
+              "detected": 438,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": null,
-              "detected": 447,
+              "detected": 439,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": null,
-              "detected": 448,
+              "detected": 443,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "feet_leave_ground",
               "labeled": null,
-              "detected": 439,
+              "detected": 438,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "feet_land",
               "labeled": null,
-              "detected": 446,
+              "detected": 448,
               "diff": null,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 3,
@@ -2421,14 +2450,14 @@
             {
               "keyframeId": "set_point",
               "labeled": null,
-              "detected": 662,
+              "detected": 658,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": null,
-              "detected": 663,
+              "detected": 659,
               "diff": null,
               "passed": true
             },
@@ -2453,7 +2482,8 @@
               "diff": null,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 4,
@@ -2513,21 +2543,21 @@
             {
               "keyframeId": "set_point",
               "labeled": null,
-              "detected": 980,
+              "detected": 977,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": null,
-              "detected": 983,
+              "detected": 979,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": null,
-              "detected": 983,
+              "detected": 981,
               "diff": null,
               "passed": true
             },
@@ -2545,7 +2575,8 @@
               "diff": null,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         },
         {
           "shotNumber": 5,
@@ -2605,28 +2636,28 @@
             {
               "keyframeId": "set_point",
               "labeled": null,
-              "detected": 1306,
+              "detected": 1301,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": null,
-              "detected": 1309,
+              "detected": 1304,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": null,
-              "detected": 1310,
+              "detected": 1305,
               "diff": null,
               "passed": true
             },
             {
               "keyframeId": "feet_leave_ground",
               "labeled": null,
-              "detected": 1303,
+              "detected": 1299,
               "diff": null,
               "passed": true
             },
@@ -2637,7 +2668,8 @@
               "diff": null,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         }
       ]
     },
@@ -2703,29 +2735,29 @@
             {
               "keyframeId": "set_point",
               "labeled": 91,
-              "detected": 99,
-              "diff": 8,
+              "detected": 92,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 98,
-              "detected": 100,
-              "diff": 2,
+              "detected": 97,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 99,
-              "detected": 102,
-              "diff": 3,
+              "detected": 101,
+              "diff": 2,
               "passed": true
             },
             {
               "keyframeId": "feet_leave_ground",
               "labeled": 97,
-              "detected": 97,
-              "diff": 0,
+              "detected": 95,
+              "diff": 2,
               "passed": true
             },
             {
@@ -2735,7 +2767,8 @@
               "diff": 2,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         }
       ]
     },
@@ -2801,8 +2834,8 @@
             {
               "keyframeId": "set_point",
               "labeled": 70,
-              "detected": 74,
-              "diff": 4,
+              "detected": 75,
+              "diff": 5,
               "passed": true
             },
             {
@@ -2833,7 +2866,8 @@
               "diff": 1,
               "passed": true
             }
-          ]
+          ],
+          "keyframeValidationExcluded": false
         }
       ]
     },

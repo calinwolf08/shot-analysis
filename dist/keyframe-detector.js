@@ -616,7 +616,8 @@ export function detectBallStartsUpward(frames, ballLowPointFrame, endFrame, conf
  */
 export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config = DEFAULT_CONFIG) {
     const shotDuration = endFrame - ballStartsUpwardFrame + 1;
-    const searchEndFrame = ballStartsUpwardFrame + Math.floor(shotDuration * config.setPointSearchWindow);
+    const searchEndFrame = ballStartsUpwardFrame +
+        Math.floor(shotDuration * config.setPointSearchWindow);
     // Collect wrist Y positions and elbow angles for frames in the search window
     const frameData = [];
     for (const frame of frames) {
@@ -636,9 +637,76 @@ export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config =
     }
     // Sort by frame index
     frameData.sort((a, b) => a.frameIndex - b.frameIndex);
-    // Strategy: Find the frame with minimum wrist Y (highest position)
-    // that also has a bent elbow (angle < threshold).
-    // If multiple frames have similar wrist Y, prefer the one with more bent elbow.
+    // Strategy 1: Detect FIRST local minimum (plateau) in wristY motion
+    // The set_point in basketball is the "cocking" position where the ball pauses
+    // at shoulder height before the final push to the peak.
+    // For two-stage release forms, the ball pauses briefly before continuing upward.
+    //
+    // A local minimum is detected when:
+    // - wristY was decreasing (ball rising)
+    // - wristY velocity becomes near-zero or positive (pause or reversal)
+    // - The elbow is significantly bent (< 120°) indicating "cocked" position
+    // Calculate velocities
+    const velocities = [];
+    for (let i = 1; i < frameData.length; i++) {
+        velocities.push(frameData[i].wristY - frameData[i - 1].wristY);
+    }
+    // Velocity threshold for detecting a plateau (near-zero velocity)
+    const plateauVelocityThreshold = 0.002; // Small velocity = pause
+    // Elbow angle threshold for "cocked" position (more restrictive than general bent)
+    // Set point typically has elbow bent around 85-100° (deeply bent before extension)
+    // This is more restrictive than the general "bent" threshold to avoid detecting
+    // the set point too early in continuous motion shots
+    const setPointElbowThreshold = 100; // degrees
+    // Look for first local minimum with properly bent elbow:
+    // - We need at least 2 frames of decreasing wristY (negative velocity)
+    // - Followed by a frame where velocity is near-zero or positive
+    // - Elbow must be significantly bent (< 120°) to be the "cocking" position
+    let consecutiveDecreasing = 0;
+    for (let i = 0; i < velocities.length; i++) {
+        const velocity = velocities[i];
+        if (velocity < -0.005) {
+            // Significant decrease - ball is rising
+            consecutiveDecreasing++;
+        }
+        else if (consecutiveDecreasing >= 2 &&
+            velocity > -plateauVelocityThreshold) {
+            // Found plateau or reversal after sustained rise
+            // Check if elbow is in "cocked" position (significantly bent)
+            const frameIndex = i + 1; // velocity[i] is between frame[i] and frame[i+1]
+            const data = frameData[frameIndex];
+            if (data) {
+                const elbowCocked = data.elbowAngle !== null && data.elbowAngle < setPointElbowThreshold;
+                if (elbowCocked) {
+                    return data.frameIndex;
+                }
+            }
+            // Reset and continue looking if elbow wasn't cocked
+            consecutiveDecreasing = 0;
+        }
+        else if (velocity > 0.002) {
+            // Significant increase - reset counter
+            consecutiveDecreasing = 0;
+        }
+    }
+    // Strategy 2: Find the FIRST frame where elbow is in "deeply cocked" position
+    // after significant ball rise (wristY has decreased from starting point)
+    // This handles continuous motion shots without a clear plateau
+    //
+    // We use a stricter elbow threshold (90°) to avoid detecting too early.
+    // The "set point" is when the elbow is deeply bent just before extension.
+    const startingWristY = frameData[0]?.wristY ?? 1.0;
+    const significantRise = 0.1; // WristY must decrease by at least 0.10 (ball rose significantly)
+    const deepBendThreshold = 90; // degrees - stricter than setPointElbowThreshold
+    for (const data of frameData) {
+        const ballHasRisen = startingWristY - data.wristY > significantRise;
+        const elbowDeeplyCocked = data.elbowAngle !== null && data.elbowAngle < deepBendThreshold;
+        if (ballHasRisen && elbowDeeplyCocked) {
+            return data.frameIndex;
+        }
+    }
+    // Fallback Strategy 3: Find minimum wrist Y with bent elbow
+    // This handles cases where elbow data is unavailable
     let bestFrame = null;
     let minWristY = Infinity;
     for (const data of frameData) {
@@ -1128,7 +1196,7 @@ export class KeyframeDetector {
         // feet keyframes may be null for set shots (non-jump shots)
         const armsConfidence = armsExtendedFrame !== null ? 1 : 0;
         const feetConfidence = feetLeaveGroundFrame !== null && feetLandFrame !== null ? 1 : 0.5;
-        const overallConfidence = (armsConfidence * 0.6 + feetConfidence * 0.4);
+        const overallConfidence = armsConfidence * 0.6 + feetConfidence * 0.4;
         return {
             keyframes,
             confidence: overallConfidence,

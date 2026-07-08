@@ -183,12 +183,18 @@ function formatShotComparison(shot) {
     lines.push(`      Start: ${startStatus}detected ${shot.startFrame.detected}, expected ${shot.startFrame.expected} (${startDiffStr})${COLORS.reset}`);
     lines.push(`      End:   ${endStatus}detected ${shot.endFrame.detected}, expected ${shot.endFrame.expected} (${endDiffStr})${COLORS.reset}`);
     lines.push(`      Orientation: ${orientationStatus}detected '${shot.orientation.detected}', expected '${shot.orientation.expected}'${shot.orientation.match ? " (match)" : ""}${COLORS.reset}`);
-    // Add keyframe results (only show labeled keyframes to reduce noise)
-    const labeledKeyframes = shot.keyframes.filter((kf) => kf.labeled !== null);
-    if (labeledKeyframes.length > 0) {
-        lines.push(`      ${COLORS.bold}Keyframes:${COLORS.reset}`);
-        for (const kf of labeledKeyframes) {
-            lines.push(formatKeyframeResult(kf));
+    // Add exclusion notice if keyframe validation was excluded
+    if (shot.keyframeValidationExcluded) {
+        lines.push(`      ${COLORS.yellow}Keyframes: EXCLUDED (${shot.exclusionReason})${COLORS.reset}`);
+    }
+    else {
+        // Add keyframe results (only show labeled keyframes to reduce noise)
+        const labeledKeyframes = shot.keyframes.filter((kf) => kf.labeled !== null);
+        if (labeledKeyframes.length > 0) {
+            lines.push(`      ${COLORS.bold}Keyframes:${COLORS.reset}`);
+            for (const kf of labeledKeyframes) {
+                lines.push(formatKeyframeResult(kf));
+            }
         }
     }
     return lines.join("\n");
@@ -338,8 +344,7 @@ export function parseCliArgs(args = process.argv.slice(2)) {
         }
         else if (arg === "--videos" && i + 1 < args.length) {
             // Parse comma-separated list of video patterns
-            result.videos = args[i + 1]
-                .split(",")
+            result.videos = args[i + 1].split(",")
                 .map((v) => v.trim())
                 .filter((v) => v.length > 0);
             i++;

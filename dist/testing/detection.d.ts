@@ -68,6 +68,10 @@ export interface ShotComparison {
     readonly orientation: OrientationComparison;
     /** Per-keyframe comparison results */
     readonly keyframes: readonly KeyframeComparisonResult[];
+    /** Whether keyframe validation was excluded due to pose limitations (e.g., behind-view with low elbow visibility) */
+    readonly keyframeValidationExcluded?: boolean;
+    /** Reason for keyframe validation exclusion */
+    readonly exclusionReason?: string;
 }
 /**
  * Overall comparison result for a video.
@@ -138,6 +142,29 @@ export declare function detectOrientation(poseData: PoseData): Orientation | "un
  * @returns Detected orientation or 'unknown' if detection fails
  */
 export declare function detectOrientationForShot(poseData: PoseData, startFrame: number, endFrame: number): Orientation | "unknown";
+/**
+ * Checks if a shot should be excluded from keyframe validation due to pose limitations.
+ *
+ * Behind-view shots (behind, behind-left, behind-right) are excluded when
+ * either elbow has average visibility below the threshold. This is because
+ * the shooting arm may not be reliably visible, making elbow angle calculations
+ * unreliable for set_point and release detection.
+ *
+ * For behind-view shots:
+ * - behind-left: right side of body is partially hidden
+ * - behind-right: left side of body is partially hidden
+ * - behind: both sides may have visibility issues
+ *
+ * @param poseData - Full pose data for the video
+ * @param startFrame - Shot start frame index (inclusive)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param orientation - Detected camera orientation for this shot
+ * @returns Object with excluded flag and reason
+ */
+export declare function shouldExcludeKeyframeValidation(poseData: PoseData, startFrame: number, endFrame: number, orientation: Orientation | "unknown"): {
+    excluded: boolean;
+    reason?: string;
+};
 /**
  * Runs shot detection on pose data and returns detected shots with orientation.
  *

@@ -271,12 +271,19 @@ function formatShotComparison(shot: ShotComparison): string {
     `      Orientation: ${orientationStatus}detected '${shot.orientation.detected}', expected '${shot.orientation.expected}'${shot.orientation.match ? " (match)" : ""}${COLORS.reset}`,
   );
 
-  // Add keyframe results (only show labeled keyframes to reduce noise)
-  const labeledKeyframes = shot.keyframes.filter((kf) => kf.labeled !== null);
-  if (labeledKeyframes.length > 0) {
-    lines.push(`      ${COLORS.bold}Keyframes:${COLORS.reset}`);
-    for (const kf of labeledKeyframes) {
-      lines.push(formatKeyframeResult(kf));
+  // Add exclusion notice if keyframe validation was excluded
+  if (shot.keyframeValidationExcluded) {
+    lines.push(
+      `      ${COLORS.yellow}Keyframes: EXCLUDED (${shot.exclusionReason})${COLORS.reset}`,
+    );
+  } else {
+    // Add keyframe results (only show labeled keyframes to reduce noise)
+    const labeledKeyframes = shot.keyframes.filter((kf) => kf.labeled !== null);
+    if (labeledKeyframes.length > 0) {
+      lines.push(`      ${COLORS.bold}Keyframes:${COLORS.reset}`);
+      for (const kf of labeledKeyframes) {
+        lines.push(formatKeyframeResult(kf));
+      }
     }
   }
 
@@ -475,8 +482,7 @@ export function parseCliArgs(args: string[] = process.argv.slice(2)): CliArgs {
       i++;
     } else if (arg === "--videos" && i + 1 < args.length) {
       // Parse comma-separated list of video patterns
-      result.videos = args[i + 1]!
-        .split(",")
+      result.videos = args[i + 1]!.split(",")
         .map((v) => v.trim())
         .filter((v) => v.length > 0);
       i++;
