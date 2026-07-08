@@ -1,0 +1,7 @@
+# The app workspace has its own prettier config (svelte plugin); root prettier skips it.
+app/
+node_modules/
+dist/
+coverage/
+test-data/
+package-lock.json

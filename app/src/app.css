@@ -1,0 +1,62 @@
+/* ShotCoach global styles & design tokens (dark-first). */
+:root {
+  /* Palette (design doc §Visual design) */
+  --sc-surface: #0f1115;
+  --sc-card: #1a1e26;
+  --sc-card-raised: #232936;
+  --sc-primary: #ff7a29;
+  --sc-primary-dim: #cc5f1c;
+  --sc-success: #3ddc84;
+  --sc-warn: #ffc24b;
+  --sc-fail: #ff5c5c;
+  --sc-text: #f2f4f8;
+  --sc-text-dim: #98a2b3;
+  --sc-border: #2c3342;
+
+  /* Spacing scale */
+  --sc-space-1: 4px;
+  --sc-space-2: 8px;
+  --sc-space-3: 12px;
+  --sc-space-4: 16px;
+  --sc-space-5: 24px;
+  --sc-space-6: 32px;
+
+  --sc-radius: 12px;
+  --sc-radius-sm: 8px;
+
+  --sc-font:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--sc-surface);
+  color: var(--sc-text);
+  font-family: var(--sc-font);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+.sc-numeral {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
