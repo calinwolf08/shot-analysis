@@ -1,0 +1,41 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`DiagnosisService > persists ranked focus areas and replaces on re-diagnosis 1`] = `
+[
+  {
+    "group": "alignment",
+    "severity": 0.989,
+    "surfaced": true,
+  },
+  {
+    "group": "posture",
+    "severity": 0.958,
+    "surfaced": true,
+  },
+  {
+    "group": "release-follow-through",
+    "severity": 0.88,
+    "surfaced": true,
+  },
+  {
+    "group": "lower-body",
+    "severity": 0.697,
+    "surfaced": false,
+  },
+  {
+    "group": "guide-hand",
+    "severity": 0.69,
+    "surfaced": false,
+  },
+  {
+    "group": "rhythm",
+    "severity": 0.511,
+    "surfaced": false,
+  },
+  {
+    "group": "ball-path",
+    "severity": 0.495,
+    "surfaced": false,
+  },
+]
+`;
