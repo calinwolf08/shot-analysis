@@ -1,0 +1,56 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`fixture rep scores vs placeholder benchmark > scores every fixture shot inside (0, 100) and matches the snapshot 1`] = `
+{
+  "20190103_180930": [
+    {
+      "excluded": 6,
+      "formScore": 23.06,
+    },
+    {
+      "excluded": 2,
+      "formScore": 20.47,
+    },
+    {
+      "excluded": 3,
+      "formScore": 31.37,
+    },
+  ],
+  "20190804_140654": [
+    {
+      "excluded": 0,
+      "formScore": 38.41,
+    },
+    {
+      "excluded": 2,
+      "formScore": 26.43,
+    },
+    {
+      "excluded": 3,
+      "formScore": 40.09,
+    },
+    {
+      "excluded": 7,
+      "formScore": 28.2,
+    },
+    {
+      "excluded": 6,
+      "formScore": 31.93,
+    },
+    {
+      "excluded": 11,
+      "formScore": 28.66,
+    },
+    {
+      "excluded": 7,
+      "formScore": 26.97,
+    },
+  ],
+  "20201212_134104": [
+    {
+      "excluded": 10,
+      "formScore": 40.08,
+    },
+  ],
+}
+`;
