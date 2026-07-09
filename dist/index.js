@@ -32,4 +32,12 @@ export { ProfileComparisonEngine, } from "./profiles/comparison";
 export { youthFundamentalsProfile, highSchoolProfile, proFormProfile, builtInProfiles, allBuiltInProfiles, getBuiltInProfile, } from "./profiles";
 // Detection types exports
 export { ShotPhase as DetectionShotPhase, SHOT_PHASES, TOTAL_SHOT_PHASES, } from "./detection/types";
+// Detection pipeline exports (public API for consumers that drive the
+// pipeline directly, e.g. replaying recorded pose sequences)
+export { ShotDetector, createShotDetector, } from "./detection";
+export { detectOrientation } from "./detection/pose-shot-detector";
+// Metrics pipeline exports
+export { MetricOrchestrator, createShootingArmCalculators, createGuideArmCalculators, createBallMetricCalculators, createLowerBodyCalculators, createPostureCalculators, createTimingCalculators, } from "./metrics";
+// Recorded pose-sequence (fixture) types + schema, for replay consumers
+export { poseDataSchema, frameSchema } from "./testing/types";
 //# sourceMappingURL=index.js.map

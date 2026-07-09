@@ -173,3 +173,35 @@ export type {
   FrameLabel,
   ShotDetectionResult,
 } from "./detection/types";
+
+// Detection pipeline exports (public API for consumers that drive the
+// pipeline directly, e.g. replaying recorded pose sequences)
+export {
+  ShotDetector,
+  createShotDetector,
+  type ShotDetectorConfig,
+} from "./detection";
+export { detectOrientation } from "./detection/pose-shot-detector";
+
+// Pose-format types used by the detection pipeline (distinct from the
+// metrics-format PoseLandmarks exported above)
+export type {
+  Landmark as DetectionLandmark,
+  PoseLandmarks as DetectionPoseLandmarks,
+} from "./pose/types";
+
+// Metrics pipeline exports
+export {
+  MetricOrchestrator,
+  createShootingArmCalculators,
+  createGuideArmCalculators,
+  createBallMetricCalculators,
+  createLowerBodyCalculators,
+  createPostureCalculators,
+  createTimingCalculators,
+} from "./metrics";
+export type { Orientation } from "./metrics/types";
+
+// Recorded pose-sequence (fixture) types + schema, for replay consumers
+export { poseDataSchema, frameSchema } from "./testing/types";
+export type { PoseData, Frame as PoseDataFrame } from "./testing/types";

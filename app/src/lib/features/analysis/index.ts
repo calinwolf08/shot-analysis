@@ -1,2 +1,19 @@
-// Public barrel for the analysis feature. Cross-feature imports go through here only.
-export {};
+// Public barrel for the analysis feature.
+export type {
+  AnalysisInput,
+  AnalysisProgress,
+  AnalysisService,
+  AnalyzeOptions,
+  FixtureRef,
+  LandmarkFrame,
+  LiveAnalysisSession,
+  ProgressCallback,
+} from "./types";
+export { isFixtureRef } from "./types";
+export {
+  createReplayAnalysisService,
+  FixtureNotSupportedError,
+  type FixtureLoader,
+  type ReplayAnalysisServiceOptions,
+} from "./replay/replay-analysis-service";
+export { createFetchFixtureLoader } from "./replay/fixture-loaders";

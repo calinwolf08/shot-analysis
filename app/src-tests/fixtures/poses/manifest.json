@@ -1,0 +1,25 @@
+{
+  "fixtures": [
+    {
+      "id": "20201212_134104",
+      "file": "20201212_134104.json",
+      "expectedShots": 1,
+      "fps": 30,
+      "totalFrames": 162
+    },
+    {
+      "id": "20190103_180930",
+      "file": "20190103_180930.json",
+      "expectedShots": 3,
+      "fps": 30,
+      "totalFrames": 497
+    },
+    {
+      "id": "20190804_140654",
+      "file": "20190804_140654.json",
+      "expectedShots": 7,
+      "fps": 30,
+      "totalFrames": 864
+    }
+  ]
+}
