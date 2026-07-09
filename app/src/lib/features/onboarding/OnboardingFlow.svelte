@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { flushDb } from "$lib/shared/db";
   import type { PlayerLevel, ShootingHand } from "$lib/shared/db/repos";
@@ -45,7 +46,7 @@
       });
       await services.repos.settings.set("onboarded", true);
       await flushDb(services.db); // onboarding must survive an immediate reload
-      await goto("/");
+      await goto(`/${page.url.search}`); // keep e2e/debug flags across the flow
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
       saving = false;

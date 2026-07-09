@@ -11,6 +11,22 @@ import {
   type AnalysisService,
 } from "$lib/features/analysis";
 import { createWorkerAnalysisService } from "$lib/features/analysis/services/worker-analysis-service";
+import {
+  createAssessmentService,
+  type AssessmentService,
+} from "$lib/features/assessment";
+import {
+  createBenchmarkService,
+  type BenchmarkService,
+} from "$lib/features/benchmarks";
+import {
+  createDiagnosisService,
+  type DiagnosisService,
+} from "$lib/features/diagnosis";
+import {
+  createScoringService,
+  type ScoringService,
+} from "$lib/features/scoring";
 import type { DatabaseAdapter } from "../db";
 import { createDatabase, migrate } from "../db";
 import type { RepoContext } from "../db/repo-base";
@@ -50,6 +66,33 @@ export interface AppServices extends RepoContext {
   ids: IdGenerator;
   repos: AppRepos;
   analysis: AnalysisService;
+  benchmarks: BenchmarkService;
+  scoring: ScoringService;
+  diagnosis: DiagnosisService;
+  assessment: AssessmentService;
+}
+
+/** Composes the domain services over a base context (shared with tests). */
+export function createDomainServices(
+  ctx: RepoContext,
+  repos: AppRepos,
+  analysis: AnalysisService,
+): Pick<AppServices, "benchmarks" | "scoring" | "diagnosis" | "assessment"> {
+  const benchmarks = createBenchmarkService(ctx, { settings: repos.settings });
+  const scoring = createScoringService(ctx, {
+    shotRepo: repos.shot,
+    scoreRepo: repos.score,
+  });
+  const diagnosis = createDiagnosisService(ctx);
+  const assessment = createAssessmentService({
+    db: ctx.db,
+    repos,
+    analysis,
+    scoring,
+    diagnosis,
+    benchmarks,
+  });
+  return { benchmarks, scoring, diagnosis, assessment };
 }
 
 /** Builds the shared repo set from a RepoContext. */
@@ -85,7 +128,7 @@ export function selectAnalysisService(): AnalysisService {
   return createWorkerAnalysisService();
 }
 
-/** Production composition: platform DB, migrations applied. */
+/** Production composition: platform DB, migrations + benchmark seed applied. */
 export async function createAppServices(): Promise<AppServices> {
   const db = await createDatabase(getPlatform());
   await migrate(db);
@@ -94,9 +137,14 @@ export async function createAppServices(): Promise<AppServices> {
     clock: systemClock,
     ids: uuidIdGenerator,
   };
+  const repos = createRepos(ctx);
+  const analysis = selectAnalysisService();
+  const domain = createDomainServices(ctx, repos, analysis);
+  await domain.benchmarks.seed();
   return {
     ...ctx,
-    repos: createRepos(ctx),
-    analysis: selectAnalysisService(),
+    repos,
+    analysis,
+    ...domain,
   };
 }

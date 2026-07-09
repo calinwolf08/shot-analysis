@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { Button, Card, EmptyState, ScoreRing } from "$lib/shared/ui";
 
@@ -53,14 +54,18 @@
 </section>
 
 <div class="cta">
-  <Button size="lg" testid="start-assessment" onclick={() => goto("/assess")}>
+  <Button
+    size="lg"
+    testid="start-assessment"
+    onclick={() => goto(`/assess${page.url.search}`)}
+  >
     {hasData ? "New assessment" : "Start your first assessment"}
   </Button>
   <Button
     variant="secondary"
     size="lg"
     testid="go-live-practice"
-    onclick={() => goto("/practice/live")}
+    onclick={() => goto(`/practice/live${page.url.search}`)}
   >
     Live practice
   </Button>
