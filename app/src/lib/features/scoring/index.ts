@@ -13,3 +13,19 @@ export {
   type RepScore,
   type ScoringConfig,
 } from "./types";
+export {
+  consistencyCurve,
+  DEFAULT_SESSION_WEIGHTS,
+  EFFICIENCY_METRICS,
+  scoreSession,
+  type MetricConsistency,
+  type SessionBreakdown,
+  type SessionScore,
+  type SessionScoreWeights,
+} from "./session";
+export {
+  createScoringService,
+  type ScoredShot,
+  type ScoringService,
+  type ScoringServiceDeps,
+} from "./service";
