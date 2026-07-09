@@ -24,3 +24,8 @@ export {
   type WorkerAnalysisServiceDeps,
   type WorkerLike,
 } from "./services/worker-analysis-service";
+export type {
+  KeyFramePose,
+  KeyFramePoses,
+  StoredShotAnalysis,
+} from "./replay/replay-pipeline";

@@ -185,7 +185,12 @@ export function runReplayAnalysis(
       shot.frameRange.end,
       run,
     );
-    analyses.push({ ...analysis, orientation });
+    const keyFramePoses = extractKeyFramePoses(prepared.source, analysis);
+    analyses.push({
+      ...analysis,
+      orientation,
+      keyFramePoses,
+    } as ShotAnalysis);
     emit({
       framesProcessed: total,
       totalFrames: total,
@@ -205,6 +210,49 @@ export function runReplayAnalysis(
     },
     config,
   };
+}
+
+/** Landmarks captured at each detected phase start (skeleton overlays). */
+export interface KeyFramePose {
+  frameIndex: number;
+  landmarks: { x: number; y: number; visibility: number }[];
+}
+
+export type KeyFramePoses = Partial<
+  Record<
+    "gather" | "load" | "rise" | "setPoint" | "release" | "followThrough",
+    KeyFramePose
+  >
+>;
+
+/** ShotAnalysis as persisted by this app: library type + overlay poses. */
+export type StoredShotAnalysis = ShotAnalysis & {
+  keyFramePoses?: KeyFramePoses;
+};
+
+function extractKeyFramePoses(
+  source: readonly PoseDataFrame[],
+  analysis: ShotAnalysis,
+): KeyFramePoses {
+  const poses: KeyFramePoses = {};
+  for (const [phase, range] of Object.entries(analysis.phases) as [
+    keyof KeyFramePoses,
+    { startFrame: number } | undefined,
+  ][]) {
+    if (!range) continue;
+    const frame = source[range.startFrame];
+    if (!frame?.landmarks) continue;
+    poses[phase] = {
+      frameIndex: range.startFrame,
+      // 2D + visibility is all the overlay needs; keeps rows small.
+      landmarks: frame.landmarks.map((l) => ({
+        x: l.x,
+        y: l.y,
+        visibility: l.visibility,
+      })),
+    };
+  }
+  return poses;
 }
 
 function shotOrientation(

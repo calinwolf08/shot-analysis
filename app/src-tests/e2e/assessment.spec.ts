@@ -42,6 +42,11 @@ test("assessment wizard: fixture → analyze → review → results, persisted",
   const band = await ring.getAttribute("data-band");
   expect(band).not.toBe("none");
 
+  // Exactly 3 top-issue cards, ordered by diagnosis rank.
+  await expect(page.getByTestId("top-issue-0")).toBeVisible();
+  await expect(page.getByTestId("top-issue-2")).toBeVisible();
+  expect(await page.locator('[data-testid^="top-issue-"]').count()).toBe(3);
+
   // Persisted: reload the results page, score still renders from the DB.
   await page.reload();
   await page.waitForSelector('[data-testid="db-ready"]', { state: "attached" });
@@ -50,4 +55,18 @@ test("assessment wizard: fixture → analyze → review → results, persisted",
     .getByTestId("results-overall")
     .getAttribute("data-band");
   expect(band2).toBe(band);
+
+  // Shot detail: skeleton overlay + metric table, then back to results.
+  await page.getByTestId("shot-card-0").click();
+  await page.waitForURL("**/progress/shot/**");
+  await expect(page.getByTestId("skeleton-overlay")).toBeVisible();
+  await expect(page.getByTestId("shot-metric-table")).toBeVisible();
+  const frame = await page
+    .getByTestId("skeleton-overlay")
+    .getAttribute("data-frame");
+  expect(Number(frame)).toBeGreaterThanOrEqual(0);
+
+  await page.getByTestId("shot-detail-back").click();
+  await page.waitForURL("**/assess/results/**");
+  await expect(page.getByTestId("results-overall")).toBeVisible();
 });

@@ -1,15 +1,26 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import type { BenchmarkProfile } from "$lib/features/benchmarks";
+  import type { FocusAreaRow } from "$lib/features/diagnosis";
   import { useAppServices } from "$lib/shared/config/services-context";
-  import type { ScoreRecord } from "$lib/shared/db/repos";
+  import type { ScoreRecord, ShotRecord } from "$lib/shared/db/repos";
   import { Button, Card, PlaceholderBadge, ScoreRing } from "$lib/shared/ui";
+  import MetricsAccordion from "./MetricsAccordion.svelte";
+  import ShotStrip from "./ShotStrip.svelte";
+  import TopIssues from "./TopIssues.svelte";
+  import { summarizeMetrics, type MetricsByCategory } from "./metrics-summary";
 
   let { sessionId }: { sessionId: string } = $props();
 
   const services = useAppServices();
 
   let score = $state<ScoreRecord | null>(null);
+  let focusAreas = $state<FocusAreaRow[]>([]);
+  let shots = $state<ShotRecord[]>([]);
+  let shotScores = $state<Map<string, number | null>>(new Map());
+  let byCategory = $state<MetricsByCategory | null>(null);
+  let benchmark = $state<BenchmarkProfile | null>(null);
   let loading = $state(true);
 
   $effect(() => {
@@ -19,13 +30,27 @@
   async function load(id: string) {
     loading = true;
     score = await services.repos.score.latestForRef("session", id);
+    focusAreas = await services.diagnosis.listForSession(id);
+    shots = await services.repos.shot.listBySession(id);
+    benchmark = await services.benchmarks.getActive();
+
+    const latest = await services.repos.score.latestForRefs(
+      "shot",
+      shots.map((s) => s.id),
+    );
+    shotScores = new Map(
+      shots.map((s) => [s.id, latest.get(s.id)?.formScore ?? null]),
+    );
+    byCategory = benchmark ? summarizeMetrics(shots, benchmark) : null;
     loading = false;
   }
 </script>
 
 <main class="results" data-testid="assess-results">
   <header>
-    <Button variant="ghost" onclick={() => goto("/")}>✕</Button>
+    <Button variant="ghost" onclick={() => goto(`/${page.url.search}`)}>
+      ✕
+    </Button>
     <h1>Your results</h1>
     <PlaceholderBadge />
   </header>
@@ -68,10 +93,15 @@
       </div>
     </section>
 
-    <!-- Top issues + all-metrics accordion land in step 15. -->
+    <TopIssues areas={focusAreas} />
+    <ShotStrip {shots} scores={shotScores} />
+    {#if byCategory}
+      <MetricsAccordion {byCategory} />
+    {/if}
+
     <div class="cta">
       <Button size="lg" testid="results-build-plan" disabled>
-        Build my training plan (coming soon)
+        Build my training plan (coming in step 17)
       </Button>
       <Button variant="secondary" onclick={() => goto(`/${page.url.search}`)}>
         Done
