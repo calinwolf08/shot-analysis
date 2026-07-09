@@ -1,2 +1,6 @@
-// Public barrel for the drills feature. Cross-feature imports go through here only.
-export {};
+// Public barrel for the drills feature.
+export {
+  createDrillRepo,
+  type DrillRepo,
+  type DrillRow,
+} from "./repo/drill-repo";

@@ -1,2 +1,6 @@
-// Public barrel for the benchmarks feature. Cross-feature imports go through here only.
-export {};
+// Public barrel for the benchmarks feature.
+export {
+  createBenchmarkRepo,
+  type BenchmarkRepo,
+  type BenchmarkRow,
+} from "./repo/benchmark-repo";

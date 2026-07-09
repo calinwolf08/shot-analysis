@@ -3,6 +3,7 @@
  * Import ONLY from tests (better-sqlite3 is a devDependency).
  */
 import type { AppServices } from "./services";
+import { createRepos } from "./services";
 import { createBetterSqliteAdapter } from "../db/drivers/better-sqlite3";
 import { migrate } from "../db";
 import {
@@ -22,10 +23,14 @@ export async function createTestServices(
 ): Promise<TestServices> {
   const db = overrides.db ?? createBetterSqliteAdapter();
   await migrate(db);
-  return {
+  const ctx = {
     db,
     clock: overrides.clock ?? createFakeClock(1_000_000),
     ids: overrides.ids ?? createFakeIdGenerator(),
+  };
+  return {
+    ...ctx,
+    repos: overrides.repos ?? createRepos(ctx),
     ...overrides,
   };
 }
