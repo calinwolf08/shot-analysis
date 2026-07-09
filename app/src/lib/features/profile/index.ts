@@ -1,2 +1,2 @@
-// Public barrel for the profile feature. Cross-feature imports go through here only.
-export {};
+// Public barrel for the profile feature.
+export { default as ProfileScreen } from "./ProfileScreen.svelte";

@@ -18,6 +18,10 @@ export default ts.config(
       ],
       // `any` requires a justifying comment per project rules; keep the rule on.
       "@typescript-eslint/no-explicit-any": "error",
+      // Guards apps deployed under a base path; this SPA always mounts at /
+      // (Capacitor webview + adapter-static fallback), so plain hrefs/goto
+      // are correct and resolve() would be noise.
+      "svelte/no-navigation-without-resolve": "off",
     },
   },
   {

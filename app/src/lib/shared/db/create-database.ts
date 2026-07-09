@@ -21,8 +21,15 @@ export async function createDatabase(
     return createCapacitorSqliteAdapter();
   }
   const { createSqlJsAdapter } = await import("./drivers/sqljs-web");
-  return createSqlJsAdapter({
+  const db = await createSqlJsAdapter({
     store: createIdbBytesStore(),
     wasmUrl: "/sqljs/sql-wasm.wasm",
   });
+  // Best-effort flush when the page is being torn down (reload/close).
+  if (typeof window !== "undefined") {
+    window.addEventListener("pagehide", () => {
+      void db.flush();
+    });
+  }
+  return db;
 }

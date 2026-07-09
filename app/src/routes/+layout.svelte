@@ -1,11 +1,14 @@
 <script lang="ts">
   import "../app.css";
   import type { Snippet } from "svelte";
+  import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import {
     createAppServices,
     type AppServices,
   } from "$lib/shared/config/services";
   import { provideAppServices } from "$lib/shared/config/services-context";
+  import { Toast } from "$lib/shared/ui";
 
   let { children }: { children: Snippet } = $props();
 
@@ -27,8 +30,9 @@
   $effect(() => {
     let cancelled = false;
     createAppServices()
-      .then((s) => {
+      .then(async (s) => {
         if (cancelled) return;
+        await redirectIfNotOnboarded(s);
         services = s;
         exposeE2eHooks(s);
       })
@@ -40,6 +44,15 @@
       cancelled = true;
     };
   });
+
+  /** First run lands on onboarding until a player is persisted. */
+  async function redirectIfNotOnboarded(s: AppServices) {
+    const onboarded = await s.repos.settings.get("onboarded");
+    const path = page.url.pathname;
+    if (!onboarded && path !== "/onboarding" && !path.startsWith("/__debug")) {
+      await goto(`/onboarding${page.url.search}`, { replaceState: true });
+    }
+  }
 
   /**
    * When the page is loaded with ?e2e in the query string, expose a tiny
@@ -72,6 +85,7 @@
 {:else if services}
   <div data-testid="db-ready" hidden></div>
   {@render children()}
+  <Toast />
 {:else}
   <main class="boot-screen" data-testid="boot-loading" aria-busy="true">
     <p>Loading…</p>

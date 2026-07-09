@@ -1,4 +1,5 @@
 export type { DatabaseAdapter, Row, RunResult, SqlValue } from "./adapter";
+export { flushDb } from "./adapter";
 export {
   ALL_MIGRATIONS,
   migrate,
