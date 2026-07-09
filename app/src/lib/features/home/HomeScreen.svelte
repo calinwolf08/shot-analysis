@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import type { Plan, PlanItem } from "$lib/features/training-plan";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { Button, Card, EmptyState, ScoreRing } from "$lib/shared/ui";
 
@@ -9,6 +10,9 @@
   let overall = $state<number | null>(null);
   let hasData = $state(false);
   let playerName = $state("");
+  let today = $state<{ plan: Plan; item: PlanItem; label: string } | null>(
+    null,
+  );
 
   $effect(() => {
     void load();
@@ -18,6 +22,7 @@
     const player = await services.repos.player.getFirst();
     if (!player) return;
     playerName = player.name;
+    await loadToday(player.id);
     const sessions = await services.repos.session.listByPlayer(player.id, {
       status: "completed",
     });
@@ -32,6 +37,43 @@
         return;
       }
     }
+  }
+
+  async function loadToday(playerId: string) {
+    const next = await services.trainingPlan.nextPendingItem(playerId);
+    if (!next) {
+      today = null;
+      return;
+    }
+    let label: string;
+    if (next.item.type === "drill" && next.item.drillId) {
+      label = (await services.drills.get(next.item.drillId))?.title ?? "Drill";
+    } else if (next.item.type === "live_practice") {
+      label = next.item.focusMetric ? "Focused live practice" : "Free shooting";
+    } else {
+      label = "Re-assessment";
+    }
+    today = { ...next, label };
+  }
+
+  function openToday() {
+    if (!today) return;
+    const { item } = today;
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local URL builder, never reactive state
+    const params = new URLSearchParams(page.url.search);
+    params.set("planItem", item.id);
+    if (item.type === "drill" && item.drillId) {
+      void goto(`/drill/${item.drillId}?${params.toString()}`);
+    } else if (item.type === "live_practice") {
+      void goto(`/practice/live?${params.toString()}`);
+    } else {
+      void goto(`/assess${page.url.search}`);
+    }
+  }
+
+  function openPlan() {
+    if (!today) return;
+    void goto(`/plan/${today.plan.id}${page.url.search}`);
   }
 </script>
 
@@ -52,6 +94,28 @@
     </Card>
   {/if}
 </section>
+
+{#if today}
+  <section class="today">
+    <Card raised testid="today-card">
+      <span class="today-label">Today</span>
+      <p class="today-title" data-testid="today-card-title">{today.label}</p>
+      <div class="today-actions">
+        <Button size="sm" testid="today-card-go" onclick={openToday}>
+          {today.item.type === "reassessment" ? "Re-assess" : "Start"}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          testid="today-card-plan"
+          onclick={openPlan}
+        >
+          View plan
+        </Button>
+      </div>
+    </Card>
+  </section>
+{/if}
 
 <div class="cta">
   <Button
@@ -83,6 +147,25 @@
     display: flex;
     justify-content: center;
     margin-bottom: var(--sc-space-5);
+  }
+  .today {
+    margin-bottom: var(--sc-space-5);
+  }
+  .today-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sc-primary);
+  }
+  .today-title {
+    margin: 4px 0 var(--sc-space-3);
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .today-actions {
+    display: flex;
+    gap: var(--sc-space-2);
   }
   .cta {
     display: flex;

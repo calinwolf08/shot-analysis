@@ -4,6 +4,7 @@
   import type { BenchmarkProfile } from "$lib/features/benchmarks";
   import type { FocusAreaRow } from "$lib/features/diagnosis";
   import { useAppServices } from "$lib/shared/config/services-context";
+  import { flushDb } from "$lib/shared/db";
   import type { ScoreRecord, ShotRecord } from "$lib/shared/db/repos";
   import { Button, Card, PlaceholderBadge, ScoreRing } from "$lib/shared/ui";
   import MetricsAccordion from "./MetricsAccordion.svelte";
@@ -22,6 +23,7 @@
   let byCategory = $state<MetricsByCategory | null>(null);
   let benchmark = $state<BenchmarkProfile | null>(null);
   let loading = $state(true);
+  let buildingPlan = $state(false);
 
   $effect(() => {
     void load(sessionId);
@@ -43,6 +45,23 @@
     );
     byCategory = benchmark ? summarizeMetrics(shots, benchmark) : null;
     loading = false;
+  }
+
+  async function buildPlan() {
+    if (buildingPlan) return;
+    buildingPlan = true;
+    try {
+      const player = await services.repos.player.getFirst();
+      if (!player) return;
+      const plan = await services.trainingPlan.generateForSession(
+        sessionId,
+        player.id,
+      );
+      await flushDb(services.db);
+      await goto(`/plan/${plan.id}${page.url.search}`);
+    } finally {
+      buildingPlan = false;
+    }
   }
 </script>
 
@@ -100,8 +119,13 @@
     {/if}
 
     <div class="cta">
-      <Button size="lg" testid="results-build-plan" disabled>
-        Build my training plan (coming in step 17)
+      <Button
+        size="lg"
+        testid="results-build-plan"
+        disabled={buildingPlan}
+        onclick={buildPlan}
+      >
+        {buildingPlan ? "Building your plan…" : "Build my training plan"}
       </Button>
       <Button variant="secondary" onclick={() => goto(`/${page.url.search}`)}>
         Done
