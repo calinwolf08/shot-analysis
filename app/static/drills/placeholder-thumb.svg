@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#1A1E26"/>
+  <circle cx="320" cy="140" r="46" fill="#FF7A29"/>
+  <path d="M274 140h92M320 94v92M287 108c22 18 22 46 0 64M353 108c-22 18-22 46 0 64" stroke="#14100C" stroke-width="4" fill="none"/>
+  <text x="320" y="250" text-anchor="middle" fill="#F2F4F8" font-family="system-ui, sans-serif" font-size="26" font-weight="700">Drill video coming soon</text>
+  <text x="320" y="284" text-anchor="middle" fill="#98A2B3" font-family="system-ui, sans-serif" font-size="15">Placeholder — real drill footage will replace this</text>
+</svg>

@@ -23,6 +23,7 @@ import {
   createDiagnosisService,
   type DiagnosisService,
 } from "$lib/features/diagnosis";
+import { createDrillService, type DrillService } from "$lib/features/drills";
 import {
   createScoringService,
   type ScoringService,
@@ -70,6 +71,7 @@ export interface AppServices extends RepoContext {
   scoring: ScoringService;
   diagnosis: DiagnosisService;
   assessment: AssessmentService;
+  drills: DrillService;
 }
 
 /** Composes the domain services over a base context (shared with tests). */
@@ -77,7 +79,10 @@ export function createDomainServices(
   ctx: RepoContext,
   repos: AppRepos,
   analysis: AnalysisService,
-): Pick<AppServices, "benchmarks" | "scoring" | "diagnosis" | "assessment"> {
+): Pick<
+  AppServices,
+  "benchmarks" | "scoring" | "diagnosis" | "assessment" | "drills"
+> {
   const benchmarks = createBenchmarkService(ctx, { settings: repos.settings });
   const scoring = createScoringService(ctx, {
     shotRepo: repos.shot,
@@ -92,7 +97,8 @@ export function createDomainServices(
     diagnosis,
     benchmarks,
   });
-  return { benchmarks, scoring, diagnosis, assessment };
+  const drills = createDrillService(ctx);
+  return { benchmarks, scoring, diagnosis, assessment, drills };
 }
 
 /** Builds the shared repo set from a RepoContext. */
@@ -141,6 +147,7 @@ export async function createAppServices(): Promise<AppServices> {
   const analysis = selectAnalysisService();
   const domain = createDomainServices(ctx, repos, analysis);
   await domain.benchmarks.seed();
+  await domain.drills.seed();
   return {
     ...ctx,
     repos,
