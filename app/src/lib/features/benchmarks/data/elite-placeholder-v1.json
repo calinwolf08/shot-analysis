@@ -1,0 +1,438 @@
+{
+  "id": "elite-placeholder-v1",
+  "name": "Elite Shooter (sample data)",
+  "version": 1,
+  "isPlaceholder": true,
+  "basedOn": "Derived from the basketball-shot-analysis library's pro-form profile heuristics. NOT measured elite-shooter data.",
+  "targets": {
+    "shootingElbowAngle": {
+      "ideal": 90,
+      "acceptable": {
+        "min": 85,
+        "max": 95
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Elbow angle is below optimal range. A tighter 90° angle maximizes force transfer through the shot line.",
+        "tooHigh": "Elbow is too extended at set point. Optimal L-shape position creates better backspin and consistency."
+      },
+      "displayName": "Elbow bend",
+      "shortCue": "Make an L",
+      "category": "shooting-arm",
+      "explanation": "The bend of your shooting arm at the set point. A right-angle L stores energy and releases it straight up through the ball."
+    },
+    "shootingElbowFlare": {
+      "ideal": 8,
+      "acceptable": {
+        "min": 0,
+        "max": 18
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Elbow is over-tucked. While alignment is good, slight natural flare improves comfort and repeatability.",
+        "tooHigh": "Excessive elbow flare reduces shot accuracy. Align elbow under the ball for a straighter shot line."
+      },
+      "displayName": "Elbow alignment",
+      "shortCue": "Tuck your elbow",
+      "category": "shooting-arm",
+      "explanation": "How far your shooting elbow drifts out from your body. A tucked elbow keeps the ball on a straight line to the rim."
+    },
+    "followThroughHold": {
+      "ideal": 80,
+      "acceptable": {
+        "min": 60,
+        "max": 100
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Abbreviated follow-through indicates incomplete release. Full extension and hold ensures consistent ball flight."
+      },
+      "displayName": "Follow-through hold",
+      "shortCue": "Hold your follow-through",
+      "category": "shooting-arm",
+      "explanation": "How long you keep your arm up after release. Holding it keeps the release smooth instead of jerky."
+    },
+    "maxArmExtension": {
+      "ideal": 170,
+      "acceptable": {
+        "min": 155,
+        "max": 180
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Incomplete arm extension limits release height and angle. Full extension optimizes release point."
+      },
+      "displayName": "Arm extension",
+      "shortCue": "Reach for rim",
+      "category": "shooting-arm",
+      "explanation": "How fully your arm extends on the release. Full extension adds arc and consistent power."
+    },
+    "wristSnapAngle": {
+      "ideal": 65,
+      "acceptable": {
+        "min": 55,
+        "max": 75
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Insufficient wrist flexion reduces backspin and soft touch. Increase wrist snap for better rotation.",
+        "tooHigh": "Over-flexion can cause inconsistent release. Moderate snap maintains control while generating spin."
+      },
+      "displayName": "Wrist snap",
+      "shortCue": "Snap your wrist",
+      "category": "shooting-arm",
+      "explanation": "How much your wrist flexes through the release. A full snap puts backspin on the ball for a soft bounce."
+    },
+    "setPointHeight": {
+      "ideal": 0.12,
+      "acceptable": {
+        "min": 0.05,
+        "max": 0.22
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Set point is too low, reducing release height and creating longer ball path to target. Elevate set point.",
+        "tooHigh": "Very high set point may affect rhythm and timing. Find optimal height for your mechanics."
+      },
+      "displayName": "Set point height",
+      "shortCue": "Set it high",
+      "category": "ball",
+      "explanation": "How high you set the ball before release. A high set point is harder to block and simplifies the release."
+    },
+    "releaseAngle": {
+      "ideal": 52,
+      "acceptable": {
+        "min": 45,
+        "max": 58
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Release angle is flat. Increase arc to optimize entry angle into the basket.",
+        "tooHigh": "Release angle is too steep. Reduce arc slightly for better distance consistency."
+      },
+      "displayName": "Release angle",
+      "shortCue": "Shoot up, not out",
+      "category": "ball",
+      "explanation": "The angle of your arm as the ball leaves. Releasing upward gives the shot arc so it can drop softly through."
+    },
+    "ballDip": {
+      "ideal": 0.05,
+      "acceptable": {
+        "min": 0,
+        "max": 0.15
+      },
+      "priority": "medium",
+      "populationStats": null,
+      "feedback": {
+        "tooHigh": "Ball dip is slowing shot tempo. Minimize pre-shot movement for quicker, more fluid release."
+      },
+      "displayName": "Ball dip",
+      "shortCue": "Smooth small dip",
+      "category": "ball",
+      "explanation": "How far the ball drops before rising. A small, smooth dip builds rhythm without wasting time."
+    },
+    "ballPath": {
+      "ideal": 0.05,
+      "acceptable": {
+        "min": 0,
+        "max": 0.15
+      },
+      "priority": "medium",
+      "populationStats": null,
+      "feedback": {
+        "tooHigh": "Lateral ball path deviation affects consistency. Straighter path to set point improves repeatability."
+      },
+      "displayName": "Ball path",
+      "shortCue": "Lift it straight",
+      "category": "ball",
+      "explanation": "How straight the ball travels from catch to set point. A straight lift is repeatable and quick."
+    },
+    "setPointDuration": {
+      "ideal": 100,
+      "acceptable": {
+        "min": 50,
+        "max": 180
+      },
+      "priority": "medium",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Brief set point may indicate rushing. Slight pause at set point improves rhythm without slowing shot.",
+        "tooHigh": "Extended pause at set point slows release. Quicken transition to release phase."
+      },
+      "displayName": "Set point pause",
+      "shortCue": "No hitch",
+      "category": "ball",
+      "explanation": "How long the ball pauses at the set point. One fluid motion beats a hitch that saps power and timing."
+    },
+    "ballBehindHead": {
+      "ideal": 0.02,
+      "acceptable": {
+        "min": -0.05,
+        "max": 0.1
+      },
+      "priority": "low",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Ball is positioned too far forward. Slight behind-head position creates better shooting angle.",
+        "tooHigh": "Ball is drifting too far behind head. This can affect release timing and control."
+      },
+      "displayName": "Ball behind head",
+      "shortCue": "Keep ball forward",
+      "category": "ball",
+      "explanation": "How far the ball drifts behind your head at the set point. Keeping it forward keeps the motion compact."
+    },
+    "guideHandPosition": {
+      "ideal": "side",
+      "acceptable": ["side"],
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "incorrect": "Guide hand must be positioned on the side of the ball at elite level. Under or thumb-up positions introduce inconsistency."
+      },
+      "displayName": "Guide hand position",
+      "shortCue": "Guide hand beside",
+      "category": "guide-arm",
+      "explanation": "Where your off-hand sits on the ball. On the side, it supports without pushing."
+    },
+    "guideHandRelease": {
+      "ideal": 50,
+      "acceptable": {
+        "min": 45,
+        "max": 58
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Guide hand releasing early may cause loss of control. Maintain contact until optimal release point.",
+        "tooHigh": "Late guide hand release can interfere with shot path. Separate hands precisely at release."
+      },
+      "displayName": "Guide hand release",
+      "shortCue": "Let go early",
+      "category": "guide-arm",
+      "explanation": "When your guide hand leaves the ball. Leaving early means only your shooting hand aims the shot."
+    },
+    "guideElbowFlare": {
+      "ideal": 35,
+      "acceptable": {
+        "min": 25,
+        "max": 45
+      },
+      "priority": "medium",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Guide arm too tight restricts natural ball support. Allow moderate separation.",
+        "tooHigh": "Excessive guide arm flare can pull shot off-line. Maintain controlled position."
+      },
+      "displayName": "Guide elbow",
+      "shortCue": "Relax guide elbow",
+      "category": "guide-arm",
+      "explanation": "How far your off-hand elbow sticks out. A relaxed guide elbow keeps the guide hand from steering the ball."
+    },
+    "kneeFlexion": {
+      "ideal": 45,
+      "acceptable": {
+        "min": 35,
+        "max": 55
+      },
+      "priority": "medium",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Insufficient knee flexion limits power generation. Increase load for better leg drive.",
+        "tooHigh": "Deep knee bend slows shot release. Optimal flexion balances power and quickness."
+      },
+      "displayName": "Knee bend",
+      "shortCue": "Bend your knees",
+      "category": "lower-body",
+      "explanation": "How deep your knees bend before rising. The right bend generates effortless range."
+    },
+    "hipDrop": {
+      "ideal": 0.1,
+      "acceptable": {
+        "min": 0.05,
+        "max": 0.15
+      },
+      "priority": "medium",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Minimal hip engagement reduces power transfer. Engage hips in the load phase.",
+        "tooHigh": "Excessive hip drop slows overall motion. Optimize load depth for speed and power."
+      },
+      "displayName": "Hip drop",
+      "shortCue": "Sit into it",
+      "category": "lower-body",
+      "explanation": "How much your hips lower in the dip. Loading your hips powers the shot from the ground up."
+    },
+    "legExtensionStart": {
+      "ideal": 35,
+      "acceptable": {
+        "min": 28,
+        "max": 42
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Premature leg extension disrupts ball-leg synchronization. Delay leg drive slightly.",
+        "tooHigh": "Late leg extension causes disconnected motion. Start leg drive earlier for fluid power transfer."
+      },
+      "displayName": "Leg drive timing",
+      "shortCue": "Legs start first",
+      "category": "lower-body",
+      "explanation": "When your legs begin extending in the shot. Legs firing first sends energy up the kinetic chain."
+    },
+    "backPosture": {
+      "ideal": 3,
+      "acceptable": {
+        "min": 0,
+        "max": 8
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooHigh": "Forward lean exceeds optimal range. Maintain near-vertical spine for consistent balance."
+      },
+      "displayName": "Back posture",
+      "shortCue": "Stay tall",
+      "category": "posture",
+      "explanation": "How upright your spine stays through the shot. Staying tall keeps your shot line consistent."
+    },
+    "headTilt": {
+      "ideal": 0,
+      "acceptable": {
+        "min": -5,
+        "max": 5
+      },
+      "priority": "medium",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Head tilting away from target affects aim. Keep head level and eyes on target.",
+        "tooHigh": "Excessive head tilt toward target can affect body alignment. Maintain neutral head position."
+      },
+      "displayName": "Head position",
+      "shortCue": "Eyes on rim",
+      "category": "posture",
+      "explanation": "How steady and level your head is. A still head means steady eyes and better aim."
+    },
+    "shoulderAlignment": {
+      "ideal": 0,
+      "acceptable": {
+        "min": -5,
+        "max": 5
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Shoulder rotation away from target reduces accuracy. Square shoulders to basket.",
+        "tooHigh": "Over-rotation creates inconsistency. Maintain neutral shoulder alignment."
+      },
+      "displayName": "Shoulder alignment",
+      "shortCue": "Square your shoulders",
+      "category": "posture",
+      "explanation": "How square your shoulders are to the rim. Square shoulders point everything at the target."
+    },
+    "handCupVsHinge": {
+      "ideal": "cup",
+      "acceptable": ["cup"],
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "incorrect": "Elite shooting requires consistent cup position for optimal ball control and release. Hinge position introduces variability."
+      },
+      "displayName": "Shooting hand set",
+      "shortCue": "Wrist loaded back",
+      "category": "posture",
+      "explanation": "Whether your shooting wrist is loaded back under the ball. A hinged wrist is a spring ready to snap."
+    },
+    "ballLegSync": {
+      "ideal": 3,
+      "acceptable": {
+        "min": -5,
+        "max": 10
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Ball rising before leg extension indicates disconnected upper/lower body. Synchronize leg drive with ball lift.",
+        "tooHigh": "Leg extension preceding ball rise wastes power. Time ball lift with leg drive initiation."
+      },
+      "displayName": "Ball-leg sync",
+      "shortCue": "Sync ball and legs",
+      "category": "timing",
+      "explanation": "How your ball lift and leg drive line up. Synced timing turns leg power into easy range."
+    },
+    "ballRiseStart": {
+      "ideal": 32,
+      "acceptable": {
+        "min": 25,
+        "max": 40
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Premature ball rise disrupts loading phase. Allow full lower body load before ball lift.",
+        "tooHigh": "Delayed ball rise extends shot time. Initiate ball lift earlier for quicker release."
+      },
+      "displayName": "Ball rise timing",
+      "shortCue": "Rise on time",
+      "category": "timing",
+      "explanation": "When the ball starts moving upward in the shot. Consistent timing makes the whole motion repeatable."
+    },
+    "legRiseStart": {
+      "ideal": 30,
+      "acceptable": {
+        "min": 22,
+        "max": 38
+      },
+      "priority": "medium",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Early leg extension before ball rises creates timing mismatch. Coordinate with ball movement.",
+        "tooHigh": "Late leg drive results in arm-dominant shot. Initiate leg extension earlier."
+      },
+      "displayName": "Leg rise timing",
+      "shortCue": "Drive legs early",
+      "category": "timing",
+      "explanation": "When your legs begin to rise. Early leg drive leads the shot instead of chasing it."
+    },
+    "releaseStart": {
+      "ideal": 72,
+      "acceptable": {
+        "min": 65,
+        "max": 80
+      },
+      "priority": "high",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Early release point indicates rushed shot. Build full rhythm before release.",
+        "tooHigh": "Late release extends shot time and reduces effectiveness off the catch. Quicken release timing."
+      },
+      "displayName": "Release timing",
+      "shortCue": "Release going up",
+      "category": "timing",
+      "explanation": "When the release begins within the shot. Releasing on the way up uses your momentum."
+    },
+    "totalShotDuration": {
+      "ideal": 550,
+      "acceptable": {
+        "min": 400,
+        "max": 700
+      },
+      "priority": "medium",
+      "populationStats": null,
+      "feedback": {
+        "tooLow": "Very fast release may sacrifice consistency. Ensure full mechanics within quick release.",
+        "tooHigh": "Extended shot duration creates defensive opportunities. Work on quickening overall motion."
+      },
+      "displayName": "Shot speed",
+      "shortCue": "Quick and smooth",
+      "category": "timing",
+      "explanation": "How long the whole shot takes. A compact shot gets off before defenders can react."
+    }
+  }
+}
