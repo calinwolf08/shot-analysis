@@ -29,4 +29,5 @@ export { MetricOrchestrator, createShootingArmCalculators, createGuideArmCalcula
 export type { Orientation } from "./metrics/types";
 export { poseDataSchema, frameSchema } from "./testing/types";
 export type { PoseData, Frame as PoseDataFrame } from "./testing/types";
+export { createPoseDetector, type PoseDetectorConfig, type PoseDetectorRuntime, } from "./pose/factory";
 //# sourceMappingURL=index.d.ts.map

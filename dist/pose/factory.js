@@ -122,6 +122,9 @@ export async function createPoseDetector(config = {}) {
             if (restConfig.modelPath !== undefined) {
                 browserConfig.modelPath = restConfig.modelPath;
             }
+            if (restConfig.wasmBasePath !== undefined) {
+                browserConfig.wasmBasePath = restConfig.wasmBasePath;
+            }
             if (restConfig.modelComplexity !== undefined) {
                 browserConfig.modelComplexity = restConfig.modelComplexity;
             }

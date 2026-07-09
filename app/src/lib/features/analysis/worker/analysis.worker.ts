@@ -1,0 +1,139 @@
+/**
+ * Analysis Web Worker: owns the MediaPipe pose detector. Receives RGBA
+ * frames from the main thread, detects poses, and either
+ * - accumulates LandmarkFrames and runs the full pipeline on finalize
+ *   (video mode), or
+ * - streams each LandmarkFrame straight back (live mode; the
+ *   LiveRepCoordinator decides when to analyze a window on-main-thread).
+ */
+import { createPoseDetector } from "basketball-shot-analysis";
+import type { AnalyzeOptions, LandmarkFrame } from "../types";
+import { runReplayAnalysis } from "../replay/replay-pipeline";
+import {
+  parseToWorker,
+  type FramePayload,
+  type FromWorkerMessage,
+} from "./worker-protocol";
+
+type PoseDetector = Awaited<ReturnType<typeof createPoseDetector>>;
+
+interface WorkerState {
+  detector: PoseDetector | null;
+  mode: "video" | "live";
+  fps: number;
+  opts: AnalyzeOptions | null;
+  collected: LandmarkFrame[];
+  framesProcessed: number;
+  cancelled: boolean;
+}
+
+const state: WorkerState = {
+  detector: null,
+  mode: "video",
+  fps: 30,
+  opts: null,
+  collected: [],
+  framesProcessed: 0,
+  cancelled: false,
+};
+
+/**
+ * Outbound messages carry library types whose arrays are `readonly`; the
+ * Zod-inferred protocol types are structurally identical but mutable.
+ */
+type FromWorkerPost =
+  | Exclude<FromWorkerMessage, { type: "result" } | { type: "landmarks" }>
+  | {
+      type: "result";
+      result: import("basketball-shot-analysis").AnalysisResult;
+    }
+  | { type: "landmarks"; frame: LandmarkFrame };
+
+function post(message: FromWorkerPost): void {
+  (self as unknown as Worker).postMessage(message);
+}
+
+async function handleFrames(frames: FramePayload[]): Promise<void> {
+  if (!state.detector) throw new Error("worker not initialized");
+  for (const frame of frames) {
+    if (state.cancelled) return;
+    const pose = await state.detector.detect({
+      data: frame.data,
+      width: frame.width,
+      height: frame.height,
+      timestamp: frame.timestamp,
+      frameIndex: frame.frameIndex,
+    });
+    const landmarkFrame: LandmarkFrame = {
+      frameIndex: frame.frameIndex,
+      timestamp: frame.timestamp,
+      poseConfidence: pose?.poseConfidence ?? 0,
+      landmarks: pose ? pose.landmarks : null,
+    };
+    state.framesProcessed += 1;
+
+    if (state.mode === "live") {
+      post({ type: "landmarks", frame: landmarkFrame });
+    } else {
+      state.collected.push(landmarkFrame);
+      if (state.framesProcessed % 15 === 0) {
+        post({
+          type: "progress",
+          progress: {
+            framesProcessed: state.framesProcessed,
+            shotsDetected: 0,
+            phase: "detecting",
+          },
+        });
+      }
+    }
+  }
+}
+
+function handleFinalize(): void {
+  if (!state.opts) throw new Error("worker not initialized");
+  const result = runReplayAnalysis(state.collected, state.opts, {
+    fps: state.fps,
+    onProgress: (progress) => post({ type: "progress", progress }),
+  });
+  post({ type: "result", result });
+}
+
+self.onmessage = async (event: MessageEvent) => {
+  try {
+    const message = parseToWorker(event.data);
+    switch (message.type) {
+      case "init": {
+        state.mode = message.mode;
+        state.fps = message.fps;
+        state.opts = message.opts;
+        state.collected = [];
+        state.framesProcessed = 0;
+        state.cancelled = false;
+        state.detector = await createPoseDetector({
+          runtime: "browser",
+          wasmBasePath: message.assets.wasmBasePath,
+          modelPath: message.assets.modelPath,
+          runningMode: "VIDEO",
+        });
+        post({ type: "ready" });
+        break;
+      }
+      case "frames":
+        await handleFrames(message.frames);
+        break;
+      case "finalize":
+        handleFinalize();
+        break;
+      case "cancel":
+        state.cancelled = true;
+        state.collected = [];
+        break;
+    }
+  } catch (err) {
+    post({
+      type: "error",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};

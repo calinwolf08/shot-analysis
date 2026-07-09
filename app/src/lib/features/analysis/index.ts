@@ -17,3 +17,10 @@ export {
   type ReplayAnalysisServiceOptions,
 } from "./replay/replay-analysis-service";
 export { createFetchFixtureLoader } from "./replay/fixture-loaders";
+export {
+  AnalysisCancelledError,
+  AnalysisWorkerError,
+  createWorkerAnalysisService,
+  type WorkerAnalysisServiceDeps,
+  type WorkerLike,
+} from "./services/worker-analysis-service";

@@ -18,6 +18,20 @@ export interface TestServices extends AppServices {
   ids: FakeIdGenerator;
 }
 
+import type { AnalysisService } from "$lib/features/analysis";
+
+/** Tests that exercise analysis inject the replay service explicitly. */
+const analysisStub: AnalysisService = {
+  analyzeVideoFile: () => {
+    throw new Error(
+      "TestServices.analysis is a stub — inject a ReplayAnalysisService (see createNodeFixtureLoader in shared/testing)",
+    );
+  },
+  createLiveSession: () => {
+    throw new Error("TestServices.analysis is a stub — inject one");
+  },
+};
+
 export async function createTestServices(
   overrides: Partial<TestServices> = {},
 ): Promise<TestServices> {
@@ -31,6 +45,7 @@ export async function createTestServices(
   return {
     ...ctx,
     repos: overrides.repos ?? createRepos(ctx),
+    analysis: overrides.analysis ?? analysisStub,
     ...overrides,
   };
 }

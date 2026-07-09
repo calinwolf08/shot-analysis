@@ -34,9 +34,6 @@ export declare enum WebGLFallbackBehavior {
 export declare class WebGLNotAvailableError extends Error {
     constructor();
 }
-/**
- * Configuration options for MediaPipeBrowserDetector.
- */
 export interface MediaPipeBrowserConfig {
     /**
      * Path to the pose landmarker model file (.task).
@@ -44,6 +41,12 @@ export interface MediaPipeBrowserConfig {
      * @default DEFAULT_MODEL_PATH
      */
     modelPath?: string;
+    /**
+     * Base path/URL of the MediaPipe tasks-vision WASM assets.
+     * Point at a locally-hosted copy for offline-first apps.
+     * @default the jsdelivr CDN for @mediapipe/tasks-vision
+     */
+    wasmBasePath?: string;
     /**
      * Model complexity (0-2). Higher values are more accurate but slower.
      * - 0: Lite model

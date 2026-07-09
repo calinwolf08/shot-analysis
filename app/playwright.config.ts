@@ -32,9 +32,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run build && npm run preview -- --port 4173 --strictPort",
+    // E2E builds enable the debug/test surfaces (VITE_E2E) and serve the
+    // replay fixtures alongside the app (kept out of production builds).
+    command:
+      "VITE_E2E=1 npm run build && node scripts/copy-fixtures-to-build.mjs && npm run preview -- --port 4173 --strictPort",
     port: 4173,
     reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
+    timeout: 300_000,
   },
 });

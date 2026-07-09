@@ -4,6 +4,8 @@ export interface AnalyzeOptions {
   shootingHand: "left" | "right";
   /** Library form-profile name (e.g. "pro-form"). */
   profile: string;
+  /** Optional cancellation for long-running video analysis. */
+  signal?: AbortSignal;
 }
 
 export interface AnalysisProgress {
@@ -63,6 +65,17 @@ export interface LiveAnalysisSession {
   onFrame(cb: (frame: LandmarkFrame) => void): () => void;
   /** Full shot detection + metrics over a bounded frame window. */
   analyzeWindow(frames: readonly LandmarkFrame[]): Promise<AnalysisResult>;
+  /**
+   * Push a camera frame for pose detection (worker-backed sessions only;
+   * replay sessions self-drive and omit this).
+   */
+  pushFrame?(frame: {
+    data: Uint8ClampedArray;
+    width: number;
+    height: number;
+    frameIndex: number;
+    timestamp: number;
+  }): void;
   start(): Promise<void>;
   stop(): Promise<void>;
 }

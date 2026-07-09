@@ -205,3 +205,11 @@ export type { Orientation } from "./metrics/types";
 // Recorded pose-sequence (fixture) types + schema, for replay consumers
 export { poseDataSchema, frameSchema } from "./testing/types";
 export type { PoseData, Frame as PoseDataFrame } from "./testing/types";
+
+// Pose detector factory (used by the app's analysis worker with
+// locally-hosted assets)
+export {
+  createPoseDetector,
+  type PoseDetectorConfig,
+  type PoseDetectorRuntime,
+} from "./pose/factory";

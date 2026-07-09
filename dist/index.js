@@ -40,4 +40,7 @@ export { detectOrientation } from "./detection/pose-shot-detector";
 export { MetricOrchestrator, createShootingArmCalculators, createGuideArmCalculators, createBallMetricCalculators, createLowerBodyCalculators, createPostureCalculators, createTimingCalculators, } from "./metrics";
 // Recorded pose-sequence (fixture) types + schema, for replay consumers
 export { poseDataSchema, frameSchema } from "./testing/types";
+// Pose detector factory (used by the app's analysis worker with
+// locally-hosted assets)
+export { createPoseDetector, } from "./pose/factory";
 //# sourceMappingURL=index.js.map
