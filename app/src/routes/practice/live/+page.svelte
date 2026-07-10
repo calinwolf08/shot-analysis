@@ -4,7 +4,12 @@
   import { page } from "$app/state";
   import type { LiveAnalysisSession } from "$lib/features/analysis";
   import { builtInBenchmarks, type MetricName } from "$lib/features/benchmarks";
-  import { SetupScreen } from "$lib/features/live-practice";
+  import {
+    createLiveRepCoordinator,
+    LiveSessionStore,
+    PracticeLoopScreen,
+    SetupScreen,
+  } from "$lib/features/live-practice";
   import { createPlanRepo } from "$lib/features/training-plan";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { createWebAudioFeedbackService } from "$lib/shared/audio";
@@ -12,7 +17,6 @@
     createBrowserCaptureService,
     type CaptureService,
   } from "$lib/shared/media/capture";
-  import { Button } from "$lib/shared/ui";
 
   const services = useAppServices();
   const audio = createWebAudioFeedbackService();
@@ -24,10 +28,15 @@
   const capture: CaptureService | null = replayMode
     ? null
     : createBrowserCaptureService();
+  // Wall-clock feedback dwell; short in e2e so multi-rep runs stay fast.
+  const feedbackMs = replayMode ? 1500 : 4000;
 
   let phase = $state<"loading" | "setup" | "running">("loading");
   let session = $state<LiveAnalysisSession | null>(null);
+  let focusMetric = $state<MetricName | null>(null);
   let focusLabel = $state<string | null>(null);
+  let store = $state<LiveSessionStore | null>(null);
+  let shootingHand: "left" | "right" = "right";
 
   $effect(() => {
     void boot();
@@ -40,23 +49,56 @@
       await goto(`/${page.url.search}`);
       return;
     }
+    shootingHand = player.shootingHand;
     const planItemId = page.url.searchParams.get("planItem");
     if (planItemId) {
       const item = await createPlanRepo(services).getItem(planItemId);
       if (item?.focusMetric) {
-        const target =
-          builtInBenchmarks()[0]!.targets[item.focusMetric as MetricName];
+        focusMetric = item.focusMetric as MetricName;
+        const target = builtInBenchmarks()[0]!.targets[focusMetric];
         focusLabel = target?.displayName ?? item.focusMetric;
       }
     }
     session = services.analysis.createLiveSession({
-      shootingHand: player.shootingHand,
+      shootingHand,
       profile: "pro-form",
     });
     phase = "setup";
   }
 
+  async function beginLoop() {
+    if (!session) return;
+    const coordinator = createLiveRepCoordinator(
+      { analyze: (frames) => session!.analyzeWindow(frames) },
+      { shootingHand },
+    );
+    // The setup screen already started the pose stream; route frames in.
+    session.onFrame((frame) => coordinator.pushFrame(frame));
+    store = new LiveSessionStore({
+      repos: services.repos,
+      scoring: services.scoring,
+      benchmarks: services.benchmarks,
+      db: services.db,
+      coordinator,
+      audio,
+      focusMetric,
+      planItemId: page.url.searchParams.get("planItem"),
+      feedbackMs,
+    });
+    await store.start();
+    phase = "running";
+  }
+
+  async function endLoop(sessionId: string | null) {
+    if (sessionId) {
+      await goto(`/practice/summary/${sessionId}${page.url.search}`);
+    } else {
+      await goto(`/${page.url.search}`);
+    }
+  }
+
   onDestroy(() => {
+    void store?.end();
     void session?.stop();
   });
 
@@ -71,29 +113,9 @@
     {capture}
     {audio}
     {focusLabel}
-    onstart={() => (phase = "running")}
+    onstart={() => void beginLoop()}
     onexit={exit}
   />
-{:else if phase === "running"}
-  <!-- Step 20 replaces this placeholder with the practice loop UI. -->
-  <main class="running" data-testid="practice-loop">
-    <h1>Session running</h1>
-    <p>The live rep loop lands in step 20.</p>
-    <Button variant="secondary" testid="practice-end" onclick={exit}>
-      End session
-    </Button>
-  </main>
+{:else if phase === "running" && store}
+  <PracticeLoopScreen {store} {focusLabel} onend={endLoop} />
 {/if}
-
-<style>
-  .running {
-    min-height: 100dvh;
-    display: grid;
-    place-content: center;
-    gap: var(--sc-space-3);
-    text-align: center;
-  }
-  p {
-    color: var(--sc-text-dim);
-  }
-</style>

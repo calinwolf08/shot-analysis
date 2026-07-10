@@ -29,3 +29,13 @@ export {
   meanLuma,
 } from "./setup/checks";
 export { default as SetupScreen } from "./setup/SetupScreen.svelte";
+export {
+  LiveSessionStore,
+  type LiveSessionStoreDeps,
+  type LoopPhase,
+  type RepEntry,
+  type RepFeedback,
+} from "./loop/live-session-store.svelte";
+export { default as PracticeLoopScreen } from "./loop/PracticeLoopScreen.svelte";
+export { compareHalves, type HalvesComparison } from "./summary/summary-logic";
+export { default as SummaryScreen } from "./summary/SummaryScreen.svelte";
