@@ -61,9 +61,9 @@ test("plan live session: 3 replayed reps → feedback → summary → plan item 
   });
   await page.getByTestId("setup-start").click();
 
-  // Countdown → loop.
+  // Countdown → loop (generous: parallel workers starve wall-clock timers).
   await expect(page.getByTestId("practice-loop")).toBeVisible({
-    timeout: 10_000,
+    timeout: 30_000,
   });
   await expect(page.getByTestId("loop-focus")).toBeVisible();
 

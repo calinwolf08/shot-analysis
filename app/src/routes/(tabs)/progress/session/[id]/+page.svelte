@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import { SessionDetailScreen } from "$lib/features/progress";
 </script>
 
-<h1>Coming soon</h1>
-<p>Detail view for {page.params.id} lands in a later step.</p>
+<SessionDetailScreen sessionId={page.params.id!} />

@@ -50,6 +50,6 @@ test("live setup reaches all-green from replayed pose and starts a session", asy
   // 3-2-1 countdown, then the session hand-off.
   await expect(page.getByTestId("setup-countdown")).toBeVisible();
   await expect(page.getByTestId("practice-loop")).toBeVisible({
-    timeout: 10_000,
+    timeout: 30_000,
   });
 });

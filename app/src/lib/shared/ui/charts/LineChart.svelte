@@ -6,6 +6,7 @@
     height = 120,
     testid = "line-chart",
     color = "var(--sc-primary)",
+    markerIndexes = [],
   }: {
     values: number[];
     /** Y-axis bounds; default to the data extent with 10% padding. */
@@ -14,6 +15,8 @@
     height?: number;
     testid?: string;
     color?: string;
+    /** Indexes drawn with a ring marker (e.g. assessments). */
+    markerIndexes?: number[];
   } = $props();
 
   const bounds = $derived.by(() => {
@@ -66,6 +69,17 @@
       fill={color}
       data-testid="{testid}-point-{i}"
     />
+    {#if markerIndexes.includes(i)}
+      <circle
+        cx={x(i)}
+        cy={y(v)}
+        r="5"
+        fill="none"
+        stroke={color}
+        stroke-width="1.25"
+        data-testid="{testid}-marker-{i}"
+      />
+    {/if}
   {/each}
 </svg>
 
