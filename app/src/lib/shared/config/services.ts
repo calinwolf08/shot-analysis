@@ -143,6 +143,7 @@ export function selectAnalysisService(): AnalysisService {
       loadFixture: createFetchFixtureLoader(),
       liveFixtureId: "20201212_134104",
       liveSpeed: 4,
+      liveLoop: true, // live mode behaves like a camera that never stops
     });
   }
   return createWorkerAnalysisService();

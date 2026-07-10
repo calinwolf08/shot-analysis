@@ -18,3 +18,14 @@ export {
   stillPose,
   type StreamCursor,
 } from "./coordinator/synthetic-streams";
+export {
+  CHECK_DEFAULTS,
+  createSustainedCheck,
+  isFullBodyVisible,
+  isLightingOk,
+  isSideView,
+  isSideViewFrame,
+  isStable,
+  meanLuma,
+} from "./setup/checks";
+export { default as SetupScreen } from "./setup/SetupScreen.svelte";

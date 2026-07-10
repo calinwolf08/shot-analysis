@@ -30,6 +30,11 @@ export interface ReplayAnalysisServiceOptions {
   liveFixtureId?: string;
   /** Playback speed multiplier for live replay (default 1). */
   liveSpeed?: number;
+  /**
+   * Restart the fixture when it ends (timestamps keep advancing), so the
+   * live stream behaves like a camera that never stops. Default false.
+   */
+  liveLoop?: boolean;
 }
 
 const defaultSchedule = (cb: () => void, ms: number): (() => void) => {
@@ -84,6 +89,7 @@ export function createReplayAnalysisService(
         loadPoseData: () => loadPoseData(fixtureId),
         schedule,
         speed: options.liveSpeed ?? 1,
+        loop: options.liveLoop ?? false,
         opts,
       });
     },
@@ -94,6 +100,7 @@ interface ReplayLiveSessionDeps {
   loadPoseData: () => Promise<PoseData>;
   schedule: (cb: () => void, ms: number) => () => void;
   speed: number;
+  loop: boolean;
   opts: AnalyzeOptions;
 }
 
@@ -116,12 +123,31 @@ function createReplayLiveSession(
       fps = pose.fps;
       const frames = poseDataToLandmarkFrames(pose);
       const intervalMs = 1000 / (pose.fps * deps.speed);
+      const spanFrames = frames.length;
+      const spanMs = spanFrames * (1000 / pose.fps);
       let i = 0;
+      let lap = 0;
       const tick = () => {
-        if (stopped || i >= frames.length) return;
-        const frame = frames[i];
+        if (stopped) return;
+        if (i >= frames.length) {
+          if (!deps.loop) return;
+          // Loop: replay from the top with monotonic indexes/timestamps.
+          i = 0;
+          lap += 1;
+        }
+        const source = frames[i];
         i += 1;
-        if (frame) for (const cb of subscribers) cb(frame);
+        if (source) {
+          const frame =
+            lap === 0
+              ? source
+              : {
+                  ...source,
+                  frameIndex: source.frameIndex + lap * spanFrames,
+                  timestamp: source.timestamp + lap * spanMs,
+                };
+          for (const cb of subscribers) cb(frame);
+        }
         cancel = deps.schedule(tick, intervalMs);
       };
       tick();
