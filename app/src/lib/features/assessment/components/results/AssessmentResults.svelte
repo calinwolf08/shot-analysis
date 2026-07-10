@@ -5,8 +5,15 @@
   import type { FocusAreaRow } from "$lib/features/diagnosis";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { flushDb } from "$lib/shared/db";
-  import type { ScoreRecord, ShotRecord } from "$lib/shared/db/repos";
+  import type { ScoreRecord, Session, ShotRecord } from "$lib/shared/db/repos";
   import { Button, Card, PlaceholderBadge, ScoreRing } from "$lib/shared/ui";
+  import DeltaStrip from "./DeltaStrip.svelte";
+  import {
+    computeFocusDeltas,
+    computeScoreDeltas,
+    type FocusDelta,
+    type ScoreDelta,
+  } from "./deltas";
   import MetricsAccordion from "./MetricsAccordion.svelte";
   import ShotStrip from "./ShotStrip.svelte";
   import TopIssues from "./TopIssues.svelte";
@@ -22,6 +29,9 @@
   let shotScores = $state<Map<string, number | null>>(new Map());
   let byCategory = $state<MetricsByCategory | null>(null);
   let benchmark = $state<BenchmarkProfile | null>(null);
+  let session = $state<Session | null>(null);
+  let scoreDeltas = $state<ScoreDelta[] | null>(null);
+  let focusDeltas = $state<FocusDelta[]>([]);
   let loading = $state(true);
   let buildingPlan = $state(false);
 
@@ -44,7 +54,36 @@
       shots.map((s) => [s.id, latest.get(s.id)?.formScore ?? null]),
     );
     byCategory = benchmark ? summarizeMetrics(shots, benchmark) : null;
+    session = await services.repos.session.get(id);
+    await loadDeltas(id);
     loading = false;
+  }
+
+  /** Compares against the most recent prior completed assessment. */
+  async function loadDeltas(id: string) {
+    scoreDeltas = null;
+    focusDeltas = [];
+    if (!session || !score) return;
+    const sessions = await services.repos.session.listByPlayer(
+      session.playerId,
+      { type: "assessment", status: "completed" },
+    );
+    const previous = sessions
+      .filter(
+        (s) =>
+          s.id !== id &&
+          (s.completedAt ?? 0) < (session!.completedAt ?? Infinity),
+      )
+      .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))[0];
+    if (!previous) return;
+    const previousScore = await services.repos.score.latestForRef(
+      "session",
+      previous.id,
+    );
+    if (!previousScore) return;
+    scoreDeltas = computeScoreDeltas(score, previousScore);
+    const previousAreas = await services.diagnosis.listForSession(previous.id);
+    focusDeltas = computeFocusDeltas(focusAreas, previousAreas);
   }
 
   async function buildPlan() {
@@ -53,12 +92,20 @@
     try {
       const player = await services.repos.player.getFirst();
       if (!player) return;
-      const plan = await services.trainingPlan.generateForSession(
-        sessionId,
-        player.id,
-      );
+      const plan = session?.planItemId
+        ? await services.trainingPlan.completeReassessment(
+            sessionId,
+            player.id,
+            session.planItemId,
+          )
+        : await services.trainingPlan.generateForSession(sessionId, player.id);
       await flushDb(services.db);
-      await goto(`/plan/${plan.id}${page.url.search}`);
+      // The plan-item binding is spent once the next plan exists.
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local URL builder, never reactive state
+      const params = new URLSearchParams(page.url.search);
+      params.delete("planItem");
+      const qs = params.toString();
+      await goto(`/plan/${plan.id}${qs ? `?${qs}` : ""}`);
     } finally {
       buildingPlan = false;
     }
@@ -112,6 +159,10 @@
       </div>
     </section>
 
+    {#if scoreDeltas}
+      <DeltaStrip {scoreDeltas} {focusDeltas} />
+    {/if}
+
     <TopIssues areas={focusAreas} />
     <ShotStrip {shots} scores={shotScores} />
     {#if byCategory}
@@ -125,7 +176,11 @@
         disabled={buildingPlan}
         onclick={buildPlan}
       >
-        {buildingPlan ? "Building your plan…" : "Build my training plan"}
+        {buildingPlan
+          ? "Building your plan…"
+          : session?.planItemId
+            ? "Build my next training plan"
+            : "Build my training plan"}
       </Button>
       <Button variant="secondary" onclick={() => goto(`/${page.url.search}`)}>
         Done

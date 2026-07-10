@@ -73,6 +73,8 @@ export interface AssessmentService {
     opts?: {
       signal?: AbortSignal;
       onProgress?: (p: AssessmentProgress) => void;
+      /** Set when launched from a plan's reassessment item. */
+      planItemId?: string;
     },
   ): Promise<AssessmentOutcome>;
   /** Re-score + re-diagnose after review exclusions changed. */
@@ -123,6 +125,7 @@ export function createAssessmentService(
       const session = await repos.session.create({
         playerId: player.id,
         type: "assessment",
+        ...(opts.planItemId ? { planItemId: opts.planItemId } : {}),
       });
 
       const emit = opts.onProgress ?? (() => undefined);

@@ -109,7 +109,9 @@
   }
 
   function handleFrame(frame: LandmarkFrame) {
-    pass["full-body"] = fullBody.update(
+    // Sticky once passed: the gate is a one-time readiness check, and a
+    // momentary pose dropout must not yank Start away mid-click.
+    pass["full-body"] ||= fullBody.update(
       isFullBodyVisible(frame),
       frame.timestamp,
     );
@@ -117,7 +119,7 @@
     if (recentFrames.length > CHECK_DEFAULTS.sideViewWindow) {
       recentFrames = recentFrames.slice(-CHECK_DEFAULTS.sideViewWindow);
     }
-    pass["side-view"] = isSideView(recentFrames);
+    pass["side-view"] ||= isSideView(recentFrames);
   }
 
   function sampleLighting() {

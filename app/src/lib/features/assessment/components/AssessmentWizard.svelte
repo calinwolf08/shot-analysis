@@ -9,7 +9,10 @@
   import ReviewStep from "./ReviewStep.svelte";
 
   const services = useAppServices();
-  const store = new AssessmentStore(services.assessment);
+  const store = new AssessmentStore(services.assessment, {
+    // Set when launched from a plan's reassessment item.
+    planItemId: page.url.searchParams.get("planItem"),
+  });
   store.begin();
 
   // Replay mode (?e2e=replay): pick fixtures instead of files.

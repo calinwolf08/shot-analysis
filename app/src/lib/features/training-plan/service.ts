@@ -33,6 +33,15 @@ export interface TrainingPlanService {
    * marked superseded.
    */
   generateForSession(sessionId: string, playerId: string): Promise<Plan>;
+  /**
+   * Closes the loop for a plan's reassessment item: marks the item done,
+   * then builds the next adapted block (previous plan superseded).
+   */
+  completeReassessment(
+    sessionId: string,
+    playerId: string,
+    planItemId: string,
+  ): Promise<Plan>;
   getPlan(planId: string): Promise<PlanWithItems | null>;
   getActivePlan(playerId: string): Promise<PlanWithItems | null>;
   completeItem(itemId: string): Promise<void>;
@@ -116,6 +125,11 @@ export function createTrainingPlanService(
         focus: spec.focus,
         items: spec.items,
       });
+    },
+
+    async completeReassessment(sessionId, playerId, planItemId) {
+      await plans.updateItemStatus(planItemId, "done");
+      return this.generateForSession(sessionId, playerId);
     },
 
     getPlan: async (planId) => withItems(await plans.get(planId)),

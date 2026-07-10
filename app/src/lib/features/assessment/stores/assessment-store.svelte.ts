@@ -31,7 +31,10 @@ export class AssessmentStore {
 
   private controller: AbortController | null = null;
 
-  constructor(private readonly service: AssessmentService) {}
+  constructor(
+    private readonly service: AssessmentService,
+    private readonly opts: { planItemId?: string | null } = {},
+  ) {}
 
   begin(): void {
     if (this.phase !== "idle") return;
@@ -59,6 +62,7 @@ export class AssessmentStore {
         onProgress: (p) => {
           this.progress = p;
         },
+        ...(this.opts.planItemId ? { planItemId: this.opts.planItemId } : {}),
       });
       this.phase = "reviewing";
     } catch (err) {

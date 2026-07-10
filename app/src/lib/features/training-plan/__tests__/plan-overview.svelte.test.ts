@@ -38,6 +38,7 @@ const items: PlanItem[] = [
     drillId: null,
     targetReps: 20,
   }),
+  item({ id: "i-drill-later", dayIndex: 6 }),
   item({
     id: "i-2",
     dayIndex: 13,
@@ -62,7 +63,7 @@ describe("PlanOverview", () => {
     expect(screen.getByTestId("plan-focus-chips").textContent).toContain(
       "Alignment",
     );
-    expect(screen.getByText("2-week block, 3 sessions")).toBeTruthy();
+    expect(screen.getByText("2-week block, 4 sessions")).toBeTruthy();
 
     // Day 1 all done, day 3 is today, day 14 locked.
     expect(screen.getByTestId("plan-day-0").textContent).toContain("Done");
@@ -80,10 +81,10 @@ describe("PlanOverview", () => {
       "Re-assessment",
     );
 
-    // Progress reflects 1 of 3 done.
+    // Progress reflects 1 of 4 done.
     expect(
       screen.getByTestId("plan-progress").getAttribute("aria-valuenow"),
-    ).toBe("33");
+    ).toBe("25");
   });
 
   it("only today's items are startable; locked days are disabled", async () => {
@@ -97,9 +98,14 @@ describe("PlanOverview", () => {
     });
 
     const todayBtn = screen.getByTestId<HTMLButtonElement>("plan-item-i-1");
-    const lockedBtn = screen.getByTestId<HTMLButtonElement>("plan-item-i-2");
+    const lockedBtn = screen.getByTestId<HTMLButtonElement>(
+      "plan-item-i-drill-later",
+    );
+    const reassessBtn = screen.getByTestId<HTMLButtonElement>("plan-item-i-2");
     expect(todayBtn.disabled).toBe(false);
     expect(lockedBtn.disabled).toBe(true);
+    // The reassessment item is always startable, even while locked.
+    expect(reassessBtn.disabled).toBe(false);
     // Done items show a check, not a button.
     expect(screen.queryByTestId("plan-item-i-0")).toBeNull();
 

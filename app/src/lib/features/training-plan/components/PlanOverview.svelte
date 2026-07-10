@@ -121,7 +121,8 @@
                   <Button
                     size="sm"
                     variant={state === "today" ? "primary" : "secondary"}
-                    disabled={state === "locked"}
+                    disabled={state === "locked" &&
+                      item.type !== "reassessment"}
                     testid="plan-item-{item.id}"
                     onclick={() => onopen(item)}
                   >

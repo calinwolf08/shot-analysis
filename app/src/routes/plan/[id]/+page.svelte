@@ -43,7 +43,8 @@
     } else if (item.type === "live_practice") {
       void goto(withPlanItem("/practice/live", item));
     } else {
-      void goto(`/assess${page.url.search}`);
+      // Reassessment: the wizard tags its session with the plan item.
+      void goto(withPlanItem("/assess", item));
     }
   }
 
