@@ -1,0 +1,13 @@
+node_modules/
+.svelte-kit/
+build/
+dist/
+coverage/
+android/
+ios/
+playwright-report/
+test-results/
+package-lock.json
+src-tests/fixtures/
+static/fixtures/
+static/mediapipe/

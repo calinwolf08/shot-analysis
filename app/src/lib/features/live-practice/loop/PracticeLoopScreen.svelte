@@ -1,0 +1,330 @@
+<script lang="ts">
+  import { page } from "$app/state";
+  import { Button, ScoreRing } from "$lib/shared/ui";
+  import type { LiveSessionStore } from "./live-session-store.svelte";
+
+  let {
+    store,
+    focusLabel = null,
+    onend,
+  }: {
+    store: LiveSessionStore;
+    focusLabel?: string | null;
+    /** Called with the sessionId once the session is ended + scored. */
+    onend: (sessionId: string | null) => void;
+  } = $props();
+
+  let drawerOpen = $state(false);
+  let ending = $state(false);
+
+  async function endSession() {
+    if (ending) return;
+    ending = true;
+    const sessionId = await store.end();
+    onend(sessionId);
+  }
+</script>
+
+<main class="loop" data-testid="practice-loop">
+  <header>
+    {#if focusLabel}
+      <span class="focus" data-testid="loop-focus">Focus: {focusLabel}</span>
+    {:else}
+      <span class="focus dim">Free shooting</span>
+    {/if}
+    <div class="controls">
+      <button
+        class="ctl"
+        data-testid="practice-mute"
+        aria-pressed={store.muted}
+        onclick={() => store.toggleMute()}
+      >
+        {store.muted ? "🔇" : "🔊"}
+      </button>
+      {#if store.phase === "paused"}
+        <button
+          class="ctl"
+          data-testid="practice-resume"
+          onclick={() => store.resume()}
+        >
+          ▶
+        </button>
+      {:else}
+        <button
+          class="ctl"
+          data-testid="practice-pause"
+          onclick={() => store.pause()}
+        >
+          ⏸
+        </button>
+      {/if}
+      <Button
+        variant="secondary"
+        size="sm"
+        testid="practice-end"
+        disabled={ending}
+        onclick={endSession}
+      >
+        End
+      </Button>
+    </div>
+  </header>
+
+  <section class="stage">
+    {#if store.feedback}
+      {@const fb = store.feedback}
+      <div class="feedback" data-testid="rep-feedback">
+        <p class="big-score sc-numeral" data-testid="rep-feedback-score">
+          {fb.score === null ? "–" : Math.round(fb.score)}
+        </p>
+        {#if fb.delta !== null}
+          <p
+            class="delta"
+            class:up={fb.delta >= 0}
+            data-testid="rep-feedback-delta"
+          >
+            {fb.delta >= 0 ? "▲" : "▼"}
+            {Math.abs(Math.round(fb.delta))}
+          </p>
+        {/if}
+        {#if fb.cues.primary}
+          <p class="cue" data-testid="rep-feedback-cue">
+            {fb.cues.primary.text}
+          </p>
+        {/if}
+        {#if fb.cues.secondary.length > 0}
+          <div class="chips">
+            {#each fb.cues.secondary.slice(0, 2) as cue (cue.metric)}
+              <span class="chip">{cue.text}</span>
+            {/each}
+          </div>
+        {/if}
+        <button
+          class="not-a-shot"
+          data-testid="rep-not-a-shot"
+          onclick={() => store.excludeRep(fb.repIndex)}
+        >
+          Not a shot?
+        </button>
+      </div>
+    {:else if store.phase === "analyzing"}
+      <div class="analyzing" data-testid="practice-analyzing">
+        <span class="pulse"></span>
+        Analyzing…
+      </div>
+    {:else if store.phase === "paused"}
+      <p class="banner dim" data-testid="practice-paused">Paused</p>
+    {:else}
+      <p class="banner" data-testid="practice-idle">Take your shot</p>
+      {#if store.noShotFlash}
+        <p class="no-shot" data-testid="practice-no-shot">
+          No shot detected — keep going
+        </p>
+      {/if}
+    {/if}
+  </section>
+
+  <footer>
+    <span class="rep-counter sc-numeral" data-testid="rep-counter">
+      Rep {store.repCount + 1}
+    </span>
+    <button
+      class="drawer-toggle"
+      data-testid="rep-drawer-toggle"
+      onclick={() => (drawerOpen = !drawerOpen)}
+    >
+      Reps ▴
+    </button>
+    <ScoreRing value={store.average} size={64} testid="session-average" />
+  </footer>
+
+  {#if drawerOpen}
+    <section class="drawer" data-testid="rep-drawer">
+      {#if store.reps.length === 0}
+        <p class="dim">No reps yet.</p>
+      {:else}
+        <ul>
+          {#each store.reps as rep (rep.repIndex)}
+            <li
+              class:excluded={rep.excluded}
+              data-testid="rep-row-{rep.repIndex}"
+            >
+              <span>Rep {rep.repIndex}</span>
+              <span class="sc-numeral">
+                {rep.score === null ? "–" : Math.round(rep.score)}
+              </span>
+              <a href="/progress/shot/{rep.shotId}{page.url.search}">detail</a>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+  {/if}
+</main>
+
+<style>
+  .loop {
+    min-height: 100dvh;
+    max-width: 560px;
+    margin: 0 auto;
+    padding: var(--sc-space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-4);
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sc-space-3);
+  }
+  .focus {
+    color: var(--sc-primary);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .dim {
+    color: var(--sc-text-dim);
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: var(--sc-space-2);
+  }
+  .ctl {
+    background: var(--sc-card);
+    border: 1px solid var(--sc-border);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .stage {
+    flex: 1;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    gap: var(--sc-space-3);
+  }
+  .banner {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .no-shot {
+    color: var(--sc-warn);
+    margin: 0;
+  }
+  .analyzing {
+    display: flex;
+    align-items: center;
+    gap: var(--sc-space-3);
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .pulse {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--sc-primary);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    50% {
+      opacity: 0.25;
+      transform: scale(0.7);
+    }
+  }
+  .feedback {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sc-space-2);
+  }
+  .big-score {
+    font-size: 96px;
+    font-weight: 800;
+    margin: 0;
+    line-height: 1;
+  }
+  .delta {
+    margin: 0;
+    font-weight: 700;
+    color: var(--sc-fail);
+  }
+  .delta.up {
+    color: var(--sc-success);
+  }
+  .cue {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .chips {
+    display: flex;
+    gap: var(--sc-space-2);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .chip {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--sc-card-raised);
+    border: 1px solid var(--sc-border);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .not-a-shot {
+    background: none;
+    border: none;
+    color: var(--sc-text-dim);
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sc-space-3);
+  }
+  .rep-counter {
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .drawer-toggle {
+    background: none;
+    border: none;
+    color: var(--sc-text-dim);
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .drawer ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-2);
+    max-height: 30dvh;
+    overflow-y: auto;
+  }
+  .drawer li {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--sc-space-3);
+    padding: 8px 12px;
+    border: 1px solid var(--sc-border);
+    border-radius: var(--sc-radius);
+    background: var(--sc-card);
+    font-size: 14px;
+  }
+  .drawer li.excluded {
+    opacity: 0.5;
+    text-decoration: line-through;
+  }
+  .drawer a {
+    color: var(--sc-primary);
+  }
+</style>

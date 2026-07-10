@@ -84,6 +84,19 @@ describe("MediaPipeBrowserDetector", () => {
                 runningMode: "IMAGE",
             });
         });
+        it("accepts custom wasmBasePath for locally-hosted WASM assets", async () => {
+            await createMediaPipeBrowserDetector({
+                wasmBasePath: "/mediapipe/wasm",
+            });
+            const calls = vi.mocked(FilesetResolver.forVisionTasks).mock.calls;
+            expect(calls.length).toBe(1);
+            expect(calls[0]?.[0]).toBe("/mediapipe/wasm");
+        });
+        it("defaults wasmBasePath to the CDN when not provided", async () => {
+            await createMediaPipeBrowserDetector();
+            const calls = vi.mocked(FilesetResolver.forVisionTasks).mock.calls;
+            expect(calls[0]?.[0]).toContain("cdn.jsdelivr.net");
+        });
         it("accepts custom modelPath", async () => {
             const customPath = "/custom/model.task";
             await createMediaPipeBrowserDetector({ modelPath: customPath });

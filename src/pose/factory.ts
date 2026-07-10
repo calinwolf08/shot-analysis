@@ -60,6 +60,12 @@ export interface PoseDetectorConfig {
   modelPath?: string;
 
   /**
+   * Base path/URL of the MediaPipe tasks-vision WASM assets (browser only).
+   * Point at a locally-hosted copy for offline-first apps.
+   */
+  wasmBasePath?: string;
+
+  /**
    * Model complexity (0-2). Higher values are more accurate but slower.
    * - 0: Lite model
    * - 1: Full model
@@ -226,6 +232,9 @@ export async function createPoseDetector(
 
       if (restConfig.modelPath !== undefined) {
         browserConfig.modelPath = restConfig.modelPath;
+      }
+      if (restConfig.wasmBasePath !== undefined) {
+        browserConfig.wasmBasePath = restConfig.wasmBasePath;
       }
       if (restConfig.modelComplexity !== undefined) {
         browserConfig.modelComplexity = restConfig.modelComplexity;

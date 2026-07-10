@@ -41,6 +41,11 @@ export class WebGLNotAvailableError extends Error {
     }
 }
 /**
+ * Configuration options for MediaPipeBrowserDetector.
+ */
+/** Default CDN location of the tasks-vision WASM runtime. */
+const DEFAULT_WASM_BASE_PATH = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
+/**
  * Detects WebGL support in the browser.
  *
  * @returns true if WebGL is available, false otherwise
@@ -126,7 +131,7 @@ export class MediaPipeBrowserDetector {
         }
         let vision;
         try {
-            vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm");
+            vision = await FilesetResolver.forVisionTasks(config.wasmBasePath ?? DEFAULT_WASM_BASE_PATH);
         }
         catch (error) {
             throw new WasmInitializationError(`Failed to initialize MediaPipe WASM runtime: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error : undefined);

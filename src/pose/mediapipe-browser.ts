@@ -60,6 +60,10 @@ export class WebGLNotAvailableError extends Error {
 /**
  * Configuration options for MediaPipeBrowserDetector.
  */
+/** Default CDN location of the tasks-vision WASM runtime. */
+const DEFAULT_WASM_BASE_PATH =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
+
 export interface MediaPipeBrowserConfig {
   /**
    * Path to the pose landmarker model file (.task).
@@ -67,6 +71,13 @@ export interface MediaPipeBrowserConfig {
    * @default DEFAULT_MODEL_PATH
    */
   modelPath?: string;
+
+  /**
+   * Base path/URL of the MediaPipe tasks-vision WASM assets.
+   * Point at a locally-hosted copy for offline-first apps.
+   * @default the jsdelivr CDN for @mediapipe/tasks-vision
+   */
+  wasmBasePath?: string;
 
   /**
    * Model complexity (0-2). Higher values are more accurate but slower.
@@ -231,7 +242,7 @@ export class MediaPipeBrowserDetector implements PoseDetector {
 
     try {
       vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm",
+        config.wasmBasePath ?? DEFAULT_WASM_BASE_PATH,
       );
     } catch (error) {
       throw new WasmInitializationError(

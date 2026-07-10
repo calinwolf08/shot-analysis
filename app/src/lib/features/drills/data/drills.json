@@ -1,0 +1,269 @@
+{
+  "version": 1,
+  "drills": [
+    {
+      "id": "drill-form-shooting-close",
+      "slug": "form-shooting-close",
+      "title": "Form Shooting — Close Range",
+      "description": "One-motion shots from 3–5 feet, focused entirely on a straight shot line: elbow under the ball, shoulders square, perfect release every rep.",
+      "coachingPoints": [
+        "Start with the ball in your shot pocket, elbow directly under it.",
+        "Square both shoulders to the rim before you begin the shot.",
+        "Finish with your fingers in the rim — hold the follow-through until the ball hits the net.",
+        "Make 5 in a row before stepping back one foot."
+      ],
+      "focusMetrics": [
+        "shootingElbowFlare",
+        "shootingElbowAngle",
+        "shoulderAlignment"
+      ],
+      "issueGroups": ["alignment"],
+      "difficulty": 1,
+      "durationMin": 8,
+      "equipment": ["ball", "hoop"],
+      "setsReps": "3 sets × 10 makes",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    },
+    {
+      "id": "drill-one-hand-form",
+      "slug": "one-hand-form-shots",
+      "title": "One-Hand Form Shots",
+      "description": "Shoot close-range with only your shooting hand. Without the guide hand, the ball flight tells you the truth about your release.",
+      "coachingPoints": [
+        "Guide arm behind your back or at your side.",
+        "Balance the ball on your shooting hand, wrist loaded back.",
+        "Snap the wrist fully — the ball should have clear backspin.",
+        "If the ball drifts sideways, your elbow or wrist is off-line."
+      ],
+      "focusMetrics": ["wristSnapAngle", "maxArmExtension", "releaseAngle"],
+      "issueGroups": ["release-follow-through"],
+      "difficulty": 1,
+      "durationMin": 8,
+      "equipment": ["ball", "hoop"],
+      "setsReps": "3 sets × 8 makes",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    },
+    {
+      "id": "drill-wall-sit-pocket",
+      "slug": "wall-sits-shot-pocket",
+      "title": "Wall Sits + Shot Pocket",
+      "description": "Build leg strength and groove the dip: hold a wall sit while moving the ball from triple threat to shot pocket on a rhythm count.",
+      "coachingPoints": [
+        "Thighs parallel to the floor, back flat on the wall.",
+        "Move the ball to the pocket on a 1-2 rhythm, exhale on the lift.",
+        "Keep the dip small and smooth — no yanking the ball down.",
+        "30 seconds on, 30 seconds rest."
+      ],
+      "focusMetrics": ["kneeFlexion", "hipDrop", "ballDip"],
+      "issueGroups": ["lower-body", "ball-path"],
+      "difficulty": 1,
+      "durationMin": 6,
+      "equipment": ["ball", "wall"],
+      "setsReps": "4 × 30 s holds",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    },
+    {
+      "id": "drill-guide-hand-discipline",
+      "slug": "guide-hand-discipline",
+      "title": "Guide-Hand Discipline",
+      "description": "Catch-and-shoot reps where the guide hand releases early and opens flat. Cures thumb pushes and sideways spin.",
+      "coachingPoints": [
+        "Guide hand on the side of the ball, fingers to the sky.",
+        "Peel the guide hand off as the ball starts up past your chin.",
+        "After release, your guide palm should face the sideline, not the rim.",
+        "Check the spin: pure backspin means the guide hand stayed quiet."
+      ],
+      "focusMetrics": [
+        "guideHandPosition",
+        "guideHandRelease",
+        "guideElbowFlare"
+      ],
+      "issueGroups": ["guide-hand"],
+      "difficulty": 2,
+      "durationMin": 10,
+      "equipment": ["ball", "hoop", "partner or wall"],
+      "setsReps": "3 sets × 10 shots",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    },
+    {
+      "id": "drill-follow-through-freeze",
+      "slug": "follow-through-freeze",
+      "title": "Follow-Through Freeze",
+      "description": "Every shot ends in a statue: full extension, wrist snapped, eyes on target — held for a full two seconds.",
+      "coachingPoints": [
+        "Freeze until the ball hits the floor — no exceptions.",
+        "Elbow above your eyebrow, fingers pointing down in the rim.",
+        "If you fall off balance during the freeze, your base needs work.",
+        "Have a partner call out 'early' if your arm drops before two seconds."
+      ],
+      "focusMetrics": [
+        "followThroughHold",
+        "wristSnapAngle",
+        "maxArmExtension"
+      ],
+      "issueGroups": ["release-follow-through"],
+      "difficulty": 1,
+      "durationMin": 8,
+      "equipment": ["ball", "hoop"],
+      "setsReps": "3 sets × 10 shots",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    },
+    {
+      "id": "drill-one-two-rhythm",
+      "slug": "one-two-step-rhythm",
+      "title": "1-2 Step Rhythm Shooting",
+      "description": "Catch off a self-toss with a 1-2 step, syncing the ball lift to the legs so everything rises as one spring.",
+      "coachingPoints": [
+        "Toss, catch on the hop or 1-2 — legs load AS the ball arrives.",
+        "Say '1-2-up' out loud; the ball starts rising on 'up' with the legs.",
+        "No pause at the pocket: the catch flows straight into the shot.",
+        "Film a rep: ball and hips should start rising within a frame or two."
+      ],
+      "focusMetrics": ["ballLegSync", "legRiseStart", "ballRiseStart"],
+      "issueGroups": ["rhythm"],
+      "difficulty": 2,
+      "durationMin": 10,
+      "equipment": ["ball", "hoop"],
+      "setsReps": "4 sets × 8 shots",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    },
+    {
+      "id": "drill-mirror-set-point",
+      "slug": "mirror-set-point",
+      "title": "Mirror Set-Point Checks",
+      "description": "Slow-motion shots in front of a mirror, pausing at the set point to check ball height and position before finishing.",
+      "coachingPoints": [
+        "Pause 2 seconds at your set point — ball above your eyebrow, in front of your head.",
+        "The ball should never drift behind your hairline.",
+        "Watch the path: pocket to set point in one straight lift.",
+        "Do 5 slow-motion reps, then 5 at game speed keeping the same positions."
+      ],
+      "focusMetrics": ["setPointHeight", "ballBehindHead", "ballPath"],
+      "issueGroups": ["ball-path"],
+      "difficulty": 2,
+      "durationMin": 8,
+      "equipment": ["ball", "mirror or window"],
+      "setsReps": "3 sets × 10 reps",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    },
+    {
+      "id": "drill-no-dip-catch-shoot",
+      "slug": "no-dip-catch-shoot",
+      "title": "No-Dip Catch & Shoot",
+      "description": "Partner or self-toss feeds at pocket height; shoot without lowering the ball. Builds a compact, hitch-free release.",
+      "coachingPoints": [
+        "Show target hands at your shot pocket before the catch.",
+        "The ball only goes UP after the catch — zero downward drift.",
+        "No pause at the set point; catch-to-release is one count.",
+        "If your rhythm dies, allow a small dip and shrink it every set."
+      ],
+      "focusMetrics": ["ballDip", "setPointDuration", "totalShotDuration"],
+      "issueGroups": ["ball-path", "rhythm"],
+      "difficulty": 3,
+      "durationMin": 10,
+      "equipment": ["ball", "hoop", "partner"],
+      "setsReps": "4 sets × 6 shots",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    },
+    {
+      "id": "drill-chair-shooting",
+      "slug": "chair-shooting",
+      "title": "Chair Shooting",
+      "description": "Start seated, stand and shoot in one motion. Forces the legs to initiate the shot and the kinetic chain to fire in order.",
+      "coachingPoints": [
+        "Sit tall on the chair edge, ball in the pocket.",
+        "Drive through your heels — legs start the shot, arms finish it.",
+        "The ball leaves your hand just before your legs finish extending.",
+        "If you shoot all-arms, lower the chair height or slow down."
+      ],
+      "focusMetrics": ["legExtensionStart", "kneeFlexion", "ballLegSync"],
+      "issueGroups": ["lower-body"],
+      "difficulty": 2,
+      "durationMin": 10,
+      "equipment": ["ball", "hoop", "chair"],
+      "setsReps": "3 sets × 8 shots",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    },
+    {
+      "id": "drill-wall-posture",
+      "slug": "wall-posture-shots",
+      "title": "Wall Posture Shots",
+      "description": "Shooting motion with your heels, hips and shoulders brushing a wall — teaches a tall spine and level head through the shot.",
+      "coachingPoints": [
+        "Heels two inches from the wall; hips and shoulders lightly touch it.",
+        "Rise into the shot without your head drifting forward off the wall line.",
+        "Eyes lock on a target spot the whole rep.",
+        "Do it with no ball first, then with a ball, no hoop needed."
+      ],
+      "focusMetrics": ["backPosture", "headTilt"],
+      "issueGroups": ["posture"],
+      "difficulty": 1,
+      "durationMin": 6,
+      "equipment": ["ball", "wall"],
+      "setsReps": "3 sets × 10 reps",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    },
+    {
+      "id": "drill-eyes-on-rim",
+      "slug": "eyes-on-rim-freeze",
+      "title": "Eyes-on-Rim Freeze",
+      "description": "Shots where the only goal is a still head and square shoulders: pick your target early, never let your eyes or chin move.",
+      "coachingPoints": [
+        "Pick the back of the rim as your target before the ball arrives.",
+        "Chin stays level — no head bob as you rise.",
+        "A partner watches your eyes: any flick to the ball flight is a miss.",
+        "Finish square: both shoulders still facing the rim after release."
+      ],
+      "focusMetrics": ["headTilt", "shoulderAlignment", "backPosture"],
+      "issueGroups": ["posture", "alignment"],
+      "difficulty": 2,
+      "durationMin": 8,
+      "equipment": ["ball", "hoop", "partner"],
+      "setsReps": "3 sets × 10 shots",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    },
+    {
+      "id": "drill-quick-release-count",
+      "slug": "quick-release-count",
+      "title": "Quick-Release Countdown",
+      "description": "Game-speed catch and shoot against a countdown: get the shot off in under one second without breaking your mechanics.",
+      "coachingPoints": [
+        "Partner counts down '3-2-1' — the ball must be gone on '1'.",
+        "Speed comes from starting the release on the way up, not rushing the arms.",
+        "Keep the follow-through even at speed; never trade form for time.",
+        "If form breaks, add half a second back and rebuild."
+      ],
+      "focusMetrics": ["totalShotDuration", "releaseStart", "setPointDuration"],
+      "issueGroups": ["rhythm"],
+      "difficulty": 3,
+      "durationMin": 10,
+      "equipment": ["ball", "hoop", "partner"],
+      "setsReps": "4 sets × 6 shots",
+      "videoUri": "/drills/placeholder.webm",
+      "thumbnailUri": "/drills/placeholder-thumb.svg",
+      "isPlaceholder": true
+    }
+  ]
+}

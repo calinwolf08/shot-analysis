@@ -22,4 +22,12 @@ export { ProfileComparisonEngine, type ProfileComparisonEngineOptions, } from ".
 export { youthFundamentalsProfile, highSchoolProfile, proFormProfile, builtInProfiles, allBuiltInProfiles, getBuiltInProfile, } from "./profiles";
 export { ShotPhase as DetectionShotPhase, SHOT_PHASES, TOTAL_SHOT_PHASES, } from "./detection/types";
 export type { PhaseRange, ShotBoundary, ShotPhases, Shot, FrameLabel, ShotDetectionResult, } from "./detection/types";
+export { ShotDetector, createShotDetector, type ShotDetectorConfig, } from "./detection";
+export { detectOrientation } from "./detection/pose-shot-detector";
+export type { Landmark as DetectionLandmark, PoseLandmarks as DetectionPoseLandmarks, } from "./pose/types";
+export { MetricOrchestrator, createShootingArmCalculators, createGuideArmCalculators, createBallMetricCalculators, createLowerBodyCalculators, createPostureCalculators, createTimingCalculators, } from "./metrics";
+export type { Orientation } from "./metrics/types";
+export { poseDataSchema, frameSchema } from "./testing/types";
+export type { PoseData, Frame as PoseDataFrame } from "./testing/types";
+export { createPoseDetector, type PoseDetectorConfig, type PoseDetectorRuntime, } from "./pose/factory";
 //# sourceMappingURL=index.d.ts.map
