@@ -31,11 +31,13 @@
   // Wall-clock feedback dwell; short in e2e so multi-rep runs stay fast.
   const feedbackMs = replayMode ? 1500 : 4000;
 
-  let phase = $state<"loading" | "setup" | "running">("loading");
+  let phase = $state<"loading" | "setup" | "running" | "error">("loading");
   let session = $state<LiveAnalysisSession | null>(null);
   let focusMetric = $state<MetricName | null>(null);
   let focusLabel = $state<string | null>(null);
   let store = $state<LiveSessionStore | null>(null);
+  let cameraStream = $state<MediaStream | null>(null);
+  let errorMessage = $state<string | null>(null);
   let shootingHand: "left" | "right" = "right";
 
   $effect(() => {
@@ -85,6 +87,15 @@
       planItemId: page.url.searchParams.get("planItem"),
       feedbackMs,
     });
+    // Re-open camera for the loop screen (setup screen stops its handle on unmount).
+    if (capture?.isAvailable()) {
+      try {
+        const handle = await capture.start();
+        cameraStream = handle.stream;
+      } catch {
+        cameraStream = null;
+      }
+    }
     await store.start();
     phase = "running";
   }
@@ -100,14 +111,28 @@
   onDestroy(() => {
     void store?.end();
     void session?.stop();
+    if (cameraStream) {
+      for (const track of cameraStream.getTracks()) track.stop();
+    }
   });
+
+  function handleSetupError(message: string) {
+    errorMessage = message;
+    phase = "error";
+  }
 
   function exit() {
     void goto(`/${page.url.search}`);
   }
 </script>
 
-{#if phase === "setup" && session}
+{#if phase === "error"}
+  <main class="error-screen">
+    <h2>Something went wrong</h2>
+    <p>{errorMessage}</p>
+    <button onclick={exit}>Go back</button>
+  </main>
+{:else if phase === "setup" && session}
   <SetupScreen
     {session}
     {capture}
@@ -115,7 +140,45 @@
     {focusLabel}
     onstart={() => void beginLoop()}
     onexit={exit}
+    onerror={handleSetupError}
   />
 {:else if phase === "running" && store}
-  <PracticeLoopScreen {store} {focusLabel} onend={endLoop} />
+  <PracticeLoopScreen
+    {store}
+    {focusLabel}
+    stream={cameraStream}
+    onend={endLoop}
+  />
 {/if}
+
+<style>
+  .error-screen {
+    min-height: 100dvh;
+    max-width: 560px;
+    margin: 0 auto;
+    padding: var(--sc-space-4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sc-space-4);
+    text-align: center;
+  }
+  .error-screen h2 {
+    margin: 0;
+    font-size: 20px;
+  }
+  .error-screen p {
+    color: var(--sc-text-dim);
+    margin: 0;
+  }
+  .error-screen button {
+    padding: 10px 24px;
+    border-radius: var(--sc-radius);
+    background: var(--sc-primary);
+    color: #fff;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+  }
+</style>

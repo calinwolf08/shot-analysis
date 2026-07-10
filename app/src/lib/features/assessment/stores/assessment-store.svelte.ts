@@ -12,6 +12,45 @@ import type {
 } from "../services/assessment-service";
 import { AssessmentAbortedError } from "../services/assessment-service";
 
+/**
+ * Converts technical error messages to user-friendly text.
+ * Technical errors (WASM, pose landmarker, etc.) are logged but shown
+ * to users as generic messages.
+ */
+function sanitizeErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+
+  // Technical errors from MediaPipe / WASM initialization
+  if (
+    message.includes("pose landmarker") ||
+    message.includes("WASM") ||
+    message.includes("self.import") ||
+    message.includes("FilesetResolver") ||
+    message.includes("ModuleFactory")
+  ) {
+    console.error("Analysis initialization error:", message);
+    return "Unable to start video analysis. Please refresh and try again.";
+  }
+
+  // Network/fetch errors
+  if (message.includes("Failed to fetch") || message.includes("NetworkError")) {
+    return "Network error. Please check your connection and try again.";
+  }
+
+  // Generic fallback - don't expose raw technical messages
+  if (
+    message.includes("Error:") ||
+    message.includes("failed") ||
+    message.includes("undefined") ||
+    message.includes("null")
+  ) {
+    console.error("Analysis error:", message);
+    return "Something went wrong. Please try again.";
+  }
+
+  return message;
+}
+
 export type AssessmentPhase =
   | "idle"
   | "picking"
@@ -72,11 +111,14 @@ export class AssessmentStore {
       if (err instanceof AssessmentAbortedError) {
         this.phase = "aborted";
       } else {
-        this.error = err instanceof Error ? err.message : String(err);
         this.errorKind =
           err instanceof Error && err.name === "NoShotsDetectedError"
             ? "no-shots"
             : "generic";
+        this.error =
+          this.errorKind === "no-shots"
+            ? null // no-shots has its own UI treatment
+            : sanitizeErrorMessage(err);
         this.phase = "picking"; // retry affordance
       }
     } finally {
@@ -117,7 +159,7 @@ export class AssessmentStore {
       this.phase = "done";
       return this.outcome.sessionId;
     } catch (err) {
-      this.error = err instanceof Error ? err.message : String(err);
+      this.error = sanitizeErrorMessage(err);
       return null;
     }
   }
