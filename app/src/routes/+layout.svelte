@@ -76,6 +76,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>ShotCoach</title>
+</svelte:head>
+
 {#if bootError}
   <main class="boot-screen" data-testid="boot-error">
     <h1>Something went wrong</h1>

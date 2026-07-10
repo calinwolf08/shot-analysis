@@ -3,6 +3,7 @@ import type { ShotRecord } from "$lib/shared/db/repos";
 import { makeShotAnalysis } from "$lib/shared/testing/fixtures";
 import {
   AssessmentAbortedError,
+  NoShotsDetectedError,
   type AssessmentOutcome,
   type AssessmentService,
 } from "../services/assessment-service";
@@ -124,6 +125,25 @@ describe("AssessmentStore state machine", () => {
     await store.start();
     expect(store.phase).toBe("picking");
     expect(store.error).toContain("worker exploded");
+    expect(store.errorKind).toBe("generic");
+  });
+
+  it("zero detected shots flags the coaching empty state", async () => {
+    const service = makeFakeService({
+      runAssessment: vi.fn(async () => {
+        throw new NoShotsDetectedError("sess-1");
+      }),
+    });
+    const store = new AssessmentStore(service);
+    store.begin();
+    store.addInputs([input]);
+    await store.start();
+    expect(store.phase).toBe("picking");
+    expect(store.errorKind).toBe("no-shots");
+
+    // A retry clears the flag.
+    await store.start();
+    expect(store.errorKind).toBe("no-shots"); // still failing service
   });
 
   it("finishReview with no changes skips re-scoring", async () => {

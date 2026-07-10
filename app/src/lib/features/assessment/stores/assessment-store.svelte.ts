@@ -26,6 +26,8 @@ export class AssessmentStore {
   progress = $state<AssessmentProgress | null>(null);
   outcome = $state<AssessmentOutcome | null>(null);
   error = $state<string | null>(null);
+  /** Distinguishes the coaching empty state from generic failures. */
+  errorKind = $state<"no-shots" | "generic" | null>(null);
   /** Shots the user toggled during review (id → excluded). */
   pendingExclusions = $state<Record<string, boolean>>({});
 
@@ -55,6 +57,7 @@ export class AssessmentStore {
     if (this.phase !== "picking" || this.inputs.length === 0) return;
     this.phase = "analyzing";
     this.error = null;
+    this.errorKind = null;
     this.controller = new AbortController();
     try {
       this.outcome = await this.service.runAssessment(this.inputs, {
@@ -70,6 +73,10 @@ export class AssessmentStore {
         this.phase = "aborted";
       } else {
         this.error = err instanceof Error ? err.message : String(err);
+        this.errorKind =
+          err instanceof Error && err.name === "NoShotsDetectedError"
+            ? "no-shots"
+            : "generic";
         this.phase = "picking"; // retry affordance
       }
     } finally {

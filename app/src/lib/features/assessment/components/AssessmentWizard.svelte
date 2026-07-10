@@ -2,7 +2,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { useAppServices } from "$lib/shared/config/services-context";
-  import { Button, Card } from "$lib/shared/ui";
+  import { Button, Card, EmptyState } from "$lib/shared/ui";
   import { AssessmentStore } from "../stores/assessment-store.svelte";
   import type { AssessmentVideoInput } from "../services/assessment-service";
   import AnalyzeStep from "./AnalyzeStep.svelte";
@@ -114,7 +114,14 @@
         </div>
       {/if}
 
-      {#if store.error}
+      {#if store.errorKind === "no-shots"}
+        <Card testid="assess-no-shots">
+          <EmptyState
+            title="No shots detected"
+            body="We couldn't find a shot in that footage. Film from the side, 10–15 ft away, with your whole body and the arc of the ball in frame — then try again."
+          />
+        </Card>
+      {:else if store.error}
         <p class="error" data-testid="assess-error">{store.error}</p>
       {/if}
 

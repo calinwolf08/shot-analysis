@@ -24,7 +24,7 @@
   <nav class="tab-bar" aria-label="Main">
     {#each tabs as tab (tab.href)}
       <a
-        href={tab.href}
+        href={tab.href + page.url.search}
         class:active={isActive(tab.href)}
         aria-current={isActive(tab.href) ? "page" : undefined}
         data-testid="tab-{tab.label.toLowerCase()}"

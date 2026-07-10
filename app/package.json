@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "cap:sync": "npm run build && npx cap sync",
-    "verify": "npm run check && npm run lint && npm run test && npm run build",
+    "verify": "npm run check && npm run lint && npm run test && npm run build && npm run check:size",
+    "check:size": "node scripts/check-bundle-size.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -31,6 +32,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@capacitor/cli": "^7.6.7",
     "@eslint/js": "^9.18.0",
     "@playwright/test": "1.58.2",

@@ -123,6 +123,7 @@
       <h2>Metric explorer</h2>
       <select
         data-testid="progress-metric-picker"
+        aria-label="Metric to explore"
         value={metric}
         onchange={(e) => void pickMetric(e.currentTarget.value)}
       >

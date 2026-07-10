@@ -186,8 +186,10 @@
     flex-direction: column;
     gap: var(--sc-space-3);
   }
-  .day[data-state="locked"] {
-    opacity: 0.55;
+  /* Locked days read via the tag + disabled buttons; an opacity dim would
+     push the text below WCAG contrast. */
+  .day[data-state="locked"] .day-head h2 {
+    color: var(--sc-text-dim);
   }
   .day-head {
     display: flex;

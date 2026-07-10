@@ -35,6 +35,16 @@
   let loading = $state(true);
   let buildingPlan = $state(false);
 
+  /** Design doc: warn when tracking quality undermines the numbers. */
+  const lowConfidence = $derived.by(() => {
+    const included = shots.filter((s) => !s.excluded);
+    if (included.length === 0) return false;
+    const avg =
+      included.reduce((sum, s) => sum + (s.overallConfidence ?? 0), 0) /
+      included.length;
+    return avg < 0.5;
+  });
+
   $effect(() => {
     void load(sessionId);
   });
@@ -159,6 +169,13 @@
       </div>
     </section>
 
+    {#if lowConfidence}
+      <p class="warning" data-testid="results-low-confidence">
+        ⚠️ Pose tracking confidence was low in this footage — treat these scores
+        as rough. Better lighting and a clear side view help.
+      </p>
+    {/if}
+
     {#if scoreDeltas}
       <DeltaStrip {scoreDeltas} {focusDeltas} />
     {/if}
@@ -241,5 +258,13 @@
     flex-direction: column;
     gap: var(--sc-space-3);
     margin-top: auto;
+  }
+  .warning {
+    margin: 0;
+    padding: var(--sc-space-3);
+    border: 1px solid var(--sc-warn);
+    border-radius: var(--sc-radius);
+    color: var(--sc-warn);
+    font-size: 13px;
   }
 </style>
