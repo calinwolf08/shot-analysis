@@ -53,15 +53,13 @@ const DEFAULT_ASSETS: WorkerAssets = {
 };
 
 function defaultMakeWorker(): WorkerLike {
-  // MUST be a classic worker: MediaPipe's tasks-vision WASM loader calls
-  // `importScripts()` to load its runtime, which only exists in classic
-  // workers. In a module worker it throws and falls back to `self.import`,
-  // which isn't a real API — surfacing as
-  // "Failed to create pose landmarker: self.import is not a function" and
-  // breaking all real (non-replay) analysis. Vite bundles this worker as
-  // an IIFE for the classic type.
+  // Must stay a MODULE worker: Vite dev serves worker sources as ESM, so a
+  // classic-typed worker crashes at runtime in `npm run dev` ("Worker
+  // crashed"). MediaPipe's WASM loader can't use importScripts() in a module
+  // worker and falls back to `self.import` — which analysis.worker.ts shims
+  // (fetch + global eval) so the runtime loads in both dev and prod.
   return new Worker(new URL("../worker/analysis.worker.ts", import.meta.url), {
-    type: "classic",
+    type: "module",
   }) as unknown as WorkerLike;
 }
 
