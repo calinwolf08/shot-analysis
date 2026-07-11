@@ -198,8 +198,34 @@ export function createWorkerAnalysisService(
       }
       opts.signal?.addEventListener("abort", abort, { once: true });
 
+      // The worker only sees frames in batches and can't know the video
+      // length, so its progress events lack totalFrames — without this the
+      // UI's progress bar never advances. Estimate the total here from the
+      // provider's metadata and enrich each event (a worker-supplied total,
+      // if one ever appears, wins).
+      const durationMs = provider.getMetadata().duration;
+      const estimatedTotalFrames =
+        durationMs !== undefined && durationMs > 0
+          ? Math.max(1, Math.round((durationMs / 1000) * provider.getFps()))
+          : undefined;
+
       try {
-        if (onProgress) handle.onProgress(onProgress);
+        if (onProgress) {
+          handle.onProgress((p) => {
+            if (p.totalFrames === undefined && estimatedTotalFrames) {
+              onProgress({
+                ...p,
+                framesProcessed: Math.min(
+                  p.framesProcessed,
+                  estimatedTotalFrames,
+                ),
+                totalFrames: estimatedTotalFrames,
+              });
+            } else {
+              onProgress(p);
+            }
+          });
+        }
         const ready = handle.waitReady();
         handle.send({
           type: "init",

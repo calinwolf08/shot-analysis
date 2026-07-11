@@ -46,6 +46,14 @@ describe("AnalyzeStep", () => {
     await userEvent.click(screen.getByTestId("assess-cancel"));
     expect(oncancel).toHaveBeenCalledOnce();
   });
+
+  it("shows the activity spinner even before progress events arrive", () => {
+    render(AnalyzeStep, { progress: null, oncancel: () => undefined });
+    expect(screen.getByTestId("assess-spinner")).toBeTruthy();
+    expect(screen.getByTestId("assess-analyze-phase").textContent).toContain(
+      "Preparing…",
+    );
+  });
 });
 
 function makeShotRecord(index: number, excluded = false): ShotRecord {
