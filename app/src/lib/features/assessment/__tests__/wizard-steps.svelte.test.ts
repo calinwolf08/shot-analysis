@@ -112,6 +112,26 @@ describe("ReviewStep", () => {
     expect(onfinish).toHaveBeenCalledOnce();
   });
 
+  it("shows start/end thumbnails and time ranges when frame info exists", () => {
+    const shots = [makeShotRecord(0)];
+    const px =
+      "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+    render(ReviewStep, {
+      shots,
+      frameInfo: {
+        "shot-0": { startSec: 1.5, endSec: 3.2, startThumb: px, endThumb: px },
+      },
+      isExcluded: () => false,
+      ontoggle: () => undefined,
+      onfinish: () => undefined,
+    });
+    expect(screen.getByTestId("review-thumb-start-0")).toBeTruthy();
+    expect(screen.getByTestId("review-thumb-end-0")).toBeTruthy();
+    expect(screen.getByTestId("review-shot-0").textContent).toContain(
+      "0:01.5–0:03.2",
+    );
+  });
+
   it("disables finish when everything is excluded", () => {
     const shots = [makeShotRecord(0, true)];
     render(ReviewStep, {
