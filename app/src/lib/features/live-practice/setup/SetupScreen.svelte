@@ -27,6 +27,7 @@
     focusLabel = null,
     onstart,
     onexit,
+    onerror,
   }: {
     /** Pose source — replay-driven in e2e, worker-backed in production. */
     session: LiveAnalysisSession;
@@ -36,6 +37,8 @@
     /** Fired when the countdown finishes: the practice loop takes over. */
     onstart: () => void;
     onexit: () => void;
+    /** Fired when the analysis session fails to start. */
+    onerror?: (message: string) => void;
   } = $props();
 
   type CheckId = "full-body" | "side-view" | "lighting" | "stability";
@@ -75,7 +78,13 @@
     // No camera pixels to judge (replay mode / no device) → auto-pass.
     if (!capture?.isAvailable()) pass.lighting = true;
     const unsubscribe = session.onFrame(handleFrame);
-    void session.start();
+    session.start().catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Analysis session failed to start:", msg);
+      onerror?.(
+        "Unable to start pose detection. Please refresh and try again.",
+      );
+    });
     void openCamera();
 
     const onMotion = (event: DeviceMotionEvent) => {

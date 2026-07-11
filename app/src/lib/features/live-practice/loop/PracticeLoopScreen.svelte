@@ -1,21 +1,37 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import { onMount } from "svelte";
   import { Button, ScoreRing } from "$lib/shared/ui";
   import type { LiveSessionStore } from "./live-session-store.svelte";
 
   let {
     store,
     focusLabel = null,
+    stream = null,
     onend,
   }: {
     store: LiveSessionStore;
     focusLabel?: string | null;
+    stream?: MediaStream | null;
     /** Called with the sessionId once the session is ended + scored. */
     onend: (sessionId: string | null) => void;
   } = $props();
 
   let drawerOpen = $state(false);
   let ending = $state(false);
+  let videoEl = $state<HTMLVideoElement | null>(null);
+
+  /** True when pose is detected (READY, ACTIVE, ANALYZING, FEEDBACK). */
+  const poseDetected = $derived(
+    store.phase === "ready" ||
+      store.phase === "active" ||
+      store.phase === "analyzing" ||
+      store.phase === "feedback",
+  );
+
+  onMount(() => {
+    if (videoEl && stream) videoEl.srcObject = stream;
+  });
 
   async function endSession() {
     if (ending) return;
@@ -69,6 +85,26 @@
       </Button>
     </div>
   </header>
+
+  <div
+    class="preview"
+    class:detected={poseDetected}
+    data-testid="pose-indicator"
+  >
+    {#if stream}
+      <video
+        bind:this={videoEl}
+        autoplay
+        muted
+        playsinline
+        data-testid="loop-preview"
+      ></video>
+    {/if}
+    <div class="pose-badge">
+      <span class="indicator-dot"></span>
+      {poseDetected ? "Player in frame" : "No player detected"}
+    </div>
+  </div>
 
   <section class="stage">
     {#if store.feedback}
@@ -177,6 +213,49 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--sc-space-3);
+  }
+  .preview {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    border-radius: var(--sc-radius);
+    border: 3px solid var(--sc-warn);
+    background: #000;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .preview.detected {
+    border-color: var(--sc-success);
+  }
+  .preview video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .pose-badge {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 60%);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .indicator-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sc-warn);
+    transition: background 0.3s;
+  }
+  .preview.detected .indicator-dot {
+    background: var(--sc-success);
   }
   .focus {
     color: var(--sc-primary);

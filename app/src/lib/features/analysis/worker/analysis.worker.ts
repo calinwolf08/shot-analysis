@@ -6,6 +6,22 @@
  * - streams each LandmarkFrame straight back (live mode; the
  *   LiveRepCoordinator decides when to analyze a window on-main-thread).
  */
+
+// MediaPipe's FilesetResolver tries importScripts() (unavailable in module
+// workers), then falls back to self.import(). The WASM JS files are classic
+// scripts (not ES modules) that register a factory on globalThis, so we
+// load them via fetch + eval to execute in the global scope.
+const workerSelf = self as unknown as Record<string, unknown>;
+if (typeof workerSelf.import !== "function") {
+  workerSelf.import = async (url: string) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
+    const text = await res.text();
+    // Indirect eval executes in global scope, matching importScripts behavior.
+    (0, eval)(text);
+  };
+}
+
 import { createPoseDetector } from "basketball-shot-analysis";
 import type { AnalyzeOptions, LandmarkFrame } from "../types";
 import { runReplayAnalysis } from "../replay/replay-pipeline";
