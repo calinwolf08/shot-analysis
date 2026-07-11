@@ -4,6 +4,7 @@
  * → live practice → summary → progress → re-assessment → adapted plan.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { onboard } from "./helpers";
 
 test.describe.configure({ timeout: 300_000 });
 
@@ -18,16 +19,8 @@ async function runFixtureAssessment(page: Page) {
 }
 
 test("full journey", async ({ page }) => {
-  // 1. Onboarding.
-  await page.goto("/?e2e=replay");
-  await page.waitForURL("**/onboarding**");
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-name").fill("Journey");
-  await page.getByTestId("onboarding-to-camera").click();
-  await page.getByTestId("onboarding-finish").click();
-  await page.waitForURL(/\/\?e2e=replay$/);
+  // 1. Sign-up + onboarding.
+  await onboard(page, "?e2e=replay", "Journey");
 
   // 2. Assessment → results (placeholder benchmark badge visible).
   await page.getByTestId("start-assessment").click();

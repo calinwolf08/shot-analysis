@@ -31,13 +31,27 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: {
-    // E2E builds enable the debug/test surfaces (VITE_E2E) and serve the
-    // replay fixtures alongside the app (kept out of production builds).
-    command:
-      "VITE_E2E=1 npm run build && node scripts/copy-fixtures-to-build.mjs && npm run preview -- --port 4173 --strictPort",
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
-    timeout: 300_000,
-  },
+  webServer: [
+    {
+      // E2E builds enable the debug/test surfaces (VITE_E2E) and serve the
+      // replay fixtures alongside the app (kept out of production builds).
+      command:
+        "VITE_E2E=1 npm run build && node scripts/copy-fixtures-to-build.mjs && npm run preview -- --port 4173 --strictPort",
+      port: 4173,
+      reuseExistingServer: !process.env.CI,
+      timeout: 300_000,
+    },
+    {
+      // Real auth: the better-auth server the SPA talks to. AUTH_E2E
+      // additionally exposes the password-reset link for the reset flow
+      // test. Specs use unique emails, so the on-disk e2e DB can persist
+      // across runs.
+      command:
+        "AUTH_E2E=1 AUTH_PORT=5174 AUTH_DB=data/e2e-auth.sqlite npm start",
+      cwd: "../auth-server",
+      url: "http://localhost:5174/health",
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+  ],
 });

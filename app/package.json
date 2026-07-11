@@ -29,6 +29,7 @@
     "@capacitor/ios": "^7.6.7",
     "@capacitor/screen-orientation": "^7.0.4",
     "basketball-shot-analysis": "file:..",
+    "better-auth": "^1.6.23",
     "sql.js": "^1.14.1",
     "zod": "^3.23.0"
   },

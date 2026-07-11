@@ -5,21 +5,14 @@
  * log rep events as the fixture loops.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { onboard as freshUser } from "./helpers";
 
 test.describe.configure({ timeout: 240_000 });
 
 const QUERY = "?e2e=replay&debug=live";
 
 async function onboard(page: Page) {
-  await page.goto(`/${QUERY}`);
-  await page.waitForURL("**/onboarding**");
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-name").fill("Debugger");
-  await page.getByTestId("onboarding-to-camera").click();
-  await page.getByTestId("onboarding-finish").click();
-  await page.waitForURL(/\/\?e2e=replay&debug=live$/);
+  await freshUser(page, QUERY, "Debugger");
 }
 
 test("debug HUD shows coordinator state and logs rep events", async ({

@@ -1,9 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { onboard } from "./helpers";
 
-// The drill catalog seeds at boot; __debug routes bypass onboarding.
+// The drill catalog seeds at boot via the __debug route, but the
+// /drill/* player itself sits behind the auth + onboarding guards.
 test("drill catalog: list, open a drill, play surface, mark complete", async ({
   page,
 }) => {
+  await onboard(page, "?e2e=replay", "Driller");
   await page.goto("/__debug/drills?e2e=replay");
   await page.waitForSelector('[data-testid="db-ready"]', {
     state: "attached",

@@ -17,6 +17,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
+import { onboard as freshUser } from "../helpers";
 
 test.describe.configure({ timeout: 240_000 });
 
@@ -30,15 +31,7 @@ const videos = existsSync(VIDEO_DIR)
   : [];
 
 async function onboard(page: Page) {
-  await page.goto("/?e2e=device");
-  await page.waitForURL("**/onboarding**");
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-name").fill("RealAnalysis");
-  await page.getByTestId("onboarding-to-camera").click();
-  await page.getByTestId("onboarding-finish").click();
-  await page.waitForURL(/\/\?e2e=device$/);
+  await freshUser(page, "?e2e=device", "RealAnalysis");
 }
 
 test.describe("real MediaPipe video analysis (golden)", () => {

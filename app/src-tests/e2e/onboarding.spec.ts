@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { signUp } from "./helpers";
 
 test("fresh app onboards, persists the player, and stays onboarded", async ({
   page,
 }) => {
-  await page.goto("/");
-  // Fresh profile → redirected to onboarding.
-  await page.waitForURL("**/onboarding");
+  // Fresh profile: create an account, then the guard lands on onboarding.
+  await signUp(page, "", "jordan");
   await expect(page.getByTestId("onboarding-slide-0")).toBeVisible();
 
   // Three intro slides.

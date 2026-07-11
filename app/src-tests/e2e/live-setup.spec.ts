@@ -1,16 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import { onboard as freshUser } from "./helpers";
 
 /** Complete onboarding quickly (fresh context per test). */
 async function onboard(page: Page) {
-  await page.goto("/?e2e=replay");
-  await page.waitForURL("**/onboarding**");
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-next").click();
-  await page.getByTestId("onboarding-name").fill("LiveTester");
-  await page.getByTestId("onboarding-to-camera").click();
-  await page.getByTestId("onboarding-finish").click();
-  await page.waitForURL(/\/\?e2e=replay$/);
+  await freshUser(page, "?e2e=replay", "LiveTester");
 }
 
 test("live setup reaches all-green from replayed pose and starts a session", async ({

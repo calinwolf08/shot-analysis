@@ -4,6 +4,7 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { signUp } from "./helpers";
 
 test.describe.configure({ timeout: 300_000 });
 
@@ -25,9 +26,12 @@ async function expectClean(page: Page, screen: string) {
 test("main screens have no serious/critical axe violations", async ({
   page,
 }) => {
-  // Onboarding.
-  await page.goto("/?e2e=replay");
-  await page.waitForURL("**/onboarding**");
+  // Auth screens.
+  await page.goto("/auth/sign-in?e2e=replay");
+  await expectClean(page, "sign-in");
+
+  // Sign-up → onboarding.
+  await signUp(page, "?e2e=replay", "axe");
   await expectClean(page, "onboarding");
 
   await page.getByTestId("onboarding-next").click();
@@ -36,7 +40,7 @@ test("main screens have no serious/critical axe violations", async ({
   await page.getByTestId("onboarding-name").fill("Axe");
   await page.getByTestId("onboarding-to-camera").click();
   await page.getByTestId("onboarding-finish").click();
-  await page.waitForURL(/\/\?e2e=replay$/);
+  await page.waitForURL((url) => url.pathname === "/");
 
   // Home.
   await expectClean(page, "home");
