@@ -80,6 +80,33 @@ export interface CoordinatorEvents {
   repResult: { analysis: AnalysisResult; window: RepWindow };
   noShot: { window: RepWindow; reason: "no-shot-detected" | "analysis-failed" };
   bufferStats: { frames: number; spanMs: number };
+  /**
+   * Per-frame diagnostics for the debug HUD. Only computed/emitted when a
+   * listener is subscribed, so the hot path stays clean in normal runs.
+   */
+  debug: {
+    timestamp: number;
+    state: CoordinatorState;
+    posePresent: boolean;
+    /** Smoothed upward wrist velocity (normalized units/s). */
+    smoothedVelocity: number;
+    riseVelocity: number;
+    settleVelocity: number;
+    /** How long the wrist has been settled while ACTIVE (null otherwise). */
+    settledForMs: number | null;
+    settleMs: number;
+    bufferFrames: number;
+    bufferSpanMs: number;
+  };
+  /**
+   * Upward wrist motion got close to (>= 60% of) the rep trigger but never
+   * crossed it — the "almost detected a shot" signal.
+   */
+  nearTrigger: {
+    timestamp: number;
+    peakVelocity: number;
+    riseVelocity: number;
+  };
 }
 
 export interface LiveRepCoordinator {
@@ -104,6 +131,11 @@ export interface LiveRepCoordinatorDeps {
 
 // MediaPipe pose landmark indexes.
 const WRIST_INDEX = { left: 15, right: 16 } as const;
+
+/** Fraction of riseVelocity that counts as a near-miss worth reporting. */
+const NEAR_TRIGGER_RATIO = 0.6;
+/** A near-miss is reported once the motion faded or this much time passed. */
+const NEAR_TRIGGER_WINDOW_MS = 1200;
 
 export function createLiveRepCoordinator(
   deps: LiveRepCoordinatorDeps,
@@ -135,6 +167,8 @@ export function createLiveRepCoordinator(
   let repStartTs = 0;
   let settledSince: number | null = null;
   let lastRepEndTs = -Infinity;
+  let nearPeak = 0;
+  let nearPeakTs = 0;
 
   function setState(to: CoordinatorState) {
     if (state === to) return;
@@ -149,6 +183,34 @@ export function createLiveRepCoordinator(
     prevWrist = null;
     smoothedVelocity = 0;
     settledSince = null;
+    nearPeak = 0;
+  }
+
+  /**
+   * While READY, remembers the highest sub-trigger upward velocity and
+   * reports it as a near-miss once the motion fades (or times out) without
+   * a rep starting.
+   */
+  function trackNearTrigger(now: number) {
+    if (
+      smoothedVelocity >= cfg.riseVelocity * NEAR_TRIGGER_RATIO &&
+      smoothedVelocity > nearPeak
+    ) {
+      nearPeak = smoothedVelocity;
+      nearPeakTs = now;
+    }
+    if (
+      nearPeak > 0 &&
+      (smoothedVelocity < nearPeak / 2 ||
+        now - nearPeakTs >= NEAR_TRIGGER_WINDOW_MS)
+    ) {
+      emit("nearTrigger", {
+        timestamp: now,
+        peakVelocity: nearPeak,
+        riseVelocity: cfg.riseVelocity,
+      });
+      nearPeak = 0;
+    }
   }
 
   function posePresent(frame: LandmarkFrame): boolean {
@@ -264,9 +326,12 @@ export function createLiveRepCoordinator(
           ) {
             repStartTs = now;
             settledSince = null;
+            nearPeak = 0; // triggered — not a near-miss
             setState("ACTIVE");
             emit("repStarted", { timestamp: now });
+            break;
           }
+          trackNearTrigger(now);
           break;
         }
 
@@ -299,6 +364,24 @@ export function createLiveRepCoordinator(
           // Frames keep buffering; transitions wait for the analysis
           // resolution / feedback dismissal.
           break;
+      }
+
+      if (listeners.get("debug")?.size) {
+        emit("debug", {
+          timestamp: now,
+          state,
+          posePresent: present,
+          smoothedVelocity,
+          riseVelocity: cfg.riseVelocity,
+          settleVelocity: cfg.settleVelocity,
+          settledForMs:
+            state === "ACTIVE" && settledSince !== null
+              ? now - settledSince
+              : null,
+          settleMs: cfg.settleMs,
+          bufferFrames: buffer.length,
+          bufferSpanMs: now - buffer[0]!.timestamp,
+        });
       }
     },
 

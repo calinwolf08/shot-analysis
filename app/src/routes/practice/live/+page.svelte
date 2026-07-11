@@ -6,9 +6,11 @@
   import { builtInBenchmarks, type MetricName } from "$lib/features/benchmarks";
   import {
     createLiveRepCoordinator,
+    LiveDebugHud,
     LiveSessionStore,
     PracticeLoopScreen,
     SetupScreen,
+    type LiveRepCoordinator,
   } from "$lib/features/live-practice";
   import { createPlanRepo } from "$lib/features/training-plan";
   import { useAppServices } from "$lib/shared/config/services-context";
@@ -31,11 +33,20 @@
   // Wall-clock feedback dwell; short in e2e so multi-rep runs stay fast.
   const feedbackMs = replayMode ? 1500 : 4000;
 
+  // Debug HUD gate. Both terms constant-fold to false in production
+  // builds (no VITE_LIVE_DEBUG, DEV=false, no VITE_E2E), so the HUD and
+  // its markers are stripped — enforced by check-debug-stripped.
+  const liveDebug =
+    import.meta.env.VITE_LIVE_DEBUG === "1" ||
+    ((import.meta.env.DEV || import.meta.env.VITE_E2E === "1") &&
+      page.url.searchParams.get("debug") === "live");
+
   let phase = $state<"loading" | "setup" | "running" | "error">("loading");
   let session = $state<LiveAnalysisSession | null>(null);
   let focusMetric = $state<MetricName | null>(null);
   let focusLabel = $state<string | null>(null);
   let store = $state<LiveSessionStore | null>(null);
+  let coordinator = $state<LiveRepCoordinator | null>(null);
   let cameraStream = $state<MediaStream | null>(null);
   let errorMessage = $state<string | null>(null);
   let shootingHand: "left" | "right" = "right";
@@ -70,12 +81,13 @@
 
   async function beginLoop() {
     if (!session) return;
-    const coordinator = createLiveRepCoordinator(
+    coordinator = createLiveRepCoordinator(
       { analyze: (frames) => session!.analyzeWindow(frames) },
       { shootingHand },
     );
+    const activeCoordinator = coordinator;
     // The setup screen already started the pose stream; route frames in.
-    session.onFrame((frame) => coordinator.pushFrame(frame));
+    session.onFrame((frame) => activeCoordinator.pushFrame(frame));
     store = new LiveSessionStore({
       repos: services.repos,
       scoring: services.scoring,
@@ -150,6 +162,9 @@
     stream={cameraStream}
     onend={endLoop}
   />
+  {#if liveDebug && coordinator}
+    <LiveDebugHud {coordinator} />
+  {/if}
 {/if}
 
 <style>

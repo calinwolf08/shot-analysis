@@ -152,3 +152,25 @@ export function dribbleNoise(
   }
   return frames;
 }
+
+/**
+ * Wrist rising at a constant upward velocity (normalized units/s) for
+ * durationMs. A sub-trigger velocity produces a near-miss rather than a
+ * rep start.
+ */
+export function wristRise(
+  cursor: StreamCursor,
+  velocity: number,
+  durationMs: number,
+  wristIndex = 16,
+): LandmarkFrame[] {
+  const frames: LandmarkFrame[] = [];
+  const count = Math.ceil((durationMs / 1000) * cursor.fps);
+  const perFrame = velocity / cursor.fps;
+  let y = 0.55;
+  for (let i = 0; i < count; i++) {
+    y -= perFrame; // screen y is down; rising = decreasing y
+    frames.push(frameAt(cursor, y, wristIndex));
+  }
+  return frames;
+}

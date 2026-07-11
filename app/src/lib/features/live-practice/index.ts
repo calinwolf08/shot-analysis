@@ -16,6 +16,7 @@ export {
   noPose,
   shotArc,
   stillPose,
+  wristRise,
   type StreamCursor,
 } from "./coordinator/synthetic-streams";
 export {
@@ -37,5 +38,12 @@ export {
   type RepFeedback,
 } from "./loop/live-session-store.svelte";
 export { default as PracticeLoopScreen } from "./loop/PracticeLoopScreen.svelte";
+export { default as LiveDebugHud } from "./loop/LiveDebugHud.svelte";
+export {
+  createPresenceTracker,
+  type PresenceState,
+  type PresenceTracker,
+  type PresenceTrackerOptions,
+} from "./loop/presence";
 export { compareHalves, type HalvesComparison } from "./summary/summary-logic";
 export { default as SummaryScreen } from "./summary/SummaryScreen.svelte";
