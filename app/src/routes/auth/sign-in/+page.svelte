@@ -49,6 +49,14 @@
       Create an account
     </a>
   </p>
+  <p class="alt">
+    <a
+      href="/auth/forgot-password{page.url.search}"
+      data-testid="auth-to-forgot"
+    >
+      Forgot password?
+    </a>
+  </p>
 </form>
 
 <style>
