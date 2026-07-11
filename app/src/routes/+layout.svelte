@@ -71,22 +71,31 @@
     };
   });
 
-  // Signed-in users without a player land on onboarding — re-checked on
-  // every navigation so a fresh sign-up flows straight into it.
+  // Scope player data to the signed-in user, then land users without a
+  // player on onboarding — re-checked on every navigation so a fresh
+  // sign-up flows straight into it, and per-account so a second account
+  // on the same device onboards its own player.
   $effect(() => {
     const s = services;
     const status = auth.status;
+    const userId = auth.user?.id ?? null;
     void page.url.pathname; // rerun on navigation
-    if (!s || status !== "signed-in") return;
-    void redirectIfNotOnboarded(s);
+    if (!s) return;
+    s.repos.player.setCurrentUser(status === "signed-in" ? userId : null);
+    if (status !== "signed-in" || !userId) return;
+    void (async () => {
+      // Rows written before auth existed belong to the first account.
+      await s.repos.player.claimUnowned(userId);
+      await redirectIfNotOnboarded(s);
+    })();
   });
 
-  /** First run lands on onboarding until a player is persisted. */
+  /** The signed-in user onboards until they have a player of their own. */
   async function redirectIfNotOnboarded(s: AppServices) {
-    const onboarded = await s.repos.settings.get("onboarded");
+    const player = await s.repos.player.getFirst();
     const path = page.url.pathname;
     if (
-      !onboarded &&
+      !player &&
       path !== "/onboarding" &&
       !path.startsWith("/__debug") &&
       !path.startsWith("/auth")

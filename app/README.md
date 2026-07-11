@@ -17,6 +17,26 @@ npm install
 npm run build            # build the library first (app depends on it)
 ```
 
+## Authentication
+
+Email/password auth via [better-auth], served by the `auth-server`
+workspace (the app is a static SPA — identity can't live in its
+client-side DB). For local dev, run it next to the dev server:
+
+```bash
+npm start --workspace shotcoach-auth-server   # http://localhost:5174
+npm run dev --workspace shotcoach
+```
+
+The app finds it through `VITE_AUTH_URL` (default `http://localhost:5174`).
+All routes except `/auth/*` require a session; sign-up flows into
+onboarding; player data is scoped per account (migration 002). Password
+reset links are logged by the auth server (see `auth-server/README.md`
+for the production email hook). Playwright starts the auth server
+automatically for `npm run test:e2e`.
+
+[better-auth]: https://better-auth.com
+
 ## Scripts (run in app/ or with --workspace=shotcoach from root)
 
 | Script                   | What                                                |

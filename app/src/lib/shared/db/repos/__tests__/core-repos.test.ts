@@ -57,6 +57,52 @@ describe("PlayerRepo", () => {
     const repo = createPlayerRepo(services);
     expect(await repo.update("nope", { name: "x" })).toBeNull();
   });
+
+  it("scopes players per auth user once setCurrentUser is called", async () => {
+    const repo = createPlayerRepo(services);
+
+    repo.setCurrentUser("user-a");
+    const a = await repo.create({
+      name: "Ava",
+      shootingHand: "right",
+      level: "youth",
+    });
+    expect((await repo.getFirst())?.id).toBe(a.id);
+
+    // A second account on the same device sees no player until it onboards.
+    repo.setCurrentUser("user-b");
+    expect(await repo.getFirst()).toBeNull();
+    const b = await repo.create({
+      name: "Ben",
+      shootingHand: "left",
+      level: "advanced",
+    });
+    expect((await repo.getFirst())?.id).toBe(b.id);
+
+    // Switching back restores the first account's player.
+    repo.setCurrentUser("user-a");
+    expect((await repo.getFirst())?.id).toBe(a.id);
+  });
+
+  it("claimUnowned assigns pre-auth rows to the first signed-in user", async () => {
+    const repo = createPlayerRepo(services);
+    // Legacy row: created with no current user (pre-auth upgrade path).
+    const legacy = await repo.create({
+      name: "Old",
+      shootingHand: "right",
+      level: "youth",
+    });
+
+    repo.setCurrentUser("user-a");
+    expect(await repo.getFirst()).toBeNull();
+    await repo.claimUnowned("user-a");
+    expect((await repo.getFirst())?.id).toBe(legacy.id);
+
+    // Already-owned rows are not re-claimed by later accounts.
+    await repo.claimUnowned("user-b");
+    repo.setCurrentUser("user-b");
+    expect(await repo.getFirst()).toBeNull();
+  });
 });
 
 describe("VideoRepo", () => {

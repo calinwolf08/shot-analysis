@@ -2,12 +2,16 @@ import type { Clock } from "../../utils";
 import { systemClock } from "../../utils";
 import type { DatabaseAdapter } from "../adapter";
 import { initialSchema } from "./001-initial-schema";
+import { playerUserScope } from "./002-player-user-scope";
 import type { Migration } from "./types";
 
 export type { Migration } from "./types";
 
 /** All known migrations, ascending by version. */
-export const ALL_MIGRATIONS: readonly Migration[] = [initialSchema];
+export const ALL_MIGRATIONS: readonly Migration[] = [
+  initialSchema,
+  playerUserScope,
+];
 
 export interface MigrateResult {
   /** Versions applied by this call (empty when already up to date). */

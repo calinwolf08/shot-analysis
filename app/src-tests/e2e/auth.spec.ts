@@ -143,3 +143,37 @@ test("change password from profile, sign out, sign back in", async ({
   await page.getByTestId("auth-submit").click();
   await page.waitForURL((url) => url.pathname === "/");
 });
+
+test("two accounts on one device keep separate player profiles", async ({
+  page,
+}) => {
+  // Account A onboards.
+  const emailA = await onboard(page, "?e2e=replay", "UserA");
+  await page.getByTestId("tab-profile").click();
+  await expect(page.getByTestId("profile-name")).toHaveText("UserA");
+
+  // Sign out; account B signs up in the SAME browser profile (same local
+  // DB) and must onboard its own player rather than seeing A's.
+  await page.getByTestId("account-sign-out").click();
+  await page.waitForURL("**/auth/sign-in**");
+  await signUp(page, "?e2e=replay", "userb");
+  await page.getByTestId("onboarding-next").click();
+  await page.getByTestId("onboarding-next").click();
+  await page.getByTestId("onboarding-next").click();
+  await page.getByTestId("onboarding-name").fill("UserB");
+  await page.getByTestId("onboarding-to-camera").click();
+  await page.getByTestId("onboarding-finish").click();
+  await page.waitForURL((url) => url.pathname === "/");
+  await page.getByTestId("tab-profile").click();
+  await expect(page.getByTestId("profile-name")).toHaveText("UserB");
+
+  // Back to A: their player is intact.
+  await page.getByTestId("account-sign-out").click();
+  await page.waitForURL("**/auth/sign-in**");
+  await page.getByTestId("auth-email").fill(emailA);
+  await page.getByTestId("auth-password").fill(E2E_PASSWORD);
+  await page.getByTestId("auth-submit").click();
+  await page.waitForURL((url) => url.pathname === "/");
+  await page.getByTestId("tab-profile").click();
+  await expect(page.getByTestId("profile-name")).toHaveText("UserA");
+});
