@@ -4,7 +4,8 @@
   "description": "TypeScript module for analyzing basketball shooting form using MediaPipe pose detection",
   "type": "module",
   "workspaces": [
-    "app"
+    "app",
+    "auth-server"
   ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

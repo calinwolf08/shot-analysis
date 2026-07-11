@@ -1,0 +1,16 @@
+{
+  "name": "shotcoach-auth-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone better-auth server for the ShotCoach app (email + password).",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test src-tests/*.test.js"
+  },
+  "dependencies": {
+    "better-auth": "^1.6.23",
+    "better-sqlite3": "^12.11.1"
+  }
+}
