@@ -67,6 +67,26 @@ test("plan live session: 3 replayed reps → feedback → summary → plan item 
   });
   await expect(page.getByTestId("loop-focus")).toBeVisible();
 
+  // The in-frame indicator reflects the replayed pose stream (full body
+  // visible in the fixture) — not just the coordinator phase.
+  await expect(page.getByTestId("pose-indicator")).toHaveAttribute(
+    "data-state",
+    "full",
+    { timeout: 30_000 },
+  );
+  // The tracking overlay is consuming frames.
+  await expect
+    .poll(
+      async () =>
+        Number(
+          await page
+            .getByTestId("live-pose-overlay")
+            .getAttribute("data-frame"),
+        ),
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0);
+
   // Rep 1: a feedback card with a numeric score and a cue.
   await expect(page.getByTestId("rep-feedback")).toBeVisible({
     timeout: 60_000,

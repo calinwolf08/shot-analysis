@@ -145,6 +145,7 @@
 {:else if phase === "running" && store}
   <PracticeLoopScreen
     {store}
+    {session}
     {focusLabel}
     stream={cameraStream}
     onend={endLoop}

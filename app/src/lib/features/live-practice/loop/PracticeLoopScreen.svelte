@@ -1,16 +1,28 @@
 <script lang="ts">
   import { page } from "$app/state";
   import { onMount } from "svelte";
+  import type {
+    LandmarkFrame,
+    LiveAnalysisSession,
+  } from "$lib/features/analysis";
   import { Button, ScoreRing } from "$lib/shared/ui";
+  import {
+    drawSkeleton,
+    type SkeletonLandmark,
+  } from "$lib/shared/ui/pose-skeleton";
+  import { createPresenceTracker, type PresenceState } from "./presence";
   import type { LiveSessionStore } from "./live-session-store.svelte";
 
   let {
     store,
+    session = null,
     focusLabel = null,
     stream = null,
     onend,
   }: {
     store: LiveSessionStore;
+    /** Live pose stream; drives the presence indicator + tracking overlay. */
+    session?: LiveAnalysisSession | null;
     focusLabel?: string | null;
     stream?: MediaStream | null;
     /** Called with the sessionId once the session is ended + scored. */
@@ -20,14 +32,74 @@
   let drawerOpen = $state(false);
   let ending = $state(false);
   let videoEl = $state<HTMLVideoElement | null>(null);
+  let overlayEl = $state<HTMLCanvasElement | null>(null);
 
-  /** True when pose is detected (READY, ACTIVE, ANALYZING, FEEDBACK). */
-  const poseDetected = $derived(
-    store.phase === "ready" ||
-      store.phase === "active" ||
-      store.phase === "analyzing" ||
-      store.phase === "feedback",
+  // Presence comes from the landmark stream itself — NOT the coordinator
+  // phase, which stays "ready/active/…" long after the player walks out
+  // of frame. Wall-clock decay handles a stalled camera (no frames at all).
+  let presence = $state<PresenceState>("none");
+  let latestFrame = $state<LandmarkFrame | null>(null);
+
+  $effect(() => {
+    if (!session) return;
+    const tracker = createPresenceTracker();
+    const unsubscribe = session.onFrame((frame) => {
+      presence = tracker.update(frame);
+      latestFrame = frame;
+    });
+    const decay = setInterval(() => {
+      presence = tracker.evaluate();
+    }, 400);
+    return () => {
+      unsubscribe();
+      clearInterval(decay);
+    };
+  });
+
+  const badgeText = $derived(
+    presence === "full"
+      ? "Player fully in frame"
+      : presence === "partial"
+        ? "Player partially in frame"
+        : "No player detected",
   );
+
+  /**
+   * The preview <video> renders with object-fit: cover; landmarks are
+   * normalized to the camera frame, so project them through the same
+   * crop. Without a camera (replay), map straight onto the canvas.
+   */
+  function coverProject(w: number, h: number) {
+    const vw = videoEl?.videoWidth ?? 0;
+    const vh = videoEl?.videoHeight ?? 0;
+    if (!vw || !vh) return undefined;
+    const scale = Math.max(w / vw, h / vh);
+    const dw = vw * scale;
+    const dh = vh * scale;
+    const ox = (w - dw) / 2;
+    const oy = (h - dh) / 2;
+    return (l: SkeletonLandmark) => ({ x: ox + l.x * dw, y: oy + l.y * dh });
+  }
+
+  $effect(() => {
+    const canvas = overlayEl;
+    const frame = latestFrame;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return; // jsdom / unsupported → overlay stays blank
+    const w = (canvas.width = canvas.clientWidth || canvas.width);
+    const h = (canvas.height = canvas.clientHeight || canvas.height);
+    ctx.clearRect(0, 0, w, h);
+    if (!frame?.landmarks) return;
+    const project = coverProject(w, h);
+    drawSkeleton(ctx, frame.landmarks, w, h, {
+      strokeStyle: "rgb(64 224 120 / 90%)",
+      jointStyle: "rgb(255 255 255 / 90%)",
+      lineWidth: 2,
+      jointRadius: 2.5,
+      ...(project ? { project } : {}),
+    });
+  });
 
   onMount(() => {
     if (videoEl && stream) videoEl.srcObject = stream;
@@ -88,8 +160,10 @@
 
   <div
     class="preview"
-    class:detected={poseDetected}
+    class:full={presence === "full"}
+    class:partial={presence === "partial"}
     data-testid="pose-indicator"
+    data-state={presence}
   >
     {#if stream}
       <video
@@ -100,9 +174,16 @@
         data-testid="loop-preview"
       ></video>
     {/if}
+    <canvas
+      bind:this={overlayEl}
+      class="overlay"
+      data-testid="live-pose-overlay"
+      data-frame={latestFrame?.frameIndex ?? -1}
+      aria-hidden="true"
+    ></canvas>
     <div class="pose-badge">
       <span class="indicator-dot"></span>
-      {poseDetected ? "Player in frame" : "No player detected"}
+      {badgeText}
     </div>
   </div>
 
@@ -218,18 +299,28 @@
     position: relative;
     aspect-ratio: 3 / 4;
     border-radius: var(--sc-radius);
-    border: 3px solid var(--sc-warn);
+    border: 3px solid var(--sc-fail);
     background: #000;
     overflow: hidden;
     transition: border-color 0.3s;
   }
-  .preview.detected {
+  .preview.partial {
+    border-color: var(--sc-warn);
+  }
+  .preview.full {
     border-color: var(--sc-success);
   }
   .preview video {
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+  .preview .overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
   }
   .pose-badge {
     position: absolute;
@@ -251,10 +342,13 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--sc-warn);
+    background: var(--sc-fail);
     transition: background 0.3s;
   }
-  .preview.detected .indicator-dot {
+  .preview.partial .indicator-dot {
+    background: var(--sc-warn);
+  }
+  .preview.full .indicator-dot {
     background: var(--sc-success);
   }
   .focus {
