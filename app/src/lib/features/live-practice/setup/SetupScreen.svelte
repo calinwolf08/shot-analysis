@@ -32,6 +32,7 @@
     onstart,
     onexit,
     onerror,
+    onstream,
   }: {
     /** Pose source — replay-driven in e2e, worker-backed in production. */
     session: LiveAnalysisSession;
@@ -43,6 +44,13 @@
     onexit: () => void;
     /** Fired when the analysis session fails to start. */
     onerror?: (message: string) => void;
+    /**
+     * Fired once the camera opens, handing the stream to the route so it
+     * (not this screen) owns the camera across the setup → loop handoff.
+     * Opening a second stream in the loop can freeze the feed on devices
+     * where the camera is a single shared resource.
+     */
+    onstream?: (stream: MediaStream) => void;
   } = $props();
 
   type CheckId = "full-body" | "side-view" | "lighting" | "stability";
@@ -115,7 +123,9 @@
       window.removeEventListener("devicemotion", onMotion);
       clearInterval(lumaTimer);
       frameCapture?.stop();
-      handle?.stop();
+      // NOTE: the camera stream is intentionally NOT stopped here — the
+      // route owns it (via onstream) so it survives into the practice loop.
+      // Stopping it here froze the loop's feed on shared-camera devices.
     };
   });
 
@@ -123,6 +133,9 @@
     if (!capture?.isAvailable()) return;
     try {
       handle = await capture.start();
+      // The route owns the camera from here so it survives the handoff to
+      // the practice loop (no second getUserMedia, no frozen feed).
+      onstream?.(handle.stream);
       if (video) {
         video.srcObject = handle.stream;
         // Wait for the video to start playing before attempting frame capture.

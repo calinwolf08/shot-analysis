@@ -28,7 +28,13 @@ export interface FrameCaptureOptions {
   fps?: number;
   /** Max edge for downsampling (default 256). Smaller = faster pose detection. */
   maxEdge?: number;
-  /** Start timestamp offset in ms (default 0). */
+  /**
+   * Epoch (ms) subtracted from `performance.now()` to form frame timestamps.
+   * Defaults to 0 — i.e. absolute `performance.now()` — so successive capture
+   * instances (setup screen, then practice loop) share one monotonic clock.
+   * A per-instance epoch would make the second stream's timestamps jump
+   * backwards, confusing the timestamp-driven coordinator across the handoff.
+   */
   startTime?: number;
 }
 
@@ -51,7 +57,7 @@ export function startFrameCapture(
 ): FrameCaptureHandle {
   const fps = options.fps ?? 15;
   const maxEdge = options.maxEdge ?? 256;
-  const startTime = options.startTime ?? performance.now();
+  const startTime = options.startTime ?? 0;
 
   let frameIndex = 0;
   let running = true;

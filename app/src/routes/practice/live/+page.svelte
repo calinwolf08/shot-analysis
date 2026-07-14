@@ -111,15 +111,9 @@
       planItemId: page.url.searchParams.get("planItem"),
       feedbackMs,
     });
-    // Re-open camera for the loop screen (setup screen stops its handle on unmount).
-    if (capture?.isAvailable()) {
-      try {
-        const handle = await capture.start();
-        cameraStream = handle.stream;
-      } catch {
-        cameraStream = null;
-      }
-    }
+    // The camera opened during setup is reused here (SetupScreen handed its
+    // stream up via onstream). Re-opening a second stream froze the feed on
+    // shared-camera devices, so the loop keeps the same one.
     await store.start();
     phase = "running";
   }
@@ -165,6 +159,7 @@
     onstart={() => void beginLoop()}
     onexit={exit}
     onerror={handleSetupError}
+    onstream={(s) => (cameraStream = s)}
   />
 {:else if phase === "running" && store}
   <PracticeLoopScreen
