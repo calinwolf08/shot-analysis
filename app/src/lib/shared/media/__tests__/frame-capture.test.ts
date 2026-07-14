@@ -1,155 +1,152 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	startFrameCapture,
-	createLiveFrameCapture,
-	type FrameData
+  createLiveFrameCapture,
+  startFrameCapture,
+  type FrameData,
 } from "../frame-capture";
 
+// The capture loop's only DOM/GPU dependency is downsampleToImageData
+// (canvas drawImage/getImageData), which can't run against a plain mock in
+// the node unit env. Stub it so we can test the loop's timing, gating, frame
+// indexing, and teardown deterministically.
+vi.mock("../downsample", () => ({
+  downsampleToImageData: (
+    _source: unknown,
+    _w: number,
+    _h: number,
+    _maxEdge: number,
+  ): ImageData =>
+    ({
+      data: new Uint8ClampedArray(4),
+      width: 1,
+      height: 1,
+    }) as ImageData,
+}));
+
+/** Minimal mutable stand-in for the HTMLVideoElement fields we read. */
+interface MockVideo {
+  videoWidth: number;
+  videoHeight: number;
+  readyState: number;
+}
+
+function makeVideo(overrides: Partial<MockVideo> = {}): HTMLVideoElement {
+  const video: MockVideo = {
+    videoWidth: 640,
+    videoHeight: 480,
+    readyState: 4, // HAVE_ENOUGH_DATA
+    ...overrides,
+  };
+  return video as unknown as HTMLVideoElement;
+}
+
 describe("startFrameCapture", () => {
-	let mockVideo: HTMLVideoElement;
-	let capturedFrames: FrameData[];
+  let capturedFrames: FrameData[];
 
-	beforeEach(() => {
-		vi.useFakeTimers();
-		capturedFrames = [];
+  beforeEach(() => {
+    vi.useFakeTimers();
+    capturedFrames = [];
+  });
 
-		// Create a mock video element with valid dimensions.
-		mockVideo = {
-			videoWidth: 640,
-			videoHeight: 480,
-			readyState: 4 // HAVE_ENOUGH_DATA
-		} as HTMLVideoElement;
-	});
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-	afterEach(() => {
-		vi.useRealTimers();
-	});
+  it("captures frames at the configured FPS", () => {
+    const handle = startFrameCapture(
+      makeVideo(),
+      (frame) => capturedFrames.push(frame),
+      { fps: 10 },
+    );
 
-	it("captures frames at the configured FPS", () => {
-		const handle = startFrameCapture(
-			mockVideo,
-			(frame) => capturedFrames.push(frame),
-			{ fps: 10 }
-		);
+    expect(handle.running).toBe(true);
 
-		expect(handle.running).toBe(true);
+    // First frame is captured immediately; ~5 more over 500ms at 10fps.
+    vi.advanceTimersByTime(500);
+    expect(capturedFrames.length).toBeGreaterThanOrEqual(5);
 
-		// Advance time by 500ms (should capture ~5 frames at 10fps).
-		vi.advanceTimersByTime(500);
+    handle.stop();
+    expect(handle.running).toBe(false);
+  });
 
-		// First frame is captured immediately, then ~5 more at intervals.
-		expect(capturedFrames.length).toBeGreaterThanOrEqual(5);
+  it("skips capture when video is not ready", () => {
+    const handle = startFrameCapture(
+      makeVideo({ readyState: 1 }), // HAVE_METADATA, not enough data
+      (frame) => capturedFrames.push(frame),
+    );
 
-		handle.stop();
-		expect(handle.running).toBe(false);
-	});
+    vi.advanceTimersByTime(200);
+    expect(capturedFrames.length).toBe(0);
 
-	it("skips capture when video is not ready", () => {
-		mockVideo.readyState = 1; // HAVE_METADATA but not enough data
+    handle.stop();
+  });
 
-		const handle = startFrameCapture(mockVideo, (frame) =>
-			capturedFrames.push(frame)
-		);
+  it("skips capture when video has no dimensions", () => {
+    const handle = startFrameCapture(
+      makeVideo({ videoWidth: 0, videoHeight: 0 }),
+      (frame) => capturedFrames.push(frame),
+    );
 
-		vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(200);
+    expect(capturedFrames.length).toBe(0);
 
-		// No frames captured because video is not ready.
-		expect(capturedFrames.length).toBe(0);
+    handle.stop();
+  });
 
-		handle.stop();
-	});
+  it("increments frame index and advances timestamps", () => {
+    const handle = startFrameCapture(
+      makeVideo(),
+      (frame) => capturedFrames.push(frame),
+      { fps: 30 },
+    );
 
-	it("skips capture when video has no dimensions", () => {
-		mockVideo.videoWidth = 0;
-		mockVideo.videoHeight = 0;
+    vi.advanceTimersByTime(100);
+    handle.stop();
 
-		const handle = startFrameCapture(mockVideo, (frame) =>
-			capturedFrames.push(frame)
-		);
+    expect(capturedFrames.length).toBeGreaterThan(0);
+    capturedFrames.forEach((frame, i) => expect(frame.frameIndex).toBe(i));
+    for (let i = 1; i < capturedFrames.length; i++) {
+      expect(capturedFrames[i]!.timestamp).toBeGreaterThanOrEqual(
+        capturedFrames[i - 1]!.timestamp,
+      );
+    }
+  });
 
-		vi.advanceTimersByTime(200);
+  it("stops capturing when stop() is called", () => {
+    const handle = startFrameCapture(makeVideo(), (frame) =>
+      capturedFrames.push(frame),
+    );
 
-		expect(capturedFrames.length).toBe(0);
+    vi.advanceTimersByTime(100);
+    const countBeforeStop = capturedFrames.length;
 
-		handle.stop();
-	});
+    handle.stop();
+    vi.advanceTimersByTime(100);
 
-	it("increments frame index and timestamp", () => {
-		const handle = startFrameCapture(
-			mockVideo,
-			(frame) => capturedFrames.push(frame),
-			{ fps: 30 }
-		);
-
-		vi.advanceTimersByTime(100);
-		handle.stop();
-
-		expect(capturedFrames.length).toBeGreaterThan(0);
-
-		// Check frame indices are sequential.
-		for (let i = 0; i < capturedFrames.length; i++) {
-			expect(capturedFrames[i].frameIndex).toBe(i);
-		}
-
-		// Check timestamps are increasing.
-		for (let i = 1; i < capturedFrames.length; i++) {
-			expect(capturedFrames[i].timestamp).toBeGreaterThanOrEqual(
-				capturedFrames[i - 1].timestamp
-			);
-		}
-	});
-
-	it("stops capturing when stop() is called", () => {
-		const handle = startFrameCapture(mockVideo, (frame) =>
-			capturedFrames.push(frame)
-		);
-
-		vi.advanceTimersByTime(100);
-		const countBeforeStop = capturedFrames.length;
-
-		handle.stop();
-
-		vi.advanceTimersByTime(100);
-		const countAfterStop = capturedFrames.length;
-
-		// No new frames after stop.
-		expect(countAfterStop).toBe(countBeforeStop);
-	});
+    expect(capturedFrames.length).toBe(countBeforeStop);
+  });
 });
 
 describe("createLiveFrameCapture", () => {
-	it("returns null when session has no pushFrame method", () => {
-		const mockVideo = { videoWidth: 640, videoHeight: 480 } as HTMLVideoElement;
-		const session = {}; // No pushFrame method
+  afterEach(() => vi.useRealTimers());
 
-		const handle = createLiveFrameCapture(mockVideo, session);
+  it("returns null when the session has no pushFrame (replay self-drives)", () => {
+    const handle = createLiveFrameCapture(makeVideo(), {});
+    expect(handle).toBeNull();
+  });
 
-		expect(handle).toBeNull();
-	});
+  it("pumps frames into session.pushFrame when present", () => {
+    vi.useFakeTimers();
+    const frames: FrameData[] = [];
+    const session = { pushFrame: (frame: FrameData) => frames.push(frame) };
 
-	it("creates a frame capture when session has pushFrame", () => {
-		vi.useFakeTimers();
+    const handle = createLiveFrameCapture(makeVideo(), session);
+    expect(handle).not.toBeNull();
+    expect(handle!.running).toBe(true);
 
-		const mockVideo = {
-			videoWidth: 640,
-			videoHeight: 480,
-			readyState: 4
-		} as HTMLVideoElement;
-		const frames: FrameData[] = [];
-		const session = {
-			pushFrame: (frame: FrameData) => frames.push(frame)
-		};
+    vi.advanceTimersByTime(100);
+    handle!.stop();
 
-		const handle = createLiveFrameCapture(mockVideo, session);
-
-		expect(handle).not.toBeNull();
-		expect(handle!.running).toBe(true);
-
-		vi.advanceTimersByTime(100);
-		handle!.stop();
-
-		expect(frames.length).toBeGreaterThan(0);
-
-		vi.useRealTimers();
-	});
+    expect(frames.length).toBeGreaterThan(0);
+  });
 });
