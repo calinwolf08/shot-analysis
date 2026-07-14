@@ -18,6 +18,7 @@
   import {
     createBrowserCaptureService,
     type CaptureService,
+    createFileCaptureService,
   } from "$lib/shared/media/capture";
 
   const services = useAppServices();
@@ -27,9 +28,20 @@
   const replayMode =
     page.url.searchParams.get("e2e") === "replay" ||
     import.meta.env.VITE_ANALYSIS_BACKEND === "replay";
+
+  // Dev/e2e only: `?liveVideo=<url>` plays a recorded clip as the "camera"
+  // through the real pipeline (no webcam) so live shot detection can be
+  // validated from a video file. Constant-folds away in production builds.
+  const liveVideoUrl =
+    import.meta.env.DEV || import.meta.env.VITE_E2E === "1"
+      ? page.url.searchParams.get("liveVideo")
+      : null;
+
   const capture: CaptureService | null = replayMode
     ? null
-    : createBrowserCaptureService();
+    : liveVideoUrl
+      ? createFileCaptureService(liveVideoUrl)
+      : createBrowserCaptureService();
   // Wall-clock feedback dwell; short in e2e so multi-rep runs stay fast.
   const feedbackMs = replayMode ? 1500 : 4000;
 
