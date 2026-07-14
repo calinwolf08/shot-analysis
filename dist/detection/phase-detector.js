@@ -362,6 +362,7 @@ export class PhaseDetector {
         // === SET POINT DETECTION ===
         // Set point: wrist at peak (minimum Y), brief plateau
         // Look for frames around the peak where wrist velocity is near zero
+        console.log("================ DOING SET POINT DETECTION ==================");
         if (state.peakWristFrame >= 0) {
             const peakIdx = state.peakWristFrame - baseFrame;
             // Find frames where wrist is within threshold of peak

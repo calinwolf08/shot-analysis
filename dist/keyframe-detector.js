@@ -230,6 +230,37 @@ function getFrameWristY(frame, visibilityThreshold) {
     return null;
 }
 /**
+ * UPDATE FOR X POSITION
+ * Gets the average wrist Y position for a frame.
+ *
+ * In normalized coordinates, Y=0 is top of frame, Y=1 is bottom.
+ * So a "lower" ball position (in physical space) corresponds to a HIGHER Y value.
+ *
+ * @param frame - The frame with pose landmarks
+ * @param visibilityThreshold - Minimum visibility for landmarks to be valid
+ * @returns Average wrist Y, or single wrist Y if one is not visible, or null if neither is valid
+ */
+function getFrameWristX(frame, visibilityThreshold) {
+    if (!frame.landmarks) {
+        return null;
+    }
+    const landmarks = frame.landmarks;
+    const leftWrist = landmarks[LANDMARK_INDICES.LEFT_WRIST];
+    const rightWrist = landmarks[LANDMARK_INDICES.RIGHT_WRIST];
+    const leftVisible = leftWrist && leftWrist.visibility >= visibilityThreshold;
+    const rightVisible = rightWrist && rightWrist.visibility >= visibilityThreshold;
+    if (leftVisible && rightVisible) {
+        return (leftWrist.x + rightWrist.x) / 2;
+    }
+    else if (leftVisible) {
+        return leftWrist.x;
+    }
+    else if (rightVisible) {
+        return rightWrist.x;
+    }
+    return null;
+}
+/**
  * Gets the elbow angle for the shooting arm in a frame.
  *
  * For set point and release detection, we need the shooting arm elbow angle.
@@ -614,10 +645,11 @@ export function detectBallStartsUpward(frames, ballLowPointFrame, endFrame, conf
  * @param config - Detection configuration
  * @returns Frame index of set point, or null if not detectable
  */
-export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config = DEFAULT_CONFIG) {
+export function detectSetPoint_old(frames, ballStartsUpwardFrame, endFrame, config = DEFAULT_CONFIG) {
     const shotDuration = endFrame - ballStartsUpwardFrame + 1;
     const searchEndFrame = ballStartsUpwardFrame +
         Math.floor(shotDuration * config.setPointSearchWindow);
+    console.log("detecting set point!!!");
     // Collect wrist Y positions and elbow angles for frames in the search window
     const frameData = [];
     for (const frame of frames) {
@@ -729,6 +761,47 @@ export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config =
         }
     }
     return bestFrame;
+}
+/**
+ * Detects the "set point" frame - the deepest wrist position before
+ * the elbow begins to straighten for the release.
+ *
+ * The set point is the "cocking" position where the ball is held at its highest
+ * point before the forward/upward release motion. It's characterized by:
+ * - the furthest point the wrists away from the hoop
+ * - the maximum y value while at that deepest point
+ *
+ * Iterate through frames. Track frame with minimum wrist X position. Track frame with minimum wrist Y position.
+ * Identify the last frame the ball is at the minimum wrist X position
+ *
+ * @param frames - Array of frames with pose data
+ * @param ballStartsUpwardFrame - Frame index where ball starts moving upward
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index of set point, or null if not detectable
+ */
+export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config = DEFAULT_CONFIG) {
+    const shotDuration = endFrame - ballStartsUpwardFrame + 1;
+    const searchEndFrame = ballStartsUpwardFrame +
+        Math.floor(shotDuration * config.setPointSearchWindow);
+    // Filter to frames after ball starts upward until end frame and sort by frame index
+    let frameData = frames
+        .filter((a) => a.frameIndex > ballStartsUpwardFrame && a.frameIndex < searchEndFrame)
+        .sort((a, b) => a.frameIndex - b.frameIndex);
+    if (frameData.length === 0) {
+        return null;
+    }
+    let maxWristXFrameIndex = -1;
+    let maxWristX = -1;
+    frameData.forEach(a => {
+        const currentFrameX = getFrameWristX(a, config.visibilityThreshold);
+        if (currentFrameX != null && currentFrameX > maxWristX) {
+            maxWristX = currentFrameX;
+            maxWristXFrameIndex = a.frameIndex;
+        }
+    });
+    console.log("DETECTED KEY FRAME: ", maxWristXFrameIndex);
+    return maxWristXFrameIndex;
 }
 /**
  * Detects the "release" frame - the frame of maximum wrist flexion (snap).

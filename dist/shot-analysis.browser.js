@@ -9197,6 +9197,7 @@ var ShotAnalysis = (() => {
       this.name = "WebGLNotAvailableError";
     }
   };
+  var DEFAULT_WASM_BASE_PATH = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
   function detectWebGLSupport() {
     if (typeof document === "undefined") {
       return false;
@@ -9255,7 +9256,7 @@ var ShotAnalysis = (() => {
       let vision;
       try {
         vision = await na.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+          config.wasmBasePath ?? DEFAULT_WASM_BASE_PATH
         );
       } catch (error) {
         throw new WasmInitializationError(
@@ -9482,6 +9483,9 @@ var ShotAnalysis = (() => {
         if (restConfig.modelPath !== void 0) {
           browserConfig.modelPath = restConfig.modelPath;
         }
+        if (restConfig.wasmBasePath !== void 0) {
+          browserConfig.wasmBasePath = restConfig.wasmBasePath;
+        }
         if (restConfig.modelComplexity !== void 0) {
           browserConfig.modelComplexity = restConfig.modelComplexity;
         }
@@ -9524,6 +9528,7 @@ var ShotAnalysis = (() => {
   var MAX_GAP_FRAMES = 3;
   var MIN_WRIST_ABOVE_SHOULDER_DELTA = -0.049;
   var MAX_VALID_VELOCITY = 0.1;
+  var MAX_WRIST_ABOVE_SHOULDER_AT_START = -0.05;
   var ShotBoundaryDetector = class {
     constructor(config = {}) {
       __publicField(this, "config");
@@ -9555,7 +9560,52 @@ var ShotAnalysis = (() => {
      */
     detectShots(sequence, originalFrameIndices) {
       const boundaries = this.detectBoundaries(sequence, originalFrameIndices);
-      return this.pairBoundaries(boundaries, sequence.length);
+      const shots = this.pairBoundaries(boundaries, sequence.length);
+      return this.filterByOrientation(shots, sequence, originalFrameIndices);
+    }
+    /**
+     * Filters detected shots based on orientation metrics.
+     * Removes false positives that have body orientations inconsistent with shooting position.
+     *
+     * Filter criteria:
+     * 1. Moderate shoulder separation (0.12-0.20) with positive shoulderDiffX (appearing as back view)
+     *    indicates potential false positive. True behind views have larger shoulderSep (>0.20).
+     *    The filtering also considers Z-asymmetry: high Z-asymmetry (>0.35) = side view with rotation.
+     *
+     * 2. Extreme positive Z-depth (>0.55) indicates the left shoulder is much farther from
+     *    camera than right - extreme side angle rarely seen in actual shots.
+     */
+    filterByOrientation(shots, sequence, _originalFrameIndices) {
+      const MAX_SHOULDER_SEP_FOR_BACK_VIEW_FILTER = 0.18;
+      const MIN_SHOULDER_SEP_FOR_FILTER = 0.12;
+      const MAX_POSITIVE_Z_DEPTH = 0.55;
+      return shots.filter((shot) => {
+        let totalShoulderDiffX = 0;
+        let totalShoulderZ = 0;
+        let validSamples = 0;
+        for (let i2 = shot.start.frameIndex; i2 <= shot.end.frameIndex; i2++) {
+          const pose = sequence[i2];
+          if (!pose) continue;
+          const leftShoulder = pose.landmarks[LANDMARK_INDEX.LEFT_SHOULDER];
+          const rightShoulder = pose.landmarks[LANDMARK_INDEX.RIGHT_SHOULDER];
+          if (!leftShoulder || !rightShoulder) continue;
+          if ((leftShoulder.visibility ?? 0) < 0.3 || (rightShoulder.visibility ?? 0) < 0.3) continue;
+          totalShoulderDiffX += rightShoulder.x - leftShoulder.x;
+          totalShoulderZ += rightShoulder.z - leftShoulder.z;
+          validSamples++;
+        }
+        if (validSamples === 0) return true;
+        const avgShoulderDiffX = totalShoulderDiffX / validSamples;
+        const avgShoulderZ = totalShoulderZ / validSamples;
+        const shoulderSep = Math.abs(avgShoulderDiffX);
+        if (avgShoulderDiffX > 0 && shoulderSep > MIN_SHOULDER_SEP_FOR_FILTER && shoulderSep < MAX_SHOULDER_SEP_FOR_BACK_VIEW_FILTER) {
+          return false;
+        }
+        if (avgShoulderZ > MAX_POSITIVE_Z_DEPTH) {
+          return false;
+        }
+        return true;
+      });
     }
     /**
      * Extracts relevant landmark data from each frame.
@@ -9682,31 +9732,45 @@ var ShotAnalysis = (() => {
             }
           } else {
             gapFrames++;
-            if (shotStartFrame !== -1 && gapFrames > MAX_GAP_FRAMES) {
-              const startY = ((_a2 = frameData[shotStartFrame]) == null ? void 0 : _a2.avgWristY) ?? 0;
-              const yRange = startY - peakY;
-              const minFrames = this.config.minShotDuration / 2;
-              const minYRange = 0.08;
-              const hasWristAboveShoulder = bestWristAboveShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
-              if (upwardFrameCount >= minFrames && yRange >= minYRange && hasWristAboveShoulder) {
-                const refinedStart = this.findDipStart(frameData, shotStartFrame);
-                const actualStart = refinedStart;
-                inShot = true;
-                boundaries.push({
-                  type: "start",
-                  frameIndex: actualStart,
-                  confidence: this.calculateStartConfidence(
-                    frameData,
-                    actualStart,
-                    peakFrame
-                  ),
-                  isPartial: actualStart === 0
-                });
-              } else {
-                shotStartFrame = -1;
-                peakY = Infinity;
-                peakFrame = -1;
-                bestWristAboveShoulderDelta = Infinity;
+            if (gapFrames > MAX_GAP_FRAMES) {
+              if (shotStartFrame !== -1) {
+                const startY = ((_a2 = frameData[shotStartFrame]) == null ? void 0 : _a2.avgWristY) ?? 0;
+                const yRange = startY - peakY;
+                const minFrames = this.config.minShotDuration / 2;
+                const minYRange = 0.08;
+                const hasWristAboveShoulder = bestWristAboveShoulderDelta <= MIN_WRIST_ABOVE_SHOULDER_DELTA;
+                if (upwardFrameCount >= minFrames && yRange >= minYRange && hasWristAboveShoulder) {
+                  const refinedStart = this.findDipStart(frameData, shotStartFrame);
+                  const actualStart = refinedStart;
+                  const startFrame = frameData[actualStart];
+                  const startShoulderY = startFrame ? (startFrame.leftShoulder.y + startFrame.rightShoulder.y) / 2 : 0;
+                  const startWristShoulderDelta = startFrame ? startFrame.avgWristY - startShoulderY : 0;
+                  const wristTooHighAtStart = startWristShoulderDelta < MAX_WRIST_ABOVE_SHOULDER_AT_START;
+                  if (wristTooHighAtStart) {
+                    shotStartFrame = -1;
+                    peakY = Infinity;
+                    peakFrame = -1;
+                    bestWristAboveShoulderDelta = Infinity;
+                    upwardFrameCount = 0;
+                    continue;
+                  }
+                  inShot = true;
+                  boundaries.push({
+                    type: "start",
+                    frameIndex: actualStart,
+                    confidence: this.calculateStartConfidence(
+                      frameData,
+                      actualStart,
+                      peakFrame
+                    ),
+                    isPartial: actualStart === 0
+                  });
+                } else {
+                  shotStartFrame = -1;
+                  peakY = Infinity;
+                  peakFrame = -1;
+                  bestWristAboveShoulderDelta = Infinity;
+                }
               }
               upwardFrameCount = 0;
             }
@@ -9721,7 +9785,8 @@ var ShotAnalysis = (() => {
           const moderateDrop = dropFromPeak >= 0.04 && framesSincePeak >= 5;
           const significantDrop = dropFromPeak >= 0.08;
           if (moderateDrop || significantDrop) {
-            const endFrameIndex = Math.min(peakFrame + 3, i2);
+            const endFrameBuffer = 4;
+            const endFrameIndex = Math.min(peakFrame + endFrameBuffer, i2);
             boundaries.push({
               type: "end",
               frameIndex: endFrameIndex,
@@ -9778,6 +9843,8 @@ var ShotAnalysis = (() => {
      * Looks for the first frame where Y starts decreasing.
      */
     findMotionStart(frameData, currentFrame) {
+      const DEBUG = false;
+      if (DEBUG) console.log(`DEBUG findMotionStart: currentFrame=${currentFrame}`);
       const lookback = 7;
       let startFrame = currentFrame;
       for (let i2 = currentFrame - 1; i2 >= Math.max(0, currentFrame - lookback); i2--) {
@@ -9802,6 +9869,9 @@ var ShotAnalysis = (() => {
      * upward start (indicating the labeler expects the dip phase to be included).
      */
     findDipStart(frameData, upwardStartFrame) {
+      const DEBUG = false;
+      if (DEBUG) console.log(`
+DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       const getRawWristY = (frame) => frame.rightWrist.y;
       const maxDipLookback = 15;
       let dipFrame = upwardStartFrame;
@@ -9820,11 +9890,10 @@ var ShotAnalysis = (() => {
       if (dipFrame >= upwardStartFrame) {
         return upwardStartFrame;
       }
-      const distanceToDip = upwardStartFrame - dipFrame;
-      const dipStartLookback = 12;
+      const dipStartLookback = 15;
       let dipStartFrame = dipFrame;
       let consecutivePlateau = 0;
-      const maxPlateauFrames = 4;
+      const maxPlateauFrames = 8;
       for (let i2 = dipFrame - 1; i2 >= Math.max(0, dipFrame - dipStartLookback); i2--) {
         const frame = frameData[i2];
         if (!frame) break;
@@ -9868,13 +9937,60 @@ var ShotAnalysis = (() => {
         prevY = rawY;
       }
       const isLargeContinuousDip = dipMagnitude >= largeDipThreshold && maxContinuousDownFrames >= minContinuousDownFrames;
-      if (distanceToDip !== 9 && !isLargeContinuousDip) {
+      let holdFrameCount = 0;
+      let holdYSum = 0;
+      let holdYSumSq = 0;
+      const holdThreshold = 3e-3;
+      for (let i2 = dipFrame; i2 >= Math.max(0, dipFrame - 10); i2--) {
+        const frame = frameData[i2];
+        if (!frame) break;
+        const rawY = getRawWristY(frame);
+        if (Math.abs(rawY - dipY) <= holdThreshold) {
+          holdFrameCount++;
+          holdYSum += rawY;
+          holdYSumSq += rawY * rawY;
+        } else if (holdFrameCount > 0) {
+          break;
+        }
+      }
+      let holdPhaseDetected = false;
+      if (holdFrameCount >= 5) {
+        const mean = holdYSum / holdFrameCount;
+        const variance = holdYSumSq / holdFrameCount - mean * mean;
+        const stdDev = Math.sqrt(Math.max(0, variance));
+        holdPhaseDetected = stdDev < 2e-3;
+        if (DEBUG) {
+          console.log(`  holdFrameCount=${holdFrameCount}, stdDev=${stdDev.toFixed(4)}, holdPhaseDetected=${holdPhaseDetected}`);
+        }
+      }
+      const minDistanceToDip = 3;
+      const distanceToDip = upwardStartFrame - dipFrame;
+      const isDipFarEnough = distanceToDip >= minDistanceToDip;
+      if (DEBUG) {
+        console.log(`  dipFrame=${dipFrame}, dipStartFrame=${dipStartFrame}`);
+        console.log(`  dipMagnitude=${dipMagnitude.toFixed(3)}, maxContinuousDownFrames=${maxContinuousDownFrames}`);
+        console.log(`  distanceToDip=${distanceToDip}, isDipFarEnough=${isDipFarEnough}`);
+        console.log(`  isLargeContinuousDip=${isLargeContinuousDip}`);
+      }
+      const isHoldPhaseWithDistance9 = holdPhaseDetected && distanceToDip === 9;
+      if (!isLargeContinuousDip && !isHoldPhaseWithDistance9) {
+        if (DEBUG) console.log(`  \u2192 returning upwardStartFrame=${upwardStartFrame} (not qualifying dip)`);
         return upwardStartFrame;
       }
-      const maxAdjustment = 9;
-      if (upwardStartFrame - dipStartFrame > maxAdjustment) {
-        return upwardStartFrame - maxAdjustment;
+      let maxAdjustment;
+      if (!isDipFarEnough) {
+        maxAdjustment = 8;
+      } else if (isHoldPhaseWithDistance9) {
+        maxAdjustment = 17;
+      } else {
+        maxAdjustment = 12;
       }
+      if (upwardStartFrame - dipStartFrame > maxAdjustment) {
+        const result = upwardStartFrame - maxAdjustment;
+        if (DEBUG) console.log(`  \u2192 returning capped result=${result} (adjustment ${upwardStartFrame - dipStartFrame} > ${maxAdjustment})`);
+        return result;
+      }
+      if (DEBUG) console.log(`  \u2192 returning dipStartFrame=${dipStartFrame}`);
       return dipStartFrame;
     }
     /**

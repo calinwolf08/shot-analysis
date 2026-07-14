@@ -5,6 +5,10 @@
     LandmarkFrame,
     LiveAnalysisSession,
   } from "$lib/features/analysis";
+  import {
+    createLiveFrameCapture,
+    type FrameCaptureHandle,
+  } from "$lib/shared/media/frame-capture";
   import { Button, ScoreRing } from "$lib/shared/ui";
   import {
     drawSkeleton,
@@ -33,6 +37,7 @@
   let ending = $state(false);
   let videoEl = $state<HTMLVideoElement | null>(null);
   let overlayEl = $state<HTMLCanvasElement | null>(null);
+  let frameCapture: FrameCaptureHandle | null = null;
 
   // Presence comes from the landmark stream itself — NOT the coordinator
   // phase, which stays "ready/active/…" long after the player walks out
@@ -102,7 +107,21 @@
   });
 
   onMount(() => {
-    if (videoEl && stream) videoEl.srcObject = stream;
+    if (videoEl && stream) {
+      videoEl.srcObject = stream;
+      // Start frame capture once the video is ready.
+      videoEl.onloadedmetadata = () => {
+        if (session && videoEl && !frameCapture) {
+          frameCapture = createLiveFrameCapture(videoEl, session);
+          if (frameCapture) {
+            console.debug("[loop] Frame capture started");
+          }
+        }
+      };
+    }
+    return () => {
+      frameCapture?.stop();
+    };
   });
 
   async function endSession() {

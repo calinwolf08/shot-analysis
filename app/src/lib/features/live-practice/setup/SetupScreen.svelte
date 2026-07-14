@@ -10,6 +10,10 @@
     CaptureService,
   } from "$lib/shared/media/capture";
   import { downsampleToImageData } from "$lib/shared/media/downsample";
+  import {
+    createLiveFrameCapture,
+    type FrameCaptureHandle,
+  } from "$lib/shared/media/frame-capture";
   import { Button } from "$lib/shared/ui";
   import {
     CHECK_DEFAULTS,
@@ -70,21 +74,29 @@
 
   let video = $state<HTMLVideoElement | null>(null);
   let handle: CaptureHandle | null = null;
+  let frameCapture: FrameCaptureHandle | null = null;
   const fullBody = createSustainedCheck(CHECK_DEFAULTS.fullBodySustainMs);
   let recentFrames: LandmarkFrame[] = [];
   let accelSamples: number[] = [];
+  let sessionReady = false;
 
   onMount(() => {
     // No camera pixels to judge (replay mode / no device) → auto-pass.
     if (!capture?.isAvailable()) pass.lighting = true;
     const unsubscribe = session.onFrame(handleFrame);
-    session.start().catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("Analysis session failed to start:", msg);
-      onerror?.(
-        "Unable to start pose detection. Please refresh and try again.",
-      );
-    });
+    session
+      .start()
+      .then(() => {
+        sessionReady = true;
+        maybeStartFrameCapture();
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("Analysis session failed to start:", msg);
+        onerror?.(
+          "Unable to start pose detection. Please refresh and try again.",
+        );
+      });
     void openCamera();
 
     const onMotion = (event: DeviceMotionEvent) => {
@@ -102,6 +114,7 @@
       unsubscribe();
       window.removeEventListener("devicemotion", onMotion);
       clearInterval(lumaTimer);
+      frameCapture?.stop();
       handle?.stop();
     };
   });
@@ -110,10 +123,29 @@
     if (!capture?.isAvailable()) return;
     try {
       handle = await capture.start();
-      if (video) video.srcObject = handle.stream;
+      if (video) {
+        video.srcObject = handle.stream;
+        // Wait for the video to start playing before attempting frame capture.
+        video.onloadedmetadata = () => maybeStartFrameCapture();
+      }
     } catch {
       cameraNote = "Camera unavailable — running pose-only setup.";
       pass.lighting = true;
+    }
+  }
+
+  /**
+   * Start frame capture once both the video element and session are ready.
+   * This bridges the camera feed to the pose detection worker.
+   */
+  function maybeStartFrameCapture() {
+    if (frameCapture) return; // Already started.
+    if (!video || !sessionReady) return; // Not ready yet.
+    if (video.videoWidth === 0) return; // Video not loaded yet.
+
+    frameCapture = createLiveFrameCapture(video, session);
+    if (frameCapture) {
+      console.debug("[setup] Frame capture started");
     }
   }
 
