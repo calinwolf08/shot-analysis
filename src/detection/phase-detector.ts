@@ -95,12 +95,20 @@ export interface PhaseDetectionResult {
 interface FrameAnalysis {
   readonly frameIndex: number;
   readonly avgWristY: number;
+  /** Smoothed average wrist X (horizontal). Used for set-point detection. */
+  readonly avgWristX: number;
   readonly avgHipY: number;
   readonly kneeAngle: number;
   readonly handSeparation: number;
   readonly wristVelocity: number;
   readonly hipVelocity: number;
   readonly avgConfidence: number;
+  /**
+   * Signed facing hint: nose.x − mean(ear.x). For a side-on shooter the
+   * nose sits toward the basket relative to the ears, so the sign of this
+   * (aggregated over the shot) tells us which way the basket is.
+   */
+  readonly faceDir: number;
 }
 
 /**
@@ -185,8 +193,13 @@ export class PhaseDetector {
 
     // Debug: Check for out-of-bounds phases
     for (const [phaseName, phaseRange] of Object.entries(phases)) {
-      if (phaseRange && (phaseRange.startFrame < actualStart || phaseRange.endFrame > actualEnd)) {
-        console.log(`[PhaseDetector] WARNING: Phase ${phaseName} out of bounds: ${phaseRange.startFrame}-${phaseRange.endFrame} (expected ${actualStart}-${actualEnd})`);
+      if (
+        phaseRange &&
+        (phaseRange.startFrame < actualStart || phaseRange.endFrame > actualEnd)
+      ) {
+        console.log(
+          `[PhaseDetector] WARNING: Phase ${phaseName} out of bounds: ${phaseRange.startFrame}-${phaseRange.endFrame} (expected ${actualStart}-${actualEnd})`,
+        );
       }
     }
 
@@ -208,6 +221,7 @@ export class PhaseDetector {
 
     // Extract raw values
     const wristYValues: number[] = [];
+    const wristXValues: number[] = [];
     const hipYValues: number[] = [];
 
     for (let i = startFrame; i <= endFrame; i++) {
@@ -218,6 +232,7 @@ export class PhaseDetector {
       const rightHip = landmarks[LANDMARK_INDEX.RIGHT_HIP]!;
 
       wristYValues.push((leftWrist.y + rightWrist.y) / 2);
+      wristXValues.push((leftWrist.x + rightWrist.x) / 2);
       hipYValues.push((leftHip.y + rightHip.y) / 2);
     }
 
@@ -226,6 +241,11 @@ export class PhaseDetector {
       this.config.smoothingWindowSize > 1
         ? movingAverage(wristYValues, this.config.smoothingWindowSize)
         : wristYValues;
+
+    const smoothedWristX =
+      this.config.smoothingWindowSize > 1
+        ? movingAverage(wristXValues, this.config.smoothingWindowSize)
+        : wristXValues;
 
     const smoothedHipY =
       this.config.smoothingWindowSize > 1
@@ -243,6 +263,9 @@ export class PhaseDetector {
       const rightIndex = landmarks[LANDMARK_INDEX.RIGHT_INDEX]!;
       const leftShoulder = landmarks[LANDMARK_INDEX.LEFT_SHOULDER]!;
       const rightShoulder = landmarks[LANDMARK_INDEX.RIGHT_SHOULDER]!;
+      const nose = landmarks[LANDMARK_INDEX.NOSE]!;
+      const leftEar = landmarks[LANDMARK_INDEX.LEFT_EAR]!;
+      const rightEar = landmarks[LANDMARK_INDEX.RIGHT_EAR]!;
       const leftHip = landmarks[LANDMARK_INDEX.LEFT_HIP]!;
       const rightHip = landmarks[LANDMARK_INDEX.RIGHT_HIP]!;
       const leftKnee = landmarks[LANDMARK_INDEX.LEFT_KNEE]!;
@@ -288,15 +311,27 @@ export class PhaseDetector {
           rightKnee.confidence) /
         6;
 
+      // Facing hint: nose relative to the mean ear X. Weighted toward the
+      // more-visible ear so a side view (one ear occluded) still reads.
+      const earX =
+        leftEar.confidence + rightEar.confidence > 0
+          ? (leftEar.x * leftEar.confidence +
+              rightEar.x * rightEar.confidence) /
+            (leftEar.confidence + rightEar.confidence)
+          : (leftEar.x + rightEar.x) / 2;
+      const faceDir = nose.x - earX;
+
       frameData.push({
         frameIndex: i,
         avgWristY: smoothedWristY[idx]!,
+        avgWristX: smoothedWristX[idx]!,
         avgHipY: smoothedHipY[idx]!,
         kneeAngle,
         handSeparation,
         wristVelocity,
         hipVelocity,
         avgConfidence,
+        faceDir,
       });
     }
 
@@ -356,6 +391,72 @@ export class PhaseDetector {
     }
 
     return phases as ShotPhases;
+  }
+
+  /**
+   * Finds the set point: the frame where the wrists are furthest from the
+   * basket, just before extending toward it to release. Searches the rise
+   * (up to the wrist-height peak) for the horizontal turning point.
+   *
+   * Basket direction is inferred from the shooter's facing (nose vs ears),
+   * which is robust for the side-on framing the app requires. Returns null
+   * when there's no clear facing/horizontal signal (e.g. a frontal view or
+   * synthetic data), so the caller falls back to the wrist-height peak.
+   */
+  private findSetPointFrame(
+    frameData: FrameAnalysis[],
+    state: PhaseState,
+    riseStartFrame: number,
+    baseFrame: number,
+  ): number | null {
+    if (state.peakWristFrame < 0) return null;
+
+    const peakIdx = state.peakWristFrame - baseFrame;
+    const startIdx = Math.max(
+      0,
+      (riseStartFrame >= 0 ? riseStartFrame : baseFrame) - baseFrame,
+    );
+    // Need a few frames of rise to find a turning point within.
+    if (peakIdx - startIdx < 2) return null;
+
+    // Basket direction from facing: mean(nose.x − ear.x) over the rise. A
+    // side-on shooter has a clear sign; a frontal view is ~0 → bail.
+    let faceSum = 0;
+    for (let i = startIdx; i <= peakIdx; i++) faceSum += frameData[i]!.faceDir;
+    const faceMean = faceSum / (peakIdx - startIdx + 1);
+    const MIN_FACING = 0.02; // normalized; below this the view is too frontal
+    if (Math.abs(faceMean) < MIN_FACING) return null;
+    const basketDir = Math.sign(faceMean); // +1: basket at +x, −1: at −x
+
+    // The wrist must actually travel horizontally during the rise, else
+    // there's no meaningful turning point (fall back to the height peak).
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (let i = startIdx; i <= peakIdx; i++) {
+      const x = frameData[i]!.avgWristX;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+    }
+    const MIN_TRAVEL = 0.03; // normalized wrist X range over the rise
+    if (maxX - minX < MIN_TRAVEL) return null;
+
+    // Set point = furthest from the basket (turning point before the push).
+    let bestIdx = startIdx;
+    let bestVal = basketDir * frameData[startIdx]!.avgWristX;
+    for (let i = startIdx + 1; i <= peakIdx; i++) {
+      const v = basketDir * frameData[i]!.avgWristX;
+      if (v < bestVal) {
+        bestVal = v;
+        bestIdx = i;
+      }
+    }
+
+    const setPointFrame = baseFrame + bestIdx;
+    // Must leave at least one rise frame before it.
+    if (setPointFrame <= (riseStartFrame >= 0 ? riseStartFrame : baseFrame)) {
+      return null;
+    }
+    return setPointFrame;
   }
 
   /**
@@ -542,12 +643,43 @@ export class PhaseDetector {
     }
 
     // === SET POINT DETECTION ===
-    // Set point: wrist at peak (minimum Y), brief plateau
-    // Look for frames around the peak where wrist velocity is near zero
-    if (state.peakWristFrame >= 0) {
-      const peakIdx = state.peakWristFrame - baseFrame;
+    // The set point is where the wrists stop moving away from the basket
+    // and begin extending toward it — the start of the push to release.
+    // This is *earlier* than the wrist's vertical peak (which is full
+    // extension, essentially the release). We find it as the horizontal
+    // turning point of the wrist; a near-frontal view (no clear horizontal
+    // motion) falls back to the old wrist-height-peak plateau.
+    const turningFrame = this.findSetPointFrame(
+      frameData,
+      state,
+      riseStart,
+      baseFrame,
+    );
 
-      // Find frames where wrist is within threshold of peak
+    if (turningFrame !== null) {
+      setPointStart = turningFrame;
+      setPointEnd = turningFrame;
+      state.phases.set(ShotPhase.SetPoint, {
+        startFrame: turningFrame,
+        endFrame: turningFrame,
+      });
+
+      // Rise ends where the set point begins (it previously ran to the
+      // vertical peak, which is now part of the release/extension).
+      const rise = state.phases.get(ShotPhase.Rise);
+      if (rise && rise.endFrame >= turningFrame) {
+        const newRiseEnd = turningFrame - 1;
+        if (newRiseEnd >= rise.startFrame) {
+          state.phases.set(ShotPhase.Rise, {
+            startFrame: rise.startFrame,
+            endFrame: newRiseEnd,
+          });
+          riseEnd = newRiseEnd;
+        }
+      }
+    } else if (state.peakWristFrame >= 0) {
+      // Fallback: wrist at peak (minimum Y), brief plateau.
+      const peakIdx = state.peakWristFrame - baseFrame;
       const peakThreshold = 0.02;
       let setStart = state.peakWristFrame;
       let setEnd = state.peakWristFrame;

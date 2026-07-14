@@ -113,6 +113,17 @@ export declare class PhaseDetector {
      */
     private identifyPhases;
     /**
+     * Finds the set point: the frame where the wrists are furthest from the
+     * basket, just before extending toward it to release. Searches the rise
+     * (up to the wrist-height peak) for the horizontal turning point.
+     *
+     * Basket direction is inferred from the shooter's facing (nose vs ears),
+     * which is robust for the side-on framing the app requires. Returns null
+     * when there's no clear facing/horizontal signal (e.g. a frontal view or
+     * synthetic data), so the caller falls back to the wrist-height peak.
+     */
+    private findSetPointFrame;
+    /**
      * Finds key biomechanical points in the sequence.
      */
     private findKeyPoints;

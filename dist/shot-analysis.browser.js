@@ -10117,7 +10117,9 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       const phases = this.identifyPhases(frameData, actualStart);
       for (const [phaseName, phaseRange] of Object.entries(phases)) {
         if (phaseRange && (phaseRange.startFrame < actualStart || phaseRange.endFrame > actualEnd)) {
-          console.log(`[PhaseDetector] WARNING: Phase ${phaseName} out of bounds: ${phaseRange.startFrame}-${phaseRange.endFrame} (expected ${actualStart}-${actualEnd})`);
+          console.log(
+            `[PhaseDetector] WARNING: Phase ${phaseName} out of bounds: ${phaseRange.startFrame}-${phaseRange.endFrame} (expected ${actualStart}-${actualEnd})`
+          );
         }
       }
       const confidence = this.calculateOverallConfidence(frameData, phases);
@@ -10129,6 +10131,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     analyzeFrames(sequence, startFrame, endFrame) {
       const frameData = [];
       const wristYValues = [];
+      const wristXValues = [];
       const hipYValues = [];
       for (let i2 = startFrame; i2 <= endFrame; i2++) {
         const landmarks = sequence[i2].landmarks;
@@ -10137,9 +10140,11 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         const leftHip = landmarks[LANDMARK_INDEX.LEFT_HIP];
         const rightHip = landmarks[LANDMARK_INDEX.RIGHT_HIP];
         wristYValues.push((leftWrist.y + rightWrist.y) / 2);
+        wristXValues.push((leftWrist.x + rightWrist.x) / 2);
         hipYValues.push((leftHip.y + rightHip.y) / 2);
       }
       const smoothedWristY = this.config.smoothingWindowSize > 1 ? movingAverage(wristYValues, this.config.smoothingWindowSize) : wristYValues;
+      const smoothedWristX = this.config.smoothingWindowSize > 1 ? movingAverage(wristXValues, this.config.smoothingWindowSize) : wristXValues;
       const smoothedHipY = this.config.smoothingWindowSize > 1 ? movingAverage(hipYValues, this.config.smoothingWindowSize) : hipYValues;
       for (let i2 = startFrame; i2 <= endFrame; i2++) {
         const idx = i2 - startFrame;
@@ -10150,6 +10155,9 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         const rightIndex = landmarks[LANDMARK_INDEX.RIGHT_INDEX];
         const leftShoulder = landmarks[LANDMARK_INDEX.LEFT_SHOULDER];
         const rightShoulder = landmarks[LANDMARK_INDEX.RIGHT_SHOULDER];
+        const nose = landmarks[LANDMARK_INDEX.NOSE];
+        const leftEar = landmarks[LANDMARK_INDEX.LEFT_EAR];
+        const rightEar = landmarks[LANDMARK_INDEX.RIGHT_EAR];
         const leftHip = landmarks[LANDMARK_INDEX.LEFT_HIP];
         const rightHip = landmarks[LANDMARK_INDEX.RIGHT_HIP];
         const leftKnee = landmarks[LANDMARK_INDEX.LEFT_KNEE];
@@ -10175,15 +10183,19 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         const wristVelocity = idx > 0 ? smoothedWristY[idx] - smoothedWristY[idx - 1] : 0;
         const hipVelocity = idx > 0 ? smoothedHipY[idx] - smoothedHipY[idx - 1] : 0;
         const avgConfidence = (leftWrist.confidence + rightWrist.confidence + leftHip.confidence + rightHip.confidence + leftKnee.confidence + rightKnee.confidence) / 6;
+        const earX = leftEar.confidence + rightEar.confidence > 0 ? (leftEar.x * leftEar.confidence + rightEar.x * rightEar.confidence) / (leftEar.confidence + rightEar.confidence) : (leftEar.x + rightEar.x) / 2;
+        const faceDir = nose.x - earX;
         frameData.push({
           frameIndex: i2,
           avgWristY: smoothedWristY[idx],
+          avgWristX: smoothedWristX[idx],
           avgHipY: smoothedHipY[idx],
           kneeAngle,
           handSeparation,
           wristVelocity,
           hipVelocity,
-          avgConfidence
+          avgConfidence,
+          faceDir
         });
       }
       return frameData;
@@ -10225,6 +10237,54 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         };
       }
       return phases;
+    }
+    /**
+     * Finds the set point: the frame where the wrists are furthest from the
+     * basket, just before extending toward it to release. Searches the rise
+     * (up to the wrist-height peak) for the horizontal turning point.
+     *
+     * Basket direction is inferred from the shooter's facing (nose vs ears),
+     * which is robust for the side-on framing the app requires. Returns null
+     * when there's no clear facing/horizontal signal (e.g. a frontal view or
+     * synthetic data), so the caller falls back to the wrist-height peak.
+     */
+    findSetPointFrame(frameData, state, riseStartFrame, baseFrame) {
+      if (state.peakWristFrame < 0) return null;
+      const peakIdx = state.peakWristFrame - baseFrame;
+      const startIdx = Math.max(
+        0,
+        (riseStartFrame >= 0 ? riseStartFrame : baseFrame) - baseFrame
+      );
+      if (peakIdx - startIdx < 2) return null;
+      let faceSum = 0;
+      for (let i2 = startIdx; i2 <= peakIdx; i2++) faceSum += frameData[i2].faceDir;
+      const faceMean = faceSum / (peakIdx - startIdx + 1);
+      const MIN_FACING = 0.02;
+      if (Math.abs(faceMean) < MIN_FACING) return null;
+      const basketDir = Math.sign(faceMean);
+      let minX = Infinity;
+      let maxX = -Infinity;
+      for (let i2 = startIdx; i2 <= peakIdx; i2++) {
+        const x2 = frameData[i2].avgWristX;
+        if (x2 < minX) minX = x2;
+        if (x2 > maxX) maxX = x2;
+      }
+      const MIN_TRAVEL = 0.03;
+      if (maxX - minX < MIN_TRAVEL) return null;
+      let bestIdx = startIdx;
+      let bestVal = basketDir * frameData[startIdx].avgWristX;
+      for (let i2 = startIdx + 1; i2 <= peakIdx; i2++) {
+        const v2 = basketDir * frameData[i2].avgWristX;
+        if (v2 < bestVal) {
+          bestVal = v2;
+          bestIdx = i2;
+        }
+      }
+      const setPointFrame = baseFrame + bestIdx;
+      if (setPointFrame <= (riseStartFrame >= 0 ? riseStartFrame : baseFrame)) {
+        return null;
+      }
+      return setPointFrame;
     }
     /**
      * Finds key biomechanical points in the sequence.
@@ -10345,7 +10405,31 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
           });
         }
       }
-      if (state.peakWristFrame >= 0) {
+      const turningFrame = this.findSetPointFrame(
+        frameData,
+        state,
+        riseStart,
+        baseFrame
+      );
+      if (turningFrame !== null) {
+        setPointStart = turningFrame;
+        setPointEnd = turningFrame;
+        state.phases.set("setPoint" /* SetPoint */, {
+          startFrame: turningFrame,
+          endFrame: turningFrame
+        });
+        const rise = state.phases.get("rise" /* Rise */);
+        if (rise && rise.endFrame >= turningFrame) {
+          const newRiseEnd = turningFrame - 1;
+          if (newRiseEnd >= rise.startFrame) {
+            state.phases.set("rise" /* Rise */, {
+              startFrame: rise.startFrame,
+              endFrame: newRiseEnd
+            });
+            riseEnd = newRiseEnd;
+          }
+        }
+      } else if (state.peakWristFrame >= 0) {
         const peakIdx = state.peakWristFrame - baseFrame;
         const peakThreshold = 0.02;
         let setStart = state.peakWristFrame;
