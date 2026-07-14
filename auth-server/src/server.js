@@ -42,7 +42,8 @@ export async function createAuthServer(options = {}) {
     "shotcoach-dev-only-secret-change-me";
   const trustedOrigins =
     options.trustedOrigins ??
-    (process.env.AUTH_TRUSTED_ORIGINS?.split(",") ?? DEFAULT_ORIGINS);
+    process.env.AUTH_TRUSTED_ORIGINS?.split(",") ??
+    DEFAULT_ORIGINS;
   const e2e = options.e2e ?? process.env.AUTH_E2E === "1";
 
   mkdirSync(dirname(dbPath), { recursive: true });

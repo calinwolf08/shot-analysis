@@ -12,13 +12,13 @@ there, so identity gets this small dedicated service.
 npm start --workspace shotcoach-auth-server
 ```
 
-| Env                    | Default                                          | Meaning                                    |
-| ---------------------- | ------------------------------------------------ | ------------------------------------------ |
-| `AUTH_PORT`            | `5174`                                           | Listen port                                |
-| `AUTH_DB`              | `auth-server/data/auth.sqlite`                   | SQLite file (created + migrated on boot)   |
-| `AUTH_SECRET`          | dev-only fallback                                | Signing secret — **set in production**     |
-| `AUTH_TRUSTED_ORIGINS` | localhost:5173/4173 + Capacitor shells           | Comma-separated origins allowed CORS/CSRF  |
-| `AUTH_E2E`             | off                                              | `1` exposes `/__test/reset-url` for tests  |
+| Env                    | Default                                | Meaning                                   |
+| ---------------------- | -------------------------------------- | ----------------------------------------- |
+| `AUTH_PORT`            | `5174`                                 | Listen port                               |
+| `AUTH_DB`              | `auth-server/data/auth.sqlite`         | SQLite file (created + migrated on boot)  |
+| `AUTH_SECRET`          | dev-only fallback                      | Signing secret — **set in production**    |
+| `AUTH_TRUSTED_ORIGINS` | localhost:5173/4173 + Capacitor shells | Comma-separated origins allowed CORS/CSRF |
+| `AUTH_E2E`             | off                                    | `1` exposes `/__test/reset-url` for tests |
 
 Endpoints: better-auth under `/api/auth/*` (sign-up/sign-in/sign-out,
 get-session, request-password-reset, reset-password, change-password),

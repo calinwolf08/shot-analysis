@@ -6,3 +6,7 @@ playwright-report/
 test-results/
 *.local
 static/mediapipe/wasm/
+
+.env
+.env.*
+!.env.example
