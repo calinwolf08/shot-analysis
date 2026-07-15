@@ -47,4 +47,6 @@ export { createPoseDetector } from "./pose/factory";
 export type { PoseData, Frame as PoseFrame, TestLandmark, Orientation, } from "./testing/types";
 export type { PoseShotDetectorConfig, DetectedShot as PoseDetectedShot, DetectionResult as PoseDetectionResult, } from "./detection/pose-shot-detector";
 export { detectShots as detectShotsFromPoses, detectOrientation, createPoseShotDetector, } from "./detection/pose-shot-detector";
+export { detectKeyframesFromFrames, phasesFromKeyframes, poseLandmarksToFrames, } from "./detection/keyframe-phases";
+export type { KeyframeId } from "./testing/types";
 //# sourceMappingURL=browser-entry.d.ts.map

@@ -2003,7 +2003,87 @@
         });
 
         html += "</div>";
+        html += renderKeyframes(shot);
         elements.phasesSection.innerHTML = html;
+      }
+
+      // Keyframe order + display names, mirroring the labeled corpus so the
+      // detected frames line up visually with the Shot Labels panel.
+      const KEYFRAME_ORDER = [
+        "legs_start_bending",
+        "leg_bend_low_point",
+        "ball_low_point",
+        "legs_start_extending",
+        "ball_starts_upward",
+        "set_point",
+        "release",
+        "arms_fully_extended",
+        "feet_leave_ground",
+        "feet_land",
+      ];
+      const KEYFRAME_NAMES = {
+        legs_start_bending: "Legs bend start",
+        leg_bend_low_point: "Leg low point",
+        ball_low_point: "Ball low point",
+        legs_start_extending: "Legs extend",
+        ball_starts_upward: "Ball up",
+        set_point: "Set point",
+        release: "Release",
+        arms_fully_extended: "Arms extended",
+        feet_leave_ground: "Feet leave",
+        feet_land: "Feet land",
+      };
+
+      // Runs the keyframe algorithm on the captured pose frames for this shot
+      // and renders each detected keyframe as a seekable chip. This is the
+      // same detection the runtime derives phases from, so the chips are the
+      // frames to compare against the labels while tuning.
+      function renderKeyframes(shot) {
+        const frames = appState.poseData && appState.poseData.frames;
+        if (
+          !frames ||
+          !frames.length ||
+          !window.ShotAnalysis ||
+          typeof ShotAnalysis.detectKeyframesFromFrames !== "function"
+        ) {
+          return "";
+        }
+
+        let detected;
+        try {
+          detected = ShotAnalysis.detectKeyframesFromFrames(
+            frames,
+            shot.frameRange.start,
+            shot.frameRange.end,
+          );
+        } catch (err) {
+          console.warn("[keyframes] detection failed", err);
+          return "";
+        }
+
+        let html =
+          '<div class="section-header">Detected Keyframes</div><div class="phase-list">';
+        KEYFRAME_ORDER.forEach((id) => {
+          const frame = detected.get ? detected.get(id) : detected[id];
+          const label = KEYFRAME_NAMES[id] || id;
+          if (frame == null) {
+            html += `
+            <div class="phase-chip" style="opacity:0.5" title="not detected">
+              <span class="name">${label}</span>
+              <span class="frames">—</span>
+            </div>
+          `;
+          } else {
+            html += `
+            <div class="phase-chip" data-start="${frame}" data-end="${frame}" onclick="seekToFrame(${frame})">
+              <span class="name">${label}</span>
+              <span class="frames">${frame}</span>
+            </div>
+          `;
+          }
+        });
+        html += "</div>";
+        return html;
       }
 
       function renderMetrics(shot) {

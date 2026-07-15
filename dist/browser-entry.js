@@ -45,4 +45,8 @@ export { youthFundamentalsProfile, highSchoolProfile, proFormProfile, builtInPro
 export { ShotPhase as DetectionShotPhase, SHOT_PHASES, TOTAL_SHOT_PHASES, } from "./detection/types";
 export { createPoseDetector } from "./pose/factory";
 export { detectShots as detectShotsFromPoses, detectOrientation, createPoseShotDetector, } from "./detection/pose-shot-detector";
+// Keyframe detection (same algorithm the runtime derives phases from and the
+// offline harness scores against labels) — exposed so the validator can show
+// the detected keyframes next to the self-labeled data.
+export { detectKeyframesFromFrames, phasesFromKeyframes, poseLandmarksToFrames, } from "./detection/keyframe-phases";
 //# sourceMappingURL=browser-entry.js.map
