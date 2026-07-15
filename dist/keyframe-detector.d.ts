@@ -188,24 +188,6 @@ export declare function detectBallStartsUpward(frames: readonly Frame[], ballLow
  * @returns Frame index of set point, or null if not detectable
  */
 export declare function detectSetPoint_old(frames: readonly Frame[], ballStartsUpwardFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
-/**
- * Detects the "set point" frame - the deepest wrist position before
- * the elbow begins to straighten for the release.
- *
- * The set point is the "cocking" position where the ball is held at its highest
- * point before the forward/upward release motion. It's characterized by:
- * - the furthest point the wrists away from the hoop
- * - the maximum y value while at that deepest point
- *
- * Iterate through frames. Track frame with minimum wrist X position. Track frame with minimum wrist Y position.
- * Identify the last frame the ball is at the minimum wrist X position
- *
- * @param frames - Array of frames with pose data
- * @param ballStartsUpwardFrame - Frame index where ball starts moving upward
- * @param endFrame - Shot end frame index (inclusive)
- * @param config - Detection configuration
- * @returns Frame index of set point, or null if not detectable
- */
 export declare function detectSetPoint(frames: readonly Frame[], ballStartsUpwardFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 /**
  * Detects the "release" frame - the frame of maximum wrist flexion (snap).

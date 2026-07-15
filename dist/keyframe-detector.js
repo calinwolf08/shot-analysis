@@ -240,26 +240,6 @@ function getFrameWristY(frame, visibilityThreshold) {
  * @param visibilityThreshold - Minimum visibility for landmarks to be valid
  * @returns Average wrist Y, or single wrist Y if one is not visible, or null if neither is valid
  */
-function getFrameWristX(frame, visibilityThreshold) {
-    if (!frame.landmarks) {
-        return null;
-    }
-    const landmarks = frame.landmarks;
-    const leftWrist = landmarks[LANDMARK_INDICES.LEFT_WRIST];
-    const rightWrist = landmarks[LANDMARK_INDICES.RIGHT_WRIST];
-    const leftVisible = leftWrist && leftWrist.visibility >= visibilityThreshold;
-    const rightVisible = rightWrist && rightWrist.visibility >= visibilityThreshold;
-    if (leftVisible && rightVisible) {
-        return (leftWrist.x + rightWrist.x) / 2;
-    }
-    else if (leftVisible) {
-        return leftWrist.x;
-    }
-    else if (rightVisible) {
-        return rightWrist.x;
-    }
-    return null;
-}
 /**
  * Gets the elbow angle for the shooting arm in a frame.
  *
@@ -649,7 +629,6 @@ export function detectSetPoint_old(frames, ballStartsUpwardFrame, endFrame, conf
     const shotDuration = endFrame - ballStartsUpwardFrame + 1;
     const searchEndFrame = ballStartsUpwardFrame +
         Math.floor(shotDuration * config.setPointSearchWindow);
-    console.log("detecting set point!!!");
     // Collect wrist Y positions and elbow angles for frames in the search window
     const frameData = [];
     for (const frame of frames) {
@@ -780,28 +759,95 @@ export function detectSetPoint_old(frames, ballStartsUpwardFrame, endFrame, conf
  * @param config - Detection configuration
  * @returns Frame index of set point, or null if not detectable
  */
+/**
+ * Degrees above the deepest elbow flex still counted as "cocked". The set
+ * point is the last frame within this band before the elbow extends to
+ * release. Tuned against the labeled corpus under test-data/.
+ */
+const SET_POINT_EXTENSION_BAND_DEG = 16;
+/** Frame of the highest ball position (min wrist Y) in a series, or null. */
+function argMinWristYFrame(series) {
+    let best = null;
+    for (const s of series) {
+        if (s.wristY === null)
+            continue;
+        if (best === null || s.wristY < best.wristY) {
+            best = { frameIndex: s.frameIndex, wristY: s.wristY };
+        }
+    }
+    return best?.frameIndex ?? null;
+}
 export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config = DEFAULT_CONFIG) {
     const shotDuration = endFrame - ballStartsUpwardFrame + 1;
     const searchEndFrame = ballStartsUpwardFrame +
         Math.floor(shotDuration * config.setPointSearchWindow);
-    // Filter to frames after ball starts upward until end frame and sort by frame index
-    let frameData = frames
-        .filter((a) => a.frameIndex > ballStartsUpwardFrame && a.frameIndex < searchEndFrame)
-        .sort((a, b) => a.frameIndex - b.frameIndex);
-    if (frameData.length === 0) {
+    // The set point is the "cocked" position: the shooting-arm elbow at its
+    // most flexed (minimum angle) just before it starts EXTENDING toward the
+    // release. Extension onset is a more reliable, earlier marker than the
+    // wrist reaching its forward/peak position — some shooters push the ball
+    // up before out, which made a wrist-position marker land late (near
+    // release). So we track the elbow angle and pick the deepest flex.
+    const series = [];
+    for (const frame of frames) {
+        if (frame.frameIndex < ballStartsUpwardFrame ||
+            frame.frameIndex > searchEndFrame) {
+            continue;
+        }
+        series.push({
+            frameIndex: frame.frameIndex,
+            elbow: getFrameElbowAngle(frame, config.visibilityThreshold),
+            wristY: getFrameWristY(frame, config.visibilityThreshold),
+        });
+    }
+    series.sort((a, b) => a.frameIndex - b.frameIndex);
+    if (series.length === 0) {
         return null;
     }
-    let maxWristXFrameIndex = -1;
-    let maxWristX = -1;
-    frameData.forEach(a => {
-        const currentFrameX = getFrameWristX(a, config.visibilityThreshold);
-        if (currentFrameX != null && currentFrameX > maxWristX) {
-            maxWristX = currentFrameX;
-            maxWristXFrameIndex = a.frameIndex;
+    // Primary: minimum smoothed elbow angle = deepest flex = set point.
+    const elbowFrames = series.filter((s) => s.elbow !== null);
+    if (elbowFrames.length >= 3) {
+        const smoothed = movingAverage(elbowFrames.map((s) => s.elbow), config.smoothingWindowSize);
+        // Deepest flex = start of the cocked hold.
+        let minIdx = 0;
+        for (let i = 1; i < smoothed.length; i++) {
+            if (smoothed[i] < smoothed[minIdx]) {
+                minIdx = i;
+            }
         }
-    });
-    console.log("DETECTED KEY FRAME: ", maxWristXFrameIndex);
-    return maxWristXFrameIndex;
+        // The set point is the END of that flexed hold — the last frame the
+        // elbow is still near its deepest flex before it begins extending to
+        // release. Walk forward while the angle stays within the band, but
+        // never past the ball's highest point (min wrist Y): the set is at or
+        // before the ball's peak; anything later is already the release push.
+        const wristPeakFrame = argMinWristYFrame(elbowFrames);
+        const minAngle = smoothed[minIdx];
+        const band = SET_POINT_EXTENSION_BAND_DEG;
+        let spIdx = minIdx;
+        for (let i = minIdx + 1; i < smoothed.length; i++) {
+            if (smoothed[i] <= minAngle + band &&
+                (wristPeakFrame === null ||
+                    elbowFrames[i].frameIndex <= wristPeakFrame)) {
+                spIdx = i;
+            }
+            else {
+                break;
+            }
+        }
+        return elbowFrames[spIdx].frameIndex;
+    }
+    // Fallback (elbow occluded, e.g. behind views): the wrist-height peak
+    // (minimum Y), which the ball reaches around the set position.
+    const wristFrames = series.filter((s) => s.wristY !== null);
+    if (wristFrames.length === 0) {
+        return null;
+    }
+    let peakIdx = 0;
+    for (let i = 1; i < wristFrames.length; i++) {
+        if (wristFrames[i].wristY < wristFrames[peakIdx].wristY) {
+            peakIdx = i;
+        }
+    }
+    return wristFrames[peakIdx].frameIndex;
 }
 /**
  * Detects the "release" frame - the frame of maximum wrist flexion (snap).
