@@ -1,5 +1,13 @@
 # Implementation plan: unify the keyframe algorithm with the phase system
 
+> **Status: implemented.** The runtime now derives the six `ShotPhases`
+> ranges from the keyframe algorithm (`detection/keyframe-phases.ts`), merged
+> over the `phase-detector` fallback and gated behind
+> `ShotDetectorConfig.useKeyframePhases` (default on). Steps 1–5 below are
+> complete; the offline harness holds at 8/12 and the fixture score/diagnosis
+> snapshots were regenerated. The two open items at the bottom remain as
+> follow-ups.
+
 Goal (from the user): the runtime should identify the **same frames as the
 self-labeled data** (`test-data/*/labels.json`) and derive the phases the
 metric calculators need from those keyframes — decoupling the arm timeline
