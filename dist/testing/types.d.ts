@@ -189,12 +189,6 @@ export declare const poseDataSchema: z.ZodObject<{
         }[] | null;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
-    video: string;
-    fps: number;
-    totalFrames: number;
-    width: number;
-    height: number;
-    extractedAt: string;
     frames: {
         frameIndex: number;
         timestamp: number;
@@ -206,13 +200,13 @@ export declare const poseDataSchema: z.ZodObject<{
             visibility: number;
         }[] | null;
     }[];
+    video: string;
+    fps: number;
+    totalFrames: number;
+    width: number;
+    height: number;
+    extractedAt: string;
 }, {
-    video: string;
-    fps: number;
-    totalFrames: number;
-    width: number;
-    height: number;
-    extractedAt: string;
     frames: {
         frameIndex: number;
         timestamp: number;
@@ -224,6 +218,12 @@ export declare const poseDataSchema: z.ZodObject<{
             visibility: number;
         }[] | null;
     }[];
+    video: string;
+    fps: number;
+    totalFrames: number;
+    width: number;
+    height: number;
+    extractedAt: string;
 }>;
 /**
  * Identifiers for each keyframe in a basketball shot.
@@ -402,6 +402,8 @@ export declare const labelDataSchema: z.ZodObject<{
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     video: string;
+    labeledBy: string;
+    labeledAt: string;
     shots: {
         shotNumber: number;
         startFrame: number;
@@ -418,10 +420,10 @@ export declare const labelDataSchema: z.ZodObject<{
         feet_leave_ground?: number | null | undefined;
         feet_land?: number | null | undefined;
     }[];
-    labeledBy: string;
-    labeledAt: string;
 }, {
     video: string;
+    labeledBy: string;
+    labeledAt: string;
     shots: {
         shotNumber: number;
         startFrame: number;
@@ -438,8 +440,6 @@ export declare const labelDataSchema: z.ZodObject<{
         feet_leave_ground?: number | null | undefined;
         feet_land?: number | null | undefined;
     }[];
-    labeledBy: string;
-    labeledAt: string;
 }>;
 /**
  * Result of comparing a single keyframe between detected and labeled values.

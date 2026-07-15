@@ -9023,6 +9023,24 @@ var ShotAnalysis = (() => {
     RIGHT_FOOT_INDEX: 32
   };
   var TOTAL_LANDMARKS2 = 33;
+  function createEmptyLandmark() {
+    return {
+      x: 0,
+      y: 0,
+      z: 0,
+      visibility: 0,
+      confidence: 0
+    };
+  }
+  function createEmptyPoseLandmarks() {
+    return {
+      landmarks: Array.from(
+        { length: TOTAL_LANDMARKS2 },
+        () => createEmptyLandmark()
+      ),
+      poseConfidence: 0
+    };
+  }
 
   // src/pose/mediapipe-node.ts
   var MEDIAPIPE_MODEL_BASE_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker";
@@ -15094,6 +15112,58 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         fps,
         totalFrames
       };
+      return this.analyzePoseSequence(
+        allPoseLandmarks,
+        allMetricsLandmarks,
+        videoMetadata
+      );
+    }
+    /**
+     * Runs analysis on an already-extracted pose sequence, skipping MediaPipe
+     * pose detection entirely. This is the fast path for the validator/harness:
+     * given a `poses.json`-style frame list, it runs shot detection, phase
+     * detection and metric extraction and returns the same `AnalysisResult` as
+     * {@link analyzeVideo}.
+     *
+     * Does **not** require {@link initialize} — no pose model is loaded, since
+     * the poses are supplied. Frame ordering is by array position (dense pose
+     * data, one entry per frame, as `poses.json` provides); each frame's own
+     * `frameIndex`/`timestamp` is used for metric timing when present.
+     *
+     * @param frames - Pre-extracted poses (e.g. `poses.json` `frames`)
+     * @param videoMetadata - Video dimensions/fps/frame count for the clip
+     * @returns Analysis result with per-shot phases and metrics
+     */
+    analyzePoses(frames, videoMetadata) {
+      const fps = videoMetadata.fps || 30;
+      const allPoseLandmarks = [];
+      const allMetricsLandmarks = [];
+      frames.forEach((frame, i2) => {
+        const hasPose = frame != null && Array.isArray(frame.landmarks) && frame.landmarks.length > 0;
+        const pose = hasPose ? {
+          landmarks: frame.landmarks,
+          poseConfidence: frame.poseConfidence ?? 0
+        } : createEmptyPoseLandmarks();
+        allPoseLandmarks.push(pose);
+        const frameIndex = (frame == null ? void 0 : frame.frameIndex) ?? i2;
+        const timestamp = (frame == null ? void 0 : frame.timestamp) ?? i2 / fps * 1e3;
+        allMetricsLandmarks.push(
+          convertToMetricsPoseLandmarks(pose, frameIndex, timestamp)
+        );
+      });
+      return this.analyzePoseSequence(
+        allPoseLandmarks,
+        allMetricsLandmarks,
+        videoMetadata
+      );
+    }
+    /**
+     * Shared post-extraction pipeline: shot boundary + phase detection, then
+     * metric extraction and orientation per shot. Used by both
+     * {@link analyzeVideo} (poses from MediaPipe) and {@link analyzePoses}
+     * (poses supplied directly).
+     */
+    analyzePoseSequence(allPoseLandmarks, allMetricsLandmarks, videoMetadata) {
       if (allPoseLandmarks.length < 2) {
         return {
           shots: [],
@@ -15105,7 +15175,9 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       console.log(
         `[Analyzer] Running shot detection on ${allPoseLandmarks.length} pose frames...`
       );
-      const detectedShots = this.shotDetector.processFrames(allPoseLandmarks);
+      const detectedShots = this.shotDetector.processFrames([
+        ...allPoseLandmarks
+      ]);
       console.log(
         `[Analyzer] Shot detection complete, found ${detectedShots.length} shots`
       );
