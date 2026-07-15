@@ -837,8 +837,25 @@ export function detectKeyframesForShot(
   startFrame: number,
   endFrame: number,
 ): Map<KeyframeId, number | null> {
+  return detectKeyframesFromFrames(poseData.frames, startFrame, endFrame);
+}
+
+/**
+ * Frame-based keyframe orchestration (no PoseData coupling), so the same
+ * chained detection the harness scores against labels can also run in the
+ * runtime pipeline (via a PoseLandmarks→Frame adapter).
+ *
+ * @param frames - Pose frames for the whole clip
+ * @param startFrame - Shot start frame index (inclusive)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @returns Map of keyframe IDs to detected frame numbers (or null)
+ */
+export function detectKeyframesFromFrames(
+  frames: readonly Frame[],
+  startFrame: number,
+  endFrame: number,
+): Map<KeyframeId, number | null> {
   const keyframeDetector = createKeyframeDetector();
-  const frames = poseData.frames;
   const detectedKeyframes = new Map<KeyframeId, number | null>();
 
   // Phase 1: Load phase keyframes

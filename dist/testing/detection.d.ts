@@ -182,6 +182,17 @@ export declare function runDetection(poseData: PoseData): DetectionResult;
  */
 export declare function detectKeyframesForShot(poseData: PoseData, startFrame: number, endFrame: number): Map<KeyframeId, number | null>;
 /**
+ * Frame-based keyframe orchestration (no PoseData coupling), so the same
+ * chained detection the harness scores against labels can also run in the
+ * runtime pipeline (via a PoseLandmarks→Frame adapter).
+ *
+ * @param frames - Pose frames for the whole clip
+ * @param startFrame - Shot start frame index (inclusive)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @returns Map of keyframe IDs to detected frame numbers (or null)
+ */
+export declare function detectKeyframesFromFrames(frames: readonly Frame[], startFrame: number, endFrame: number): Map<KeyframeId, number | null>;
+/**
  * Compares all keyframes for a labeled shot.
  *
  * Edge cases handled:
