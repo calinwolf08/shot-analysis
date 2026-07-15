@@ -10960,121 +10960,168 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     });
     return result;
   }
-  var SET_POINT_EXTENSION_BAND_DEG = 16;
-  function argMinWristYFrame(series) {
-    let best = null;
-    for (const s2 of series) {
-      if (s2.wristY === null) continue;
-      if (best === null || s2.wristY < best.wristY) {
-        best = { frameIndex: s2.frameIndex, wristY: s2.wristY };
-      }
-    }
-    return (best == null ? void 0 : best.frameIndex) ?? null;
-  }
+  var SET_POINT_FLEX_MAX_DEG = 140;
+  var SET_POINT_MIN_DEPTH_DEG = 125;
+  var SET_POINT_MIN_DIP_DEG = 15;
   function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config = DEFAULT_CONFIG4) {
     const shotDuration = endFrame - ballStartsUpwardFrame + 1;
     const searchEndFrame = ballStartsUpwardFrame + Math.floor(shotDuration * config.setPointSearchWindow);
-    const series = [];
+    const buildArm = (key) => {
+      const raw = [];
+      for (const frame of frames) {
+        if (frame.frameIndex < ballStartsUpwardFrame || frame.frameIndex > searchEndFrame) {
+          continue;
+        }
+        const a2 = getFrameElbowAnglesPerArm(
+          frame,
+          config.visibilityThreshold
+        )[key];
+        if (a2 != null) raw.push({ frameIndex: frame.frameIndex, angle: a2 });
+      }
+      raw.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
+      const sm = movingAverage(
+        raw.map((p2) => p2.angle),
+        config.smoothingWindowSize
+      );
+      return raw.map((p2, i2) => ({
+        frameIndex: p2.frameIndex,
+        raw: p2.angle,
+        smooth: sm[i2]
+      }));
+    };
+    const arms = {
+      left: buildArm("left"),
+      right: buildArm("right")
+    };
+    const flexRun = (pts) => {
+      let best = 0;
+      let cur = 0;
+      for (const p2 of pts) {
+        if (p2.raw < SET_POINT_FLEX_MAX_DEG) {
+          cur++;
+          best = Math.max(best, cur);
+        } else cur = 0;
+      }
+      return best;
+    };
+    const minRaw = (pts) => pts.reduce((m2, p2) => Math.min(m2, p2.raw), Infinity);
+    const jitter = (pts) => {
+      if (pts.length < 3) return Infinity;
+      let sum = 0;
+      let n2 = 0;
+      for (let i2 = 1; i2 < pts.length - 1; i2++) {
+        sum += Math.abs(
+          pts[i2 + 1].smooth - 2 * pts[i2].smooth + pts[i2 - 1].smooth
+        );
+        n2++;
+      }
+      return n2 === 0 ? Infinity : sum / n2;
+    };
+    const firstSignificantMin = (pts) => {
+      var _a2, _b;
+      if (pts.length < 3) return null;
+      let runningMax = -Infinity;
+      for (let i2 = 0; i2 < pts.length; i2++) {
+        runningMax = Math.max(runningMax, pts[i2].smooth);
+        const prev = ((_a2 = pts[i2 - 1]) == null ? void 0 : _a2.smooth) ?? Infinity;
+        const next = ((_b = pts[i2 + 1]) == null ? void 0 : _b.smooth) ?? Infinity;
+        const isLocalMin = pts[i2].smooth <= prev && pts[i2].smooth < next;
+        if (isLocalMin && pts[i2].smooth < SET_POINT_FLEX_MAX_DEG && runningMax - pts[i2].smooth >= SET_POINT_MIN_DIP_DEG) {
+          return pts[i2];
+        }
+      }
+      return null;
+    };
+    const globalMin = (pts) => {
+      let best = null;
+      for (const p2 of pts) if (best === null || p2.smooth < best.smooth) best = p2;
+      return best;
+    };
+    const candidates = ["left", "right"].filter(
+      (k2) => minRaw(arms[k2]) < SET_POINT_MIN_DEPTH_DEG && flexRun(arms[k2]) >= 3
+    );
+    const withSig = candidates.map((k2) => ({ k: k2, sig: firstSignificantMin(arms[k2]) })).filter((c2) => c2.sig !== null);
+    let shootingKey = null;
+    let chosen = null;
+    let how = "";
+    if (withSig.length === 1) {
+      shootingKey = withSig[0].k;
+      chosen = withSig[0].sig;
+      how = "first significant flex";
+    } else if (withSig.length === 2) {
+      const best = jitter(arms.left) <= jitter(arms.right) ? withSig.find((c2) => c2.k === "left") : withSig.find((c2) => c2.k === "right");
+      shootingKey = best.k;
+      chosen = best.sig;
+      how = "first significant flex (smoother arm)";
+    } else if (candidates.length > 0) {
+      shootingKey = candidates.length === 1 ? candidates[0] : minRaw(arms.left) <= minRaw(arms.right) ? "left" : "right";
+      chosen = globalMin(arms[shootingKey]);
+      how = "deepest flex (no significant local min)";
+    }
+    if (shootingKey && chosen) {
+      emitDiagnostic({
+        keyframe: "set_point",
+        frame: chosen.frameIndex,
+        method: `shooting-${shootingKey}-elbow`,
+        detail: `shooting arm=${shootingKey} (flex-run L ${flexRun(arms.left)} / R ${flexRun(arms.right)}, min L ${minRaw(arms.left) === Infinity ? "n/a" : minRaw(arms.left).toFixed(0) + "\xB0"} / R ${minRaw(arms.right) === Infinity ? "n/a" : minRaw(arms.right).toFixed(0) + "\xB0"}, jitter L ${jitter(arms.left).toFixed(1)} / R ${jitter(arms.right).toFixed(1)}). ${how} (${chosen.smooth.toFixed(0)}\xB0) @${chosen.frameIndex}; window ${ballStartsUpwardFrame}-${searchEndFrame}`
+      });
+      return chosen.frameIndex;
+    }
+    const avg = [];
+    {
+      const raw = [];
+      for (const frame of frames) {
+        if (frame.frameIndex < ballStartsUpwardFrame || frame.frameIndex > searchEndFrame) {
+          continue;
+        }
+        const a2 = getFrameElbowAngle(frame, config.visibilityThreshold);
+        if (a2 != null) raw.push({ frameIndex: frame.frameIndex, angle: a2 });
+      }
+      raw.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
+      const sm = movingAverage(
+        raw.map((p2) => p2.angle),
+        config.smoothingWindowSize
+      );
+      raw.forEach(
+        (p2, i2) => avg.push({ frameIndex: p2.frameIndex, raw: p2.angle, smooth: sm[i2] })
+      );
+    }
+    const avgSig = firstSignificantMin(avg);
+    if (avgSig) {
+      emitDiagnostic({
+        keyframe: "set_point",
+        frame: avgSig.frameIndex,
+        method: "avg-elbow-first-flex",
+        detail: `no single arm clearly cocked; averaged elbow first significant flex (${avgSig.smooth.toFixed(0)}\xB0) @${avgSig.frameIndex}, window ${ballStartsUpwardFrame}-${searchEndFrame}`
+      });
+      return avgSig.frameIndex;
+    }
+    let peak = null;
     for (const frame of frames) {
       if (frame.frameIndex < ballStartsUpwardFrame || frame.frameIndex > searchEndFrame) {
         continue;
       }
-      const perArm = getFrameElbowAnglesPerArm(
-        frame,
-        config.visibilityThreshold
-      );
-      series.push({
-        frameIndex: frame.frameIndex,
-        elbow: getFrameElbowAngle(frame, config.visibilityThreshold),
-        left: perArm.left,
-        right: perArm.right,
-        wristY: getFrameWristY(frame, config.visibilityThreshold)
-      });
+      const wy = getFrameWristY(frame, config.visibilityThreshold);
+      if (wy == null) continue;
+      if (peak === null || wy < peak.wristY)
+        peak = { frameIndex: frame.frameIndex, wristY: wy };
     }
-    series.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
-    if (series.length === 0) {
+    if (peak === null) {
       emitDiagnostic({
         keyframe: "set_point",
         frame: null,
         method: "none",
-        detail: `no frames in search window ${ballStartsUpwardFrame}-${searchEndFrame}`
+        detail: `no elbow or wrist data in window ${ballStartsUpwardFrame}-${searchEndFrame}`
       });
       return null;
     }
-    const minFrameOf = (key) => {
-      let best = null;
-      for (const s2 of series) {
-        const v2 = s2[key];
-        if (v2 == null) continue;
-        if (best === null || v2 < best.angle)
-          best = { frame: s2.frameIndex, angle: v2 };
-      }
-      return best;
-    };
-    const leftMin = minFrameOf("left");
-    const rightMin = minFrameOf("right");
-    const elbowFrames = series.filter(
-      (s2) => s2.elbow !== null
-    );
-    if (elbowFrames.length >= 3) {
-      const smoothed = movingAverage(
-        elbowFrames.map((s2) => s2.elbow),
-        config.smoothingWindowSize
-      );
-      let minIdx = 0;
-      for (let i2 = 1; i2 < smoothed.length; i2++) {
-        if (smoothed[i2] < smoothed[minIdx]) {
-          minIdx = i2;
-        }
-      }
-      const wristPeakFrame = argMinWristYFrame(elbowFrames);
-      const minAngle = smoothed[minIdx];
-      const band = SET_POINT_EXTENSION_BAND_DEG;
-      let spIdx = minIdx;
-      for (let i2 = minIdx + 1; i2 < smoothed.length; i2++) {
-        if (smoothed[i2] <= minAngle + band && (wristPeakFrame === null || elbowFrames[i2].frameIndex <= wristPeakFrame)) {
-          spIdx = i2;
-        } else {
-          break;
-        }
-      }
-      const minFrame = elbowFrames[minIdx].frameIndex;
-      const result2 = elbowFrames[spIdx].frameIndex;
-      const cappedByWrist = wristPeakFrame !== null && result2 === wristPeakFrame;
-      emitDiagnostic({
-        keyframe: "set_point",
-        frame: result2,
-        method: "elbow-extension",
-        detail: `avg-elbow min ${minAngle.toFixed(0)}\xB0 @${minFrame}, walked to end of ${band}\xB0 band \u2192 @${result2}` + (cappedByWrist ? ` (capped at ball peak @${wristPeakFrame})` : "") + `; per-arm min: L ${leftMin ? `${leftMin.angle.toFixed(0)}\xB0@${leftMin.frame}` : "n/a"}, R ${rightMin ? `${rightMin.angle.toFixed(0)}\xB0@${rightMin.frame}` : "n/a"}; ballPeak(minWristY)@${wristPeakFrame ?? "n/a"}; elbow-visible ${elbowFrames.length}/${series.length} frames`
-      });
-      return result2;
-    }
-    const wristFrames = series.filter(
-      (s2) => s2.wristY !== null
-    );
-    if (wristFrames.length === 0) {
-      emitDiagnostic({
-        keyframe: "set_point",
-        frame: null,
-        method: "none",
-        detail: `elbow-visible only ${elbowFrames.length} (<3) and no wrist Y in window`
-      });
-      return null;
-    }
-    let peakIdx = 0;
-    for (let i2 = 1; i2 < wristFrames.length; i2++) {
-      if (wristFrames[i2].wristY < wristFrames[peakIdx].wristY) {
-        peakIdx = i2;
-      }
-    }
-    const result = wristFrames[peakIdx].frameIndex;
     emitDiagnostic({
       keyframe: "set_point",
-      frame: result,
+      frame: peak.frameIndex,
       method: "wristY-peak-fallback",
-      detail: `elbow-visible only ${elbowFrames.length} (<3) \u2192 fell back to ball height peak (min wrist Y) @${result}. NOTE: fallback runs ~3-4 frames late. per-arm min: L ${leftMin ? `@${leftMin.frame}` : "n/a"}, R ${rightMin ? `@${rightMin.frame}` : "n/a"}`
+      detail: `no elbow signal; fell back to ball-height peak (min wrist Y) @${peak.frameIndex} (runs ~3-4 frames late)`
     });
-    return result;
+    return peak.frameIndex;
   }
   function detectRelease(frames, setPointFrame, endFrame, config = DEFAULT_CONFIG4) {
     const searchStartFrame = setPointFrame + 1;

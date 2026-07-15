@@ -829,143 +829,208 @@ export function detectSetPoint_old(frames, ballStartsUpwardFrame, endFrame, conf
  * point is the last frame within this band before the elbow extends to
  * release. Tuned against the labeled corpus under test-data/.
  */
-const SET_POINT_EXTENSION_BAND_DEG = 16;
-/** Frame of the highest ball position (min wrist Y) in a series, or null. */
-function argMinWristYFrame(series) {
-    let best = null;
-    for (const s of series) {
-        if (s.wristY === null)
-            continue;
-        if (best === null || s.wristY < best.wristY) {
-            best = { frameIndex: s.frameIndex, wristY: s.wristY };
-        }
-    }
-    return best?.frameIndex ?? null;
-}
+// Set-point (v2) tuning. The set point is the shooting-arm elbow's first
+// significant flex (the cocked position) — not the deepest flex, which for
+// shooters who hold the set lands several frames late, near the release push.
+/** Elbow angle (deg) below which an arm is considered "flexed"/cocked. */
+const SET_POINT_FLEX_MAX_DEG = 140;
+/** An arm must flex below this to be a shooting-arm candidate (vs a straight/guide arm). */
+const SET_POINT_MIN_DEPTH_DEG = 125;
+/** A local minimum must sit at least this far below the preceding running max to count (rejects shallow noise dips and the shot's starting flex). */
+const SET_POINT_MIN_DIP_DEG = 15;
 export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config = DEFAULT_CONFIG) {
     const shotDuration = endFrame - ballStartsUpwardFrame + 1;
     const searchEndFrame = ballStartsUpwardFrame +
         Math.floor(shotDuration * config.setPointSearchWindow);
-    // The set point is the "cocked" position: the shooting-arm elbow at its
-    // most flexed (minimum angle) just before it starts EXTENDING toward the
-    // release. Extension onset is a more reliable, earlier marker than the
-    // wrist reaching its forward/peak position — some shooters push the ball
-    // up before out, which made a wrist-position marker land late (near
-    // release). So we track the elbow angle and pick the deepest flex.
-    const series = [];
+    // Build a per-arm elbow series (raw + smoothed) over the search window.
+    const buildArm = (key) => {
+        const raw = [];
+        for (const frame of frames) {
+            if (frame.frameIndex < ballStartsUpwardFrame ||
+                frame.frameIndex > searchEndFrame) {
+                continue;
+            }
+            const a = getFrameElbowAnglesPerArm(frame, config.visibilityThreshold)[key];
+            if (a != null)
+                raw.push({ frameIndex: frame.frameIndex, angle: a });
+        }
+        raw.sort((a, b) => a.frameIndex - b.frameIndex);
+        const sm = movingAverage(raw.map((p) => p.angle), config.smoothingWindowSize);
+        return raw.map((p, i) => ({
+            frameIndex: p.frameIndex,
+            raw: p.angle,
+            smooth: sm[i],
+        }));
+    };
+    const arms = {
+        left: buildArm("left"),
+        right: buildArm("right"),
+    };
+    // Longest contiguous run of flexed frames (raw) — identifies the arm that
+    // stays cocked (the shooting arm) vs a straight/erratic guide arm.
+    const flexRun = (pts) => {
+        let best = 0;
+        let cur = 0;
+        for (const p of pts) {
+            if (p.raw < SET_POINT_FLEX_MAX_DEG) {
+                cur++;
+                best = Math.max(best, cur);
+            }
+            else
+                cur = 0;
+        }
+        return best;
+    };
+    const minRaw = (pts) => pts.reduce((m, p) => Math.min(m, p.raw), Infinity);
+    // Jitter: mean |second difference| of the smoothed series. The shooting
+    // arm flexes and extends smoothly; the guide arm is erratic/occluded (it
+    // comes off the ball and passes behind the body), so it jitters more.
+    const jitter = (pts) => {
+        if (pts.length < 3)
+            return Infinity;
+        let sum = 0;
+        let n = 0;
+        for (let i = 1; i < pts.length - 1; i++) {
+            sum += Math.abs(pts[i + 1].smooth - 2 * pts[i].smooth + pts[i - 1].smooth);
+            n++;
+        }
+        return n === 0 ? Infinity : sum / n;
+    };
+    // First significant local minimum of a smoothed series: a local min that
+    // sits >= MIN_DIP below the preceding running max (so the arm extended
+    // then flexed into it) and is itself flexed. Rejects shallow noise and the
+    // shot's initial flex.
+    const firstSignificantMin = (pts) => {
+        if (pts.length < 3)
+            return null;
+        let runningMax = -Infinity;
+        for (let i = 0; i < pts.length; i++) {
+            runningMax = Math.max(runningMax, pts[i].smooth);
+            const prev = pts[i - 1]?.smooth ?? Infinity;
+            const next = pts[i + 1]?.smooth ?? Infinity;
+            const isLocalMin = pts[i].smooth <= prev && pts[i].smooth < next;
+            if (isLocalMin &&
+                pts[i].smooth < SET_POINT_FLEX_MAX_DEG &&
+                runningMax - pts[i].smooth >= SET_POINT_MIN_DIP_DEG) {
+                return pts[i];
+            }
+        }
+        return null;
+    };
+    const globalMin = (pts) => {
+        let best = null;
+        for (const p of pts)
+            if (best === null || p.smooth < best.smooth)
+                best = p;
+        return best;
+    };
+    // Choose the shooting arm. Candidate arms actually flex (below MIN_DEPTH)
+    // and stay cocked for a few frames. The shooting arm shows a clear
+    // flex-then-extend signature (a first-significant-min); the guide arm
+    // often barely flexes or is erratic. So prefer the arm that HAS a
+    // significant flex; if both do, the smoother (less occluded) one wins.
+    const candidates = ["left", "right"].filter((k) => minRaw(arms[k]) < SET_POINT_MIN_DEPTH_DEG && flexRun(arms[k]) >= 3);
+    const withSig = candidates
+        .map((k) => ({ k, sig: firstSignificantMin(arms[k]) }))
+        .filter((c) => c.sig !== null);
+    let shootingKey = null;
+    let chosen = null;
+    let how = "";
+    if (withSig.length === 1) {
+        shootingKey = withSig[0].k;
+        chosen = withSig[0].sig;
+        how = "first significant flex";
+    }
+    else if (withSig.length === 2) {
+        const best = jitter(arms.left) <= jitter(arms.right)
+            ? withSig.find((c) => c.k === "left")
+            : withSig.find((c) => c.k === "right");
+        shootingKey = best.k;
+        chosen = best.sig;
+        how = "first significant flex (smoother arm)";
+    }
+    else if (candidates.length > 0) {
+        // No clear flex-then-extend on either arm; use the arm that flexes
+        // deepest and take its deepest flex.
+        shootingKey =
+            candidates.length === 1
+                ? candidates[0]
+                : minRaw(arms.left) <= minRaw(arms.right)
+                    ? "left"
+                    : "right";
+        chosen = globalMin(arms[shootingKey]);
+        how = "deepest flex (no significant local min)";
+    }
+    if (shootingKey && chosen) {
+        emitDiagnostic({
+            keyframe: "set_point",
+            frame: chosen.frameIndex,
+            method: `shooting-${shootingKey}-elbow`,
+            detail: `shooting arm=${shootingKey} (flex-run L ${flexRun(arms.left)} / R ${flexRun(arms.right)}, ` +
+                `min L ${minRaw(arms.left) === Infinity ? "n/a" : minRaw(arms.left).toFixed(0) + "°"} / ` +
+                `R ${minRaw(arms.right) === Infinity ? "n/a" : minRaw(arms.right).toFixed(0) + "°"}, ` +
+                `jitter L ${jitter(arms.left).toFixed(1)} / R ${jitter(arms.right).toFixed(1)}). ` +
+                `${how} (${chosen.smooth.toFixed(0)}°) @${chosen.frameIndex}; window ${ballStartsUpwardFrame}-${searchEndFrame}`,
+        });
+        return chosen.frameIndex;
+    }
+    // Both arms occluded (e.g. straight-behind view): use the averaged elbow's
+    // first significant flex if available, else the ball-height peak.
+    const avg = [];
+    {
+        const raw = [];
+        for (const frame of frames) {
+            if (frame.frameIndex < ballStartsUpwardFrame ||
+                frame.frameIndex > searchEndFrame) {
+                continue;
+            }
+            const a = getFrameElbowAngle(frame, config.visibilityThreshold);
+            if (a != null)
+                raw.push({ frameIndex: frame.frameIndex, angle: a });
+        }
+        raw.sort((a, b) => a.frameIndex - b.frameIndex);
+        const sm = movingAverage(raw.map((p) => p.angle), config.smoothingWindowSize);
+        raw.forEach((p, i) => avg.push({ frameIndex: p.frameIndex, raw: p.angle, smooth: sm[i] }));
+    }
+    const avgSig = firstSignificantMin(avg);
+    if (avgSig) {
+        emitDiagnostic({
+            keyframe: "set_point",
+            frame: avgSig.frameIndex,
+            method: "avg-elbow-first-flex",
+            detail: `no single arm clearly cocked; averaged elbow first significant flex (${avgSig.smooth.toFixed(0)}°) @${avgSig.frameIndex}, window ${ballStartsUpwardFrame}-${searchEndFrame}`,
+        });
+        return avgSig.frameIndex;
+    }
+    // Last resort: ball-height peak (min wrist Y). Runs a few frames late.
+    let peak = null;
     for (const frame of frames) {
         if (frame.frameIndex < ballStartsUpwardFrame ||
             frame.frameIndex > searchEndFrame) {
             continue;
         }
-        const perArm = getFrameElbowAnglesPerArm(frame, config.visibilityThreshold);
-        series.push({
-            frameIndex: frame.frameIndex,
-            elbow: getFrameElbowAngle(frame, config.visibilityThreshold),
-            left: perArm.left,
-            right: perArm.right,
-            wristY: getFrameWristY(frame, config.visibilityThreshold),
-        });
+        const wy = getFrameWristY(frame, config.visibilityThreshold);
+        if (wy == null)
+            continue;
+        if (peak === null || wy < peak.wristY)
+            peak = { frameIndex: frame.frameIndex, wristY: wy };
     }
-    series.sort((a, b) => a.frameIndex - b.frameIndex);
-    if (series.length === 0) {
+    if (peak === null) {
         emitDiagnostic({
             keyframe: "set_point",
             frame: null,
             method: "none",
-            detail: `no frames in search window ${ballStartsUpwardFrame}-${searchEndFrame}`,
+            detail: `no elbow or wrist data in window ${ballStartsUpwardFrame}-${searchEndFrame}`,
         });
         return null;
     }
-    // Report where each arm reaches its deepest flex (minimum angle) so an
-    // occluded/averaged shooting arm is obvious in the logs.
-    const minFrameOf = (key) => {
-        let best = null;
-        for (const s of series) {
-            const v = s[key];
-            if (v == null)
-                continue;
-            if (best === null || v < best.angle)
-                best = { frame: s.frameIndex, angle: v };
-        }
-        return best;
-    };
-    const leftMin = minFrameOf("left");
-    const rightMin = minFrameOf("right");
-    // Primary: minimum smoothed elbow angle = deepest flex = set point.
-    const elbowFrames = series.filter((s) => s.elbow !== null);
-    if (elbowFrames.length >= 3) {
-        const smoothed = movingAverage(elbowFrames.map((s) => s.elbow), config.smoothingWindowSize);
-        // Deepest flex = start of the cocked hold.
-        let minIdx = 0;
-        for (let i = 1; i < smoothed.length; i++) {
-            if (smoothed[i] < smoothed[minIdx]) {
-                minIdx = i;
-            }
-        }
-        // The set point is the END of that flexed hold — the last frame the
-        // elbow is still near its deepest flex before it begins extending to
-        // release. Walk forward while the angle stays within the band, but
-        // never past the ball's highest point (min wrist Y): the set is at or
-        // before the ball's peak; anything later is already the release push.
-        const wristPeakFrame = argMinWristYFrame(elbowFrames);
-        const minAngle = smoothed[minIdx];
-        const band = SET_POINT_EXTENSION_BAND_DEG;
-        let spIdx = minIdx;
-        for (let i = minIdx + 1; i < smoothed.length; i++) {
-            if (smoothed[i] <= minAngle + band &&
-                (wristPeakFrame === null ||
-                    elbowFrames[i].frameIndex <= wristPeakFrame)) {
-                spIdx = i;
-            }
-            else {
-                break;
-            }
-        }
-        const minFrame = elbowFrames[minIdx].frameIndex;
-        const result = elbowFrames[spIdx].frameIndex;
-        const cappedByWrist = wristPeakFrame !== null && result === wristPeakFrame;
-        emitDiagnostic({
-            keyframe: "set_point",
-            frame: result,
-            method: "elbow-extension",
-            detail: `avg-elbow min ${minAngle.toFixed(0)}° @${minFrame}, ` +
-                `walked to end of ${band}° band → @${result}` +
-                (cappedByWrist ? ` (capped at ball peak @${wristPeakFrame})` : "") +
-                `; per-arm min: L ${leftMin ? `${leftMin.angle.toFixed(0)}°@${leftMin.frame}` : "n/a"}, ` +
-                `R ${rightMin ? `${rightMin.angle.toFixed(0)}°@${rightMin.frame}` : "n/a"}; ` +
-                `ballPeak(minWristY)@${wristPeakFrame ?? "n/a"}; ` +
-                `elbow-visible ${elbowFrames.length}/${series.length} frames`,
-        });
-        return result;
-    }
-    // Fallback (elbow occluded, e.g. behind views): the wrist-height peak
-    // (minimum Y), which the ball reaches around the set position.
-    const wristFrames = series.filter((s) => s.wristY !== null);
-    if (wristFrames.length === 0) {
-        emitDiagnostic({
-            keyframe: "set_point",
-            frame: null,
-            method: "none",
-            detail: `elbow-visible only ${elbowFrames.length} (<3) and no wrist Y in window`,
-        });
-        return null;
-    }
-    let peakIdx = 0;
-    for (let i = 1; i < wristFrames.length; i++) {
-        if (wristFrames[i].wristY < wristFrames[peakIdx].wristY) {
-            peakIdx = i;
-        }
-    }
-    const result = wristFrames[peakIdx].frameIndex;
     emitDiagnostic({
         keyframe: "set_point",
-        frame: result,
+        frame: peak.frameIndex,
         method: "wristY-peak-fallback",
-        detail: `elbow-visible only ${elbowFrames.length} (<3) → fell back to ball height peak (min wrist Y) @${result}. ` +
-            `NOTE: fallback runs ~3-4 frames late. per-arm min: L ${leftMin ? `@${leftMin.frame}` : "n/a"}, R ${rightMin ? `@${rightMin.frame}` : "n/a"}`,
+        detail: `no elbow signal; fell back to ball-height peak (min wrist Y) @${peak.frameIndex} (runs ~3-4 frames late)`,
     });
-    return result;
+    return peak.frameIndex;
 }
 /**
  * Detects the "release" frame - the frame of maximum wrist flexion (snap).
