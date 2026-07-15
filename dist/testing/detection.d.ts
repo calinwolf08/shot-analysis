@@ -11,6 +11,7 @@
  * @see Task 9.2 - Detection Execution & Comparison
  */
 import type { PoseLandmarks } from "../pose/types";
+import { detectKeyframesFromFrames } from "../detection/keyframe-phases";
 import type { PoseData, LabelData, LabeledShot, Orientation, Frame, KeyframeId, KeyframeComparisonResult } from "./types";
 /**
  * A detected shot from the algorithm.
@@ -181,17 +182,7 @@ export declare function runDetection(poseData: PoseData): DetectionResult;
  * @returns Map of keyframe IDs to detected frame numbers (or null if not detected)
  */
 export declare function detectKeyframesForShot(poseData: PoseData, startFrame: number, endFrame: number): Map<KeyframeId, number | null>;
-/**
- * Frame-based keyframe orchestration (no PoseData coupling), so the same
- * chained detection the harness scores against labels can also run in the
- * runtime pipeline (via a PoseLandmarks→Frame adapter).
- *
- * @param frames - Pose frames for the whole clip
- * @param startFrame - Shot start frame index (inclusive)
- * @param endFrame - Shot end frame index (inclusive)
- * @returns Map of keyframe IDs to detected frame numbers (or null)
- */
-export declare function detectKeyframesFromFrames(frames: readonly Frame[], startFrame: number, endFrame: number): Map<KeyframeId, number | null>;
+export { detectKeyframesFromFrames };
 /**
  * Compares all keyframes for a labeled shot.
  *

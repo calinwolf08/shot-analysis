@@ -4,7 +4,7 @@ exports[`DiagnosisService > persists ranked focus areas and replaces on re-diagn
 [
   {
     "group": "alignment",
-    "severity": 0.989,
+    "severity": 0.963,
     "surfaced": true,
   },
   {
@@ -14,27 +14,27 @@ exports[`DiagnosisService > persists ranked focus areas and replaces on re-diagn
   },
   {
     "group": "release-follow-through",
-    "severity": 0.858,
+    "severity": 0.874,
     "surfaced": true,
   },
   {
     "group": "lower-body",
-    "severity": 0.697,
+    "severity": 0.707,
     "surfaced": false,
   },
   {
     "group": "guide-hand",
-    "severity": 0.687,
+    "severity": 0.705,
     "surfaced": false,
   },
   {
     "group": "rhythm",
-    "severity": 0.558,
+    "severity": 0.524,
     "surfaced": false,
   },
   {
     "group": "ball-path",
-    "severity": 0.493,
+    "severity": 0.511,
     "surfaced": false,
   },
 ]

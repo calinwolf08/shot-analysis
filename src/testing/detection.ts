@@ -15,7 +15,7 @@ import type { PoseLandmarks, Landmark } from "../pose/types";
 import { LANDMARK_INDEX } from "../pose/types";
 import { LANDMARK_INDICES } from "../types";
 import { createShotBoundaryDetector } from "../detection/shot-detector";
-import { createKeyframeDetector } from "../keyframe-detector";
+import { detectKeyframesFromFrames } from "../detection/keyframe-phases";
 import type {
   PoseData,
   LabelData,
@@ -840,117 +840,11 @@ export function detectKeyframesForShot(
   return detectKeyframesFromFrames(poseData.frames, startFrame, endFrame);
 }
 
-/**
- * Frame-based keyframe orchestration (no PoseData coupling), so the same
- * chained detection the harness scores against labels can also run in the
- * runtime pipeline (via a PoseLandmarks→Frame adapter).
- *
- * @param frames - Pose frames for the whole clip
- * @param startFrame - Shot start frame index (inclusive)
- * @param endFrame - Shot end frame index (inclusive)
- * @returns Map of keyframe IDs to detected frame numbers (or null)
- */
-export function detectKeyframesFromFrames(
-  frames: readonly Frame[],
-  startFrame: number,
-  endFrame: number,
-): Map<KeyframeId, number | null> {
-  const keyframeDetector = createKeyframeDetector();
-  const detectedKeyframes = new Map<KeyframeId, number | null>();
-
-  // Phase 1: Load phase keyframes
-  const loadResult = keyframeDetector.detectLoadPhaseKeyframes(
-    frames,
-    startFrame,
-    endFrame,
-  );
-
-  // Extract leg_bend_low_point and ball_low_point from Load phase
-  let legBendLowPointFrame: number | null = null;
-  let ballLowPointFrame: number | null = null;
-
-  for (const kf of loadResult.keyframes) {
-    detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
-    if (kf.keyframeId === "leg_bend_low_point") {
-      legBendLowPointFrame = kf.frameIndex;
-    }
-    if (kf.keyframeId === "ball_low_point") {
-      ballLowPointFrame = kf.frameIndex;
-    }
-  }
-
-  // Phase 2: Rise phase keyframes (depends on Load phase)
-  let ballStartsUpwardFrame: number | null = null;
-
-  if (legBendLowPointFrame !== null && ballLowPointFrame !== null) {
-    const riseResult = keyframeDetector.detectRisePhaseKeyframes(
-      frames,
-      legBendLowPointFrame,
-      ballLowPointFrame,
-      endFrame,
-    );
-
-    for (const kf of riseResult.keyframes) {
-      detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
-      if (kf.keyframeId === "ball_starts_upward") {
-        ballStartsUpwardFrame = kf.frameIndex;
-      }
-    }
-  } else {
-    // Cannot detect Rise phase without Load phase
-    detectedKeyframes.set("legs_start_extending", null);
-    detectedKeyframes.set("ball_starts_upward", null);
-  }
-
-  // Phase 3: Set Point and Release (depends on Rise phase)
-  let releaseFrame: number | null = null;
-
-  if (ballStartsUpwardFrame !== null) {
-    const setPointReleaseResult =
-      keyframeDetector.detectSetPointReleaseKeyframes(
-        frames,
-        ballStartsUpwardFrame,
-        endFrame,
-      );
-
-    for (const kf of setPointReleaseResult.keyframes) {
-      detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
-      if (kf.keyframeId === "release") {
-        releaseFrame = kf.frameIndex;
-      }
-    }
-  } else {
-    // Cannot detect Set Point/Release without Rise phase
-    detectedKeyframes.set("set_point", null);
-    detectedKeyframes.set("release", null);
-  }
-
-  // Phase 4: Follow-through (depends on Release)
-  if (releaseFrame !== null) {
-    const followThroughResult = keyframeDetector.detectFollowThroughKeyframes(
-      frames,
-      releaseFrame,
-      startFrame,
-      endFrame,
-    );
-
-    for (const kf of followThroughResult.keyframes) {
-      detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
-    }
-  } else {
-    // Cannot detect Follow-through without Release
-    detectedKeyframes.set("arms_fully_extended", null);
-    detectedKeyframes.set("feet_leave_ground", null);
-    detectedKeyframes.set("feet_land", null);
-  }
-
-  // Also add the "legs_start_bending" keyframe - this is the shot start
-  // The labels seem to use this to indicate when the shooting motion begins
-  // For now, we'll set it to the start frame since it's the beginning of the load phase
-  detectedKeyframes.set("legs_start_bending", startFrame);
-
-  return detectedKeyframes;
-}
+// The frame-based keyframe orchestration now lives in the library
+// (`detection/keyframe-phases`) so the runtime pipeline can derive phases from
+// the same keyframes the harness scores against labels, without importing test
+// code. Re-exported here to keep the harness's existing import surface.
+export { detectKeyframesFromFrames };
 
 // ============================================================================
 // Tolerance Logic

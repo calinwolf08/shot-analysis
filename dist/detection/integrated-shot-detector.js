@@ -57,6 +57,7 @@
  */
 import { ShotBoundaryDetector, } from "./shot-detector";
 import { PhaseDetector } from "./phase-detector";
+import { detectKeyframesFromFrames, phasesFromKeyframes, poseLandmarksToFrames, } from "./keyframe-phases";
 /**
  * Integrated shot detector that combines boundary and phase detection.
  *
@@ -95,10 +96,12 @@ import { PhaseDetector } from "./phase-detector";
 export class ShotDetector {
     boundaryDetector;
     phaseDetector;
+    useKeyframePhases;
     state;
     constructor(config = {}) {
         this.boundaryDetector = new ShotBoundaryDetector(config.boundaryConfig);
         this.phaseDetector = new PhaseDetector(config.phaseConfig);
+        this.useKeyframePhases = config.useKeyframePhases ?? true;
         this.state = this.createInitialState();
     }
     /**
@@ -246,6 +249,16 @@ export class ShotDetector {
         const endFrame = detected.end.frameIndex;
         // Detect phases within the shot boundaries
         const phaseResult = this.phaseDetector.detectPhases(sequence, startFrame, endFrame);
+        // Derive phase ranges from the keyframe algorithm (same detection scored
+        // against the self-labeled corpus) and merge them over the heuristic
+        // output, so any boundary the keyframes don't yield still has a value.
+        let phases = phaseResult.phases;
+        if (this.useKeyframePhases) {
+            const kfFrames = poseLandmarksToFrames(sequence);
+            const keyframes = detectKeyframesFromFrames(kfFrames, startFrame, endFrame);
+            const kfPhases = phasesFromKeyframes(keyframes, startFrame, endFrame);
+            phases = { ...phases, ...kfPhases };
+        }
         // Calculate overall confidence from boundary and phase detection
         const boundaryConfidence = (detected.start.confidence + detected.end.confidence) / 2;
         const overallConfidence = (boundaryConfidence + phaseResult.confidence) / 2;
@@ -255,7 +268,7 @@ export class ShotDetector {
                 start: startFrame,
                 end: endFrame,
             },
-            phases: phaseResult.phases,
+            phases,
             confidence: overallConfidence,
         };
     }

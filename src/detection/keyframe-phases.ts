@@ -15,6 +15,7 @@
  * keyframes don't yield (e.g. an occluded elbow in a behind view) still has
  * a value.
  */
+import { createKeyframeDetector } from "../keyframe-detector";
 import type { PoseLandmarks } from "../pose/types";
 import type { Frame, KeyframeId } from "../testing/types";
 import { ShotPhase, type PhaseRange, type ShotPhases } from "./types";
@@ -36,6 +37,122 @@ export function poseLandmarksToFrames(
       visibility: l.visibility,
     })),
   }));
+}
+
+/**
+ * Frame-based keyframe orchestration (no PoseData coupling). This is the same
+ * chained detection the offline harness scores against the labeled corpus, so
+ * the runtime pipeline produces the same frames as the self-labeled data.
+ *
+ * The four sub-detectors run in dependency order: Load → Rise (needs the load
+ * low points) → SetPoint/Release (needs ball-starts-upward) → FollowThrough
+ * (needs release). A missing upstream keyframe nulls the dependent track
+ * rather than guessing.
+ *
+ * @param frames - Pose frames for the whole clip
+ * @param startFrame - Shot start frame index (inclusive)
+ * @param endFrame - Shot end frame index (inclusive)
+ * @returns Map of keyframe IDs to detected frame numbers (or null)
+ */
+export function detectKeyframesFromFrames(
+  frames: readonly Frame[],
+  startFrame: number,
+  endFrame: number,
+): Map<KeyframeId, number | null> {
+  const keyframeDetector = createKeyframeDetector();
+  const detectedKeyframes = new Map<KeyframeId, number | null>();
+
+  // Phase 1: Load phase keyframes
+  const loadResult = keyframeDetector.detectLoadPhaseKeyframes(
+    frames,
+    startFrame,
+    endFrame,
+  );
+
+  // Extract leg_bend_low_point and ball_low_point from Load phase
+  let legBendLowPointFrame: number | null = null;
+  let ballLowPointFrame: number | null = null;
+
+  for (const kf of loadResult.keyframes) {
+    detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+    if (kf.keyframeId === "leg_bend_low_point") {
+      legBendLowPointFrame = kf.frameIndex;
+    }
+    if (kf.keyframeId === "ball_low_point") {
+      ballLowPointFrame = kf.frameIndex;
+    }
+  }
+
+  // Phase 2: Rise phase keyframes (depends on Load phase)
+  let ballStartsUpwardFrame: number | null = null;
+
+  if (legBendLowPointFrame !== null && ballLowPointFrame !== null) {
+    const riseResult = keyframeDetector.detectRisePhaseKeyframes(
+      frames,
+      legBendLowPointFrame,
+      ballLowPointFrame,
+      endFrame,
+    );
+
+    for (const kf of riseResult.keyframes) {
+      detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+      if (kf.keyframeId === "ball_starts_upward") {
+        ballStartsUpwardFrame = kf.frameIndex;
+      }
+    }
+  } else {
+    // Cannot detect Rise phase without Load phase
+    detectedKeyframes.set("legs_start_extending", null);
+    detectedKeyframes.set("ball_starts_upward", null);
+  }
+
+  // Phase 3: Set Point and Release (depends on Rise phase)
+  let releaseFrame: number | null = null;
+
+  if (ballStartsUpwardFrame !== null) {
+    const setPointReleaseResult =
+      keyframeDetector.detectSetPointReleaseKeyframes(
+        frames,
+        ballStartsUpwardFrame,
+        endFrame,
+      );
+
+    for (const kf of setPointReleaseResult.keyframes) {
+      detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+      if (kf.keyframeId === "release") {
+        releaseFrame = kf.frameIndex;
+      }
+    }
+  } else {
+    // Cannot detect Set Point/Release without Rise phase
+    detectedKeyframes.set("set_point", null);
+    detectedKeyframes.set("release", null);
+  }
+
+  // Phase 4: Follow-through (depends on Release)
+  if (releaseFrame !== null) {
+    const followThroughResult = keyframeDetector.detectFollowThroughKeyframes(
+      frames,
+      releaseFrame,
+      startFrame,
+      endFrame,
+    );
+
+    for (const kf of followThroughResult.keyframes) {
+      detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+    }
+  } else {
+    // Cannot detect Follow-through without Release
+    detectedKeyframes.set("arms_fully_extended", null);
+    detectedKeyframes.set("feet_leave_ground", null);
+    detectedKeyframes.set("feet_land", null);
+  }
+
+  // legs_start_bending marks where the shooting motion begins; the labels use
+  // the shot start for this, so we mirror that.
+  detectedKeyframes.set("legs_start_bending", startFrame);
+
+  return detectedKeyframes;
 }
 
 /** A clamped, ordered range, or null when degenerate. */

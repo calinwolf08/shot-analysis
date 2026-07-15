@@ -4829,8 +4829,8 @@ var ShotAnalysis = (() => {
       const ideal = target.ideal;
       const deviation = value - ideal;
       const isInRange = value >= min && value <= max;
-      const range = max - min;
-      const warningZone = range * this.options.warningThreshold;
+      const range2 = max - min;
+      const warningZone = range2 * this.options.warningThreshold;
       const innerMin = min + warningZone;
       const innerMax = max - warningZone;
       let status;
@@ -4838,7 +4838,7 @@ var ShotAnalysis = (() => {
       if (!isInRange) {
         status = "fail";
         isTooLow = value < min;
-      } else if (range > 0 && value !== min && value !== max && (value < innerMin || value > innerMax)) {
+      } else if (range2 > 0 && value !== min && value !== max && (value < innerMin || value > innerMax)) {
         status = "warning";
         isTooLow = value < innerMin;
       } else {
@@ -10230,10 +10230,10 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       this.assignPhases(frameData, state, baseFrame);
       const maxFrameIndex = baseFrame + frameData.length - 1;
       const phases = {};
-      for (const [phase, range] of state.phases) {
+      for (const [phase, range2] of state.phases) {
         phases[phase] = {
-          startFrame: range.startFrame,
-          endFrame: Math.min(range.endFrame, maxFrameIndex)
+          startFrame: range2.startFrame,
+          endFrame: Math.min(range2.endFrame, maxFrameIndex)
         };
       }
       return phases;
@@ -10540,9 +10540,9 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       for (const frame of frameData) {
         allFrames.add(frame.frameIndex);
       }
-      for (const range of Object.values(phases)) {
-        if (range) {
-          for (let i2 = range.startFrame; i2 <= range.endFrame; i2++) {
+      for (const range2 of Object.values(phases)) {
+        if (range2) {
+          for (let i2 = range2.startFrame; i2 <= range2.endFrame; i2++) {
             if (allFrames.has(i2)) {
               coveredFrames++;
             }
@@ -10555,14 +10555,955 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     }
   };
 
+  // src/keyframe-detector.ts
+  var DEFAULT_CONFIG4 = {
+    visibilityThreshold: 0.3,
+    // Lowered from 0.5 to handle low-visibility frames in behind views
+    ballLowPointSearchWindow: 0.6,
+    // Expanded from 0.4 to handle behind views
+    legBendSearchWindow: 0.7,
+    // Expanded from 0.5 to capture jump shots with late leg bend
+    riseSearchWindow: 0.6,
+    smoothingWindowSize: 3,
+    minConsecutiveFrames: 2,
+    kneeVelocityThreshold: 0.5,
+    wristVelocityThreshold: -2e-3,
+    // Lowered from -0.005 to detect gradual upward motion
+    setPointSearchWindow: 0.7,
+    setPointMaxElbowAngle: 160,
+    releaseSearchWindow: 0.5,
+    groundBaselineSearchWindow: 0.4,
+    ankleGroundThreshold: 0.01,
+    // Lowered to detect small jumps (Jax front-right/side-left); landing uses 2x multiplier
+    followThroughSearchWindow: 0.5
+  };
+  function calculateJointAngle(pointA, vertex, pointB) {
+    if (!pointA || !vertex || !pointB) {
+      return null;
+    }
+    const a2 = { x: pointA.x, y: pointA.y, z: pointA.z };
+    const v2 = { x: vertex.x, y: vertex.y, z: vertex.z };
+    const b2 = { x: pointB.x, y: pointB.y, z: pointB.z };
+    const vA = {
+      x: a2.x - v2.x,
+      y: a2.y - v2.y,
+      z: a2.z - v2.z
+    };
+    const vB = {
+      x: b2.x - v2.x,
+      y: b2.y - v2.y,
+      z: b2.z - v2.z
+    };
+    const magA = Math.sqrt(vA.x * vA.x + vA.y * vA.y + vA.z * vA.z);
+    const magB = Math.sqrt(vB.x * vB.x + vB.y * vB.y + vB.z * vB.z);
+    if (magA === 0 || magB === 0) {
+      return null;
+    }
+    const dotProduct = vA.x * vB.x + vA.y * vB.y + vA.z * vB.z;
+    const cosAngle = Math.max(-1, Math.min(1, dotProduct / (magA * magB)));
+    const angleRadians = Math.acos(cosAngle);
+    const angleDegrees = angleRadians * (180 / Math.PI);
+    return angleDegrees;
+  }
+  function calculateElbowAngle(shoulder, elbow, wrist) {
+    return calculateJointAngle(shoulder, elbow, wrist);
+  }
+  function calculateWristAngle(elbow, wrist, indexFinger) {
+    return calculateJointAngle(elbow, wrist, indexFinger);
+  }
+  function calculateKneeAngle(hip, knee, ankle) {
+    if (!hip || !knee || !ankle) {
+      return null;
+    }
+    const hipPoint = { x: hip.x, y: hip.y, z: hip.z };
+    const kneePoint = { x: knee.x, y: knee.y, z: knee.z };
+    const anklePoint = { x: ankle.x, y: ankle.y, z: ankle.z };
+    const vHip = {
+      x: hipPoint.x - kneePoint.x,
+      y: hipPoint.y - kneePoint.y,
+      z: hipPoint.z - kneePoint.z
+    };
+    const vAnkle = {
+      x: anklePoint.x - kneePoint.x,
+      y: anklePoint.y - kneePoint.y,
+      z: anklePoint.z - kneePoint.z
+    };
+    const magHip = Math.sqrt(vHip.x * vHip.x + vHip.y * vHip.y + vHip.z * vHip.z);
+    const magAnkle = Math.sqrt(
+      vAnkle.x * vAnkle.x + vAnkle.y * vAnkle.y + vAnkle.z * vAnkle.z
+    );
+    if (magHip === 0 || magAnkle === 0) {
+      return null;
+    }
+    const dotProduct = vHip.x * vAnkle.x + vHip.y * vAnkle.y + vHip.z * vAnkle.z;
+    const cosAngle = Math.max(-1, Math.min(1, dotProduct / (magHip * magAnkle)));
+    const angleRadians = Math.acos(cosAngle);
+    const angleDegrees = angleRadians * (180 / Math.PI);
+    return angleDegrees;
+  }
+  function getFrameKneeAngle(frame, visibilityThreshold) {
+    if (!frame.landmarks) {
+      return null;
+    }
+    const landmarks = frame.landmarks;
+    const leftHip = landmarks[LANDMARK_INDICES.LEFT_HIP];
+    const leftKnee = landmarks[LANDMARK_INDICES.LEFT_KNEE];
+    const leftAnkle = landmarks[LANDMARK_INDICES.LEFT_ANKLE];
+    const rightHip = landmarks[LANDMARK_INDICES.RIGHT_HIP];
+    const rightKnee = landmarks[LANDMARK_INDICES.RIGHT_KNEE];
+    const rightAnkle = landmarks[LANDMARK_INDICES.RIGHT_ANKLE];
+    const leftVisible = leftHip && leftKnee && leftAnkle && leftHip.visibility >= visibilityThreshold && leftKnee.visibility >= visibilityThreshold && leftAnkle.visibility >= visibilityThreshold;
+    const rightVisible = rightHip && rightKnee && rightAnkle && rightHip.visibility >= visibilityThreshold && rightKnee.visibility >= visibilityThreshold && rightAnkle.visibility >= visibilityThreshold;
+    const leftAngle = leftVisible ? calculateKneeAngle(leftHip, leftKnee, leftAnkle) : null;
+    const rightAngle = rightVisible ? calculateKneeAngle(rightHip, rightKnee, rightAnkle) : null;
+    if (leftAngle !== null && rightAngle !== null) {
+      return (leftAngle + rightAngle) / 2;
+    } else if (leftAngle !== null) {
+      return leftAngle;
+    } else if (rightAngle !== null) {
+      return rightAngle;
+    }
+    return null;
+  }
+  function getFrameWristY(frame, visibilityThreshold) {
+    if (!frame.landmarks) {
+      return null;
+    }
+    const landmarks = frame.landmarks;
+    const leftWrist = landmarks[LANDMARK_INDICES.LEFT_WRIST];
+    const rightWrist = landmarks[LANDMARK_INDICES.RIGHT_WRIST];
+    const leftVisible = leftWrist && leftWrist.visibility >= visibilityThreshold;
+    const rightVisible = rightWrist && rightWrist.visibility >= visibilityThreshold;
+    if (leftVisible && rightVisible) {
+      return (leftWrist.y + rightWrist.y) / 2;
+    } else if (leftVisible) {
+      return leftWrist.y;
+    } else if (rightVisible) {
+      return rightWrist.y;
+    }
+    return null;
+  }
+  function getFrameElbowAngle(frame, visibilityThreshold) {
+    if (!frame.landmarks) {
+      return null;
+    }
+    const landmarks = frame.landmarks;
+    const leftShoulder = landmarks[LANDMARK_INDICES.LEFT_SHOULDER];
+    const leftElbow = landmarks[LANDMARK_INDICES.LEFT_ELBOW];
+    const leftWrist = landmarks[LANDMARK_INDICES.LEFT_WRIST];
+    const rightShoulder = landmarks[LANDMARK_INDICES.RIGHT_SHOULDER];
+    const rightElbow = landmarks[LANDMARK_INDICES.RIGHT_ELBOW];
+    const rightWrist = landmarks[LANDMARK_INDICES.RIGHT_WRIST];
+    const leftVisible = leftShoulder && leftElbow && leftWrist && leftShoulder.visibility >= visibilityThreshold && leftElbow.visibility >= visibilityThreshold && leftWrist.visibility >= visibilityThreshold;
+    const rightVisible = rightShoulder && rightElbow && rightWrist && rightShoulder.visibility >= visibilityThreshold && rightElbow.visibility >= visibilityThreshold && rightWrist.visibility >= visibilityThreshold;
+    const leftAngle = leftVisible ? calculateElbowAngle(leftShoulder, leftElbow, leftWrist) : null;
+    const rightAngle = rightVisible ? calculateElbowAngle(rightShoulder, rightElbow, rightWrist) : null;
+    if (leftAngle !== null && rightAngle !== null) {
+      return (leftAngle + rightAngle) / 2;
+    } else if (leftAngle !== null) {
+      return leftAngle;
+    } else if (rightAngle !== null) {
+      return rightAngle;
+    }
+    return null;
+  }
+  function getFrameWristAngle(frame, visibilityThreshold) {
+    if (!frame.landmarks) {
+      return null;
+    }
+    const landmarks = frame.landmarks;
+    const leftElbow = landmarks[LANDMARK_INDICES.LEFT_ELBOW];
+    const leftWrist = landmarks[LANDMARK_INDICES.LEFT_WRIST];
+    const leftIndex = landmarks[LANDMARK_INDICES.LEFT_INDEX];
+    const rightElbow = landmarks[LANDMARK_INDICES.RIGHT_ELBOW];
+    const rightWrist = landmarks[LANDMARK_INDICES.RIGHT_WRIST];
+    const rightIndex = landmarks[LANDMARK_INDICES.RIGHT_INDEX];
+    const leftVisible = leftElbow && leftWrist && leftIndex && leftElbow.visibility >= visibilityThreshold && leftWrist.visibility >= visibilityThreshold && leftIndex.visibility >= visibilityThreshold;
+    const rightVisible = rightElbow && rightWrist && rightIndex && rightElbow.visibility >= visibilityThreshold && rightWrist.visibility >= visibilityThreshold && rightIndex.visibility >= visibilityThreshold;
+    const leftAngle = leftVisible ? calculateWristAngle(leftElbow, leftWrist, leftIndex) : null;
+    const rightAngle = rightVisible ? calculateWristAngle(rightElbow, rightWrist, rightIndex) : null;
+    if (leftAngle !== null && rightAngle !== null) {
+      return (leftAngle + rightAngle) / 2;
+    } else if (leftAngle !== null) {
+      return leftAngle;
+    } else if (rightAngle !== null) {
+      return rightAngle;
+    }
+    return null;
+  }
+  function detectLegBendLowPoint(frames, startFrame, endFrame, config = DEFAULT_CONFIG4) {
+    const shotDuration = endFrame - startFrame + 1;
+    const searchEndFrame = startFrame + Math.floor(shotDuration * config.legBendSearchWindow);
+    let minAngle = Infinity;
+    let minAngleFrame = null;
+    for (const frame of frames) {
+      const frameIdx = frame.frameIndex;
+      if (frameIdx < startFrame || frameIdx > searchEndFrame) {
+        continue;
+      }
+      const kneeAngle = getFrameKneeAngle(frame, config.visibilityThreshold);
+      if (kneeAngle !== null && kneeAngle < minAngle) {
+        minAngle = kneeAngle;
+        minAngleFrame = frameIdx;
+      }
+    }
+    if (minAngleFrame === null) {
+      for (const frame of frames) {
+        if (frame.frameIndex >= startFrame && frame.frameIndex <= searchEndFrame) {
+          if (getFrameKneeAngle(frame, config.visibilityThreshold) !== null) {
+            return frame.frameIndex;
+          }
+        }
+      }
+    }
+    return minAngleFrame;
+  }
+  function detectBallLowPoint(frames, startFrame, endFrame, config = DEFAULT_CONFIG4) {
+    const shotDuration = endFrame - startFrame + 1;
+    const searchEndFrame = startFrame + Math.floor(shotDuration * config.ballLowPointSearchWindow);
+    const findMaxWristYFrame = (visThreshold) => {
+      let maxWristY = -Infinity;
+      let maxWristYFrame2 = null;
+      for (const frame of frames) {
+        const frameIdx = frame.frameIndex;
+        if (frameIdx < startFrame || frameIdx > searchEndFrame) {
+          continue;
+        }
+        const wristY = getFrameWristY(frame, visThreshold);
+        if (wristY !== null && wristY > maxWristY) {
+          maxWristY = wristY;
+          maxWristYFrame2 = frameIdx;
+        }
+      }
+      return maxWristYFrame2;
+    };
+    let maxWristYFrame = findMaxWristYFrame(config.visibilityThreshold);
+    if (config.visibilityThreshold <= 0.3) {
+      const firstHalfEnd = startFrame + Math.floor((searchEndFrame - startFrame) / 2);
+      if (maxWristYFrame !== null && maxWristYFrame > firstHalfEnd) {
+        const lowVisFrame = findMaxWristYFrame(0.01);
+        if (lowVisFrame !== null && lowVisFrame < maxWristYFrame) {
+          maxWristYFrame = lowVisFrame;
+        }
+      }
+      if (maxWristYFrame === null) {
+        maxWristYFrame = findMaxWristYFrame(0.01);
+      }
+    }
+    return maxWristYFrame;
+  }
+  function calculateVelocity(values) {
+    const velocities = [];
+    for (let i2 = 1; i2 < values.length; i2++) {
+      velocities.push(values[i2] - values[i2 - 1]);
+    }
+    return velocities;
+  }
+  function calculateSmoothedVelocity(values, windowSize) {
+    if (values.length < 2) {
+      return [];
+    }
+    const smoothedValues = movingAverage(values, windowSize);
+    return calculateVelocity(smoothedValues);
+  }
+  function detectLegsStartExtending(frames, legBendLowPointFrame, endFrame, config = DEFAULT_CONFIG4) {
+    const shotDuration = endFrame - legBendLowPointFrame + 1;
+    const searchEndFrame = legBendLowPointFrame + Math.floor(shotDuration * config.riseSearchWindow);
+    const frameAngles = [];
+    for (const frame of frames) {
+      const frameIdx = frame.frameIndex;
+      if (frameIdx < legBendLowPointFrame || frameIdx > searchEndFrame) {
+        continue;
+      }
+      const kneeAngle = getFrameKneeAngle(frame, config.visibilityThreshold);
+      if (kneeAngle !== null) {
+        frameAngles.push({ frameIndex: frameIdx, angle: kneeAngle });
+      }
+    }
+    if (frameAngles.length < config.minConsecutiveFrames + 1) {
+      return null;
+    }
+    frameAngles.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
+    const angles = frameAngles.map((fa2) => fa2.angle);
+    const smoothedVelocities = calculateSmoothedVelocity(
+      angles,
+      config.smoothingWindowSize
+    );
+    let consecutivePositive = 0;
+    for (let i2 = 0; i2 < smoothedVelocities.length; i2++) {
+      const velocity = smoothedVelocities[i2];
+      if (velocity > config.kneeVelocityThreshold) {
+        consecutivePositive++;
+        if (consecutivePositive >= config.minConsecutiveFrames) {
+          const startIdx = i2 - config.minConsecutiveFrames + 1;
+          return frameAngles[startIdx + 1].frameIndex;
+        }
+      } else {
+        consecutivePositive = 0;
+      }
+    }
+    return null;
+  }
+  function detectBallStartsUpward(frames, ballLowPointFrame, endFrame, config = DEFAULT_CONFIG4) {
+    const shotDuration = endFrame - ballLowPointFrame + 1;
+    const searchEndFrame = ballLowPointFrame + Math.floor(shotDuration * config.riseSearchWindow);
+    const findBallStartsUpward = (visThreshold) => {
+      const framePositions = [];
+      for (const frame of frames) {
+        const frameIdx = frame.frameIndex;
+        if (frameIdx < ballLowPointFrame || frameIdx > searchEndFrame) {
+          continue;
+        }
+        const wristY = getFrameWristY(frame, visThreshold);
+        if (wristY !== null) {
+          framePositions.push({ frameIndex: frameIdx, wristY });
+        }
+      }
+      if (framePositions.length < config.minConsecutiveFrames + 1) {
+        return null;
+      }
+      framePositions.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
+      const wristYValues = framePositions.map((fp) => fp.wristY);
+      const smoothedVelocities = calculateSmoothedVelocity(
+        wristYValues,
+        config.smoothingWindowSize
+      );
+      let consecutiveNegative = 0;
+      for (let i2 = 0; i2 < smoothedVelocities.length; i2++) {
+        const velocity = smoothedVelocities[i2];
+        if (velocity < config.wristVelocityThreshold) {
+          consecutiveNegative++;
+          if (consecutiveNegative >= config.minConsecutiveFrames) {
+            const startIdx = i2 - config.minConsecutiveFrames + 1;
+            return framePositions[startIdx + 1].frameIndex;
+          }
+        } else {
+          consecutiveNegative = 0;
+        }
+      }
+      return null;
+    };
+    let result = findBallStartsUpward(config.visibilityThreshold);
+    if (config.visibilityThreshold <= 0.3) {
+      const expectedNearLowPoint = ballLowPointFrame + 5;
+      if (result === null || result > expectedNearLowPoint + 5) {
+        const lowVisResult = findBallStartsUpward(0.01);
+        if (lowVisResult !== null) {
+          if (result === null || lowVisResult < result) {
+            result = lowVisResult;
+          }
+        }
+      }
+    }
+    return result;
+  }
+  var SET_POINT_EXTENSION_BAND_DEG = 16;
+  function argMinWristYFrame(series) {
+    let best = null;
+    for (const s2 of series) {
+      if (s2.wristY === null) continue;
+      if (best === null || s2.wristY < best.wristY) {
+        best = { frameIndex: s2.frameIndex, wristY: s2.wristY };
+      }
+    }
+    return (best == null ? void 0 : best.frameIndex) ?? null;
+  }
+  function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config = DEFAULT_CONFIG4) {
+    const shotDuration = endFrame - ballStartsUpwardFrame + 1;
+    const searchEndFrame = ballStartsUpwardFrame + Math.floor(shotDuration * config.setPointSearchWindow);
+    const series = [];
+    for (const frame of frames) {
+      if (frame.frameIndex < ballStartsUpwardFrame || frame.frameIndex > searchEndFrame) {
+        continue;
+      }
+      series.push({
+        frameIndex: frame.frameIndex,
+        elbow: getFrameElbowAngle(frame, config.visibilityThreshold),
+        wristY: getFrameWristY(frame, config.visibilityThreshold)
+      });
+    }
+    series.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
+    if (series.length === 0) {
+      return null;
+    }
+    const elbowFrames = series.filter(
+      (s2) => s2.elbow !== null
+    );
+    if (elbowFrames.length >= 3) {
+      const smoothed = movingAverage(
+        elbowFrames.map((s2) => s2.elbow),
+        config.smoothingWindowSize
+      );
+      let minIdx = 0;
+      for (let i2 = 1; i2 < smoothed.length; i2++) {
+        if (smoothed[i2] < smoothed[minIdx]) {
+          minIdx = i2;
+        }
+      }
+      const wristPeakFrame = argMinWristYFrame(elbowFrames);
+      const minAngle = smoothed[minIdx];
+      const band = SET_POINT_EXTENSION_BAND_DEG;
+      let spIdx = minIdx;
+      for (let i2 = minIdx + 1; i2 < smoothed.length; i2++) {
+        if (smoothed[i2] <= minAngle + band && (wristPeakFrame === null || elbowFrames[i2].frameIndex <= wristPeakFrame)) {
+          spIdx = i2;
+        } else {
+          break;
+        }
+      }
+      return elbowFrames[spIdx].frameIndex;
+    }
+    const wristFrames = series.filter(
+      (s2) => s2.wristY !== null
+    );
+    if (wristFrames.length === 0) {
+      return null;
+    }
+    let peakIdx = 0;
+    for (let i2 = 1; i2 < wristFrames.length; i2++) {
+      if (wristFrames[i2].wristY < wristFrames[peakIdx].wristY) {
+        peakIdx = i2;
+      }
+    }
+    return wristFrames[peakIdx].frameIndex;
+  }
+  function detectRelease(frames, setPointFrame, endFrame, config = DEFAULT_CONFIG4) {
+    const searchStartFrame = setPointFrame + 1;
+    const shotDuration = endFrame - setPointFrame + 1;
+    const searchEndFrame = setPointFrame + Math.floor(shotDuration * config.releaseSearchWindow);
+    const frameData = [];
+    for (const frame of frames) {
+      const frameIdx = frame.frameIndex;
+      if (frameIdx < searchStartFrame || frameIdx > searchEndFrame) {
+        continue;
+      }
+      const wristAngle = getFrameWristAngle(frame, config.visibilityThreshold);
+      if (wristAngle !== null) {
+        frameData.push({ frameIndex: frameIdx, wristAngle });
+      }
+    }
+    if (frameData.length === 0) {
+      return null;
+    }
+    frameData.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
+    let releaseFrame = null;
+    let minWristAngle = Infinity;
+    for (const data of frameData) {
+      if (data.wristAngle < minWristAngle) {
+        minWristAngle = data.wristAngle;
+        releaseFrame = data.frameIndex;
+      }
+    }
+    return releaseFrame;
+  }
+  function getFrameAnkleY(frame, visibilityThreshold) {
+    if (!frame.landmarks) {
+      return null;
+    }
+    const landmarks = frame.landmarks;
+    const leftAnkle = landmarks[LANDMARK_INDICES.LEFT_ANKLE];
+    const rightAnkle = landmarks[LANDMARK_INDICES.RIGHT_ANKLE];
+    const leftVisible = leftAnkle && leftAnkle.visibility >= visibilityThreshold;
+    const rightVisible = rightAnkle && rightAnkle.visibility >= visibilityThreshold;
+    if (leftVisible && rightVisible) {
+      return (leftAnkle.y + rightAnkle.y) / 2;
+    } else if (leftVisible) {
+      return leftAnkle.y;
+    } else if (rightVisible) {
+      return rightAnkle.y;
+    }
+    return null;
+  }
+  function establishGroundBaseline(frames, startFrame, endFrame, _baselineSearchWindow, visibilityThreshold) {
+    const ankleData = [];
+    for (const frame of frames) {
+      const frameIdx = frame.frameIndex;
+      if (frameIdx < startFrame || frameIdx > endFrame) {
+        continue;
+      }
+      const ankleY = getFrameAnkleY(frame, visibilityThreshold);
+      if (ankleY !== null) {
+        ankleData.push({ frameIndex: frameIdx, ankleY });
+      }
+    }
+    if (ankleData.length === 0) {
+      return null;
+    }
+    ankleData.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
+    let bestMaxIdx = -1;
+    let bestDescent = -Infinity;
+    let bestMaxAnkleY = -Infinity;
+    for (let i2 = 0; i2 < ankleData.length; i2++) {
+      const currentY = ankleData[i2].ankleY;
+      let minAfter = Infinity;
+      for (let j2 = i2 + 1; j2 < ankleData.length; j2++) {
+        if (ankleData[j2].ankleY < minAfter) {
+          minAfter = ankleData[j2].ankleY;
+        }
+      }
+      const descent = currentY - minAfter;
+      if (descent > bestDescent && currentY > 0) {
+        bestDescent = descent;
+        bestMaxIdx = i2;
+        bestMaxAnkleY = currentY;
+      }
+    }
+    if (bestMaxIdx === -1 || bestDescent <= 0) {
+      for (let i2 = 0; i2 < ankleData.length; i2++) {
+        if (ankleData[i2].ankleY > bestMaxAnkleY) {
+          bestMaxAnkleY = ankleData[i2].ankleY;
+          bestMaxIdx = i2;
+        }
+      }
+    }
+    if (bestMaxAnkleY === -Infinity || bestMaxIdx === -1) {
+      return null;
+    }
+    return {
+      ankleY: bestMaxAnkleY,
+      frameIndex: ankleData[bestMaxIdx].frameIndex
+    };
+  }
+  function detectArmsFullyExtended(frames, releaseFrame, endFrame, config = DEFAULT_CONFIG4) {
+    const shotDuration = endFrame - releaseFrame + 1;
+    const searchEndFrame = releaseFrame + Math.floor(shotDuration * config.followThroughSearchWindow);
+    let maxElbowAngle = -Infinity;
+    let maxElbowAngleFrame = null;
+    for (const frame of frames) {
+      const frameIdx = frame.frameIndex;
+      if (frameIdx < releaseFrame || frameIdx > searchEndFrame) {
+        continue;
+      }
+      const elbowAngle = getFrameElbowAngle(frame, config.visibilityThreshold);
+      if (elbowAngle !== null && elbowAngle > maxElbowAngle) {
+        maxElbowAngle = elbowAngle;
+        maxElbowAngleFrame = frameIdx;
+      }
+    }
+    return maxElbowAngleFrame;
+  }
+  function detectFeetLeaveGround(frames, groundBaselineResult, startFrame, endFrame, config = DEFAULT_CONFIG4) {
+    const searchStart = Math.max(startFrame, groundBaselineResult.frameIndex);
+    for (const frame of frames) {
+      const frameIdx = frame.frameIndex;
+      if (frameIdx < searchStart || frameIdx > endFrame) {
+        continue;
+      }
+      const ankleY = getFrameAnkleY(frame, config.visibilityThreshold);
+      if (ankleY !== null) {
+        const deviation = groundBaselineResult.ankleY - ankleY;
+        if (deviation > config.ankleGroundThreshold) {
+          return frameIdx;
+        }
+      }
+    }
+    return null;
+  }
+  function detectFeetLand(frames, groundBaselineResult, feetLeaveGroundFrame, endFrame, config = DEFAULT_CONFIG4) {
+    if (feetLeaveGroundFrame === null) {
+      return null;
+    }
+    const landingThreshold = config.ankleGroundThreshold * 2;
+    let minAnkleY = Infinity;
+    let peakFrame = feetLeaveGroundFrame;
+    for (const frame of frames) {
+      const frameIdx = frame.frameIndex;
+      if (frameIdx <= feetLeaveGroundFrame || frameIdx > endFrame) {
+        continue;
+      }
+      const ankleY = getFrameAnkleY(frame, config.visibilityThreshold);
+      if (ankleY !== null && ankleY < minAnkleY) {
+        minAnkleY = ankleY;
+        peakFrame = frameIdx;
+      }
+    }
+    for (const frame of frames) {
+      const frameIdx = frame.frameIndex;
+      if (frameIdx <= peakFrame || frameIdx > endFrame) {
+        continue;
+      }
+      const ankleY = getFrameAnkleY(frame, config.visibilityThreshold);
+      if (ankleY !== null) {
+        const deviation = groundBaselineResult.ankleY - ankleY;
+        if (deviation <= landingThreshold) {
+          return frameIdx;
+        }
+      }
+    }
+    return endFrame;
+  }
+  var KeyframeDetector = class {
+    constructor(config = {}) {
+      __publicField(this, "config");
+      this.config = {
+        ...DEFAULT_CONFIG4,
+        ...config
+      };
+    }
+    /**
+     * Detects Load phase keyframes for a shot.
+     *
+     * @param frames - Array of frames with pose data
+     * @param startFrame - Shot start frame index (inclusive)
+     * @param endFrame - Shot end frame index (inclusive)
+     * @returns Detection result with keyframes and confidence
+     */
+    detectLoadPhaseKeyframes(frames, startFrame, endFrame) {
+      const keyframes = [];
+      const legBendFrame = detectLegBendLowPoint(
+        frames,
+        startFrame,
+        endFrame,
+        this.config
+      );
+      keyframes.push({
+        keyframeId: "leg_bend_low_point",
+        frameIndex: legBendFrame,
+        confidence: legBendFrame !== null ? 0.8 : 0
+      });
+      const ballLowFrame = detectBallLowPoint(
+        frames,
+        startFrame,
+        endFrame,
+        this.config
+      );
+      keyframes.push({
+        keyframeId: "ball_low_point",
+        frameIndex: ballLowFrame,
+        confidence: ballLowFrame !== null ? 0.8 : 0
+      });
+      const successCount = keyframes.filter((k2) => k2.frameIndex !== null).length;
+      const overallConfidence = successCount / keyframes.length;
+      return {
+        keyframes,
+        confidence: overallConfidence
+      };
+    }
+    /**
+     * Detects Rise phase keyframes for a shot.
+     *
+     * Requires Load phase keyframes to have been detected first,
+     * as Rise phase detection starts from the Load phase low points.
+     *
+     * @param frames - Array of frames with pose data
+     * @param legBendLowPointFrame - Frame index of leg bend low point (from Load phase)
+     * @param ballLowPointFrame - Frame index of ball low point (from Load phase)
+     * @param endFrame - Shot end frame index (inclusive)
+     * @returns Detection result with keyframes and confidence
+     */
+    detectRisePhaseKeyframes(frames, legBendLowPointFrame, ballLowPointFrame, endFrame) {
+      const keyframes = [];
+      const legsExtendingFrame = detectLegsStartExtending(
+        frames,
+        legBendLowPointFrame,
+        endFrame,
+        this.config
+      );
+      keyframes.push({
+        keyframeId: "legs_start_extending",
+        frameIndex: legsExtendingFrame,
+        confidence: legsExtendingFrame !== null ? 0.8 : 0
+      });
+      const ballUpwardFrame = detectBallStartsUpward(
+        frames,
+        ballLowPointFrame,
+        endFrame,
+        this.config
+      );
+      keyframes.push({
+        keyframeId: "ball_starts_upward",
+        frameIndex: ballUpwardFrame,
+        confidence: ballUpwardFrame !== null ? 0.8 : 0
+      });
+      const successCount = keyframes.filter((k2) => k2.frameIndex !== null).length;
+      const overallConfidence = successCount / keyframes.length;
+      return {
+        keyframes,
+        confidence: overallConfidence
+      };
+    }
+    /**
+     * Detects Set Point and Release phase keyframes for a shot.
+     *
+     * Requires Rise phase keyframes to have been detected first,
+     * as set_point detection starts from ball_starts_upward.
+     *
+     * @param frames - Array of frames with pose data
+     * @param ballStartsUpwardFrame - Frame index where ball starts upward (from Rise phase)
+     * @param endFrame - Shot end frame index (inclusive)
+     * @returns Detection result with keyframes and confidence
+     */
+    detectSetPointReleaseKeyframes(frames, ballStartsUpwardFrame, endFrame) {
+      const keyframes = [];
+      const setPointFrame = detectSetPoint(
+        frames,
+        ballStartsUpwardFrame,
+        endFrame,
+        this.config
+      );
+      keyframes.push({
+        keyframeId: "set_point",
+        frameIndex: setPointFrame,
+        confidence: setPointFrame !== null ? 0.8 : 0
+      });
+      let releaseFrame = null;
+      if (setPointFrame !== null) {
+        releaseFrame = detectRelease(
+          frames,
+          setPointFrame,
+          endFrame,
+          this.config
+        );
+      }
+      keyframes.push({
+        keyframeId: "release",
+        frameIndex: releaseFrame,
+        confidence: releaseFrame !== null ? 0.8 : 0
+      });
+      const successCount = keyframes.filter((k2) => k2.frameIndex !== null).length;
+      const overallConfidence = successCount / keyframes.length;
+      return {
+        keyframes,
+        confidence: overallConfidence
+      };
+    }
+    /**
+     * Detects Follow-through phase keyframes for a shot.
+     *
+     * Requires previous phases to have been detected first,
+     * as Follow-through detection uses the release frame and ground baseline.
+     *
+     * @param frames - Array of frames with pose data
+     * @param releaseFrame - Frame index of the release
+     * @param startFrame - Shot start frame index (for ground baseline)
+     * @param endFrame - Shot end frame index (inclusive)
+     * @returns Detection result with keyframes and confidence
+     */
+    detectFollowThroughKeyframes(frames, releaseFrame, startFrame, endFrame) {
+      const keyframes = [];
+      const jumpSearchStart = Math.max(startFrame, releaseFrame - 10);
+      const groundBaseline = establishGroundBaseline(
+        frames,
+        jumpSearchStart,
+        endFrame,
+        this.config.groundBaselineSearchWindow,
+        this.config.visibilityThreshold
+      );
+      const armsExtendedFrame = detectArmsFullyExtended(
+        frames,
+        releaseFrame,
+        endFrame,
+        this.config
+      );
+      keyframes.push({
+        keyframeId: "arms_fully_extended",
+        frameIndex: armsExtendedFrame,
+        confidence: armsExtendedFrame !== null ? 0.8 : 0
+      });
+      let feetLeaveGroundFrame = null;
+      if (groundBaseline !== null) {
+        feetLeaveGroundFrame = detectFeetLeaveGround(
+          frames,
+          groundBaseline,
+          jumpSearchStart,
+          endFrame,
+          this.config
+        );
+      }
+      keyframes.push({
+        keyframeId: "feet_leave_ground",
+        frameIndex: feetLeaveGroundFrame,
+        // Lower confidence for feet detection since it may be null for set shots
+        confidence: feetLeaveGroundFrame !== null ? 0.7 : 0
+      });
+      let feetLandFrame = null;
+      if (groundBaseline !== null) {
+        feetLandFrame = detectFeetLand(
+          frames,
+          groundBaseline,
+          feetLeaveGroundFrame,
+          endFrame,
+          this.config
+        );
+      }
+      keyframes.push({
+        keyframeId: "feet_land",
+        frameIndex: feetLandFrame,
+        confidence: feetLandFrame !== null ? 0.7 : 0
+      });
+      const armsConfidence = armsExtendedFrame !== null ? 1 : 0;
+      const feetConfidence = feetLeaveGroundFrame !== null && feetLandFrame !== null ? 1 : 0.5;
+      const overallConfidence = armsConfidence * 0.6 + feetConfidence * 0.4;
+      return {
+        keyframes,
+        confidence: overallConfidence
+      };
+    }
+    /**
+     * Get the current configuration.
+     */
+    getConfig() {
+      return { ...this.config };
+    }
+  };
+  function createKeyframeDetector(config) {
+    return new KeyframeDetector(config);
+  }
+
+  // src/detection/keyframe-phases.ts
+  function poseLandmarksToFrames(sequence) {
+    return sequence.map((pose, frameIndex) => ({
+      frameIndex,
+      // The keyframe detectors key off frameIndex, not wall time; a synthetic
+      // timestamp keeps the Frame shape valid without needing real fps here.
+      timestamp: frameIndex,
+      poseConfidence: pose.poseConfidence,
+      landmarks: pose.landmarks.map((l2) => ({
+        x: l2.x,
+        y: l2.y,
+        z: l2.z,
+        visibility: l2.visibility
+      }))
+    }));
+  }
+  function detectKeyframesFromFrames(frames, startFrame, endFrame) {
+    const keyframeDetector = createKeyframeDetector();
+    const detectedKeyframes = /* @__PURE__ */ new Map();
+    const loadResult = keyframeDetector.detectLoadPhaseKeyframes(
+      frames,
+      startFrame,
+      endFrame
+    );
+    let legBendLowPointFrame = null;
+    let ballLowPointFrame = null;
+    for (const kf of loadResult.keyframes) {
+      detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+      if (kf.keyframeId === "leg_bend_low_point") {
+        legBendLowPointFrame = kf.frameIndex;
+      }
+      if (kf.keyframeId === "ball_low_point") {
+        ballLowPointFrame = kf.frameIndex;
+      }
+    }
+    let ballStartsUpwardFrame = null;
+    if (legBendLowPointFrame !== null && ballLowPointFrame !== null) {
+      const riseResult = keyframeDetector.detectRisePhaseKeyframes(
+        frames,
+        legBendLowPointFrame,
+        ballLowPointFrame,
+        endFrame
+      );
+      for (const kf of riseResult.keyframes) {
+        detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+        if (kf.keyframeId === "ball_starts_upward") {
+          ballStartsUpwardFrame = kf.frameIndex;
+        }
+      }
+    } else {
+      detectedKeyframes.set("legs_start_extending", null);
+      detectedKeyframes.set("ball_starts_upward", null);
+    }
+    let releaseFrame = null;
+    if (ballStartsUpwardFrame !== null) {
+      const setPointReleaseResult = keyframeDetector.detectSetPointReleaseKeyframes(
+        frames,
+        ballStartsUpwardFrame,
+        endFrame
+      );
+      for (const kf of setPointReleaseResult.keyframes) {
+        detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+        if (kf.keyframeId === "release") {
+          releaseFrame = kf.frameIndex;
+        }
+      }
+    } else {
+      detectedKeyframes.set("set_point", null);
+      detectedKeyframes.set("release", null);
+    }
+    if (releaseFrame !== null) {
+      const followThroughResult = keyframeDetector.detectFollowThroughKeyframes(
+        frames,
+        releaseFrame,
+        startFrame,
+        endFrame
+      );
+      for (const kf of followThroughResult.keyframes) {
+        detectedKeyframes.set(kf.keyframeId, kf.frameIndex);
+      }
+    } else {
+      detectedKeyframes.set("arms_fully_extended", null);
+      detectedKeyframes.set("feet_leave_ground", null);
+      detectedKeyframes.set("feet_land", null);
+    }
+    detectedKeyframes.set("legs_start_bending", startFrame);
+    return detectedKeyframes;
+  }
+  function range(start, end, lo2, hi2) {
+    if (start == null || end == null) return null;
+    const s2 = Math.max(lo2, Math.min(start, hi2));
+    const e2 = Math.max(lo2, Math.min(end, hi2));
+    if (s2 > e2) return null;
+    return { startFrame: s2, endFrame: e2 };
+  }
+  function phasesFromKeyframes(keyframes, startFrame, endFrame) {
+    const kf = (id) => keyframes.get(id) ?? null;
+    const lo2 = startFrame;
+    const hi2 = endFrame;
+    const phases = {};
+    const legsStartBending = kf("legs_start_bending");
+    const loadEnd = kf("leg_bend_low_point") ?? kf("ball_low_point");
+    const ballStartsUpward = kf("ball_starts_upward");
+    const setPoint = kf("set_point");
+    const release = kf("release");
+    const armsExtended = kf("arms_fully_extended");
+    const releaseEnd = armsExtended ?? release;
+    const gather = range(startFrame, legsStartBending, lo2, hi2);
+    if (gather && legsStartBending != null && legsStartBending > startFrame) {
+      phases["gather" /* Gather */] = range(
+        startFrame,
+        legsStartBending - 1,
+        lo2,
+        hi2
+      );
+    }
+    const load = range(legsStartBending, loadEnd, lo2, hi2);
+    if (load) phases["load" /* Load */] = load;
+    const rise = range(
+      ballStartsUpward,
+      setPoint != null ? setPoint - 1 : null,
+      lo2,
+      hi2
+    );
+    if (rise) phases["rise" /* Rise */] = rise;
+    if (setPoint != null) {
+      const sp = range(setPoint, setPoint, lo2, hi2);
+      if (sp) phases["setPoint" /* SetPoint */] = sp;
+    }
+    const rel = range(
+      setPoint != null ? setPoint + 1 : release,
+      releaseEnd,
+      lo2,
+      hi2
+    );
+    if (rel) phases["release" /* Release */] = rel;
+    const ftStart = rel ? rel.endFrame + 1 : null;
+    const ft2 = range(ftStart, endFrame, lo2, hi2);
+    if (ft2 && ftStart != null && ftStart <= endFrame) {
+      phases["followThrough" /* FollowThrough */] = ft2;
+    }
+    return phases;
+  }
+
   // src/detection/integrated-shot-detector.ts
   var ShotDetector = class {
     constructor(config = {}) {
       __publicField(this, "boundaryDetector");
       __publicField(this, "phaseDetector");
+      __publicField(this, "useKeyframePhases");
       __publicField(this, "state");
       this.boundaryDetector = new ShotBoundaryDetector(config.boundaryConfig);
       this.phaseDetector = new PhaseDetector(config.phaseConfig);
+      this.useKeyframePhases = config.useKeyframePhases ?? true;
       this.state = this.createInitialState();
     }
     /**
@@ -10644,8 +11585,8 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
               startFrame,
               endFrame
             );
-            for (const [phase, range] of Object.entries(phaseResult.phases)) {
-              if (range && frameIndex >= range.startFrame && frameIndex <= range.endFrame) {
+            for (const [phase, range2] of Object.entries(phaseResult.phases)) {
+              if (range2 && frameIndex >= range2.startFrame && frameIndex <= range2.endFrame) {
                 currentPhase = phase;
                 break;
               }
@@ -10712,6 +11653,17 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         startFrame,
         endFrame
       );
+      let phases = phaseResult.phases;
+      if (this.useKeyframePhases) {
+        const kfFrames = poseLandmarksToFrames(sequence);
+        const keyframes = detectKeyframesFromFrames(
+          kfFrames,
+          startFrame,
+          endFrame
+        );
+        const kfPhases = phasesFromKeyframes(keyframes, startFrame, endFrame);
+        phases = { ...phases, ...kfPhases };
+      }
       const boundaryConfidence = (detected.start.confidence + detected.end.confidence) / 2;
       const overallConfidence = (boundaryConfidence + phaseResult.confidence) / 2;
       return {
@@ -10720,7 +11672,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
           start: startFrame,
           end: endFrame
         },
-        phases: phaseResult.phases,
+        phases,
         confidence: overallConfidence
       };
     }
@@ -13532,7 +14484,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
   }
 
   // src/detection/pose-shot-detector.ts
-  var DEFAULT_CONFIG4 = {
+  var DEFAULT_CONFIG5 = {
     kneeBendThreshold: 15,
     hipDropThreshold: 0.015,
     armExtensionThreshold: -0.15,
@@ -13542,7 +14494,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     minPoseConfidence: 0.3,
     confirmationFrames: 3
   };
-  function calculateKneeAngle(hip, knee, ankle) {
+  function calculateKneeAngle2(hip, knee, ankle) {
     return calculateAngle(hip, knee, ankle);
   }
   function getLandmarkPoint(frame, index) {
@@ -13572,10 +14524,10 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     let leftKneeAngle = 180;
     let rightKneeAngle = 180;
     if (leftHip && leftKnee && leftAnkle) {
-      leftKneeAngle = calculateKneeAngle(leftHip, leftKnee, leftAnkle);
+      leftKneeAngle = calculateKneeAngle2(leftHip, leftKnee, leftAnkle);
     }
     if (rightHip && rightKnee && rightAnkle) {
-      rightKneeAngle = calculateKneeAngle(rightHip, rightKnee, rightAnkle);
+      rightKneeAngle = calculateKneeAngle2(rightHip, rightKnee, rightAnkle);
     }
     const avgKneeAngle = (leftKneeAngle + rightKneeAngle) / 2;
     const hipY = (leftHip.y + rightHip.y) / 2;
@@ -13695,7 +14647,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     }
   }
   function detectShots(poseData, config = {}) {
-    const cfg = { ...DEFAULT_CONFIG4, ...config };
+    const cfg = { ...DEFAULT_CONFIG5, ...config };
     const rawAnalyses = poseData.frames.map(analyzeFrame);
     const analyses = smoothFrameAnalysis(rawAnalyses, cfg.smoothingWindowSize);
     const validAnalyses = analyses.filter((a2) => a2.confidence >= cfg.minPoseConfidence);
