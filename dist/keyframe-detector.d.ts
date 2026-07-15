@@ -60,6 +60,23 @@ export interface KeyframeDetectionResult {
     /** Overall confidence for the detection */
     readonly confidence: number;
 }
+/** One explanation of how a keyframe was determined for a shot. */
+export interface KeyframeDiagnostic {
+    /** Keyframe id (e.g. "set_point"). */
+    readonly keyframe: string;
+    /** Chosen frame, or null when not detectable. */
+    readonly frame: number | null;
+    /** Short method tag (e.g. "elbow-extension", "wristY-peak-fallback"). */
+    readonly method: string;
+    /** Human-readable reasoning, including the deciding numbers. */
+    readonly detail: string;
+}
+/**
+ * Installs (or clears with `null`) a sink that receives a diagnostic for every
+ * keyframe the detectors resolve. Set it before running detection and clear it
+ * afterwards. Not reentrant — one sink at a time.
+ */
+export declare function setKeyframeDiagnosticsSink(sink: ((d: KeyframeDiagnostic) => void) | null): void;
 /**
  * Calculates the angle at the elbow joint (shoulder-elbow-wrist).
  *

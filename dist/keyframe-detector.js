@@ -27,6 +27,19 @@ const DEFAULT_CONFIG = {
     ankleGroundThreshold: 0.01, // Lowered to detect small jumps (Jax front-right/side-left); landing uses 2x multiplier
     followThroughSearchWindow: 0.5,
 };
+let diagnosticsSink = null;
+/**
+ * Installs (or clears with `null`) a sink that receives a diagnostic for every
+ * keyframe the detectors resolve. Set it before running detection and clear it
+ * afterwards. Not reentrant — one sink at a time.
+ */
+export function setKeyframeDiagnosticsSink(sink) {
+    diagnosticsSink = sink;
+}
+function emitDiagnostic(d) {
+    if (diagnosticsSink)
+        diagnosticsSink(d);
+}
 /**
  * Calculates the angle between three points at a joint (vertex).
  *
@@ -295,6 +308,40 @@ function getFrameElbowAngle(frame, visibilityThreshold) {
     return null;
 }
 /**
+ * Returns the left and right elbow angles separately (null when that arm is
+ * below the visibility threshold). Used by set-point detection so it can track
+ * the flexing/extending arm on its own — averaging both arms blurs the signal
+ * and, when the shooting arm is occluded, lets the (still-bent) guide arm keep
+ * the average low past the true set point.
+ */
+function getFrameElbowAnglesPerArm(frame, visibilityThreshold) {
+    if (!frame.landmarks)
+        return { left: null, right: null };
+    const lm = frame.landmarks;
+    const ls = lm[LANDMARK_INDICES.LEFT_SHOULDER];
+    const le = lm[LANDMARK_INDICES.LEFT_ELBOW];
+    const lw = lm[LANDMARK_INDICES.LEFT_WRIST];
+    const rs = lm[LANDMARK_INDICES.RIGHT_SHOULDER];
+    const re = lm[LANDMARK_INDICES.RIGHT_ELBOW];
+    const rw = lm[LANDMARK_INDICES.RIGHT_WRIST];
+    const leftVisible = ls &&
+        le &&
+        lw &&
+        ls.visibility >= visibilityThreshold &&
+        le.visibility >= visibilityThreshold &&
+        lw.visibility >= visibilityThreshold;
+    const rightVisible = rs &&
+        re &&
+        rw &&
+        rs.visibility >= visibilityThreshold &&
+        re.visibility >= visibilityThreshold &&
+        rw.visibility >= visibilityThreshold;
+    return {
+        left: leftVisible ? calculateElbowAngle(ls, le, lw) : null,
+        right: rightVisible ? calculateElbowAngle(rs, re, rw) : null,
+    };
+}
+/**
  * Gets the wrist flexion angle for the shooting arm in a frame.
  *
  * Wrist flexion angle is measured from elbow -> wrist -> index finger.
@@ -384,11 +431,23 @@ export function detectLegBendLowPoint(frames, startFrame, endFrame, config = DEF
             if (frame.frameIndex >= startFrame &&
                 frame.frameIndex <= searchEndFrame) {
                 if (getFrameKneeAngle(frame, config.visibilityThreshold) !== null) {
+                    emitDiagnostic({
+                        keyframe: "leg_bend_low_point",
+                        frame: frame.frameIndex,
+                        method: "no-dip-fallback",
+                        detail: `no clear knee-angle minimum in window ${startFrame}-${searchEndFrame}; used first valid frame`,
+                    });
                     return frame.frameIndex;
                 }
             }
         }
     }
+    emitDiagnostic({
+        keyframe: "leg_bend_low_point",
+        frame: minAngleFrame,
+        method: "knee-angle-min",
+        detail: `deepest knee bend (min angle ${minAngle === Infinity ? "n/a" : minAngle.toFixed(0) + "°"}) in window ${startFrame}-${searchEndFrame} (legBendSearchWindow ${config.legBendSearchWindow})`,
+    });
     return minAngleFrame;
 }
 /**
@@ -608,6 +667,12 @@ export function detectBallStartsUpward(frames, ballLowPointFrame, endFrame, conf
             }
         }
     }
+    emitDiagnostic({
+        keyframe: "ball_starts_upward",
+        frame: result,
+        method: "wristY-velocity",
+        detail: `first sustained upward wrist motion (<${config.wristVelocityThreshold}/frame for ${config.minConsecutiveFrames} frames) after ball_low_point@${ballLowPointFrame}, window ${ballLowPointFrame}-${searchEndFrame}`,
+    });
     return result;
 }
 /**
@@ -793,16 +858,40 @@ export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config =
             frame.frameIndex > searchEndFrame) {
             continue;
         }
+        const perArm = getFrameElbowAnglesPerArm(frame, config.visibilityThreshold);
         series.push({
             frameIndex: frame.frameIndex,
             elbow: getFrameElbowAngle(frame, config.visibilityThreshold),
+            left: perArm.left,
+            right: perArm.right,
             wristY: getFrameWristY(frame, config.visibilityThreshold),
         });
     }
     series.sort((a, b) => a.frameIndex - b.frameIndex);
     if (series.length === 0) {
+        emitDiagnostic({
+            keyframe: "set_point",
+            frame: null,
+            method: "none",
+            detail: `no frames in search window ${ballStartsUpwardFrame}-${searchEndFrame}`,
+        });
         return null;
     }
+    // Report where each arm reaches its deepest flex (minimum angle) so an
+    // occluded/averaged shooting arm is obvious in the logs.
+    const minFrameOf = (key) => {
+        let best = null;
+        for (const s of series) {
+            const v = s[key];
+            if (v == null)
+                continue;
+            if (best === null || v < best.angle)
+                best = { frame: s.frameIndex, angle: v };
+        }
+        return best;
+    };
+    const leftMin = minFrameOf("left");
+    const rightMin = minFrameOf("right");
     // Primary: minimum smoothed elbow angle = deepest flex = set point.
     const elbowFrames = series.filter((s) => s.elbow !== null);
     if (elbowFrames.length >= 3) {
@@ -833,12 +922,33 @@ export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config =
                 break;
             }
         }
-        return elbowFrames[spIdx].frameIndex;
+        const minFrame = elbowFrames[minIdx].frameIndex;
+        const result = elbowFrames[spIdx].frameIndex;
+        const cappedByWrist = wristPeakFrame !== null && result === wristPeakFrame;
+        emitDiagnostic({
+            keyframe: "set_point",
+            frame: result,
+            method: "elbow-extension",
+            detail: `avg-elbow min ${minAngle.toFixed(0)}° @${minFrame}, ` +
+                `walked to end of ${band}° band → @${result}` +
+                (cappedByWrist ? ` (capped at ball peak @${wristPeakFrame})` : "") +
+                `; per-arm min: L ${leftMin ? `${leftMin.angle.toFixed(0)}°@${leftMin.frame}` : "n/a"}, ` +
+                `R ${rightMin ? `${rightMin.angle.toFixed(0)}°@${rightMin.frame}` : "n/a"}; ` +
+                `ballPeak(minWristY)@${wristPeakFrame ?? "n/a"}; ` +
+                `elbow-visible ${elbowFrames.length}/${series.length} frames`,
+        });
+        return result;
     }
     // Fallback (elbow occluded, e.g. behind views): the wrist-height peak
     // (minimum Y), which the ball reaches around the set position.
     const wristFrames = series.filter((s) => s.wristY !== null);
     if (wristFrames.length === 0) {
+        emitDiagnostic({
+            keyframe: "set_point",
+            frame: null,
+            method: "none",
+            detail: `elbow-visible only ${elbowFrames.length} (<3) and no wrist Y in window`,
+        });
         return null;
     }
     let peakIdx = 0;
@@ -847,7 +957,15 @@ export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config =
             peakIdx = i;
         }
     }
-    return wristFrames[peakIdx].frameIndex;
+    const result = wristFrames[peakIdx].frameIndex;
+    emitDiagnostic({
+        keyframe: "set_point",
+        frame: result,
+        method: "wristY-peak-fallback",
+        detail: `elbow-visible only ${elbowFrames.length} (<3) → fell back to ball height peak (min wrist Y) @${result}. ` +
+            `NOTE: fallback runs ~3-4 frames late. per-arm min: L ${leftMin ? `@${leftMin.frame}` : "n/a"}, R ${rightMin ? `@${rightMin.frame}` : "n/a"}`,
+    });
+    return result;
 }
 /**
  * Detects the "release" frame - the frame of maximum wrist flexion (snap).
@@ -882,6 +1000,12 @@ export function detectRelease(frames, setPointFrame, endFrame, config = DEFAULT_
         }
     }
     if (frameData.length === 0) {
+        emitDiagnostic({
+            keyframe: "release",
+            frame: null,
+            method: "none",
+            detail: `no wrist-flexion frames in window ${searchStartFrame}-${searchEndFrame}`,
+        });
         return null;
     }
     // Sort by frame index
@@ -895,6 +1019,12 @@ export function detectRelease(frames, setPointFrame, endFrame, config = DEFAULT_
             releaseFrame = data.frameIndex;
         }
     }
+    emitDiagnostic({
+        keyframe: "release",
+        frame: releaseFrame,
+        method: "wrist-flexion-peak",
+        detail: `max wrist snap (min flexion angle ${minWristAngle.toFixed(0)}°) after set_point@${setPointFrame}, window ${searchStartFrame}-${searchEndFrame}`,
+    });
     return releaseFrame;
 }
 /**

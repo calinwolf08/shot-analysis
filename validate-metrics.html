@@ -499,6 +499,45 @@
         font-weight: 400;
       }
 
+      /* Keyframe diagnostics (algorithm reasoning) */
+      .kf-diag {
+        margin-bottom: 15px;
+        background: #1a1a1a;
+        border-radius: 6px;
+        padding: 8px 12px;
+      }
+
+      .kf-diag summary {
+        cursor: pointer;
+        color: #9ca3af;
+        font-size: 0.82rem;
+      }
+
+      .kf-diag-row {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #2a2a2a;
+      }
+
+      .kf-diag-name {
+        color: #60a5fa;
+        font-weight: 600;
+        font-size: 0.82rem;
+      }
+
+      .kf-diag-method {
+        color: #34d399;
+        font-size: 0.72rem;
+        margin-left: 6px;
+      }
+
+      .kf-diag-detail {
+        color: #9ca3af;
+        font-size: 0.78rem;
+        margin-top: 2px;
+        line-height: 1.4;
+      }
+
       /* Labeled keyframe chips shown under the video */
       .label-kf-list {
         display: flex;
@@ -2570,7 +2609,12 @@
         }
 
         let detected;
+        const diagnostics = [];
         try {
+          // Capture the algorithm's own reasoning for each keyframe.
+          if (typeof ShotAnalysis.setKeyframeDiagnosticsSink === "function") {
+            ShotAnalysis.setKeyframeDiagnosticsSink((d) => diagnostics.push(d));
+          }
           detected = ShotAnalysis.detectKeyframesFromFrames(
             frames,
             shot.frameRange.start,
@@ -2579,6 +2623,18 @@
         } catch (err) {
           console.warn("[keyframes] detection failed", err);
           return "";
+        } finally {
+          if (typeof ShotAnalysis.setKeyframeDiagnosticsSink === "function") {
+            ShotAnalysis.setKeyframeDiagnosticsSink(null);
+          }
+        }
+        if (diagnostics.length) {
+          console.log(
+            `[keyframes] shot ${shot.shotIndex} (frames ${shot.frameRange.start}-${shot.frameRange.end}):`,
+          );
+          diagnostics.forEach((d) =>
+            console.log(`  [${d.keyframe}] @${d.frame} (${d.method}) — ${d.detail}`),
+          );
         }
 
         // Pair with the labeled shot (if labels are loaded) for a per-keyframe
@@ -2633,6 +2689,16 @@
           if (n > 0) {
             html += `<div style="font-size:0.8rem;color:#9ca3af;margin-bottom:15px">MAE ${(sum / n).toFixed(1)} frames over ${n} keyframes (±3 = ok)</div>`;
           }
+        }
+
+        // How/why each keyframe was chosen (algorithm diagnostics).
+        if (diagnostics.length) {
+          html +=
+            '<details class="kf-diag"><summary>Why these frames? (algorithm reasoning)</summary>';
+          diagnostics.forEach((d) => {
+            html += `<div class="kf-diag-row"><span class="kf-diag-name">${d.keyframe} @${d.frame}</span> <span class="kf-diag-method">${d.method}</span><div class="kf-diag-detail">${d.detail}</div></div>`;
+          });
+          html += "</details>";
         }
         return html;
       }

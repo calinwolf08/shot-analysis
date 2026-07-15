@@ -220,3 +220,10 @@ export {
 } from "./detection/keyframe-phases";
 
 export type { KeyframeId } from "./testing/types";
+
+// Keyframe diagnostics: install a sink to capture the per-keyframe reasoning
+// (method + explanation) the detectors emit, for debugging against labels.
+export {
+  setKeyframeDiagnosticsSink,
+  type KeyframeDiagnostic,
+} from "./keyframe-detector";

@@ -86,6 +86,7 @@ var ShotAnalysis = (() => {
     poseLandmarksToFrames: () => poseLandmarksToFrames,
     proFormProfile: () => proFormProfile,
     safeValidateConfig: () => safeValidateConfig,
+    setKeyframeDiagnosticsSink: () => setKeyframeDiagnosticsSink,
     shootingHandSchema: () => shootingHandSchema,
     smoothLandmarkSequence: () => smoothLandmarkSequence,
     timingUnitSchema: () => timingUnitSchema,
@@ -10598,6 +10599,13 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     // Lowered to detect small jumps (Jax front-right/side-left); landing uses 2x multiplier
     followThroughSearchWindow: 0.5
   };
+  var diagnosticsSink = null;
+  function setKeyframeDiagnosticsSink(sink) {
+    diagnosticsSink = sink;
+  }
+  function emitDiagnostic(d2) {
+    if (diagnosticsSink) diagnosticsSink(d2);
+  }
   function calculateJointAngle(pointA, vertex, pointB) {
     if (!pointA || !vertex || !pointB) {
       return null;
@@ -10728,6 +10736,22 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     }
     return null;
   }
+  function getFrameElbowAnglesPerArm(frame, visibilityThreshold) {
+    if (!frame.landmarks) return { left: null, right: null };
+    const lm = frame.landmarks;
+    const ls2 = lm[LANDMARK_INDICES.LEFT_SHOULDER];
+    const le2 = lm[LANDMARK_INDICES.LEFT_ELBOW];
+    const lw = lm[LANDMARK_INDICES.LEFT_WRIST];
+    const rs2 = lm[LANDMARK_INDICES.RIGHT_SHOULDER];
+    const re2 = lm[LANDMARK_INDICES.RIGHT_ELBOW];
+    const rw = lm[LANDMARK_INDICES.RIGHT_WRIST];
+    const leftVisible = ls2 && le2 && lw && ls2.visibility >= visibilityThreshold && le2.visibility >= visibilityThreshold && lw.visibility >= visibilityThreshold;
+    const rightVisible = rs2 && re2 && rw && rs2.visibility >= visibilityThreshold && re2.visibility >= visibilityThreshold && rw.visibility >= visibilityThreshold;
+    return {
+      left: leftVisible ? calculateElbowAngle(ls2, le2, lw) : null,
+      right: rightVisible ? calculateElbowAngle(rs2, re2, rw) : null
+    };
+  }
   function getFrameWristAngle(frame, visibilityThreshold) {
     if (!frame.landmarks) {
       return null;
@@ -10772,11 +10796,23 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       for (const frame of frames) {
         if (frame.frameIndex >= startFrame && frame.frameIndex <= searchEndFrame) {
           if (getFrameKneeAngle(frame, config.visibilityThreshold) !== null) {
+            emitDiagnostic({
+              keyframe: "leg_bend_low_point",
+              frame: frame.frameIndex,
+              method: "no-dip-fallback",
+              detail: `no clear knee-angle minimum in window ${startFrame}-${searchEndFrame}; used first valid frame`
+            });
             return frame.frameIndex;
           }
         }
       }
     }
+    emitDiagnostic({
+      keyframe: "leg_bend_low_point",
+      frame: minAngleFrame,
+      method: "knee-angle-min",
+      detail: `deepest knee bend (min angle ${minAngle === Infinity ? "n/a" : minAngle.toFixed(0) + "\xB0"}) in window ${startFrame}-${searchEndFrame} (legBendSearchWindow ${config.legBendSearchWindow})`
+    });
     return minAngleFrame;
   }
   function detectBallLowPoint(frames, startFrame, endFrame, config = DEFAULT_CONFIG4) {
@@ -10916,6 +10952,12 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         }
       }
     }
+    emitDiagnostic({
+      keyframe: "ball_starts_upward",
+      frame: result,
+      method: "wristY-velocity",
+      detail: `first sustained upward wrist motion (<${config.wristVelocityThreshold}/frame for ${config.minConsecutiveFrames} frames) after ball_low_point@${ballLowPointFrame}, window ${ballLowPointFrame}-${searchEndFrame}`
+    });
     return result;
   }
   var SET_POINT_EXTENSION_BAND_DEG = 16;
@@ -10937,16 +10979,40 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       if (frame.frameIndex < ballStartsUpwardFrame || frame.frameIndex > searchEndFrame) {
         continue;
       }
+      const perArm = getFrameElbowAnglesPerArm(
+        frame,
+        config.visibilityThreshold
+      );
       series.push({
         frameIndex: frame.frameIndex,
         elbow: getFrameElbowAngle(frame, config.visibilityThreshold),
+        left: perArm.left,
+        right: perArm.right,
         wristY: getFrameWristY(frame, config.visibilityThreshold)
       });
     }
     series.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
     if (series.length === 0) {
+      emitDiagnostic({
+        keyframe: "set_point",
+        frame: null,
+        method: "none",
+        detail: `no frames in search window ${ballStartsUpwardFrame}-${searchEndFrame}`
+      });
       return null;
     }
+    const minFrameOf = (key) => {
+      let best = null;
+      for (const s2 of series) {
+        const v2 = s2[key];
+        if (v2 == null) continue;
+        if (best === null || v2 < best.angle)
+          best = { frame: s2.frameIndex, angle: v2 };
+      }
+      return best;
+    };
+    const leftMin = minFrameOf("left");
+    const rightMin = minFrameOf("right");
     const elbowFrames = series.filter(
       (s2) => s2.elbow !== null
     );
@@ -10972,12 +11038,27 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
           break;
         }
       }
-      return elbowFrames[spIdx].frameIndex;
+      const minFrame = elbowFrames[minIdx].frameIndex;
+      const result2 = elbowFrames[spIdx].frameIndex;
+      const cappedByWrist = wristPeakFrame !== null && result2 === wristPeakFrame;
+      emitDiagnostic({
+        keyframe: "set_point",
+        frame: result2,
+        method: "elbow-extension",
+        detail: `avg-elbow min ${minAngle.toFixed(0)}\xB0 @${minFrame}, walked to end of ${band}\xB0 band \u2192 @${result2}` + (cappedByWrist ? ` (capped at ball peak @${wristPeakFrame})` : "") + `; per-arm min: L ${leftMin ? `${leftMin.angle.toFixed(0)}\xB0@${leftMin.frame}` : "n/a"}, R ${rightMin ? `${rightMin.angle.toFixed(0)}\xB0@${rightMin.frame}` : "n/a"}; ballPeak(minWristY)@${wristPeakFrame ?? "n/a"}; elbow-visible ${elbowFrames.length}/${series.length} frames`
+      });
+      return result2;
     }
     const wristFrames = series.filter(
       (s2) => s2.wristY !== null
     );
     if (wristFrames.length === 0) {
+      emitDiagnostic({
+        keyframe: "set_point",
+        frame: null,
+        method: "none",
+        detail: `elbow-visible only ${elbowFrames.length} (<3) and no wrist Y in window`
+      });
       return null;
     }
     let peakIdx = 0;
@@ -10986,7 +11067,14 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         peakIdx = i2;
       }
     }
-    return wristFrames[peakIdx].frameIndex;
+    const result = wristFrames[peakIdx].frameIndex;
+    emitDiagnostic({
+      keyframe: "set_point",
+      frame: result,
+      method: "wristY-peak-fallback",
+      detail: `elbow-visible only ${elbowFrames.length} (<3) \u2192 fell back to ball height peak (min wrist Y) @${result}. NOTE: fallback runs ~3-4 frames late. per-arm min: L ${leftMin ? `@${leftMin.frame}` : "n/a"}, R ${rightMin ? `@${rightMin.frame}` : "n/a"}`
+    });
+    return result;
   }
   function detectRelease(frames, setPointFrame, endFrame, config = DEFAULT_CONFIG4) {
     const searchStartFrame = setPointFrame + 1;
@@ -11004,6 +11092,12 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       }
     }
     if (frameData.length === 0) {
+      emitDiagnostic({
+        keyframe: "release",
+        frame: null,
+        method: "none",
+        detail: `no wrist-flexion frames in window ${searchStartFrame}-${searchEndFrame}`
+      });
       return null;
     }
     frameData.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
@@ -11015,6 +11109,12 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         releaseFrame = data.frameIndex;
       }
     }
+    emitDiagnostic({
+      keyframe: "release",
+      frame: releaseFrame,
+      method: "wrist-flexion-peak",
+      detail: `max wrist snap (min flexion angle ${minWristAngle.toFixed(0)}\xB0) after set_point@${setPointFrame}, window ${searchStartFrame}-${searchEndFrame}`
+    });
     return releaseFrame;
   }
   function getFrameAnkleY(frame, visibilityThreshold) {

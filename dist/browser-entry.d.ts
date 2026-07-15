@@ -49,4 +49,5 @@ export type { PoseShotDetectorConfig, DetectedShot as PoseDetectedShot, Detectio
 export { detectShots as detectShotsFromPoses, detectOrientation, createPoseShotDetector, } from "./detection/pose-shot-detector";
 export { detectKeyframesFromFrames, phasesFromKeyframes, poseLandmarksToFrames, } from "./detection/keyframe-phases";
 export type { KeyframeId } from "./testing/types";
+export { setKeyframeDiagnosticsSink, type KeyframeDiagnostic, } from "./keyframe-detector";
 //# sourceMappingURL=browser-entry.d.ts.map

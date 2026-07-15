@@ -49,4 +49,7 @@ export { detectShots as detectShotsFromPoses, detectOrientation, createPoseShotD
 // offline harness scores against labels) — exposed so the validator can show
 // the detected keyframes next to the self-labeled data.
 export { detectKeyframesFromFrames, phasesFromKeyframes, poseLandmarksToFrames, } from "./detection/keyframe-phases";
+// Keyframe diagnostics: install a sink to capture the per-keyframe reasoning
+// (method + explanation) the detectors emit, for debugging against labels.
+export { setKeyframeDiagnosticsSink, } from "./keyframe-detector";
 //# sourceMappingURL=browser-entry.js.map
