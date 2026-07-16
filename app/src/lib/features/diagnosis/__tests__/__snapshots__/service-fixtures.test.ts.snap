@@ -29,7 +29,7 @@ exports[`DiagnosisService > persists ranked focus areas and replaces on re-diagn
   },
   {
     "group": "ball-path",
-    "severity": 0.53,
+    "severity": 0.539,
     "surfaced": false,
   },
   {

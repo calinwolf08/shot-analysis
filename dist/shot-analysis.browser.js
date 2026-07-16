@@ -12666,22 +12666,22 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     if (!nose) return null;
     return nose.position;
   }
-  var SET_POINT_HOLD_ELBOW_BAND_DEG = 18;
-  function smoothAngleSeries(series, window2) {
-    const half = Math.floor(window2 / 2);
-    return series.map((v2, i2) => {
-      if (v2 === null) return null;
-      let sum = 0;
-      let n2 = 0;
-      for (let j2 = i2 - half; j2 <= i2 + half; j2++) {
-        const x2 = series[j2];
-        if (j2 >= 0 && j2 < series.length && x2 !== null && x2 !== void 0) {
-          sum += x2;
-          n2++;
-        }
-      }
-      return n2 > 0 ? sum / n2 : v2;
-    });
+  var SET_POINT_HOLD_MAX_VEL = 0.08;
+  function wristShoulderRel(pose, shoulderIdx, wristIdx, minVisibility = 0.2) {
+    const s2 = pose.landmarks[shoulderIdx];
+    const w2 = pose.landmarks[wristIdx];
+    if (!s2 || !w2) return null;
+    if (s2.visibility < minVisibility || w2.visibility < minVisibility) return null;
+    const ls2 = pose.landmarks[LANDMARK_INDICES.LEFT_SHOULDER];
+    const rs2 = pose.landmarks[LANDMARK_INDICES.RIGHT_SHOULDER];
+    const scale = ls2 && rs2 ? Math.max(
+      Math.hypot(ls2.position.x - rs2.position.x, ls2.position.y - rs2.position.y),
+      0.05
+    ) : 0.15;
+    return {
+      x: (w2.position.x - s2.position.x) / scale,
+      y: (w2.position.y - s2.position.y) / scale
+    };
   }
   function armElbowAngle(pose, shoulderIdx, elbowIdx, wristIdx, minVisibility = 0.2) {
     const s2 = pose.landmarks[shoulderIdx];
@@ -12941,31 +12941,58 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       const setFrame = setPointPhase.startFrame;
       const setPose = getPoseAtFrame3(poseLandmarks, setFrame);
       const arm = setPose ? pickCockedArm(setPose, config) : null;
-      const setAngle = setPose && arm ? armElbowAngle(setPose, arm.shoulder, arm.elbow, arm.wrist) : null;
       let holdStart = setFrame;
       let holdEnd = setFrame;
-      if (setAngle !== null && arm) {
-        const band = SET_POINT_HOLD_ELBOW_BAND_DEG;
-        const raw = poseLandmarks.map(
-          (p2) => armElbowAngle(p2, arm.shoulder, arm.elbow, arm.wrist)
+      if (arm) {
+        const relX = poseLandmarks.map(
+          (p2) => {
+            var _a3;
+            return ((_a3 = wristShoulderRel(p2, arm.shoulder, arm.wrist)) == null ? void 0 : _a3.x) ?? null;
+          }
         );
-        const smooth = smoothAngleSeries(raw, 3);
+        const relY = poseLandmarks.map(
+          (p2) => {
+            var _a3;
+            return ((_a3 = wristShoulderRel(p2, arm.shoulder, arm.wrist)) == null ? void 0 : _a3.y) ?? null;
+          }
+        );
         const setIdx = poseLandmarks.findIndex((p2) => p2.frameIndex === setFrame);
+        const vel = (i2) => {
+          const x2 = relX[i2];
+          const y2 = relY[i2];
+          const px = relX[i2 - 1];
+          const py = relY[i2 - 1];
+          if (x2 === null || x2 === void 0 || y2 === null || y2 === void 0 || px === null || px === void 0 || py === null || py === void 0) {
+            return null;
+          }
+          return Math.hypot(x2 - px, y2 - py);
+        };
         if (setIdx >= 0) {
-          const ref = smooth[setIdx];
-          if (ref !== null && ref !== void 0) {
-            holdStart = setFrame;
-            holdEnd = setFrame;
-            for (let i2 = setIdx - 1; i2 >= 0; i2--) {
-              const a2 = smooth[i2];
-              if (a2 === null || a2 === void 0 || Math.abs(a2 - ref) > band) break;
-              holdStart = poseLandmarks[i2].frameIndex;
+          let anchor = setIdx;
+          let bestVel = Infinity;
+          for (let i2 = Math.max(1, setIdx - 5); i2 <= setIdx + 2; i2++) {
+            const v2 = vel(i2);
+            if (v2 !== null && v2 < bestVel) {
+              bestVel = v2;
+              anchor = i2;
             }
-            for (let i2 = setIdx + 1; i2 < smooth.length; i2++) {
-              const a2 = smooth[i2];
-              if (a2 === null || a2 === void 0 || Math.abs(a2 - ref) > band) break;
+          }
+          if (bestVel <= SET_POINT_HOLD_MAX_VEL) {
+            holdStart = poseLandmarks[anchor].frameIndex;
+            holdEnd = poseLandmarks[anchor].frameIndex;
+            for (let i2 = anchor; i2 >= 1; i2--) {
+              const v2 = vel(i2);
+              if (v2 === null || v2 > SET_POINT_HOLD_MAX_VEL) break;
+              holdStart = poseLandmarks[i2 - 1].frameIndex;
+            }
+            for (let i2 = anchor + 1; i2 < poseLandmarks.length; i2++) {
+              const v2 = vel(i2);
+              if (v2 === null || v2 > SET_POINT_HOLD_MAX_VEL) break;
               holdEnd = poseLandmarks[i2].frameIndex;
             }
+          } else {
+            holdStart = setFrame;
+            holdEnd = setFrame;
           }
         }
       }
