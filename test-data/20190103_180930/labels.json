@@ -5,15 +5,15 @@
   "shots": [
     {
       "shotNumber": 1,
-      "startFrame": 81,
+      "startFrame": 84,
       "endFrame": 111,
       "cameraOrientation": "side-right",
-      "legs_start_bending": 81,
+      "legs_start_bending": 84,
       "leg_bend_low_point": 93,
       "ball_low_point": 86,
       "ball_starts_upward": 88,
       "legs_start_extending": 94,
-      "set_point": 96,
+      "set_point": 98,
       "arms_fully_extended": 103,
       "feet_leave_ground": 102,
       "feet_land": 106,
@@ -21,7 +21,7 @@
     },
     {
       "shotNumber": 2,
-      "startFrame": 243,
+      "startFrame": 245,
       "endFrame": 270,
       "cameraOrientation": "front",
       "legs_start_bending": 243,
