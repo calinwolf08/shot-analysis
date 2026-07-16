@@ -12666,6 +12666,47 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     if (!nose) return null;
     return nose.position;
   }
+  var SET_POINT_HOLD_ELBOW_BAND_DEG = 18;
+  function smoothAngleSeries(series, window2) {
+    const half = Math.floor(window2 / 2);
+    return series.map((v2, i2) => {
+      if (v2 === null) return null;
+      let sum = 0;
+      let n2 = 0;
+      for (let j2 = i2 - half; j2 <= i2 + half; j2++) {
+        const x2 = series[j2];
+        if (j2 >= 0 && j2 < series.length && x2 !== null && x2 !== void 0) {
+          sum += x2;
+          n2++;
+        }
+      }
+      return n2 > 0 ? sum / n2 : v2;
+    });
+  }
+  function armElbowAngle(pose, shoulderIdx, elbowIdx, wristIdx, minVisibility = 0.2) {
+    const s2 = pose.landmarks[shoulderIdx];
+    const e2 = pose.landmarks[elbowIdx];
+    const w2 = pose.landmarks[wristIdx];
+    if (!s2 || !e2 || !w2) return null;
+    if (s2.visibility < minVisibility || e2.visibility < minVisibility || w2.visibility < minVisibility) {
+      return null;
+    }
+    return calculateAngle(s2.position, e2.position, w2.position);
+  }
+  function pickCockedArm(pose, config) {
+    const m2 = getHandednessMapping(config.shootingHand);
+    const arms = [
+      { shoulder: m2.shootingShoulder, elbow: m2.shootingElbow, wrist: m2.shootingWrist },
+      { shoulder: m2.guideShoulder, elbow: m2.guideElbow, wrist: m2.guideWrist }
+    ];
+    let best = null;
+    for (const arm of arms) {
+      const a2 = armElbowAngle(pose, arm.shoulder, arm.elbow, arm.wrist);
+      if (a2 === null) continue;
+      if (best === null || a2 < best.angle) best = { arm, angle: a2 };
+    }
+    return (best == null ? void 0 : best.arm) ?? null;
+  }
   function areHandsTogether(pose, threshold = DEFAULT_HAND_TOGETHER_THRESHOLD) {
     const leftIndex = pose.landmarks[LANDMARK_INDICES.LEFT_INDEX];
     const rightIndex = pose.landmarks[LANDMARK_INDICES.RIGHT_INDEX];
@@ -12892,21 +12933,54 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     }
     calculate(context) {
       var _a2, _b;
-      const { poseLandmarks, phases } = context;
+      const { poseLandmarks, phases, config } = context;
       const setPointPhase = phases["setPoint" /* SetPoint */];
       if (!setPointPhase) {
         return { error: "SetPoint phase not detected" };
       }
-      const durationFrames = setPointPhase.endFrame - setPointPhase.startFrame + 1;
-      let durationMs;
-      const startPose = getPoseAtFrame3(poseLandmarks, setPointPhase.startFrame);
-      const endPose = getPoseAtFrame3(poseLandmarks, setPointPhase.endFrame);
-      if (startPose && endPose) {
-        durationMs = endPose.timestamp - startPose.timestamp;
-        if (durationMs <= 0 && poseLandmarks.length >= 2) {
-          const fps = 1e3 / ((((_a2 = poseLandmarks[1]) == null ? void 0 : _a2.timestamp) ?? 33.33) - (((_b = poseLandmarks[0]) == null ? void 0 : _b.timestamp) ?? 0));
-          durationMs = durationFrames / fps * 1e3;
+      const setFrame = setPointPhase.startFrame;
+      const setPose = getPoseAtFrame3(poseLandmarks, setFrame);
+      const arm = setPose ? pickCockedArm(setPose, config) : null;
+      const setAngle = setPose && arm ? armElbowAngle(setPose, arm.shoulder, arm.elbow, arm.wrist) : null;
+      let holdStart = setFrame;
+      let holdEnd = setFrame;
+      if (setAngle !== null && arm) {
+        const band = SET_POINT_HOLD_ELBOW_BAND_DEG;
+        const raw = poseLandmarks.map(
+          (p2) => armElbowAngle(p2, arm.shoulder, arm.elbow, arm.wrist)
+        );
+        const smooth = smoothAngleSeries(raw, 3);
+        const setIdx = poseLandmarks.findIndex((p2) => p2.frameIndex === setFrame);
+        if (setIdx >= 0) {
+          const ref = smooth[setIdx];
+          if (ref !== null && ref !== void 0) {
+            holdStart = setFrame;
+            holdEnd = setFrame;
+            for (let i2 = setIdx - 1; i2 >= 0; i2--) {
+              const a2 = smooth[i2];
+              if (a2 === null || a2 === void 0 || Math.abs(a2 - ref) > band) break;
+              holdStart = poseLandmarks[i2].frameIndex;
+            }
+            for (let i2 = setIdx + 1; i2 < smooth.length; i2++) {
+              const a2 = smooth[i2];
+              if (a2 === null || a2 === void 0 || Math.abs(a2 - ref) > band) break;
+              holdEnd = poseLandmarks[i2].frameIndex;
+            }
+          }
         }
+      }
+      const durationFrames = holdEnd - holdStart + 1;
+      let durationMs;
+      const startPose = getPoseAtFrame3(poseLandmarks, holdStart);
+      const endPose = getPoseAtFrame3(poseLandmarks, holdEnd);
+      if (startPose && endPose && endPose.timestamp > startPose.timestamp) {
+        durationMs = endPose.timestamp - startPose.timestamp;
+      } else if (poseLandmarks.length >= 2) {
+        const fps = 1e3 / Math.max(
+          1,
+          (((_a2 = poseLandmarks[1]) == null ? void 0 : _a2.timestamp) ?? 33.33) - (((_b = poseLandmarks[0]) == null ? void 0 : _b.timestamp) ?? 0)
+        );
+        durationMs = durationFrames / fps * 1e3;
       } else {
         durationMs = durationFrames / 30 * 1e3;
       }
@@ -12918,7 +12992,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       const value = {
         value: Math.round(durationMs),
         unit: this.unit,
-        frame: setPointPhase.startFrame,
+        frame: holdStart,
         confidence
       };
       return { value };

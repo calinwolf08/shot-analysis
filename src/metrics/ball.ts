@@ -28,7 +28,7 @@ import type {
   MetricValue,
 } from "./types";
 import { getHandednessMapping } from "../config";
-import { calculateDistance } from "../utils/geometry";
+import { calculateAngle, calculateDistance } from "../utils/geometry";
 import { ShotPhase } from "../detection/types";
 import type { PoseLandmarks, Point3D } from "../types";
 import { LANDMARK_INDICES } from "../types";
@@ -99,6 +99,76 @@ function getNosePosition(pose: PoseLandmarks): Point3D | null {
   const nose = pose.landmarks[LANDMARK_INDICES.NOSE];
   if (!nose) return null;
   return nose.position;
+}
+
+/** Degrees the cocked elbow may open and still count as "held" at set point. */
+const SET_POINT_HOLD_ELBOW_BAND_DEG = 18;
+
+/** Moving average over a series that may contain nulls (nulls stay null). */
+function smoothAngleSeries(
+  series: readonly (number | null)[],
+  window: number,
+): (number | null)[] {
+  const half = Math.floor(window / 2);
+  return series.map((v, i) => {
+    if (v === null) return null;
+    let sum = 0;
+    let n = 0;
+    for (let j = i - half; j <= i + half; j++) {
+      const x = series[j];
+      if (j >= 0 && j < series.length && x !== null && x !== undefined) {
+        sum += x;
+        n++;
+      }
+    }
+    return n > 0 ? sum / n : v;
+  });
+}
+
+/** Elbow-joint angle (shoulder-elbow-wrist) for a given arm, or null. */
+function armElbowAngle(
+  pose: PoseLandmarks,
+  shoulderIdx: number,
+  elbowIdx: number,
+  wristIdx: number,
+  minVisibility = 0.2,
+): number | null {
+  const s = pose.landmarks[shoulderIdx];
+  const e = pose.landmarks[elbowIdx];
+  const w = pose.landmarks[wristIdx];
+  if (!s || !e || !w) return null;
+  if (
+    s.visibility < minVisibility ||
+    e.visibility < minVisibility ||
+    w.visibility < minVisibility
+  ) {
+    return null;
+  }
+  return calculateAngle(s.position, e.position, w.position);
+}
+
+/**
+ * Picks the "cocked" arm at the set point — the more flexed (smaller elbow
+ * angle) of the two arms — and returns its landmark indices, so the hold can
+ * be tracked on the same arm across frames. Handedness config is only a hint;
+ * whichever arm is actually cocked wins.
+ */
+function pickCockedArm(
+  pose: PoseLandmarks,
+  config: MetricCalculatorContext["config"],
+): { shoulder: number; elbow: number; wrist: number } | null {
+  const m = getHandednessMapping(config.shootingHand);
+  const arms = [
+    { shoulder: m.shootingShoulder, elbow: m.shootingElbow, wrist: m.shootingWrist },
+    { shoulder: m.guideShoulder, elbow: m.guideElbow, wrist: m.guideWrist },
+  ];
+  let best: { arm: (typeof arms)[number]; angle: number } | null = null;
+  for (const arm of arms) {
+    const a = armElbowAngle(pose, arm.shoulder, arm.elbow, arm.wrist);
+    if (a === null) continue;
+    if (best === null || a < best.angle) best = { arm, angle: a };
+  }
+  return best?.arm ?? null;
 }
 
 /**
@@ -457,7 +527,7 @@ export class SetPointDurationCalculator implements MetricCalculator {
   readonly unit = "ms";
 
   calculate(context: MetricCalculatorContext): MetricCalculatorResult {
-    const { poseLandmarks, phases } = context;
+    const { poseLandmarks, phases, config } = context;
 
     // Get set point phase
     const setPointPhase = phases[ShotPhase.SetPoint];
@@ -465,34 +535,86 @@ export class SetPointDurationCalculator implements MetricCalculator {
       return { error: "SetPoint phase not detected" };
     }
 
-    // Calculate duration in frames
-    const durationFrames =
-      setPointPhase.endFrame - setPointPhase.startFrame + 1;
+    // Some shooters hold the set for several frames; others move continuously
+    // through it. The SetPoint phase itself is a single frame, so we measure
+    // the hold from the shooting hand's position RELATIVE TO THE HEAD (vertical
+    // wrist-to-nose offset). This is body-relative, so a shooter still
+    // extending the legs — whose whole body (and wrist) rises — reads as held,
+    // whereas the release push (wrist rising past the head) ends the hold. A
+    // wrist-Y signal alone can't tell those apart.
+    const setFrame = setPointPhase.startFrame;
+    const setPose = getPoseAtFrame(poseLandmarks, setFrame);
+    const arm = setPose ? pickCockedArm(setPose, config) : null;
+    const setAngle =
+      setPose && arm
+        ? armElbowAngle(setPose, arm.shoulder, arm.elbow, arm.wrist)
+        : null;
 
-    // Convert to milliseconds using frame timestamps
-    let durationMs: number;
-    const startPose = getPoseAtFrame(poseLandmarks, setPointPhase.startFrame);
-    const endPose = getPoseAtFrame(poseLandmarks, setPointPhase.endFrame);
+    let holdStart = setFrame;
+    let holdEnd = setFrame;
 
-    if (startPose && endPose) {
-      durationMs = endPose.timestamp - startPose.timestamp;
-      // For single frame, estimate from surrounding frames
-      if (durationMs <= 0 && poseLandmarks.length >= 2) {
-        const fps =
-          1000 /
-          ((poseLandmarks[1]?.timestamp ?? 33.33) -
-            (poseLandmarks[0]?.timestamp ?? 0));
-        durationMs = (durationFrames / fps) * 1000;
+    if (setAngle !== null && arm) {
+      // The hold is the span the cocked arm stays flexed near its set-point
+      // angle. This is body-relative (an angle), so a shooter still extending
+      // the legs — whose whole body rises — still reads as held; the hold ends
+      // when the elbow opens out into the release. A wrist-Y signal can't tell
+      // those apart.
+      //
+      // Track a smoothed angle series so a single-frame landmark jitter doesn't
+      // truncate the hold.
+      const band = SET_POINT_HOLD_ELBOW_BAND_DEG;
+      const raw = poseLandmarks.map((p) =>
+        armElbowAngle(p, arm.shoulder, arm.elbow, arm.wrist),
+      );
+      const smooth = smoothAngleSeries(raw, 3);
+      const setIdx = poseLandmarks.findIndex((p) => p.frameIndex === setFrame);
+      if (setIdx >= 0) {
+        // How long the arm stays cocked: the contiguous span the elbow angle
+        // stays within `band` of the set-point angle. Body-relative, so a
+        // shooter still extending the legs (whole body rising) still reads as
+        // held; the span ends when the elbow opens out into the release. A
+        // continuous shooter passes straight through (a frame or two); a
+        // shooter who holds the set reads several frames.
+        const ref = smooth[setIdx];
+        if (ref !== null && ref !== undefined) {
+          holdStart = setFrame;
+          holdEnd = setFrame;
+          for (let i = setIdx - 1; i >= 0; i--) {
+            const a = smooth[i];
+            if (a === null || a === undefined || Math.abs(a - ref) > band) break;
+            holdStart = poseLandmarks[i]!.frameIndex;
+          }
+          for (let i = setIdx + 1; i < smooth.length; i++) {
+            const a = smooth[i];
+            if (a === null || a === undefined || Math.abs(a - ref) > band) break;
+            holdEnd = poseLandmarks[i]!.frameIndex;
+          }
+        }
       }
-    } else {
-      // Estimate assuming 30fps
-      durationMs = (durationFrames / 30) * 1000;
     }
 
-    // Ensure positive duration
+    const durationFrames = holdEnd - holdStart + 1;
+
+    // Convert to milliseconds using frame timestamps.
+    let durationMs: number;
+    const startPose = getPoseAtFrame(poseLandmarks, holdStart);
+    const endPose = getPoseAtFrame(poseLandmarks, holdEnd);
+    if (startPose && endPose && endPose.timestamp > startPose.timestamp) {
+      durationMs = endPose.timestamp - startPose.timestamp;
+    } else if (poseLandmarks.length >= 2) {
+      const fps =
+        1000 /
+        Math.max(
+          1,
+          (poseLandmarks[1]?.timestamp ?? 33.33) -
+            (poseLandmarks[0]?.timestamp ?? 0),
+        );
+      durationMs = (durationFrames / fps) * 1000;
+    } else {
+      durationMs = (durationFrames / 30) * 1000;
+    }
     durationMs = Math.max(durationMs, (durationFrames / 30) * 1000);
 
-    // Calculate confidence
     let confidence = 0.8;
     if (startPose && endPose) {
       confidence =
@@ -503,7 +625,7 @@ export class SetPointDurationCalculator implements MetricCalculator {
     const value: MetricValue = {
       value: Math.round(durationMs),
       unit: this.unit,
-      frame: setPointPhase.startFrame,
+      frame: holdStart,
       confidence,
     };
 
