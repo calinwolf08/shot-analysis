@@ -173,22 +173,19 @@ export class PhaseDetector {
             return { phases: {}, confidence: 0 };
         }
 
-        // Identified start frame is based on wrist movement but may be after the 
-        // true start of the leg bend. We rewind the start frame by an offset so that analyze frames can
-        // walk backwards from actualStart to find the first frame with knee bend.
-        const START_OFFSET = 15
-
-        // Ensure frame indices are within bounds
+        // Ensure frame indices are within bounds. (The shot boundary detector
+        // already rewinds the start to the gather onset, so the phase window
+        // begins at the shot start — analyzeFrames' baseFrame and the frameData
+        // indexing must stay consistent, so no extra backward offset here.)
         const actualStart = Math.max(0, startFrame);
-        const actualStartOffset = Math.max(0, startFrame - START_OFFSET);
         const actualEnd = Math.min(sequence.length - 1, endFrame);
 
         if (actualEnd - actualStart < 1) {
             return { phases: {}, confidence: 0 };
         }
 
-        // Analyze each frame 
-        const frameData = this.analyzeFrames(sequence, actualStartOffset, actualEnd);
+        // Analyze each frame
+        const frameData = this.analyzeFrames(sequence, actualStart, actualEnd);
 
         if (frameData.length < 2) {
             return { phases: {}, confidence: 0 };
@@ -683,8 +680,14 @@ export class PhaseDetector {
                     riseEnd = newRiseEnd;
                 }
             }
-        } else if (state.peakWristFrame >= 0) {
-            // Fallback: wrist at peak (minimum Y), brief plateau.
+        } else if (
+            state.peakWristFrame >= 0 &&
+            state.peakWristFrame - baseFrame >= 0 &&
+            state.peakWristFrame - baseFrame < n
+        ) {
+            // Fallback: wrist at peak (minimum Y), brief plateau. Only when the
+            // peak is inside this shot's frame window (a moved boundary can put
+            // it outside, which previously indexed out of bounds).
             const peakIdx = state.peakWristFrame - baseFrame;
             const peakThreshold = 0.02;
             let setStart = state.peakWristFrame;

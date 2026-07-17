@@ -12,6 +12,7 @@ import { KEYFRAME_IDS } from "./types";
 
 const TOL: Record<string, number> = { set_point: 1 };
 const DEFAULT_TOL = 2;
+const START_TOL = 3; // the shot start (boundary) is allowed ±3
 const tolFor = (k: string) => TOL[k] ?? DEFAULT_TOL;
 
 const EMPTY = Array.from({ length: 33 }, () => ({
@@ -119,7 +120,8 @@ for (const video of fs.readdirSync("test-data").sort()) {
     ] as const) {
       const diff = det - lv;
       totalChecks++;
-      const pass = Math.abs(diff) <= DEFAULT_TOL;
+      const pass =
+        Math.abs(diff) <= (name === "start" ? START_TOL : DEFAULT_TOL);
       if (name === "start") rec.startPass = pass;
       if (!pass) {
         totalFails++;

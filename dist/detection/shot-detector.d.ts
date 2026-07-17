@@ -135,6 +135,21 @@ export declare class ShotBoundaryDetector {
      * Velocities that are too large (indicating pose dropout recovery) are clamped to 0.
      */
     private calculateVelocities;
+    /**
+     * Average knee angle (hip-knee-ankle) over both visible legs, or null when
+     * neither leg is visible. Lower = more bent.
+     */
+    private avgKneeAngle;
+    /**
+     * Refines a shot start to the frame the knees BEGAN bending (legs_start_
+     * bending) — the shot-boundary "start" fires on the ball's upward motion,
+     * which is after the gather. Two phases, because `armStart` can land after
+     * the deepest bend (during leg extension):
+     *   1. Find the knee-angle minimum (deepest bend) near armStart.
+     *   2. From there walk back to the straightest knee (the bend onset),
+     *      stopping when the knee bends again (a separate earlier motion) or
+     *      the legs drop out of view.
+     */
     private findKneeBendStartFromArmStart;
     /**
      * Finds shot start and end boundaries based on velocity patterns.

@@ -11,8 +11,8 @@
  *
  * @see Feature 4.0 - Shot Detection & Phase Identification
  */
-import { calculateKneeAngle } from "../keyframe-detector";
 import { LANDMARK_INDEX } from "../pose/types";
+import { calculateAngle } from "../utils/geometry";
 import { movingAverage } from "../utils/smoothing";
 /**
  * Default configuration values.
@@ -180,7 +180,6 @@ export class ShotBoundaryDetector {
             const rightKnee = landmarks[LANDMARK_INDEX.RIGHT_KNEE];
             const leftAnkle = landmarks[LANDMARK_INDEX.LEFT_ANKLE];
             const rightAnkle = landmarks[LANDMARK_INDEX.RIGHT_ANKLE];
-            console.log('GET KNEE HIP ANKLE LANDMARKS HERE');
             // Use original frame index if provided, otherwise use array index
             const originalFrameIndex = originalFrameIndices?.[i] ?? i;
             frameData.push({
@@ -236,35 +235,124 @@ export class ShotBoundaryDetector {
             frameData[0].wristVelocity = 0;
         }
     }
-    findKneeBendStartFromArmStart(armStart, frameData) {
-        if (armStart < 0 || armStart > frameData.length) {
-            console.error("armStart out of bounds: ", armStart, frameData.length);
-        }
-        let i = armStart;
-        // Walk backwards from armStart to 0
-        while (i - 1 >= 0) {
-            let current = frameData[i];
-            let previous = frameData[i - 1];
-            let currentLeftKneeAngle = calculateKneeAngle(current.leftHip, current.leftKnee, current.leftAnkle);
-            let currentRightKneeAngle = calculateKneeAngle(current.righttHip, current.rightKnee, current.rightAnkle);
-            let currentKneeAngle = (currentLeftKneeAngle + currentRightKneeAngle) / 2;
-            let previousLeftKneeAngle = calculateKneeAngle(previous.leftHip, previous.leftKnee, previous.leftAnkle);
-            let previousRightKneeAngle = calculateKneeAngle(previous.righttHip, previous.rightKnee, previous.rightAnkle);
-            let previousKneeAngle = (previousLeftKneeAngle + previousRightKneeAngle) / 2;
-            // If previous knee angle smaller than the current knee angle then
-            // the players legs are no longer bending
-            if (previousKneeAngle <= currentKneeAngle) {
-                break;
+    /**
+     * Average knee angle (hip-knee-ankle) over both visible legs, or null when
+     * neither leg is visible. Lower = more bent.
+     */
+    avgKneeAngle(f) {
+        const leg = (hip, knee, ankle) => {
+            if ((hip.visibility ?? 0) < 0.3 ||
+                (knee.visibility ?? 0) < 0.3 ||
+                (ankle.visibility ?? 0) < 0.3) {
+                return null;
             }
+            return calculateAngle(hip, knee, ankle);
+        };
+        const l = leg(f.leftHip, f.leftKnee, f.leftAnkle);
+        const r = leg(f.rightHip, f.rightKnee, f.rightAnkle);
+        if (l !== null && r !== null)
+            return (l + r) / 2;
+        return l ?? r;
+    }
+    /**
+     * Refines a shot start to the frame the knees BEGAN bending (legs_start_
+     * bending) — the shot-boundary "start" fires on the ball's upward motion,
+     * which is after the gather. Two phases, because `armStart` can land after
+     * the deepest bend (during leg extension):
+     *   1. Find the knee-angle minimum (deepest bend) near armStart.
+     *   2. From there walk back to the straightest knee (the bend onset),
+     *      stopping when the knee bends again (a separate earlier motion) or
+     *      the legs drop out of view.
+     */
+    findKneeBendStartFromArmStart(armStart, frameData) {
+        const MAX_BACK = 25; // furthest back the gather onset may be
+        const FORWARD = 8; // deepest bend can sit a little past armStart
+        const lo = Math.max(0, armStart - MAX_BACK);
+        const hi = Math.min(frameData.length - 1, armStart + FORWARD);
+        // Smoothed knee-angle series over [lo, hi], null where legs occluded.
+        const idx = [];
+        const raw = [];
+        for (let i = lo; i <= hi; i++) {
+            idx.push(i);
+            raw.push(this.avgKneeAngle(frameData[i]));
         }
-        return i;
+        if (raw.filter((v) => v !== null).length < 3)
+            return armStart;
+        const half = 1;
+        const sm = raw.map((v, i) => {
+            if (v === null)
+                return null;
+            let sum = 0;
+            let n = 0;
+            for (let j = i - half; j <= i + half; j++) {
+                const x = raw[j];
+                if (j >= 0 && j < raw.length && x !== null && x !== undefined) {
+                    sum += x;
+                    n++;
+                }
+            }
+            return n > 0 ? sum / n : v;
+        });
+        // Phase 1: deepest bend (minimum knee angle) in the window.
+        let minK = -1;
+        for (let k = 0; k < sm.length; k++) {
+            if (sm[k] === null)
+                continue;
+            if (minK === -1 || sm[k] < sm[minK])
+                minK = k;
+        }
+        if (minK === -1)
+            return armStart;
+        // The gather is short, so only consider the frames just before the
+        // deepest bend — otherwise the window reaches an earlier standing period
+        // or an unrelated motion and picks a wildly early "onset".
+        const MAX_GATHER = 14;
+        const gatherLo = Math.max(0, minK - MAX_GATHER);
+        // Phase 2: the standing plateau BEFORE the bend — the max knee angle in
+        // [gatherLo, minK]. The bend onset is where the knee leaves it.
+        let standIdx = gatherLo;
+        for (let k = gatherLo; k <= minK; k++) {
+            if (sm[k] === null)
+                continue;
+            if (sm[standIdx] === null || sm[k] > sm[standIdx])
+                standIdx = k;
+        }
+        const standMax = sm[standIdx];
+        const kneeMin = sm[minK];
+        if (standMax == null || kneeMin == null)
+            return armStart;
+        // Only refine when there is a CLEAN gather: the legs were fairly
+        // straight (a real standing plateau) and then bent significantly. In
+        // noisy/occluded/behind views the knee never straightens cleanly, so we
+        // keep the ball-based start rather than trust a bad knee signal.
+        const MIN_STAND_ANGLE = 155; // legs were clearly straight (standing)
+        const MIN_BEND_DROP = 30; // and then bent substantially
+        if (standMax < MIN_STAND_ANGLE || standMax - kneeMin < MIN_BEND_DROP) {
+            return armStart;
+        }
+        // Onset = last frame of the plateau (knee within BAND of standing)
+        // before the descent begins.
+        const BAND = 8;
+        let onset = standIdx;
+        for (let k = standIdx; k <= minK; k++) {
+            if (sm[k] !== null && sm[k] >= standMax - BAND)
+                onset = k;
+            else
+                break;
+        }
+        // The gather precedes the ball's upward motion by only a few frames;
+        // never move later than the ball-based start, nor further back than a
+        // plausible gather length (a guard against a spurious early plateau).
+        const MAX_MOVE = 12;
+        return Math.min(idx[onset], armStart) < armStart - MAX_MOVE
+            ? armStart - MAX_MOVE
+            : Math.min(idx[onset], armStart);
     }
     /**
      * Finds shot start and end boundaries based on velocity patterns.
      * Uses gap tolerance to handle small breaks in upward motion.
      */
     findBoundaries(frameData, totalFrames) {
-        console.log('========== FINDING BOUNDARIES ==============');
         const boundaries = [];
         let inShot = false;
         let shotStartFrame = -1;
@@ -381,13 +469,13 @@ export class ShotBoundaryDetector {
                                     upwardFrameCount = 0;
                                     continue;
                                 }
-                                // Walk backwards to find point where knee starts bending
+                                // Refine the start back to where the knees began bending.
                                 const kneeBendStart = this.findKneeBendStartFromArmStart(actualStart, frameData);
                                 // Confirmed shot start
                                 inShot = true;
                                 boundaries.push({
                                     type: "start",
-                                    frameIndex: actualStart,
+                                    frameIndex: kneeBendStart,
                                     confidence: this.calculateStartConfidence(frameData, actualStart, peakFrame),
                                     isPartial: actualStart === 0,
                                 });

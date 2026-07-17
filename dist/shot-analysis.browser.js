@@ -9646,7 +9646,6 @@ var ShotAnalysis = (() => {
         const rightKnee = landmarks[LANDMARK_INDEX.RIGHT_KNEE];
         const leftAnkle = landmarks[LANDMARK_INDEX.LEFT_ANKLE];
         const rightAnkle = landmarks[LANDMARK_INDEX.RIGHT_ANKLE];
-        console.log("GET KNEE HIP ANKLE LANDMARKS HERE");
         const originalFrameIndex = (originalFrameIndices == null ? void 0 : originalFrameIndices[i2]) ?? i2;
         frameData.push({
           frameIndex: i2,
@@ -9698,14 +9697,87 @@ var ShotAnalysis = (() => {
         frameData[0].wristVelocity = 0;
       }
     }
+    /**
+     * Average knee angle (hip-knee-ankle) over both visible legs, or null when
+     * neither leg is visible. Lower = more bent.
+     */
+    avgKneeAngle(f2) {
+      const leg = (hip, knee, ankle) => {
+        if ((hip.visibility ?? 0) < 0.3 || (knee.visibility ?? 0) < 0.3 || (ankle.visibility ?? 0) < 0.3) {
+          return null;
+        }
+        return calculateAngle(hip, knee, ankle);
+      };
+      const l2 = leg(f2.leftHip, f2.leftKnee, f2.leftAnkle);
+      const r2 = leg(f2.rightHip, f2.rightKnee, f2.rightAnkle);
+      if (l2 !== null && r2 !== null) return (l2 + r2) / 2;
+      return l2 ?? r2;
+    }
+    /**
+     * Refines a shot start to the frame the knees BEGAN bending (legs_start_
+     * bending) — the shot-boundary "start" fires on the ball's upward motion,
+     * which is after the gather. Two phases, because `armStart` can land after
+     * the deepest bend (during leg extension):
+     *   1. Find the knee-angle minimum (deepest bend) near armStart.
+     *   2. From there walk back to the straightest knee (the bend onset),
+     *      stopping when the knee bends again (a separate earlier motion) or
+     *      the legs drop out of view.
+     */
     findKneeBendStartFromArmStart(armStart, frameData) {
-      if (armStart < 0 || armStart > frameData.length) {
-        console.error("armStart out of bounds: ", armStart, frameData.length);
+      const MAX_BACK = 25;
+      const FORWARD = 8;
+      const lo2 = Math.max(0, armStart - MAX_BACK);
+      const hi2 = Math.min(frameData.length - 1, armStart + FORWARD);
+      const idx = [];
+      const raw = [];
+      for (let i2 = lo2; i2 <= hi2; i2++) {
+        idx.push(i2);
+        raw.push(this.avgKneeAngle(frameData[i2]));
       }
-      let i2 = armStart;
-      while (i2 - 1 >= 0) {
+      if (raw.filter((v2) => v2 !== null).length < 3) return armStart;
+      const half = 1;
+      const sm = raw.map((v2, i2) => {
+        if (v2 === null) return null;
+        let sum = 0;
+        let n2 = 0;
+        for (let j2 = i2 - half; j2 <= i2 + half; j2++) {
+          const x2 = raw[j2];
+          if (j2 >= 0 && j2 < raw.length && x2 !== null && x2 !== void 0) {
+            sum += x2;
+            n2++;
+          }
+        }
+        return n2 > 0 ? sum / n2 : v2;
+      });
+      let minK = -1;
+      for (let k2 = 0; k2 < sm.length; k2++) {
+        if (sm[k2] === null) continue;
+        if (minK === -1 || sm[k2] < sm[minK]) minK = k2;
       }
-      return i2;
+      if (minK === -1) return armStart;
+      const MAX_GATHER = 14;
+      const gatherLo = Math.max(0, minK - MAX_GATHER);
+      let standIdx = gatherLo;
+      for (let k2 = gatherLo; k2 <= minK; k2++) {
+        if (sm[k2] === null) continue;
+        if (sm[standIdx] === null || sm[k2] > sm[standIdx]) standIdx = k2;
+      }
+      const standMax = sm[standIdx];
+      const kneeMin = sm[minK];
+      if (standMax == null || kneeMin == null) return armStart;
+      const MIN_STAND_ANGLE = 155;
+      const MIN_BEND_DROP = 30;
+      if (standMax < MIN_STAND_ANGLE || standMax - kneeMin < MIN_BEND_DROP) {
+        return armStart;
+      }
+      const BAND = 8;
+      let onset = standIdx;
+      for (let k2 = standIdx; k2 <= minK; k2++) {
+        if (sm[k2] !== null && sm[k2] >= standMax - BAND) onset = k2;
+        else break;
+      }
+      const MAX_MOVE = 12;
+      return Math.min(idx[onset], armStart) < armStart - MAX_MOVE ? armStart - MAX_MOVE : Math.min(idx[onset], armStart);
     }
     /**
      * Finds shot start and end boundaries based on velocity patterns.
@@ -9713,7 +9785,6 @@ var ShotAnalysis = (() => {
      */
     findBoundaries(frameData, totalFrames) {
       var _a2, _b;
-      console.log("========== FINDING BOUNDARIES ==============");
       const boundaries = [];
       let inShot = false;
       let shotStartFrame = -1;
@@ -9799,7 +9870,10 @@ var ShotAnalysis = (() => {
                     upwardFrameCount = 0;
                     continue;
                   }
-                  const kneeBendStart = Math.max(0, actualStart - 10);
+                  const kneeBendStart = this.findKneeBendStartFromArmStart(
+                    actualStart,
+                    frameData
+                  );
                   inShot = true;
                   boundaries.push({
                     type: "start",
@@ -10151,14 +10225,12 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       if (sequence.length === 0 || startFrame > endFrame) {
         return { phases: {}, confidence: 0 };
       }
-      const START_OFFSET = 15;
       const actualStart = Math.max(0, startFrame);
-      const actualStartOffset = Math.max(0, startFrame - START_OFFSET);
       const actualEnd = Math.min(sequence.length - 1, endFrame);
       if (actualEnd - actualStart < 1) {
         return { phases: {}, confidence: 0 };
       }
-      const frameData = this.analyzeFrames(sequence, actualStartOffset, actualEnd);
+      const frameData = this.analyzeFrames(sequence, actualStart, actualEnd);
       if (frameData.length < 2) {
         return { phases: {}, confidence: 0 };
       }
@@ -10477,7 +10549,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
             riseEnd = newRiseEnd;
           }
         }
-      } else if (state.peakWristFrame >= 0) {
+      } else if (state.peakWristFrame >= 0 && state.peakWristFrame - baseFrame >= 0 && state.peakWristFrame - baseFrame < n2) {
         const peakIdx = state.peakWristFrame - baseFrame;
         const peakThreshold = 0.02;
         let setStart = state.peakWristFrame;
