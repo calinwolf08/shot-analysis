@@ -74,14 +74,19 @@ export class PhaseDetector {
         if (sequence.length === 0 || startFrame > endFrame) {
             return { phases: {}, confidence: 0 };
         }
+        // Identified start frame is based on wrist movement but may be after the 
+        // true start of the leg bend. We rewind the start frame by an offset so that analyze frames can
+        // walk backwards from actualStart to find the first frame with knee bend.
+        const START_OFFSET = 15;
         // Ensure frame indices are within bounds
         const actualStart = Math.max(0, startFrame);
+        const actualStartOffset = Math.max(0, startFrame - START_OFFSET);
         const actualEnd = Math.min(sequence.length - 1, endFrame);
         if (actualEnd - actualStart < 1) {
             return { phases: {}, confidence: 0 };
         }
-        // Analyze each frame
-        const frameData = this.analyzeFrames(sequence, actualStart, actualEnd);
+        // Analyze each frame 
+        const frameData = this.analyzeFrames(sequence, actualStartOffset, actualEnd);
         if (frameData.length < 2) {
             return { phases: {}, confidence: 0 };
         }

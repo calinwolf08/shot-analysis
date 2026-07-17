@@ -9640,6 +9640,13 @@ var ShotAnalysis = (() => {
         const rightWrist = landmarks[LANDMARK_INDEX.RIGHT_WRIST];
         const leftShoulder = landmarks[LANDMARK_INDEX.LEFT_SHOULDER];
         const rightShoulder = landmarks[LANDMARK_INDEX.RIGHT_SHOULDER];
+        const leftHip = landmarks[LANDMARK_INDEX.LEFT_HIP];
+        const rightHip = landmarks[LANDMARK_INDEX.RIGHT_HIP];
+        const leftKnee = landmarks[LANDMARK_INDEX.LEFT_KNEE];
+        const rightKnee = landmarks[LANDMARK_INDEX.RIGHT_KNEE];
+        const leftAnkle = landmarks[LANDMARK_INDEX.LEFT_ANKLE];
+        const rightAnkle = landmarks[LANDMARK_INDEX.RIGHT_ANKLE];
+        console.log("GET KNEE HIP ANKLE LANDMARKS HERE");
         const originalFrameIndex = (originalFrameIndices == null ? void 0 : originalFrameIndices[i2]) ?? i2;
         frameData.push({
           frameIndex: i2,
@@ -9648,6 +9655,12 @@ var ShotAnalysis = (() => {
           rightWrist,
           leftShoulder,
           rightShoulder,
+          leftHip,
+          rightHip,
+          leftKnee,
+          rightKnee,
+          leftAnkle,
+          rightAnkle,
           avgWristY: (leftWrist.y + rightWrist.y) / 2,
           wristVelocity: 0
         });
@@ -9685,12 +9698,22 @@ var ShotAnalysis = (() => {
         frameData[0].wristVelocity = 0;
       }
     }
+    findKneeBendStartFromArmStart(armStart, frameData) {
+      if (armStart < 0 || armStart > frameData.length) {
+        console.error("armStart out of bounds: ", armStart, frameData.length);
+      }
+      let i2 = armStart;
+      while (i2 - 1 >= 0) {
+      }
+      return i2;
+    }
     /**
      * Finds shot start and end boundaries based on velocity patterns.
      * Uses gap tolerance to handle small breaks in upward motion.
      */
     findBoundaries(frameData, totalFrames) {
       var _a2, _b;
+      console.log("========== FINDING BOUNDARIES ==============");
       const boundaries = [];
       let inShot = false;
       let shotStartFrame = -1;
@@ -9776,10 +9799,11 @@ var ShotAnalysis = (() => {
                     upwardFrameCount = 0;
                     continue;
                   }
+                  const kneeBendStart = Math.max(0, actualStart - 10);
                   inShot = true;
                   boundaries.push({
                     type: "start",
-                    frameIndex: actualStart,
+                    frameIndex: kneeBendStart,
                     confidence: this.calculateStartConfidence(
                       frameData,
                       actualStart,
@@ -10127,12 +10151,14 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       if (sequence.length === 0 || startFrame > endFrame) {
         return { phases: {}, confidence: 0 };
       }
+      const START_OFFSET = 15;
       const actualStart = Math.max(0, startFrame);
+      const actualStartOffset = Math.max(0, startFrame - START_OFFSET);
       const actualEnd = Math.min(sequence.length - 1, endFrame);
       if (actualEnd - actualStart < 1) {
         return { phases: {}, confidence: 0 };
       }
-      const frameData = this.analyzeFrames(sequence, actualStart, actualEnd);
+      const frameData = this.analyzeFrames(sequence, actualStartOffset, actualEnd);
       if (frameData.length < 2) {
         return { phases: {}, confidence: 0 };
       }

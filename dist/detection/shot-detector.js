@@ -11,6 +11,7 @@
  *
  * @see Feature 4.0 - Shot Detection & Phase Identification
  */
+import { calculateKneeAngle } from "../keyframe-detector";
 import { LANDMARK_INDEX } from "../pose/types";
 import { movingAverage } from "../utils/smoothing";
 /**
@@ -173,6 +174,13 @@ export class ShotBoundaryDetector {
             const rightWrist = landmarks[LANDMARK_INDEX.RIGHT_WRIST];
             const leftShoulder = landmarks[LANDMARK_INDEX.LEFT_SHOULDER];
             const rightShoulder = landmarks[LANDMARK_INDEX.RIGHT_SHOULDER];
+            const leftHip = landmarks[LANDMARK_INDEX.LEFT_HIP];
+            const rightHip = landmarks[LANDMARK_INDEX.RIGHT_HIP];
+            const leftKnee = landmarks[LANDMARK_INDEX.LEFT_KNEE];
+            const rightKnee = landmarks[LANDMARK_INDEX.RIGHT_KNEE];
+            const leftAnkle = landmarks[LANDMARK_INDEX.LEFT_ANKLE];
+            const rightAnkle = landmarks[LANDMARK_INDEX.RIGHT_ANKLE];
+            console.log('GET KNEE HIP ANKLE LANDMARKS HERE');
             // Use original frame index if provided, otherwise use array index
             const originalFrameIndex = originalFrameIndices?.[i] ?? i;
             frameData.push({
@@ -182,6 +190,12 @@ export class ShotBoundaryDetector {
                 rightWrist,
                 leftShoulder,
                 rightShoulder,
+                leftHip,
+                rightHip,
+                leftKnee,
+                rightKnee,
+                leftAnkle,
+                rightAnkle,
                 avgWristY: (leftWrist.y + rightWrist.y) / 2,
                 wristVelocity: 0,
             });
@@ -222,11 +236,35 @@ export class ShotBoundaryDetector {
             frameData[0].wristVelocity = 0;
         }
     }
+    findKneeBendStartFromArmStart(armStart, frameData) {
+        if (armStart < 0 || armStart > frameData.length) {
+            console.error("armStart out of bounds: ", armStart, frameData.length);
+        }
+        let i = armStart;
+        // Walk backwards from armStart to 0
+        while (i - 1 >= 0) {
+            let current = frameData[i];
+            let previous = frameData[i - 1];
+            let currentLeftKneeAngle = calculateKneeAngle(current.leftHip, current.leftKnee, current.leftAnkle);
+            let currentRightKneeAngle = calculateKneeAngle(current.righttHip, current.rightKnee, current.rightAnkle);
+            let currentKneeAngle = (currentLeftKneeAngle + currentRightKneeAngle) / 2;
+            let previousLeftKneeAngle = calculateKneeAngle(previous.leftHip, previous.leftKnee, previous.leftAnkle);
+            let previousRightKneeAngle = calculateKneeAngle(previous.righttHip, previous.rightKnee, previous.rightAnkle);
+            let previousKneeAngle = (previousLeftKneeAngle + previousRightKneeAngle) / 2;
+            // If previous knee angle smaller than the current knee angle then
+            // the players legs are no longer bending
+            if (previousKneeAngle <= currentKneeAngle) {
+                break;
+            }
+        }
+        return i;
+    }
     /**
      * Finds shot start and end boundaries based on velocity patterns.
      * Uses gap tolerance to handle small breaks in upward motion.
      */
     findBoundaries(frameData, totalFrames) {
+        console.log('========== FINDING BOUNDARIES ==============');
         const boundaries = [];
         let inShot = false;
         let shotStartFrame = -1;
@@ -343,6 +381,8 @@ export class ShotBoundaryDetector {
                                     upwardFrameCount = 0;
                                     continue;
                                 }
+                                // Walk backwards to find point where knee starts bending
+                                const kneeBendStart = this.findKneeBendStartFromArmStart(actualStart, frameData);
                                 // Confirmed shot start
                                 inShot = true;
                                 boundaries.push({

@@ -135,6 +135,7 @@ export declare class ShotBoundaryDetector {
      * Velocities that are too large (indicating pose dropout recovery) are clamped to 0.
      */
     private calculateVelocities;
+    private findKneeBendStartFromArmStart;
     /**
      * Finds shot start and end boundaries based on velocity patterns.
      * Uses gap tolerance to handle small breaks in upward motion.
