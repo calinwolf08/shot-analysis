@@ -5,9 +5,12 @@
   "shots": [
     {
       "shotNumber": 1,
-      "startFrame": 33,
+      "startFrame": 27,
       "endFrame": 62,
-      "cameraOrientation": "front"
+      "cameraOrientation": "front",
+      "legs_start_bending": 27,
+      "ball_low_point": 38,
+      "ball_starts_upward": 39
     }
   ]
 }

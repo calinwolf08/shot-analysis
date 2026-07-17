@@ -152,6 +152,40 @@ for (const video of fs.readdirSync("test-data").sort()) {
       perKf[id] ??= { n: 0, fail: 0 };
       perKf[id].n++;
       totalChecks++;
+
+      // Release is a RANGE, not a point: the algorithm brackets it from the
+      // wrist snap (`release`) through arm extension (`arms_fully_extended`),
+      // while the label marks the single moment the ball leaves the hand. Count
+      // it correct when the labeled frame lands inside that range (± tol).
+      if (id === "release") {
+        const relStart = kf.get("release");
+        const relEndRaw = kf.get("arms_fully_extended");
+        if (typeof relStart !== "number") {
+          perKf[id].fail++;
+          totalFails++;
+          rec.kf[id] = "M";
+          fails.push(`${id} MISSING (lab ${lv})`);
+          continue;
+        }
+        const relEnd =
+          typeof relEndRaw === "number"
+            ? Math.max(relStart, relEndRaw)
+            : relStart;
+        const tol = tolFor(id);
+        if (lv >= relStart - tol && lv <= relEnd + tol) {
+          rec.kf[id] = "P";
+        } else {
+          perKf[id].fail++;
+          totalFails++;
+          rec.kf[id] = "F";
+          const off = lv < relStart ? lv - relStart : lv - relEnd;
+          fails.push(
+            `${id} [${relStart}-${relEnd}]v${lv} (${off > 0 ? "+" : ""}${off}, tol±${tol})`,
+          );
+        }
+        continue;
+      }
+
       if (typeof det !== "number") {
         perKf[id].fail++;
         totalFails++;

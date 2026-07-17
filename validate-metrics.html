@@ -1107,6 +1107,17 @@
       <div class="analysis-section">
         <div class="analysis-form">
           <div class="form-group">
+            <label>Test Case (poses + labels)</label>
+            <div style="display: flex; gap: 10px; align-items: center">
+              <select id="testCaseSelect" style="min-width: 220px">
+                <option value="">Loading…</option>
+              </select>
+              <span id="testCaseHint" style="color: #9ca3af; font-size: 0.9rem"
+                >Pick a case to auto-load its poses + labels</span
+              >
+            </div>
+          </div>
+          <div class="form-group">
             <label>Video File</label>
             <div style="display: flex; gap: 10px; align-items: center">
               <button
@@ -1146,9 +1157,7 @@
                 accept="application/json,.json"
                 style="display: none"
               />
-              <span
-                id="posesFileName"
-                style="color: #9ca3af; font-size: 0.9rem"
+              <span id="posesFileName" style="color: #9ca3af; font-size: 0.9rem"
                 >No poses loaded</span
               >
             </div>
@@ -1348,7 +1357,9 @@
             <div class="shot-labeling-header">
               <span class="shot-labeling-title">Shot Labels</span>
               <div class="shot-labeling-actions">
-                <button id="addShotBtn" class="secondary" disabled>+ Add Shot</button>
+                <button id="addShotBtn" class="secondary" disabled>
+                  + Add Shot
+                </button>
                 <button id="removeShotBtn" class="danger" disabled>
                   Remove Shot
                 </button>
@@ -1398,11 +1409,7 @@
               >
                 Keyframes
               </button>
-              <button
-                id="viewMetricsBtn"
-                class="view-toggle-btn"
-                type="button"
-              >
+              <button id="viewMetricsBtn" class="view-toggle-btn" type="button">
                 Metrics
               </button>
             </div>
@@ -1506,6 +1513,8 @@
       const $ = (id) => document.getElementById(id);
 
       const elements = {
+        testCaseSelect: $("testCaseSelect"),
+        testCaseHint: $("testCaseHint"),
         selectVideoBtn: $("selectVideoBtn"),
         videoFileInput: $("videoFileInput"),
         selectedFileName: $("selectedFileName"),
@@ -1745,7 +1754,8 @@
                 errorMessage = "Network error while loading video";
                 break;
               case MediaError.MEDIA_ERR_DECODE:
-                errorMessage = "Video file is corrupted or uses an unsupported format";
+                errorMessage =
+                  "Video file is corrupted or uses an unsupported format";
                 break;
               case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
                 errorMessage = "Video format is not supported by your browser";
@@ -2397,7 +2407,8 @@
 
         const W = canvas.width;
         const H = canvas.height;
-        const pt = (i) => lm[i] && { x: lm[i].x * W, y: lm[i].y * H, v: lm[i].visibility };
+        const pt = (i) =>
+          lm[i] && { x: lm[i].x * W, y: lm[i].y * H, v: lm[i].visibility };
 
         ctx.lineWidth = 3;
         ctx.strokeStyle = "#34d399";
@@ -2501,7 +2512,11 @@
         const orientation = shot.orientation || "unknown";
 
         // Format orientation for display (e.g., "front-left" -> "Front Left")
-        const formatOrientation = (o) => o.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        const formatOrientation = (o) =>
+          o
+            .split("-")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
 
         elements.shotInfo.innerHTML = `
         <span class="label">Start:</span> <span class="value">${shot.frameRange.start}</span>
@@ -2633,7 +2648,9 @@
             `[keyframes] shot ${shot.shotIndex} (frames ${shot.frameRange.start}-${shot.frameRange.end}):`,
           );
           diagnostics.forEach((d) =>
-            console.log(`  [${d.keyframe}] @${d.frame} (${d.method}) — ${d.detail}`),
+            console.log(
+              `  [${d.keyframe}] @${d.frame} (${d.method}) — ${d.detail}`,
+            ),
           );
         }
 
@@ -2680,7 +2697,8 @@
           let n = 0;
           KEYFRAME_ORDER.forEach((id) => {
             const algo = detected.get ? detected.get(id) : detected[id];
-            const lab = typeof labeledKf[id] === "number" ? labeledKf[id] : null;
+            const lab =
+              typeof labeledKf[id] === "number" ? labeledKf[id] : null;
             if (algo != null && lab != null) {
               sum += Math.abs(algo - lab);
               n++;
@@ -3181,9 +3199,7 @@
             // Update progress every 10 frames or 100ms
             const now = Date.now();
             if (frameCount % 10 === 0 || now - lastProgressUpdate >= 100) {
-              const percent = Math.round(
-                10 + (frameCount / totalFrames) * 85,
-              );
+              const percent = Math.round(10 + (frameCount / totalFrames) * 85);
               updateProgress(
                 `Detecting poses: ${frameCount} / ${totalFrames} (${Math.round((frameCount / totalFrames) * 100)}%)`,
                 percent,
@@ -3704,7 +3720,9 @@
           };
 
           // Handle orientation change
-          const orientationSelect = entry.querySelector(".shot-orientation-select");
+          const orientationSelect = entry.querySelector(
+            ".shot-orientation-select",
+          );
           orientationSelect.onchange = (e) => {
             e.stopPropagation();
             updateShotOrientation(index, e.target.value);
@@ -3812,6 +3830,96 @@
         if (file) loadLabelsFromFile(file);
         elements.labelsFileInput.value = "";
       };
+
+      // Test-case dropdown: one pick loads poses + labels (+ video if present).
+      // loadPosesFromFile/loadLabelsFromFile read `.text()` and `.name`, so a
+      // fetched JSON string wrapped as `{ text, name }` reuses them as-is.
+      async function populateTestCases() {
+        try {
+          const res = await fetch("/api/test-cases");
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const { cases } = await res.json();
+          const sel = elements.testCaseSelect;
+          sel.innerHTML = "";
+          const first = document.createElement("option");
+          first.value = "";
+          first.textContent = cases.length
+            ? "Select a test case…"
+            : "No test cases found";
+          sel.appendChild(first);
+          for (const c of cases) {
+            const opt = document.createElement("option");
+            opt.value = c.name;
+            opt.dataset.video = c.video || "";
+            opt.textContent = c.video ? `${c.name} (video)` : c.name;
+            sel.appendChild(opt);
+          }
+        } catch (err) {
+          // Served from file:// or without the dev server — hide the control.
+          console.warn("[test-cases] unavailable:", err.message);
+          const group = elements.testCaseSelect.closest(".form-group");
+          if (group) group.style.display = "none";
+        }
+      }
+
+      async function loadTestCase(name, videoFile) {
+        elements.testCaseHint.textContent = `Loading ${name}…`;
+        try {
+          const [posesRes, labelsRes] = await Promise.all([
+            fetch(`/test-data/${encodeURIComponent(name)}/poses.json`),
+            fetch(`/test-data/${encodeURIComponent(name)}/labels.json`),
+          ]);
+          if (!posesRes.ok) throw new Error("poses.json not found");
+          if (!labelsRes.ok) throw new Error("labels.json not found");
+          const posesText = await posesRes.text();
+          const labelsText = await labelsRes.text();
+
+          // Video first (if any) so poses-only playback knows a video exists;
+          // loadVideoIntoPlayer preserves already-loaded poses.
+          if (videoFile) {
+            try {
+              // Source videos live in the shared test-data/videos/ folder.
+              const vRes = await fetch(
+                `/test-data/videos/${encodeURIComponent(videoFile)}`,
+              );
+              if (vRes.ok) {
+                const blob = await vRes.blob();
+                const file = new File([blob], videoFile, {
+                  type: blob.type || "video/mp4",
+                });
+                elements.selectedFileName.textContent = videoFile;
+                loadVideoIntoPlayer(file);
+              }
+            } catch (e) {
+              console.warn("[test-case] video load failed:", e.message);
+            }
+          }
+
+          await loadPosesFromFile({
+            text: async () => posesText,
+            name: `${name}/poses.json`,
+          });
+          await loadLabelsFromFile({
+            text: async () => labelsText,
+            name: `${name}/labels.json`,
+          });
+          elements.testCaseHint.textContent = `Loaded ${name}`;
+        } catch (err) {
+          console.error("Load test case error:", err);
+          showToast(`Failed to load ${name}: ${err.message}`, "error");
+          elements.testCaseHint.textContent = "Load failed";
+        }
+      }
+
+      elements.testCaseSelect.onchange = () => {
+        const sel = elements.testCaseSelect;
+        const name = sel.value;
+        if (!name) return;
+        const videoFile = sel.options[sel.selectedIndex]?.dataset.video || null;
+        loadTestCase(name, videoFile);
+      };
+
+      populateTestCases();
 
       // Sidebar Keyframes/Metrics view toggle
       elements.viewKeyframesBtn.onclick = () => setSidebarView("keyframes");

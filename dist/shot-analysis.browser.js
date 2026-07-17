@@ -9714,16 +9714,49 @@ var ShotAnalysis = (() => {
       return l2 ?? r2;
     }
     /**
+     * Knee angle (hip-knee-ankle) of the MOST-VISIBLE leg, or null when neither
+     * leg is reliable. Lower = more bent.
+     *
+     * Unlike {@link avgKneeAngle} this never averages the two legs: in
+     * side/behind views the far leg is occluded and MediaPipe fabricates a
+     * near-straight angle for it, which drags the average toward "standing" even
+     * while the visible leg is clearly bent. Picking the single most-visible leg
+     * keeps the signal honest — used by the deep-stance fallback below.
+     */
+    reliableKnee(f2) {
+      const legVis = (hip, knee, ankle) => Math.min(hip.visibility ?? 0, knee.visibility ?? 0, ankle.visibility ?? 0);
+      const lVis = legVis(f2.leftHip, f2.leftKnee, f2.leftAnkle);
+      const rVis = legVis(f2.rightHip, f2.rightKnee, f2.rightAnkle);
+      const best = Math.max(lVis, rVis);
+      if (best < 0.3) return null;
+      return lVis >= rVis ? calculateAngle(f2.leftHip, f2.leftKnee, f2.leftAnkle) : calculateAngle(f2.rightHip, f2.rightKnee, f2.rightAnkle);
+    }
+    /**
      * Refines a shot start to the frame the knees BEGAN bending (legs_start_
      * bending) — the shot-boundary "start" fires on the ball's upward motion,
-     * which is after the gather. Two phases, because `armStart` can land after
-     * the deepest bend (during leg extension):
-     *   1. Find the knee-angle minimum (deepest bend) near armStart.
-     *   2. From there walk back to the straightest knee (the bend onset),
-     *      stopping when the knee bends again (a separate earlier motion) or
-     *      the legs drop out of view.
+     * which is after the gather.
+     *
+     * Two strategies, tried in order:
+     *   A. CLEAN gather (the common side view): the legs were clearly straight
+     *      (a standing plateau) then bent substantially. Conservative and
+     *      reliable — the primary path.
+     *   B. DEEP-STANCE fallback (only when A declines): the player starts from
+     *      an already-bent athletic stance, so the legs never straighten. If the
+     *      most-visible knee is clearly bent AT the ball-based start (we are deep
+     *      in a gather, so the start is late) and was meaningfully straighter a
+     *      few frames earlier, trace back to that recent bend's onset.
      */
     findKneeBendStartFromArmStart(armStart, frameData) {
+      const clean = this.cleanGatherStart(armStart, frameData);
+      if (clean !== armStart) return clean;
+      return this.deepStanceStart(armStart, frameData);
+    }
+    /**
+     * Strategy A — the standing-plateau gather (see {@link
+     * findKneeBendStartFromArmStart}). Returns armStart unchanged when there is
+     * no clean plateau-then-bend, so the caller can try the fallback.
+     */
+    cleanGatherStart(armStart, frameData) {
       const MAX_BACK = 25;
       const FORWARD = 8;
       const lo2 = Math.max(0, armStart - MAX_BACK);
@@ -9735,20 +9768,7 @@ var ShotAnalysis = (() => {
         raw.push(this.avgKneeAngle(frameData[i2]));
       }
       if (raw.filter((v2) => v2 !== null).length < 3) return armStart;
-      const half = 1;
-      const sm = raw.map((v2, i2) => {
-        if (v2 === null) return null;
-        let sum = 0;
-        let n2 = 0;
-        for (let j2 = i2 - half; j2 <= i2 + half; j2++) {
-          const x2 = raw[j2];
-          if (j2 >= 0 && j2 < raw.length && x2 !== null && x2 !== void 0) {
-            sum += x2;
-            n2++;
-          }
-        }
-        return n2 > 0 ? sum / n2 : v2;
-      });
+      const sm = this.smooth(raw);
       let minK = -1;
       for (let k2 = 0; k2 < sm.length; k2++) {
         if (sm[k2] === null) continue;
@@ -9778,6 +9798,70 @@ var ShotAnalysis = (() => {
       }
       const MAX_MOVE = 12;
       return Math.min(idx[onset], armStart) < armStart - MAX_MOVE ? armStart - MAX_MOVE : Math.min(idx[onset], armStart);
+    }
+    /**
+     * Strategy B — the deep-stance fallback (see {@link
+     * findKneeBendStartFromArmStart}). Uses the most-visible leg and fires only
+     * when the knee is clearly bent at the ball-based start. Returns armStart
+     * unchanged when the preconditions aren't met.
+     */
+    deepStanceStart(armStart, frameData) {
+      const LOOKBACK = 15;
+      const FORWARD = 6;
+      const BENT_AT_START = 120;
+      const BENT_AT_LOW = 130;
+      const MIN_STRAIGHTEN = 25;
+      const lo2 = Math.max(0, armStart - LOOKBACK - FORWARD);
+      const hi2 = Math.min(frameData.length - 1, armStart + FORWARD);
+      const idx = [];
+      const raw = [];
+      for (let i2 = lo2; i2 <= hi2; i2++) {
+        idx.push(i2);
+        raw.push(this.reliableKnee(frameData[i2]));
+      }
+      if (raw.filter((v2) => v2 !== null).length < 3) return armStart;
+      const sm = this.smooth(raw);
+      const armIdx = idx.indexOf(armStart);
+      if (armIdx === -1) return armStart;
+      const startK = sm[armIdx];
+      if (startK == null || startK >= BENT_AT_START) return armStart;
+      const searchLo = Math.max(0, armIdx - FORWARD);
+      const searchHi = Math.min(sm.length - 1, armIdx + FORWARD);
+      let lowIdx = -1;
+      for (let k2 = searchLo; k2 <= searchHi; k2++) {
+        if (sm[k2] === null) continue;
+        if (lowIdx === -1 || sm[k2] < sm[lowIdx]) lowIdx = k2;
+      }
+      if (lowIdx === -1) return armStart;
+      const lowK = sm[lowIdx];
+      if (lowK >= BENT_AT_LOW) return armStart;
+      const NOISE = 2;
+      const reachLo = Math.max(0, lowIdx - LOOKBACK);
+      let onset = lowIdx;
+      for (let k2 = lowIdx - 1; k2 >= reachLo; k2--) {
+        if (sm[k2] === null) break;
+        if (sm[k2] >= sm[onset] - NOISE) onset = k2;
+        else break;
+      }
+      if (sm[onset] - lowK < MIN_STRAIGHTEN) return armStart;
+      return Math.min(idx[onset], armStart);
+    }
+    /** Centered 3-tap moving average, preserving nulls. */
+    smooth(raw) {
+      const half = 1;
+      return raw.map((v2, i2) => {
+        if (v2 === null) return null;
+        let sum = 0;
+        let n2 = 0;
+        for (let j2 = i2 - half; j2 <= i2 + half; j2++) {
+          const x2 = raw[j2];
+          if (j2 >= 0 && j2 < raw.length && x2 !== null && x2 !== void 0) {
+            sum += x2;
+            n2++;
+          }
+        }
+        return n2 > 0 ? sum / n2 : v2;
+      });
     }
     /**
      * Finds shot start and end boundaries based on velocity patterns.
