@@ -89,6 +89,81 @@ async function listValidations(): Promise<string[]> {
   return files.filter((f) => f.endsWith(".json"));
 }
 
+const VIDEO_EXT_RE = /\.(mp4|mov|webm)$/i;
+
+/**
+ * Lists test-data cases that can be loaded in one click: any folder holding
+ * both poses.json and labels.json. Reports the video filename when one is
+ * present so the UI can offer it (the committed corpus is poses-only).
+ */
+async function listTestCases(): Promise<
+  { name: string; video: string | null }[]
+> {
+  let entries: string[];
+  try {
+    entries = await fs.readdir(TEST_DATA_DIR);
+  } catch {
+    return [];
+  }
+  const cases: { name: string; video: string | null }[] = [];
+  for (const name of entries.sort()) {
+    const dir = path.join(TEST_DATA_DIR, name);
+    let files: string[];
+    try {
+      const stat = await fs.stat(dir);
+      if (!stat.isDirectory()) continue;
+      files = await fs.readdir(dir);
+    } catch {
+      continue;
+    }
+    if (!files.includes("poses.json") || !files.includes("labels.json")) {
+      continue;
+    }
+    const video = files.find((f) => VIDEO_EXT_RE.test(f)) ?? null;
+    cases.push({ name, video });
+  }
+  return cases;
+}
+
+const CONTENT_TYPES: Record<string, string> = {
+  ".json": "application/json",
+  ".mp4": "video/mp4",
+  ".mov": "video/quicktime",
+  ".webm": "video/webm",
+};
+
+/**
+ * Serves a single file from a test-data case folder (poses.json, labels.json,
+ * or the video). Rejects anything with path traversal or a disallowed name.
+ */
+async function serveTestDataFile(
+  res: http.ServerResponse,
+  caseName: string,
+  fileName: string,
+): Promise<void> {
+  const safeCase = path.basename(caseName);
+  const safeFile = path.basename(fileName);
+  const allowed =
+    safeFile === "poses.json" ||
+    safeFile === "labels.json" ||
+    VIDEO_EXT_RE.test(safeFile);
+  if (!allowed || safeCase !== caseName || safeFile !== fileName) {
+    sendError(res, "Not found", 404);
+    return;
+  }
+  const filePath = path.join(TEST_DATA_DIR, safeCase, safeFile);
+  try {
+    const content = await fs.readFile(filePath);
+    const type =
+      CONTENT_TYPES[path.extname(safeFile).toLowerCase()] ??
+      "application/octet-stream";
+    res.writeHead(200, { "Content-Type": type });
+    res.end(content);
+  } catch {
+    sendError(res, "Not found", 404);
+  }
+}
+
 async function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -200,6 +275,28 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/validations") {
       const files = await listValidations();
       sendJson(res, { files });
+      return;
+    }
+
+    // List loadable test cases (folders with poses.json + labels.json)
+    if (req.method === "GET" && url.pathname === "/api/test-cases") {
+      const cases = await listTestCases();
+      sendJson(res, { cases });
+      return;
+    }
+
+    // Serve a file from a test-data case: /test-data/<name>/<file>
+    if (req.method === "GET" && url.pathname.startsWith("/test-data/")) {
+      const parts = url.pathname.slice("/test-data/".length).split("/");
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        await serveTestDataFile(
+          res,
+          decodeURIComponent(parts[0]),
+          decodeURIComponent(parts[1]),
+        );
+        return;
+      }
+      sendError(res, "Not found", 404);
       return;
     }
 
