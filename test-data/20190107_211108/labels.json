@@ -10,7 +10,8 @@
       "cameraOrientation": "front",
       "legs_start_bending": 27,
       "ball_low_point": 38,
-      "ball_starts_upward": 39
+      "ball_starts_upward": 39,
+      "set_point": 48
     }
   ]
 }

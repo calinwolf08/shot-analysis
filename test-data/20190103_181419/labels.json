@@ -10,7 +10,7 @@
       "cameraOrientation": "side-right",
       "legs_start_bending": 11,
       "leg_bend_low_point": 20,
-      "ball_low_point": 10,
+      "ball_low_point": 14,
       "ball_starts_upward": 16,
       "legs_start_extending": 21,
       "set_point": 23,
