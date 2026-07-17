@@ -1,6 +1,15 @@
-// Failure report at tightened tolerance (set_point ±1, all other keyframes
-// ±2, boundary start/end ±2), comparing labeled data to the RUNTIME output
-// (detected shot boundaries). Best-overlap shot matching; no exclusions.
+// Runs the algorithm against every labeled test clip and prints detected-vs-
+// labeled results — the fast loop for editing the detectors and seeing the
+// effect immediately.
+//
+//   npm run test:labels              # all clips
+//   npm run test:labels -- 140654    # only clips whose folder contains "140654"
+//
+// Tolerance: set_point ±1, all other keyframes ±2, boundary start/end ±2 (the
+// start is ±3). Compares to the RUNTIME output (detected shot boundaries) so
+// it reflects what the app/validator actually produce. Best-overlap shot
+// matching; no exclusions. Output: per-shot failures, per-keyframe pass rates,
+// the start→downstream cascade, and a per-shot P/F grid.
 import * as fs from "fs";
 import * as path from "path";
 import { createShotDetector } from "../detection/integrated-shot-detector";
@@ -14,6 +23,10 @@ const TOL: Record<string, number> = { set_point: 1 };
 const DEFAULT_TOL = 2;
 const START_TOL = 3; // the shot start (boundary) is allowed ±3
 const tolFor = (k: string) => TOL[k] ?? DEFAULT_TOL;
+
+// Optional first CLI arg: only report videos whose folder name contains this
+// substring (e.g. `npm run test:labels -- 140654`).
+const videoFilter = process.argv[2]?.trim() ?? "";
 
 const EMPTY = Array.from({ length: 33 }, () => ({
   x: 0,
@@ -67,6 +80,7 @@ type ShotRecord = {
 const records: ShotRecord[] = [];
 
 for (const video of fs.readdirSync("test-data").sort()) {
+  if (videoFilter && !video.includes(videoFilter)) continue;
   const dir = path.join("test-data", video);
   if (!fs.existsSync(path.join(dir, "poses.json"))) continue;
   if (!fs.existsSync(path.join(dir, "labels.json"))) continue;

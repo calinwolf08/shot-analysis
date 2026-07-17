@@ -17,6 +17,7 @@
     "test:integration": "vitest --config vitest.integration.config.ts",
     "test:e2e": "vitest --config vitest.e2e.config.ts",
     "test": "vitest run",
+    "test:labels": "tsx src/testing/tolerance-report.ts",
     "lint": "prettier --check .",
     "format": "prettier --write .",
     "validate": "npm run build:browser && npx tsx server.ts"
