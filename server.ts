@@ -91,10 +91,13 @@ async function listValidations(): Promise<string[]> {
 
 const VIDEO_EXT_RE = /\.(mp4|mov|webm)$/i;
 
+const VIDEOS_DIR = path.join(TEST_DATA_DIR, "videos");
+
 /**
  * Lists test-data cases that can be loaded in one click: any folder holding
- * both poses.json and labels.json. Reports the video filename when one is
- * present so the UI can offer it (the committed corpus is poses-only).
+ * both poses.json and labels.json. The shared source videos live in
+ * test-data/videos/, keyed by each case's poses.json `video` field, so we
+ * report that filename only when the matching video is actually present.
  */
 async function listTestCases(): Promise<
   { name: string; video: string | null }[]
@@ -105,8 +108,15 @@ async function listTestCases(): Promise<
   } catch {
     return [];
   }
+  let videoFiles: Set<string>;
+  try {
+    videoFiles = new Set(await fs.readdir(VIDEOS_DIR));
+  } catch {
+    videoFiles = new Set();
+  }
   const cases: { name: string; video: string | null }[] = [];
   for (const name of entries.sort()) {
+    if (name === "videos") continue;
     const dir = path.join(TEST_DATA_DIR, name);
     let files: string[];
     try {
@@ -119,7 +129,22 @@ async function listTestCases(): Promise<
     if (!files.includes("poses.json") || !files.includes("labels.json")) {
       continue;
     }
-    const video = files.find((f) => VIDEO_EXT_RE.test(f)) ?? null;
+    // Resolve the video from the shared videos/ folder via the poses `video`
+    // field (falling back to labels.json).
+    let video: string | null = null;
+    for (const meta of ["poses.json", "labels.json"]) {
+      try {
+        const parsed = JSON.parse(
+          await fs.readFile(path.join(dir, meta), "utf-8"),
+        );
+        if (typeof parsed.video === "string" && videoFiles.has(parsed.video)) {
+          video = parsed.video;
+          break;
+        }
+      } catch {
+        // ignore malformed metadata
+      }
+    }
     cases.push({ name, video });
   }
   return cases;

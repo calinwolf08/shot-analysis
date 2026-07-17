@@ -3878,8 +3878,9 @@
           // loadVideoIntoPlayer preserves already-loaded poses.
           if (videoFile) {
             try {
+              // Source videos live in the shared test-data/videos/ folder.
               const vRes = await fetch(
-                `/test-data/${encodeURIComponent(name)}/${encodeURIComponent(videoFile)}`,
+                `/test-data/videos/${encodeURIComponent(videoFile)}`,
               );
               if (vRes.ok) {
                 const blob = await vRes.blob();
