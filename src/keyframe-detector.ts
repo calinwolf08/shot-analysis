@@ -577,6 +577,51 @@ function getFrameWristAngle(
 }
 
 /**
+ * Knee angle of the MOST-VISIBLE leg (never an average of the two).
+ *
+ * In side views the far leg is occluded and MediaPipe fabricates a near-
+ * straight angle for it; averaging both legs (as {@link getFrameKneeAngle}
+ * does) then shifts the deepest-bend frame. Picking the single leg whose
+ * hip/knee/ankle are most visible keeps the bend signal honest.
+ */
+function getReliableKneeAngle(
+    frame: Frame,
+    visibilityThreshold: number,
+): number | null {
+    if (!frame.landmarks) return null;
+    const lm = frame.landmarks;
+    const legVis = (hip: number, knee: number, ankle: number): number =>
+        Math.min(
+            lm[hip]?.visibility ?? 0,
+            lm[knee]?.visibility ?? 0,
+            lm[ankle]?.visibility ?? 0,
+        );
+    const lVis = legVis(
+        LANDMARK_INDICES.LEFT_HIP,
+        LANDMARK_INDICES.LEFT_KNEE,
+        LANDMARK_INDICES.LEFT_ANKLE,
+    );
+    const rVis = legVis(
+        LANDMARK_INDICES.RIGHT_HIP,
+        LANDMARK_INDICES.RIGHT_KNEE,
+        LANDMARK_INDICES.RIGHT_ANKLE,
+    );
+    if (Math.max(lVis, rVis) < visibilityThreshold) return null;
+    if (lVis >= rVis) {
+        return calculateKneeAngle(
+            lm[LANDMARK_INDICES.LEFT_HIP]!,
+            lm[LANDMARK_INDICES.LEFT_KNEE]!,
+            lm[LANDMARK_INDICES.LEFT_ANKLE]!,
+        );
+    }
+    return calculateKneeAngle(
+        lm[LANDMARK_INDICES.RIGHT_HIP]!,
+        lm[LANDMARK_INDICES.RIGHT_KNEE]!,
+        lm[LANDMARK_INDICES.RIGHT_ANKLE]!,
+    );
+}
+
+/**
  * Detects the frame with the deepest knee bend (minimum knee angle).
  *
  * This corresponds to the "leg_bend_low_point" keyframe in the Load phase.
@@ -598,22 +643,46 @@ export function detectLegBendLowPoint(
     const searchEndFrame =
         startFrame + Math.floor(shotDuration * config.legBendSearchWindow);
 
-    let minAngle = Infinity;
-    let minAngleFrame: number | null = null;
-
+    // Collect the knee-angle series over the window, then take the deepest bend
+    // on a CENTERED-smoothed signal. The raw argmin latches onto a single noisy
+    // frame (giving a few-frame scatter in either direction); smoothing settles
+    // it on the true bottom of the bend.
+    const pts: { frameIndex: number; angle: number }[] = [];
     for (const frame of frames) {
         const frameIdx = frame.frameIndex;
-
-        // Only search within the start to search window
         if (frameIdx < startFrame || frameIdx > searchEndFrame) {
             continue;
         }
+        const kneeAngle = getReliableKneeAngle(frame, config.visibilityThreshold);
+        if (kneeAngle !== null) {
+            pts.push({ frameIndex: frameIdx, angle: kneeAngle });
+        }
+    }
 
-        const kneeAngle = getFrameKneeAngle(frame, config.visibilityThreshold);
-
-        if (kneeAngle !== null && kneeAngle < minAngle) {
-            minAngle = kneeAngle;
-            minAngleFrame = frameIdx;
+    let minAngle = Infinity;
+    let minAngleFrame: number | null = null;
+    if (pts.length > 0) {
+        pts.sort((a, b) => a.frameIndex - b.frameIndex);
+        const sm = pts.map((p, i) => {
+            const prev = pts[i - 1]?.angle;
+            const next = pts[i + 1]?.angle;
+            let sum = p.angle;
+            let n = 1;
+            if (prev !== undefined) {
+                sum += prev;
+                n++;
+            }
+            if (next !== undefined) {
+                sum += next;
+                n++;
+            }
+            return sum / n;
+        });
+        for (let i = 0; i < sm.length; i++) {
+            if (sm[i]! < minAngle) {
+                minAngle = sm[i]!;
+                minAngleFrame = pts[i]!.frameIndex;
+            }
         }
     }
 
