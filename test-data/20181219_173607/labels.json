@@ -21,10 +21,10 @@
     },
     {
       "shotNumber": 2,
-      "startFrame": 320,
+      "startFrame": 306,
       "endFrame": 351,
       "cameraOrientation": "side-left",
-      "legs_start_bending": 320,
+      "legs_start_bending": 306,
       "leg_bend_low_point": 327,
       "ball_low_point": 312,
       "ball_starts_upward": 315,

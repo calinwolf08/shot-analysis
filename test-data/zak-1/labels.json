@@ -5,15 +5,17 @@
   "shots": [
     {
       "shotNumber": 1,
-      "startFrame": 3,
+      "startFrame": 1,
       "endFrame": 26,
-      "cameraOrientation": "front-right"
+      "cameraOrientation": "front-right",
+      "legs_start_bending": 1
     },
     {
       "shotNumber": 2,
-      "startFrame": 110,
+      "startFrame": 98,
       "endFrame": 132,
-      "cameraOrientation": "side-right"
+      "cameraOrientation": "side-right",
+      "legs_start_bending": 98
     },
     {
       "shotNumber": 3,
@@ -35,27 +37,31 @@
     },
     {
       "shotNumber": 6,
-      "startFrame": 536,
+      "startFrame": 530,
       "endFrame": 558,
-      "cameraOrientation": "front"
+      "cameraOrientation": "front",
+      "legs_start_bending": 530
     },
     {
       "shotNumber": 7,
-      "startFrame": 676,
+      "startFrame": 667,
       "endFrame": 701,
-      "cameraOrientation": "side-left"
+      "cameraOrientation": "side-left",
+      "legs_start_bending": 667
     },
     {
       "shotNumber": 8,
       "startFrame": 783,
       "endFrame": 806,
-      "cameraOrientation": "side-left"
+      "cameraOrientation": "side-left",
+      "legs_start_bending": 783
     },
     {
       "shotNumber": 9,
-      "startFrame": 899,
+      "startFrame": 884,
       "endFrame": 920,
-      "cameraOrientation": "front-left"
+      "cameraOrientation": "front-left",
+      "legs_start_bending": 884
     }
   ]
 }
