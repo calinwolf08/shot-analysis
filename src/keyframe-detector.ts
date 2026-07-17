@@ -622,10 +622,95 @@ function getReliableKneeAngle(
 }
 
 /**
+ * Minimum hip drop (basin depth) required to trust the hip-drop signal over the
+ * knee angle. Below this the hip barely moves (e.g. synthetic fixtures, or a
+ * view where hips/ankles aren't tracked well) and we fall back to the knee.
+ */
+const HIP_DROP_MIN_RANGE = 0.02;
+
+/**
+ * Vertical hip-to-ankle distance (ankleY − hipY) of the most-visible side, or
+ * null. As the legs bend the hips drop toward the ankles, so this SHRINKS —
+ * a cleaner "how bent are the legs" signal than knee angle, which depends on
+ * the occluded far leg in side views. Lower = more bent.
+ */
+function getHipAnkleDrop(
+    frame: Frame,
+    visibilityThreshold: number,
+): number | null {
+    if (!frame.landmarks) return null;
+    const lm = frame.landmarks;
+    const side = (
+        hipI: number,
+        ankleI: number,
+    ): { vis: number; drop: number } | null => {
+        const hip = lm[hipI];
+        const ankle = lm[ankleI];
+        if (!hip || !ankle) return null;
+        return {
+            vis: Math.min(hip.visibility ?? 0, ankle.visibility ?? 0),
+            drop: ankle.y - hip.y,
+        };
+    };
+    const l = side(LANDMARK_INDICES.LEFT_HIP, LANDMARK_INDICES.LEFT_ANKLE);
+    const r = side(LANDMARK_INDICES.RIGHT_HIP, LANDMARK_INDICES.RIGHT_ANKLE);
+    const best = l && r ? (l.vis >= r.vis ? l : r) : (l ?? r);
+    if (!best || best.vis < visibilityThreshold) return null;
+    return best.drop;
+}
+
+/**
+ * Builds the centered-smoothed hip-drop series over [lo, hi] and its min/range.
+ * Returns null when there aren't enough tracked frames to be useful.
+ */
+function hipDropBasin(
+    frames: readonly Frame[],
+    lo: number,
+    hi: number,
+    visibilityThreshold: number,
+): { series: { frameIndex: number; v: number }[]; min: number; range: number } | null {
+    const pts: { frameIndex: number; v: number }[] = [];
+    for (const frame of frames) {
+        const idx = frame.frameIndex;
+        if (idx < lo || idx > hi) continue;
+        const drop = getHipAnkleDrop(frame, visibilityThreshold);
+        if (drop !== null) pts.push({ frameIndex: idx, v: drop });
+    }
+    if (pts.length < 3) return null;
+    pts.sort((a, b) => a.frameIndex - b.frameIndex);
+    const series = pts.map((p, i) => {
+        const prev = pts[i - 1]?.v;
+        const next = pts[i + 1]?.v;
+        let sum = p.v;
+        let n = 1;
+        if (prev !== undefined) {
+            sum += prev;
+            n++;
+        }
+        if (next !== undefined) {
+            sum += next;
+            n++;
+        }
+        return { frameIndex: p.frameIndex, v: sum / n };
+    });
+    let min = Infinity;
+    let max = -Infinity;
+    for (const p of series) {
+        if (p.v < min) min = p.v;
+        if (p.v > max) max = p.v;
+    }
+    return { series, min, range: max - min };
+}
+
+/**
  * Detects the frame with the deepest knee bend (minimum knee angle).
  *
  * This corresponds to the "leg_bend_low_point" keyframe in the Load phase.
  * The search is limited to the first portion of the shot (configurable).
+ *
+ * Primary signal is the hip drop (hips lowest relative to the ankles = deepest
+ * bend); the onset of that basin is the low point. Falls back to the knee angle
+ * when the hips barely move (e.g. hips/ankles not tracked).
  *
  * @param frames - Array of frames with pose data
  * @param startFrame - Shot start frame index (inclusive)
@@ -643,10 +728,34 @@ export function detectLegBendLowPoint(
     const searchEndFrame =
         startFrame + Math.floor(shotDuration * config.legBendSearchWindow);
 
-    // Collect the knee-angle series over the window, then take the deepest bend
-    // on a CENTERED-smoothed signal. The raw argmin latches onto a single noisy
-    // frame (giving a few-frame scatter in either direction); smoothing settles
-    // it on the true bottom of the bend.
+    // Primary: hip-drop basin ONSET — the first frame the hips reach the bottom
+    // of their drop (within a small band of the minimum). Only trusted when the
+    // hips actually drop a meaningful amount.
+    const basin = hipDropBasin(
+        frames,
+        startFrame,
+        searchEndFrame,
+        config.visibilityThreshold,
+    );
+    if (basin && basin.range >= HIP_DROP_MIN_RANGE) {
+        const eps = Math.max(0.002, 0.05 * basin.range);
+        for (const p of basin.series) {
+            if (p.v <= basin.min + eps) {
+                emitDiagnostic({
+                    keyframe: "leg_bend_low_point",
+                    frame: p.frameIndex,
+                    method: "hip-drop-basin-onset",
+                    detail: `hips lowest vs ankles (drop ${basin.min.toFixed(3)}, range ${basin.range.toFixed(3)}) in window ${startFrame}-${searchEndFrame}`,
+                });
+                return p.frameIndex;
+            }
+        }
+    }
+
+    // Fallback: collect the knee-angle series over the window, then take the
+    // deepest bend on a CENTERED-smoothed signal. The raw argmin latches onto a
+    // single noisy frame (giving a few-frame scatter in either direction);
+    // smoothing settles it on the true bottom of the bend.
     const pts: { frameIndex: number; angle: number }[] = [];
     for (const frame of frames) {
         const frameIdx = frame.frameIndex;
@@ -878,7 +987,33 @@ export function detectLegsStartExtending(
     const searchEndFrame =
         legBendLowPointFrame + Math.floor(shotDuration * config.riseSearchWindow);
 
-    // Extract knee angles for frames in the search window
+    // Primary: hip-drop basin TURN — the last frame the hips are still at the
+    // bottom of their drop, i.e. where they begin rising again as the legs push
+    // up. Only trusted when the hips drop a meaningful amount.
+    const basin = hipDropBasin(
+        frames,
+        legBendLowPointFrame,
+        searchEndFrame,
+        config.visibilityThreshold,
+    );
+    if (basin && basin.range >= HIP_DROP_MIN_RANGE) {
+        const eps = Math.max(0.002, 0.05 * basin.range);
+        let lastIdx = -1;
+        for (let i = 0; i < basin.series.length; i++) {
+            if (basin.series[i]!.v <= basin.min + eps) lastIdx = i;
+        }
+        if (lastIdx >= 0) {
+            emitDiagnostic({
+                keyframe: "legs_start_extending",
+                frame: basin.series[lastIdx]!.frameIndex,
+                method: "hip-drop-basin-turn",
+                detail: `hips begin rising after the bottom (drop ${basin.min.toFixed(3)}, range ${basin.range.toFixed(3)}) in window ${legBendLowPointFrame}-${searchEndFrame}`,
+            });
+            return basin.series[lastIdx]!.frameIndex;
+        }
+    }
+
+    // Fallback: extract knee angles for frames in the search window
     const frameAngles: Array<{ frameIndex: number; angle: number }> = [];
 
     for (const frame of frames) {
