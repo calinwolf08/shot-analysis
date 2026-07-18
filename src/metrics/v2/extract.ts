@@ -58,6 +58,16 @@ function toSequence(frames: readonly Frame[]): PoseLandmarks[] {
   }));
 }
 
+/**
+ * PoseData → the keyframe Frame[] (frameIndex aligned to shot boundaries) that
+ * both keyframe detection and structure metrics consume. Exposed so callers
+ * with their OWN shot boundaries (e.g. labeled reference clips) can detect
+ * keyframes and call {@link metricsForShot} directly.
+ */
+export function keyframeFramesFromPoseData(poseData: PoseData): Frame[] {
+  return poseLandmarksToFrames(toSequence(poseData.frames as readonly Frame[]));
+}
+
 /** Mean pose confidence across a shot's frame span. */
 function meanConfidence(frames: readonly Frame[], start: number, end: number): number {
   let sum = 0;

@@ -11,6 +11,8 @@ export * from "./normalize";
 export * from "./sequencing";
 export * from "./structure";
 export * from "./extract";
+export * from "./flatten";
+export * from "./stats";
 export { derivePhaseRanges } from "./structure/phases";
 export type { PhaseRanges, FrameRange } from "./structure/phases";
 export type { ShootingHand } from "./structure/geometry";
