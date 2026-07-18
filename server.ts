@@ -310,6 +310,26 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Serve placeholder reference assets: /reference/<file>.json
+    if (req.method === "GET" && url.pathname.startsWith("/reference/")) {
+      const file = path.basename(url.pathname.slice("/reference/".length));
+      if (/^[a-zA-Z0-9_-]+\.json$/.test(file)) {
+        try {
+          const content = await fs.readFile(
+            path.join(process.cwd(), "reference", file),
+            "utf-8",
+          );
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(content);
+        } catch {
+          sendError(res, "Not found", 404);
+        }
+        return;
+      }
+      sendError(res, "Not found", 404);
+      return;
+    }
+
     // Serve a file from a test-data case: /test-data/<name>/<file>
     if (req.method === "GET" && url.pathname.startsWith("/test-data/")) {
       const parts = url.pathname.slice("/test-data/".length).split("/");

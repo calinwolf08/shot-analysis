@@ -2429,6 +2429,45 @@
           ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
           ctx.fill();
         }
+        // Pro-skeleton overlay: when scrubbed onto a detected keyframe and the
+        // reference poses are loaded, draw the pro's stance-aligned skeleton as
+        // a dashed ghost so the user can compare their shape to the target.
+        const kfId =
+          appState.currentKeyframes && appState.currentKeyframes[frameNo];
+        const refPose =
+          kfId &&
+          appState.referencePoses &&
+          appState.referencePoses.byKeyframe &&
+          appState.referencePoses.byKeyframe[kfId];
+        if (
+          refPose &&
+          window.ShotAnalysis &&
+          typeof ShotAnalysis.referenceOnFrame === "function"
+        ) {
+          const proLm = ShotAnalysis.referenceOnFrame(refPose, frame);
+          if (proLm) {
+            const ppt = (i) =>
+              proLm[i] && { x: proLm[i].x * W, y: proLm[i].y * H };
+            ctx.save();
+            ctx.setLineDash([6, 5]);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "rgba(251, 191, 36, 0.85)"; // amber = pro target
+            for (const [a, b] of POSE_CONNECTIONS) {
+              const pa = ppt(a);
+              const pb = ppt(b);
+              if (!pa || !pb) continue;
+              ctx.beginPath();
+              ctx.moveTo(pa.x, pa.y);
+              ctx.lineTo(pb.x, pb.y);
+              ctx.stroke();
+            }
+            ctx.restore();
+            ctx.fillStyle = "rgba(251, 191, 36, 0.95)";
+            ctx.font = "14px sans-serif";
+            ctx.fillText(`pro target: ${kfId}`, 12, H - 14);
+          }
+        }
+
         ctx.fillStyle = "#e5e7eb";
         ctx.font = "18px sans-serif";
         ctx.fillText(`Frame ${frameNo}`, 12, 26);
@@ -2637,6 +2676,14 @@
             shot.frameRange.start,
             shot.frameRange.end,
           );
+          // Cache frame -> keyframe id so the pro-skeleton overlay knows which
+          // reference pose to draw when scrubbed onto a keyframe.
+          const frameToKf = {};
+          KEYFRAME_ORDER.forEach((id) => {
+            const f = detected.get ? detected.get(id) : detected[id];
+            if (typeof f === "number") frameToKf[f] = id;
+          });
+          appState.currentKeyframes = frameToKf;
         } catch (err) {
           console.warn("[keyframes] detection failed", err);
           return "";
@@ -4015,6 +4062,18 @@
       };
 
       populateTestCases();
+
+      // Load the (placeholder) pro reference skeletons for the you-vs-pro
+      // overlay. Missing file is fine — the overlay just won't draw.
+      async function loadReferencePoses() {
+        try {
+          const res = await fetch("/reference/reference-poses.json");
+          if (res.ok) appState.referencePoses = await res.json();
+        } catch (err) {
+          console.warn("[reference] not available:", err.message);
+        }
+      }
+      loadReferencePoses();
 
       // Sidebar Keyframes/Metrics view toggle
       elements.viewKeyframesBtn.onclick = () => setSidebarView("keyframes");
