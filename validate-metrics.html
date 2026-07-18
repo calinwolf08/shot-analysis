@@ -2796,7 +2796,100 @@
           elements.metricsList.appendChild(section);
         }
 
+        renderV2Metrics(shot);
+
         highlightCurrentFrame();
+      }
+
+      // Memoized v2 extraction, keyed by the loaded poses + shooting hand.
+      let _v2Cache = { poseData: null, hand: null, metrics: null };
+      function getV2Metrics() {
+        const pd = appState.poseData;
+        const hand = elements.shootingHand.value;
+        if (
+          !pd ||
+          !window.ShotAnalysis ||
+          typeof ShotAnalysis.extractShotMetrics !== "function"
+        ) {
+          return null;
+        }
+        if (_v2Cache.poseData === pd && _v2Cache.hand === hand)
+          return _v2Cache.metrics;
+        let metrics = null;
+        try {
+          metrics = ShotAnalysis.extractShotMetrics(pd, { shootingHand: hand });
+        } catch (err) {
+          console.warn("[v2] extractShotMetrics failed", err);
+        }
+        _v2Cache = { poseData: pd, hand, metrics };
+        return metrics;
+      }
+
+      // Sequencing (signed gaps) + Structure (per-phase) metrics from the v2
+      // pipeline — the numbers that feed the new Sequencing/Structure scoring.
+      // Unmeasurable values show as n/a so nothing is silently guessed.
+      function renderV2Metrics(shot) {
+        const all = getV2Metrics();
+        if (!all || !all.length) return;
+        const m =
+          all.find((x) => x.shot.startFrame === shot.frameRange.start) ||
+          all.find(
+            (x) => Math.abs(x.shot.startFrame - shot.frameRange.start) <= 3,
+          );
+        if (!m) return;
+
+        const rowCss =
+          "display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 6px;border-bottom:1px solid #22304a;font-size:0.82rem";
+        const na = '<span style="color:#6b7280">n/a</span>';
+        const frameBtn = (meas) =>
+          meas.reliable && meas.frames && meas.frames.length
+            ? `<button class="metric-frame-btn" onclick="seekToFrame(${meas.frames[meas.frames.length - 1]})">f${meas.frames[meas.frames.length - 1]}</button>`
+            : "";
+
+        let html = "";
+
+        // Sequencing gaps — green if in order (>=0), red if order violated (<0).
+        html +=
+          '<div class="category-section"><div class="category-header">Sequencing (v2)</div>';
+        for (const g of m.sequencing.gaps) {
+          const rel = g.gap.reliable;
+          const color = !rel
+            ? "#6b7280"
+            : g.gap.value < 0
+              ? "#f87171"
+              : "#34d399";
+          const val = rel
+            ? `${g.gap.value >= 0 ? "+" : ""}${g.gap.value.toFixed(3)}`
+            : "n/a";
+          html += `<div style="${rowCss}"><span>${g.from} → ${g.to}</span><span style="color:${color};font-variant-numeric:tabular-nums">${val}</span></div>`;
+        }
+        html += `<div style="${rowCss};color:#9ca3af"><span>coverage</span><span>${(m.sequencing.coverage * 100).toFixed(0)}%</span></div>`;
+        html += "</div>";
+
+        // Structure — one section per phase.
+        const phaseNames = {
+          gather: "Gather",
+          load: "Load",
+          rise: "Rise",
+          setPoint: "Set Point",
+          release: "Release",
+          followThrough: "Follow-through",
+        };
+        for (const [phase, metrics] of Object.entries(m.structure || {})) {
+          if (!metrics) continue;
+          html += `<div class="category-section"><div class="category-header">${phaseNames[phase] || phase} (v2)</div>`;
+          for (const [key, meas] of Object.entries(metrics)) {
+            const val = meas.reliable
+              ? `<span style="font-variant-numeric:tabular-nums">${meas.value.toFixed(3)}</span>`
+              : na;
+            html += `<div style="${rowCss}"><span>${key}</span><span style="display:flex;gap:6px;align-items:center">${val}${frameBtn(meas)}</span></div>`;
+          }
+          html += "</div>";
+        }
+
+        const container = document.createElement("div");
+        container.innerHTML = html;
+        elements.metricsList.appendChild(container);
       }
 
       function createMetricCard(metricName, metric, validation) {
