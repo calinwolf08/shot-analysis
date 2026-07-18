@@ -1,8 +1,12 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import { scoreShot, type ShotScore } from "basketball-shot-analysis";
+  import type { StoredShotAnalysis } from "$lib/features/analysis";
   import type { BenchmarkProfile } from "$lib/features/benchmarks";
   import type { FocusAreaRow } from "$lib/features/diagnosis";
+  import Scorecard from "$lib/features/scoring/v2/Scorecard.svelte";
+  import { loadThresholds } from "$lib/features/scoring/v2/service";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { flushDb } from "$lib/shared/db";
   import type { ScoreRecord, Session, ShotRecord } from "$lib/shared/db/repos";
@@ -35,6 +39,11 @@
   let loading = $state(true);
   let buildingPlan = $state(false);
 
+  // v2 Sequencing/Structure scorecards, one per included shot (null when a shot
+  // predates v2 metrics or the reference thresholds aren't available).
+  let v2Scores = $state<{ shotIndex: number; score: ShotScore }[]>([]);
+  let v2Selected = $state(0);
+
   /** Design doc: warn when tracking quality undermines the numbers. */
   const lowConfidence = $derived.by(() => {
     const included = shots.filter((s) => !s.excluded);
@@ -66,7 +75,28 @@
     byCategory = benchmark ? summarizeMetrics(shots, benchmark) : null;
     session = await services.repos.session.get(id);
     await loadDeltas(id);
+    await loadV2Scores();
     loading = false;
+  }
+
+  /** Scores each included shot's persisted v2 metrics against the reference. */
+  async function loadV2Scores() {
+    v2Scores = [];
+    v2Selected = 0;
+    let thresholds;
+    try {
+      thresholds = await loadThresholds();
+    } catch {
+      return; // reference thresholds not available — skip the scorecard
+    }
+    const out: { shotIndex: number; score: ShotScore }[] = [];
+    shots.forEach((s, i) => {
+      if (s.excluded) return;
+      const metrics = (s.analysis as StoredShotAnalysis).v2Metrics;
+      if (metrics)
+        out.push({ shotIndex: i, score: scoreShot(metrics, thresholds!) });
+    });
+    v2Scores = out;
   }
 
   /** Compares against the most recent prior completed assessment. */
@@ -186,6 +216,29 @@
       <MetricsAccordion {byCategory} />
     {/if}
 
+    {#if v2Scores.length > 0}
+      <Card testid="results-scorecard">
+        <div class="scorecard-head">
+          <h3>Sequencing &amp; Structure</h3>
+          {#if v2Scores.length > 1}
+            <div class="v2-tabs">
+              {#each v2Scores as v, i (v.shotIndex)}
+                <button
+                  class:active={i === v2Selected}
+                  onclick={() => (v2Selected = i)}
+                >
+                  Shot {v.shotIndex + 1}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+        {#if v2Scores[v2Selected]}
+          <Scorecard score={v2Scores[v2Selected]!.score} />
+        {/if}
+      </Card>
+    {/if}
+
     <div class="cta">
       <Button
         size="lg"
@@ -207,6 +260,36 @@
 </main>
 
 <style>
+  .scorecard-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .scorecard-head h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .v2-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .v2-tabs button {
+    background: var(--sc-color-surface-2, #1f2937);
+    color: var(--sc-color-text-muted, #cbd5e1);
+    border: none;
+    border-radius: 6px;
+    padding: 3px 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+  .v2-tabs button.active {
+    background: var(--sc-color-accent, #2563eb);
+    color: white;
+  }
   .results {
     min-height: 100dvh;
     max-width: 560px;

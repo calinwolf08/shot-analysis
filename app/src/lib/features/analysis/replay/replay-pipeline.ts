@@ -13,7 +13,9 @@ import {
   createPostureCalculators,
   createShootingArmCalculators,
   createTimingCalculators,
+  detectKeyframesFromFrames,
   detectOrientation,
+  metricsForShot,
   type AnalysisConfig,
   type AnalysisResult,
   type DetectionPoseLandmarks,
@@ -21,6 +23,7 @@ import {
   type PoseDataFrame,
   type PoseLandmarks as MetricsPoseLandmarks,
   type ShotAnalysis,
+  type ShotMetricsV2,
 } from "basketball-shot-analysis";
 import type { AnalyzeOptions, LandmarkFrame, ProgressCallback } from "../types";
 
@@ -186,10 +189,18 @@ export function runReplayAnalysis(
       run,
     );
     const keyFramePoses = extractKeyFramePoses(prepared.source, analysis);
+    const v2Metrics = computeV2Metrics(
+      prepared.source,
+      shot.frameRange,
+      orientation ?? "front",
+      config.shootingHand ?? "right",
+      run.fps,
+    );
     analyses.push({
       ...analysis,
       orientation,
       keyFramePoses,
+      ...(v2Metrics ? { v2Metrics } : {}),
     } as ShotAnalysis);
     emit({
       framesProcessed: total,
@@ -228,7 +239,60 @@ export type KeyFramePoses = Partial<
 /** ShotAnalysis as persisted by this app: library type + overlay poses. */
 export type StoredShotAnalysis = ShotAnalysis & {
   keyFramePoses?: KeyFramePoses;
+  /** v2 Sequencing/Structure measurements — scored at results time against
+   * the reference thresholds. Persisted (not the score) so re-thresholding
+   * doesn't require re-analysis. */
+  v2Metrics?: ShotMetricsV2;
 };
+
+/**
+ * Computes the v2 Sequencing/Structure metrics for a shot from the full frames.
+ * Defensive: any failure returns undefined so the core analysis is never broken
+ * by the (newer) v2 path.
+ */
+function computeV2Metrics(
+  source: readonly PoseDataFrame[],
+  frameRange: { start: number; end: number },
+  orientation: string,
+  shootingHand: "left" | "right",
+  fps: number,
+): ShotMetricsV2 | undefined {
+  try {
+    const frames = source as Parameters<typeof metricsForShot>[0];
+    const keyframes = detectKeyframesFromFrames(
+      frames,
+      frameRange.start,
+      frameRange.end,
+    );
+    let sum = 0;
+    let n = 0;
+    for (
+      let i = frameRange.start;
+      i <= frameRange.end && i < source.length;
+      i++
+    ) {
+      const c = source[i]?.poseConfidence;
+      if (typeof c === "number") {
+        sum += c;
+        n++;
+      }
+    }
+    return metricsForShot(
+      frames,
+      keyframes,
+      { startFrame: frameRange.start, endFrame: frameRange.end },
+      {
+        fps,
+        cameraOrientation: orientation,
+        shootingHand,
+        poseConfidence: n > 0 ? sum / n : 0,
+      },
+    );
+  } catch (err) {
+    console.warn("[v2] metrics computation failed for shot", err);
+    return undefined;
+  }
+}
 
 function extractKeyFramePoses(
   source: readonly PoseDataFrame[],

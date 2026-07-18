@@ -221,6 +221,10 @@ export {
   computeSequencing,
   computeStructure,
 } from "./metrics/v2";
+export {
+  detectKeyframesFromFrames,
+  poseLandmarksToFrames,
+} from "./detection/keyframe-phases";
 export type {
   ShotMetricsV2,
   SequencingMetrics,
