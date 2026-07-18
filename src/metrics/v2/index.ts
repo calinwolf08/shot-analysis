@@ -9,3 +9,6 @@
 export * from "./types";
 export * from "./normalize";
 export * from "./sequencing";
+export * from "./structure";
+export { derivePhaseRanges } from "./structure/phases";
+export type { PhaseRanges, FrameRange } from "./structure/phases";
