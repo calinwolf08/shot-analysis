@@ -227,4 +227,9 @@ export type {
   StructureMetrics,
   Measurement,
   ExtractOptions,
+  Thresholds,
+  MetricThreshold,
 } from "./metrics/v2";
+export { deriveThresholds } from "./metrics/v2";
+export { scoreShot } from "./scoring/v2";
+export type { ShotScore, CategoryScore, MetricScore } from "./scoring/v2";

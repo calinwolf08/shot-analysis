@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:labels": "tsx src/testing/tolerance-report.ts",
     "metrics:extract": "tsx src/testing/extract-reference-metrics.ts",
+    "metrics:thresholds": "tsx src/testing/derive-thresholds.ts",
     "lint": "prettier --check .",
     "format": "prettier --write .",
     "validate": "npm run build:browser && npx tsx server.ts"
