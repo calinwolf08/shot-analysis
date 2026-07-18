@@ -1,0 +1,1069 @@
+{
+  "version": 1,
+  "generatedFrom": [
+    "20190804_140654",
+    "20190103_180930",
+    "20190103_181419",
+    "20190804_140617",
+    "20190818_142631",
+    "20201212_134104"
+  ],
+  "metrics": {
+    "followThrough.elbow_extension_angle": {
+      "band": [
+        94.8504112515759,
+        171.4325096841509
+      ],
+      "weight": 0,
+      "tightness": 0.1689484853242577,
+      "coverage": 1,
+      "category": "followThrough",
+      "label": "Elbow extension angle",
+      "reportedOnly": true
+    },
+    "followThrough.wrist_snap_angle": {
+      "band": [
+        34.7626071919354,
+        122.46772596860345
+      ],
+      "weight": 0,
+      "tightness": 0.1980483919080874,
+      "coverage": 1,
+      "category": "followThrough",
+      "label": "Wrist snap angle",
+      "reportedOnly": true
+    },
+    "gather.ankles": {
+      "band": [
+        0,
+        0
+      ],
+      "weight": 1,
+      "tightness": 1,
+      "coverage": 1,
+      "category": "gather",
+      "label": "Ankles",
+      "reportedOnly": false
+    },
+    "gather.ball_height": {
+      "band": [
+        0.5018185015500232,
+        0.7605296468423146
+      ],
+      "weight": 0,
+      "tightness": 0.23118372862500103,
+      "coverage": 0.8333333333333334,
+      "category": "gather",
+      "label": "Ball height",
+      "reportedOnly": true
+    },
+    "gather.head": {
+      "band": [
+        -0.3529602215349304,
+        0.38524578521054403
+      ],
+      "weight": 0,
+      "tightness": 0.19277520213333332,
+      "coverage": 1,
+      "category": "gather",
+      "label": "Head",
+      "reportedOnly": true
+    },
+    "gather.hips": {
+      "band": [
+        -0.14281940904784196,
+        0.052082130810732735
+      ],
+      "weight": 0,
+      "tightness": 0.1716296888109557,
+      "coverage": 1,
+      "category": "gather",
+      "label": "Hips",
+      "reportedOnly": true
+    },
+    "gather.knees": {
+      "band": [
+        -0.2887487844626861,
+        0.11379524038605981
+      ],
+      "weight": 0,
+      "tightness": 0.23649787324983584,
+      "coverage": 1,
+      "category": "gather",
+      "label": "Knees",
+      "reportedOnly": true
+    },
+    "gather.shoulders": {
+      "band": [
+        -0.19766596474084358,
+        0.20419200671738413
+      ],
+      "weight": 0.2508935586329052,
+      "tightness": 0.2508935586329052,
+      "coverage": 1,
+      "category": "gather",
+      "label": "Shoulders",
+      "reportedOnly": false
+    },
+    "load.ankles_delta": {
+      "band": [
+        0,
+        0
+      ],
+      "weight": 1,
+      "tightness": 1,
+      "coverage": 1,
+      "category": "load",
+      "label": "Ankles delta",
+      "reportedOnly": false
+    },
+    "load.ankles_end": {
+      "band": [
+        0,
+        0
+      ],
+      "weight": 1,
+      "tightness": 1,
+      "coverage": 1,
+      "category": "load",
+      "label": "Ankles end",
+      "reportedOnly": false
+    },
+    "load.ankles_start": {
+      "band": [
+        0,
+        0
+      ],
+      "weight": 1,
+      "tightness": 1,
+      "coverage": 1,
+      "category": "load",
+      "label": "Ankles start",
+      "reportedOnly": false
+    },
+    "load.ball_low_height": {
+      "band": [
+        0.4991954077480528,
+        0.7296879169731556
+      ],
+      "weight": 0,
+      "tightness": 0.16783587467933228,
+      "coverage": 0.8333333333333334,
+      "category": "load",
+      "label": "Ball low height",
+      "reportedOnly": true
+    },
+    "load.depth_drop": {
+      "band": [
+        0.011377861595093741,
+        0.1012494580765958
+      ],
+      "weight": 0,
+      "tightness": 0.2175696261915805,
+      "coverage": 1,
+      "category": "load",
+      "label": "Depth drop",
+      "reportedOnly": true
+    },
+    "load.head_delta": {
+      "band": [
+        -0.16560416806643358,
+        0.16897626594560694
+      ],
+      "weight": 0.30202168750042174,
+      "tightness": 0.30202168750042174,
+      "coverage": 1,
+      "category": "load",
+      "label": "Head delta",
+      "reportedOnly": false
+    },
+    "load.head_end": {
+      "band": [
+        -0.23084483304171233,
+        0.45943925767765464
+      ],
+      "weight": 0,
+      "tightness": 0.19554125844849107,
+      "coverage": 1,
+      "category": "load",
+      "label": "Head end",
+      "reportedOnly": true
+    },
+    "load.head_start": {
+      "band": [
+        -0.3529602215349304,
+        0.38524578521054403
+      ],
+      "weight": 0,
+      "tightness": 0.19277520213333332,
+      "coverage": 1,
+      "category": "load",
+      "label": "Head start",
+      "reportedOnly": true
+    },
+    "load.hip_depth": {
+      "band": [
+        0.41201729730977554,
+        0.4663031895357262
+      ],
+      "weight": 0,
+      "tightness": 0.2494902091212722,
+      "coverage": 1,
+      "category": "load",
+      "label": "Hip depth",
+      "reportedOnly": true
+    },
+    "load.hips_delta": {
+      "band": [
+        -0.07755879581053354,
+        0.09587396209961288
+      ],
+      "weight": 0.3786899696599886,
+      "tightness": 0.3786899696599886,
+      "coverage": 1,
+      "category": "load",
+      "label": "Hips delta",
+      "reportedOnly": false
+    },
+    "load.hips_end": {
+      "band": [
+        -0.09251276832789211,
+        0.0785305827617621
+      ],
+      "weight": 0.3444055976903212,
+      "tightness": 0.3444055976903212,
+      "coverage": 1,
+      "category": "load",
+      "label": "Hips end",
+      "reportedOnly": false
+    },
+    "load.hips_start": {
+      "band": [
+        -0.14281940904784196,
+        0.052082130810732735
+      ],
+      "weight": 0,
+      "tightness": 0.1716296888109557,
+      "coverage": 1,
+      "category": "load",
+      "label": "Hips start",
+      "reportedOnly": true
+    },
+    "load.knees_delta": {
+      "band": [
+        -0.03848739944701098,
+        0.41743107410618097
+      ],
+      "weight": 0,
+      "tightness": 0.15619492745046254,
+      "coverage": 1,
+      "category": "load",
+      "label": "Knees delta",
+      "reportedOnly": true
+    },
+    "load.knees_end": {
+      "band": [
+        -0.24478384578018184,
+        0.4933288510674286
+      ],
+      "weight": 0,
+      "tightness": 0.12276991332559122,
+      "coverage": 1,
+      "category": "load",
+      "label": "Knees end",
+      "reportedOnly": true
+    },
+    "load.knees_start": {
+      "band": [
+        -0.2887487844626861,
+        0.11379524038605981
+      ],
+      "weight": 0,
+      "tightness": 0.23649787324983584,
+      "coverage": 1,
+      "category": "load",
+      "label": "Knees start",
+      "reportedOnly": true
+    },
+    "load.shoulders_delta": {
+      "band": [
+        -0.08350611564603733,
+        0.15633037830350222
+      ],
+      "weight": 0.4176366809957227,
+      "tightness": 0.4176366809957227,
+      "coverage": 1,
+      "category": "load",
+      "label": "Shoulders delta",
+      "reportedOnly": false
+    },
+    "load.shoulders_end": {
+      "band": [
+        -0.11070507897647869,
+        0.2500954061258655
+      ],
+      "weight": 0,
+      "tightness": 0.24713584794499113,
+      "coverage": 1,
+      "category": "load",
+      "label": "Shoulders end",
+      "reportedOnly": true
+    },
+    "load.shoulders_start": {
+      "band": [
+        -0.19766596474084358,
+        0.20419200671738413
+      ],
+      "weight": 0.2508935586329052,
+      "tightness": 0.2508935586329052,
+      "coverage": 1,
+      "category": "load",
+      "label": "Shoulders start",
+      "reportedOnly": false
+    },
+    "load.start_height": {
+      "band": [
+        0.43853047608553225,
+        0.5391888946986656
+      ],
+      "weight": 0,
+      "tightness": 0.1005060836133904,
+      "coverage": 1,
+      "category": "load",
+      "label": "Start height",
+      "reportedOnly": true
+    },
+    "load.wrist_cock_delta": {
+      "band": [
+        -58.34119886258177,
+        30.39567005455534
+      ],
+      "weight": 0,
+      "tightness": 0.13666389569049764,
+      "coverage": 1,
+      "category": "load",
+      "label": "Wrist cock delta",
+      "reportedOnly": true
+    },
+    "load.wrist_cock_end": {
+      "band": [
+        67.92568626394376,
+        176.18163358460748
+      ],
+      "weight": 0,
+      "tightness": 0.12486068631053693,
+      "coverage": 1,
+      "category": "load",
+      "label": "Wrist cock end",
+      "reportedOnly": true
+    },
+    "load.wrist_cock_start": {
+      "band": [
+        70.53474431686806,
+        182.88505938333913
+      ],
+      "weight": 0,
+      "tightness": 0.17868318074448952,
+      "coverage": 1,
+      "category": "load",
+      "label": "Wrist cock start",
+      "reportedOnly": true
+    },
+    "load.wrist_dist_delta": {
+      "band": [
+        -0.1371221879049528,
+        0.4952499537972407
+      ],
+      "weight": 0,
+      "tightness": 0.1533110348662531,
+      "coverage": 1,
+      "category": "load",
+      "label": "Wrist dist delta",
+      "reportedOnly": true
+    },
+    "load.wrist_dist_end": {
+      "band": [
+        0.35273140225951294,
+        0.8333278299659789
+      ],
+      "weight": 0,
+      "tightness": 0.1441163725217578,
+      "coverage": 1,
+      "category": "load",
+      "label": "Wrist dist end",
+      "reportedOnly": true
+    },
+    "load.wrist_dist_start": {
+      "band": [
+        0.16865142381120643,
+        0.6055324085841967
+      ],
+      "weight": 0,
+      "tightness": 0.16088800736784092,
+      "coverage": 1,
+      "category": "load",
+      "label": "Wrist dist start",
+      "reportedOnly": true
+    },
+    "load.wrist_height_delta": {
+      "band": [
+        -0.0963946215818008,
+        0.39824217769236187
+      ],
+      "weight": 0,
+      "tightness": 0.22085100748606912,
+      "coverage": 1,
+      "category": "load",
+      "label": "Wrist height delta",
+      "reportedOnly": true
+    },
+    "load.wrist_height_end": {
+      "band": [
+        0.5662970413219206,
+        0.9461424753694552
+      ],
+      "weight": 0,
+      "tightness": 0.12423473339266648,
+      "coverage": 1,
+      "category": "load",
+      "label": "Wrist height end",
+      "reportedOnly": true
+    },
+    "load.wrist_height_start": {
+      "band": [
+        0.5082351126014432,
+        0.8073753458968682
+      ],
+      "weight": 0.3104221944779958,
+      "tightness": 0.3104221944779958,
+      "coverage": 1,
+      "category": "load",
+      "label": "Wrist height start",
+      "reportedOnly": false
+    },
+    "release.ankles_delta": {
+      "band": [
+        0,
+        0
+      ],
+      "weight": 1,
+      "tightness": 1,
+      "coverage": 1,
+      "category": "release",
+      "label": "Ankles delta",
+      "reportedOnly": false
+    },
+    "release.ankles_end": {
+      "band": [
+        0,
+        0
+      ],
+      "weight": 1,
+      "tightness": 1,
+      "coverage": 1,
+      "category": "release",
+      "label": "Ankles end",
+      "reportedOnly": false
+    },
+    "release.ankles_start": {
+      "band": [
+        0,
+        0
+      ],
+      "weight": 1,
+      "tightness": 1,
+      "coverage": 1,
+      "category": "release",
+      "label": "Ankles start",
+      "reportedOnly": false
+    },
+    "release.elbow_height_vs_head": {
+      "band": [
+        0.012626960689350217,
+        0.08716453516498768
+      ],
+      "weight": 0.3497378166946003,
+      "tightness": 0.3497378166946003,
+      "coverage": 1,
+      "category": "release",
+      "label": "Elbow height vs head",
+      "reportedOnly": false
+    },
+    "release.guide_hand_duration": {
+      "band": [
+        0.0370743727598566,
+        0.2219835982546361
+      ],
+      "weight": 0,
+      "tightness": 0.04967079273110341,
+      "coverage": 1,
+      "category": "release",
+      "label": "Guide hand duration",
+      "reportedOnly": true
+    },
+    "release.head_delta": {
+      "band": [
+        -0.2802160723014123,
+        0.10123760043642308
+      ],
+      "weight": 0,
+      "tightness": 0.12263398951283695,
+      "coverage": 1,
+      "category": "release",
+      "label": "Head delta",
+      "reportedOnly": true
+    },
+    "release.head_end": {
+      "band": [
+        -0.055069787963825584,
+        0.1540292407583592
+      ],
+      "weight": 0,
+      "tightness": 0.24630880140903008,
+      "coverage": 1,
+      "category": "release",
+      "label": "Head end",
+      "reportedOnly": true
+    },
+    "release.head_start": {
+      "band": [
+        -0.19921070714241076,
+        0.42110647212511454
+      ],
+      "weight": 0,
+      "tightness": 0.11607680293205486,
+      "coverage": 1,
+      "category": "release",
+      "label": "Head start",
+      "reportedOnly": true
+    },
+    "release.hips_delta": {
+      "band": [
+        -0.13334903815303786,
+        0.050003585287960714
+      ],
+      "weight": 0,
+      "tightness": 0.11645061005731142,
+      "coverage": 1,
+      "category": "release",
+      "label": "Hips delta",
+      "reportedOnly": true
+    },
+    "release.hips_end": {
+      "band": [
+        -0.06702700714250037,
+        0.05308913111846761
+      ],
+      "weight": 0,
+      "tightness": 0.1825391235817958,
+      "coverage": 1,
+      "category": "release",
+      "label": "Hips end",
+      "reportedOnly": true
+    },
+    "release.hips_start": {
+      "band": [
+        -0.09355411636084376,
+        0.09149919763409231
+      ],
+      "weight": 0.2690033613642699,
+      "tightness": 0.2690033613642699,
+      "coverage": 1,
+      "category": "release",
+      "label": "Hips start",
+      "reportedOnly": false
+    },
+    "release.knees_delta": {
+      "band": [
+        -0.3589317387999872,
+        0.17899832776969155
+      ],
+      "weight": 0,
+      "tightness": 0.16815626141068998,
+      "coverage": 1,
+      "category": "release",
+      "label": "Knees delta",
+      "reportedOnly": true
+    },
+    "release.knees_end": {
+      "band": [
+        -0.06249902831437616,
+        0.03286572931617354
+      ],
+      "weight": 0.29070726017058335,
+      "tightness": 0.29070726017058335,
+      "coverage": 1,
+      "category": "release",
+      "label": "Knees end",
+      "reportedOnly": false
+    },
+    "release.knees_start": {
+      "band": [
+        -0.23188706842052953,
+        0.32537460573521215
+      ],
+      "weight": 0,
+      "tightness": 0.07986859677337008,
+      "coverage": 1,
+      "category": "release",
+      "label": "Knees start",
+      "reportedOnly": true
+    },
+    "release.shoulders_delta": {
+      "band": [
+        -0.1798486536172539,
+        0.043449550723305884
+      ],
+      "weight": 0,
+      "tightness": 0.11214548400915553,
+      "coverage": 1,
+      "category": "release",
+      "label": "Shoulders delta",
+      "reportedOnly": true
+    },
+    "release.shoulders_end": {
+      "band": [
+        -0.07425343096874107,
+        0.0676041269846904
+      ],
+      "weight": 0.3701600086721752,
+      "tightness": 0.3701600086721752,
+      "coverage": 1,
+      "category": "release",
+      "label": "Shoulders end",
+      "reportedOnly": false
+    },
+    "release.shoulders_start": {
+      "band": [
+        -0.08554084079233383,
+        0.22222773080578778
+      ],
+      "weight": 0,
+      "tightness": 0.1908364061312984,
+      "coverage": 1,
+      "category": "release",
+      "label": "Shoulders start",
+      "reportedOnly": true
+    },
+    "rise.ankles_delta": {
+      "band": [
+        0,
+        0
+      ],
+      "weight": 1,
+      "tightness": 1,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Ankles delta",
+      "reportedOnly": false
+    },
+    "rise.ankles_end": {
+      "band": [
+        0,
+        0
+      ],
+      "weight": 1,
+      "tightness": 1,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Ankles end",
+      "reportedOnly": false
+    },
+    "rise.ankles_start": {
+      "band": [
+        0,
+        0
+      ],
+      "weight": 1,
+      "tightness": 1,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Ankles start",
+      "reportedOnly": false
+    },
+    "rise.head_delta": {
+      "band": [
+        -0.18067921973786116,
+        0.09174204920282678
+      ],
+      "weight": 0,
+      "tightness": 0.2368602339510769,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Head delta",
+      "reportedOnly": true
+    },
+    "rise.head_end": {
+      "band": [
+        -0.19921070714241076,
+        0.42110647212511454
+      ],
+      "weight": 0,
+      "tightness": 0.11607680293205486,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Head end",
+      "reportedOnly": true
+    },
+    "rise.head_start": {
+      "band": [
+        -0.21296290000100437,
+        0.4415573246369467
+      ],
+      "weight": 0,
+      "tightness": 0.1515845499804112,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Head start",
+      "reportedOnly": true
+    },
+    "rise.hips_delta": {
+      "band": [
+        -0.09476179874513274,
+        0.1505843637211727
+      ],
+      "weight": 0,
+      "tightness": 0.17050621928250043,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Hips delta",
+      "reportedOnly": true
+    },
+    "rise.hips_end": {
+      "band": [
+        -0.09083117818488931,
+        0.11399022640881598
+      ],
+      "weight": 0,
+      "tightness": 0.21645241244327018,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Hips end",
+      "reportedOnly": true
+    },
+    "rise.hips_start": {
+      "band": [
+        -0.0794216414159079,
+        0.040780621061277195
+      ],
+      "weight": 0.27225805125948394,
+      "tightness": 0.27225805125948394,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Hips start",
+      "reportedOnly": false
+    },
+    "rise.knees_delta": {
+      "band": [
+        -0.17057914503287025,
+        0.06007655176500919
+      ],
+      "weight": 0,
+      "tightness": 0.22267008350726042,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Knees delta",
+      "reportedOnly": true
+    },
+    "rise.knees_end": {
+      "band": [
+        -0.2339095860687548,
+        0.3273971233834374
+      ],
+      "weight": 0,
+      "tightness": 0.08649948847793695,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Knees end",
+      "reportedOnly": true
+    },
+    "rise.knees_start": {
+      "band": [
+        -0.23074154071502706,
+        0.4792865460022738
+      ],
+      "weight": 0,
+      "tightness": 0.08807175780229066,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Knees start",
+      "reportedOnly": true
+    },
+    "rise.shoulders_delta": {
+      "band": [
+        -0.03401306466684944,
+        0.0343570818351288
+      ],
+      "weight": 0.6103504721976328,
+      "tightness": 0.6103504721976328,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Shoulders delta",
+      "reportedOnly": false
+    },
+    "rise.shoulders_end": {
+      "band": [
+        -0.08554084079233383,
+        0.22222773080578778
+      ],
+      "weight": 0,
+      "tightness": 0.1908364061312984,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Shoulders end",
+      "reportedOnly": true
+    },
+    "rise.shoulders_start": {
+      "band": [
+        -0.10213545906381966,
+        0.2415257862132065
+      ],
+      "weight": 0,
+      "tightness": 0.20958864285483333,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Shoulders start",
+      "reportedOnly": true
+    },
+    "rise.wrist_cock_peak": {
+      "band": [
+        40.70405588955012,
+        166.36761093853335
+      ],
+      "weight": 0,
+      "tightness": 0.1621383140962618,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Wrist cock peak",
+      "reportedOnly": true
+    },
+    "rise.wrist_cock_peak_t": {
+      "band": [
+        0.3176671799235517,
+        0.6100302616782279
+      ],
+      "weight": 0.42168911706683704,
+      "tightness": 0.42168911706683704,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Wrist cock peak t",
+      "reportedOnly": false
+    },
+    "rise.wrist_cock_start": {
+      "band": [
+        67.92568626394376,
+        176.18163358460748
+      ],
+      "weight": 0,
+      "tightness": 0.12486068631053693,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Wrist cock start",
+      "reportedOnly": true
+    },
+    "rise.wrist_path_deviation": {
+      "band": [
+        0.00744203083325759,
+        0.21566172870617284
+      ],
+      "weight": 0,
+      "tightness": 0.22372071309381722,
+      "coverage": 1,
+      "category": "rise",
+      "label": "Wrist path deviation",
+      "reportedOnly": true
+    },
+    "seq.ball_low__ball_rise": {
+      "band": [
+        -0.012709813321226365,
+        0.04842409903551209
+      ],
+      "weight": 0.4158023863108912,
+      "tightness": 0.4158023863108912,
+      "coverage": 1,
+      "category": "sequencing",
+      "label": "Ball low → Ball rise",
+      "reportedOnly": false
+    },
+    "seq.ball_rise__leg_low": {
+      "band": [
+        0.043775607202717184,
+        0.3621383712919064
+      ],
+      "weight": 0,
+      "tightness": 0.24850724137785205,
+      "coverage": 1,
+      "category": "sequencing",
+      "label": "Ball rise → Leg low",
+      "reportedOnly": true
+    },
+    "seq.leg_low__legs_rise": {
+      "band": [
+        -0.013832521645021634,
+        0.08049918831168829
+      ],
+      "weight": 0.29327405707729803,
+      "tightness": 0.29327405707729803,
+      "coverage": 1,
+      "category": "sequencing",
+      "label": "Leg low → Legs rise",
+      "reportedOnly": false
+    },
+    "seq.legs_extend__release": {
+      "band": [
+        -0.12471678187403988,
+        0.07652837607693845
+      ],
+      "weight": 0.32845625250197574,
+      "tightness": 0.32845625250197574,
+      "coverage": 1,
+      "category": "sequencing",
+      "label": "Legs extend → Release",
+      "reportedOnly": false
+    },
+    "seq.legs_rise__set_point": {
+      "band": [
+        0.029763943057286732,
+        0.33738973659639293
+      ],
+      "weight": 0.33596305620281547,
+      "tightness": 0.33596305620281547,
+      "coverage": 1,
+      "category": "sequencing",
+      "label": "Legs rise → Set point",
+      "reportedOnly": false
+    },
+    "seq.release__arm_extension": {
+      "band": [
+        0.02491605616605612,
+        0.18270299145299146
+      ],
+      "weight": 0.2877676965042268,
+      "tightness": 0.2877676965042268,
+      "coverage": 1,
+      "category": "sequencing",
+      "label": "Release → Arm extension",
+      "reportedOnly": false
+    },
+    "seq.set_point__legs_extend": {
+      "band": [
+        0.05091497075192733,
+        0.2569826007326007
+      ],
+      "weight": 0.26996898123730395,
+      "tightness": 0.26996898123730395,
+      "coverage": 1,
+      "category": "sequencing",
+      "label": "Set point → Legs extend",
+      "reportedOnly": false
+    },
+    "setPoint.ankles": {
+      "band": [
+        0,
+        0
+      ],
+      "weight": 1,
+      "tightness": 1,
+      "coverage": 1,
+      "category": "setPoint",
+      "label": "Ankles",
+      "reportedOnly": false
+    },
+    "setPoint.elbow_angle": {
+      "band": [
+        30.93293567059025,
+        148.6166397924793
+      ],
+      "weight": 0,
+      "tightness": 0.21409009411289956,
+      "coverage": 1,
+      "category": "setPoint",
+      "label": "Elbow angle",
+      "reportedOnly": true
+    },
+    "setPoint.elbow_flare": {
+      "band": [
+        71.79851279466256,
+        131.94413763062528
+      ],
+      "weight": 0,
+      "tightness": 0.23637933623816745,
+      "coverage": 1,
+      "category": "setPoint",
+      "label": "Elbow flare",
+      "reportedOnly": true
+    },
+    "setPoint.head": {
+      "band": [
+        -0.19921070714241076,
+        0.42110647212511454
+      ],
+      "weight": 0,
+      "tightness": 0.11607680293205486,
+      "coverage": 1,
+      "category": "setPoint",
+      "label": "Head",
+      "reportedOnly": true
+    },
+    "setPoint.hips": {
+      "band": [
+        -0.09355411636084376,
+        0.09149919763409231
+      ],
+      "weight": 0.2690033613642699,
+      "tightness": 0.2690033613642699,
+      "coverage": 1,
+      "category": "setPoint",
+      "label": "Hips",
+      "reportedOnly": false
+    },
+    "setPoint.knees": {
+      "band": [
+        -0.23188706842052953,
+        0.32537460573521215
+      ],
+      "weight": 0,
+      "tightness": 0.07986859677337008,
+      "coverage": 1,
+      "category": "setPoint",
+      "label": "Knees",
+      "reportedOnly": true
+    },
+    "setPoint.shoulders": {
+      "band": [
+        -0.08554084079233383,
+        0.22222773080578778
+      ],
+      "weight": 0,
+      "tightness": 0.1908364061312984,
+      "coverage": 1,
+      "category": "setPoint",
+      "label": "Shoulders",
+      "reportedOnly": true
+    },
+    "setPoint.wrist_cock": {
+      "band": [
+        55.403353396891916,
+        169.51222609769863
+      ],
+      "weight": 0,
+      "tightness": 0.17915370201858655,
+      "coverage": 1,
+      "category": "setPoint",
+      "label": "Wrist cock",
+      "reportedOnly": true
+    },
+    "setPoint.wrist_height_vs_head": {
+      "band": [
+        -0.10960999439206062,
+        0.06742950393748193
+      ],
+      "weight": 0,
+      "tightness": 0.21649813151851363,
+      "coverage": 1,
+      "category": "setPoint",
+      "label": "Wrist height vs head",
+      "reportedOnly": true
+    }
+  }
+}

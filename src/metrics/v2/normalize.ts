@@ -74,6 +74,14 @@ export function centerOfFeetX(frame: Frame): number | null {
   );
 }
 
+/** Vertical ankle line (ankle midpoint Y) — the ground reference. Null if neither ankle visible. */
+export function ankleLineY(frame: Frame): number | null {
+  return avgY(
+    lm(frame, LANDMARK_INDICES.LEFT_ANKLE),
+    lm(frame, LANDMARK_INDICES.RIGHT_ANKLE),
+  );
+}
+
 /**
  * Whether posture / depth metrics are meaningful for this camera orientation.
  * Those metrics rely on a side-on horizontal axis; front/behind views collapse
