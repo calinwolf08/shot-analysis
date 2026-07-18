@@ -6,7 +6,11 @@ camera), the detection/scoring algorithm, auth, and persistence.
 
 Companion docs: app run instructions in [`../app/README.md`](../app/README.md),
 manual validation in [`../app/docs/VALIDATION.md`](../app/docs/VALIDATION.md),
-design rationale in [`design-training-app.md`](./design-training-app.md).
+design rationale in [`design-training-app.md`](./design-training-app.md). The
+detection & analysis algorithm is explained step by step, with granular
+diagrams, in
+[`shot-detection-and-analysis.md`](./shot-detection-and-analysis.md); the
+command/tooling reference lives in the root [`README`](../README.md).
 
 - [1. System topology](#1-system-topology)
 - [2. The analysis stack (shared by both paths)](#2-the-analysis-stack-shared-by-both-paths)
@@ -298,6 +302,42 @@ Diagnosis ranks the weakest metrics into `FocusArea`s, which seed the
 re-assessment loop. The benchmark is currently a placeholder profile
 derived from the library's pro-form targets (flagged with a
 `PlaceholderBadge` in the UI).
+
+### 6a. Sequencing / Structure scoring (v2)
+
+A second, keyframe-driven scoring path grades a shot on two coach-facing
+categories — **Sequencing** (event order + timing) and **Structure** (body
+mechanics per phase) — against thresholds derived from pro reference clips.
+Unlike the benchmark path above, its "ideal" comes from _what pros actually
+have in common_ rather than a hand-set target. Full algorithm:
+[`shot-detection-and-analysis.md`](./shot-detection-and-analysis.md).
+
+```mermaid
+flowchart TB
+    subgraph Offline["Offline (from pro clips)"]
+      RC["Reference clips"] --> EX["extractShotMetrics"]
+      EX --> TH["deriveThresholds<br/>consensus band + tightness weight"]
+      TH --> TJ[("thresholds.json<br/>+ reference-poses.json")]
+    end
+    subgraph Runtime["Per shot (app)"]
+      PP["Pose frames"] --> AN["runReplayAnalysis"]
+      AN --> M2["v2 metrics persisted<br/>on the shot"]
+      M2 --> SS2["scoreShot(metrics, thresholds)"]
+      TJ --> SS2
+      SS2 --> UI["Scorecard<br/>Sequencing + Structure"]
+      TJ --> OV["you-vs-pro skeleton overlay"]
+    end
+
+    classDef store fill:#1f2a3a,stroke:#3d5a80,color:#e8f0ff;
+    class TJ store;
+```
+
+Metrics (not the score) are persisted at analysis time on
+`StoredShotAnalysis.v2Metrics`, so re-deriving thresholds from new pro data
+re-scores existing shots without re-analysis. Unreliable / missing / reported-
+only metrics never affect the score, and the UI surfaces the measured fraction.
+Thresholds and reference skeletons are currently **placeholders** built from
+`test-data` clips (see [`follow-up-work.md`](./follow-up-work.md)).
 
 ---
 
