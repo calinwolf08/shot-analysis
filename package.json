@@ -22,7 +22,8 @@
     "metrics:thresholds": "tsx src/testing/derive-thresholds.ts",
     "lint": "prettier --check .",
     "format": "prettier --write .",
-    "validate": "npm run build:browser && npx tsx server.ts"
+    "validate": "npm run build:browser && npx tsx server.ts",
+    "metrics:golden": "tsx src/testing/build-metrics-golden.ts"
   },
   "keywords": [
     "basketball",
