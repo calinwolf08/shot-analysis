@@ -134,6 +134,21 @@ export {
   filterMetricsByConfidence,
 } from "./metrics/types";
 
+// v2 metrics (Sequencing / Structure) — extraction for the validator + app
+export {
+  extractShotMetrics,
+  metricsForShot,
+  computeSequencing,
+  computeStructure,
+} from "./metrics/v2";
+export type {
+  ShotMetricsV2,
+  SequencingMetrics,
+  StructureMetrics,
+  Measurement,
+  ExtractOptions,
+} from "./metrics/v2";
+
 // Profile exports
 export type {
   MetricFeedback,

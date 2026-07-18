@@ -213,3 +213,18 @@ export {
   type PoseDetectorConfig,
   type PoseDetectorRuntime,
 } from "./pose/factory";
+
+// v2 metrics (Sequencing / Structure overhaul) — extraction + measurement types
+export {
+  extractShotMetrics,
+  metricsForShot,
+  computeSequencing,
+  computeStructure,
+} from "./metrics/v2";
+export type {
+  ShotMetricsV2,
+  SequencingMetrics,
+  StructureMetrics,
+  Measurement,
+  ExtractOptions,
+} from "./metrics/v2";
