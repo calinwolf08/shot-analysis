@@ -63,6 +63,7 @@ const CHRONO = [
   "leg_bend_low_point",
   "legs_start_extending",
   "set_point",
+  "legs_fully_extended",
   "release",
   "arms_fully_extended",
   "feet_leave_ground",

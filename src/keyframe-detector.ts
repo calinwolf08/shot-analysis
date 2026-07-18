@@ -1069,6 +1069,100 @@ export function detectLegsStartExtending(
 }
 
 /**
+ * Detects the frame where the legs reach FULL extension (the drive is complete).
+ *
+ * This corresponds to the "legs_fully_extended" keyframe — event #6 of the
+ * shooting sequence, after "legs start rising". The hips reach their highest
+ * point relative to the ankles (legs straightest / player up on the drive), so
+ * the hip-drop signal (ankleY − hipY) reaches its MAXIMUM. We return the onset
+ * of that peak (first frame within a small band of the max). Falls back to the
+ * straightest knee angle when the hips barely move.
+ *
+ * @param frames - Array of frames with pose data
+ * @param legsStartExtendingFrame - Frame where the legs began extending
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index of full leg extension, or null if not detectable
+ */
+export function detectLegsFullyExtended(
+    frames: readonly Frame[],
+    legsStartExtendingFrame: number,
+    endFrame: number,
+    config: Required<KeyframeDetectorConfig> = DEFAULT_CONFIG,
+): number | null {
+    const shotDuration = endFrame - legsStartExtendingFrame + 1;
+    // Full extension completes on the drive, a bit before the top of the jump;
+    // search most of the remaining shot from where extension began.
+    const searchEndFrame =
+        legsStartExtendingFrame + Math.floor(shotDuration * 0.7);
+
+    // Primary: hip-drop basin PEAK — the first frame the hips reach the top of
+    // their rise (within a small band of the maximum ankle-to-hip distance).
+    const basin = hipDropBasin(
+        frames,
+        legsStartExtendingFrame,
+        Math.min(searchEndFrame, endFrame),
+        config.visibilityThreshold,
+    );
+    if (basin && basin.range >= HIP_DROP_MIN_RANGE) {
+        const max = basin.min + basin.range;
+        const eps = Math.max(0.002, 0.05 * basin.range);
+        for (const p of basin.series) {
+            if (p.v >= max - eps) {
+                emitDiagnostic({
+                    keyframe: "legs_fully_extended",
+                    frame: p.frameIndex,
+                    method: "hip-drop-basin-peak",
+                    detail: `hips highest vs ankles (drop ${max.toFixed(3)}, range ${basin.range.toFixed(3)}) in window ${legsStartExtendingFrame}-${searchEndFrame}`,
+                });
+                return p.frameIndex;
+            }
+        }
+    }
+
+    // Fallback: straightest knee (max reliable knee angle) on a smoothed signal.
+    const pts: { frameIndex: number; angle: number }[] = [];
+    for (const frame of frames) {
+        const idx = frame.frameIndex;
+        if (idx < legsStartExtendingFrame || idx > searchEndFrame) continue;
+        const angle = getReliableKneeAngle(frame, config.visibilityThreshold);
+        if (angle !== null) pts.push({ frameIndex: idx, angle });
+    }
+    if (pts.length < 3) return null;
+    pts.sort((a, b) => a.frameIndex - b.frameIndex);
+    const sm = pts.map((p, i) => {
+        const prev = pts[i - 1]?.angle;
+        const next = pts[i + 1]?.angle;
+        let sum = p.angle;
+        let n = 1;
+        if (prev !== undefined) {
+            sum += prev;
+            n++;
+        }
+        if (next !== undefined) {
+            sum += next;
+            n++;
+        }
+        return sum / n;
+    });
+    let maxAngle = -Infinity;
+    let maxFrame: number | null = null;
+    for (let i = 0; i < sm.length; i++) {
+        if (sm[i]! > maxAngle) {
+            maxAngle = sm[i]!;
+            maxFrame = pts[i]!.frameIndex;
+        }
+    }
+    emitDiagnostic({
+        keyframe: "legs_fully_extended",
+        frame: maxFrame,
+        method: "knee-angle-max",
+        detail: `straightest knee (${maxAngle === -Infinity ? "n/a" : maxAngle.toFixed(0) + "°"}) in window ${legsStartExtendingFrame}-${searchEndFrame}`,
+    });
+    return maxFrame;
+}
+
+/**
  * Detects the frame where the ball starts moving upward (wrist Y starts decreasing).
  *
  * This corresponds to the "ball_starts_upward" keyframe in the Rise phase.
@@ -2129,6 +2223,22 @@ export class KeyframeDetector {
             keyframeId: "legs_start_extending",
             frameIndex: legsExtendingFrame,
             confidence: legsExtendingFrame !== null ? 0.8 : 0.0,
+        });
+
+        // Detect legs_fully_extended (full drive) — needs legs_start_extending.
+        const legsFullyExtendedFrame =
+            legsExtendingFrame !== null
+                ? detectLegsFullyExtended(
+                      frames,
+                      legsExtendingFrame,
+                      endFrame,
+                      this.config,
+                  )
+                : null;
+        keyframes.push({
+            keyframeId: "legs_fully_extended",
+            frameIndex: legsFullyExtendedFrame,
+            confidence: legsFullyExtendedFrame !== null ? 0.8 : 0.0,
         });
 
         // Detect ball_starts_upward

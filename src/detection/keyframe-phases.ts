@@ -103,6 +103,7 @@ export function detectKeyframesFromFrames(
   } else {
     // Cannot detect Rise phase without Load phase
     detectedKeyframes.set("legs_start_extending", null);
+    detectedKeyframes.set("legs_fully_extended", null);
     detectedKeyframes.set("ball_starts_upward", null);
   }
 

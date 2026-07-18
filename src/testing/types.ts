@@ -159,7 +159,7 @@ export const poseDataSchema = z.object({
  * - Load: legs_start_bending, leg_bend_low_point, ball_low_point
  * - Rise: legs_start_extending, ball_starts_upward
  * - Set Point: set_point
- * - Release: release, arms_fully_extended
+ * - Release: legs_fully_extended, release, arms_fully_extended
  * - Follow-through: feet_leave_ground, feet_land
  */
 export type KeyframeId =
@@ -169,6 +169,7 @@ export type KeyframeId =
   | "legs_start_extending"
   | "ball_starts_upward"
   | "set_point"
+  | "legs_fully_extended"
   | "release"
   | "arms_fully_extended"
   | "feet_leave_ground"
@@ -184,6 +185,7 @@ export const KEYFRAME_IDS: readonly KeyframeId[] = [
   "legs_start_extending",
   "ball_starts_upward",
   "set_point",
+  "legs_fully_extended",
   "release",
   "arms_fully_extended",
   "feet_leave_ground",
@@ -233,6 +235,8 @@ export interface LabeledShot {
   readonly ball_starts_upward?: number | null | undefined;
   /** Frame where ball is at peak before release (Set Point) */
   readonly set_point?: number | null | undefined;
+  /** Frame where the legs reach full extension (the drive is complete) */
+  readonly legs_fully_extended?: number | null | undefined;
   /** Frame where wrist snaps and ball leaves hand (Release) */
   readonly release?: number | null | undefined;
   /** Frame of maximum arm extension */
@@ -260,6 +264,7 @@ export const labeledShotSchema = z.object({
   legs_start_extending: keyframeFieldSchema,
   ball_starts_upward: keyframeFieldSchema,
   set_point: keyframeFieldSchema,
+  legs_fully_extended: keyframeFieldSchema,
   release: keyframeFieldSchema,
   arms_fully_extended: keyframeFieldSchema,
   feet_leave_ground: keyframeFieldSchema,

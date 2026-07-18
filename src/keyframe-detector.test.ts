@@ -1055,16 +1055,21 @@ describe("KeyframeDetector.detectRisePhaseKeyframes", () => {
 
     const result = detector.detectRisePhaseKeyframes(frames, 0, 0, 24);
 
-    expect(result.keyframes).toHaveLength(2);
+    // legs_start_extending, legs_fully_extended, ball_starts_upward
+    expect(result.keyframes).toHaveLength(3);
 
     const legsExtending = result.keyframes.find(
       (k) => k.keyframeId === "legs_start_extending",
+    );
+    const legsFullyExtended = result.keyframes.find(
+      (k) => k.keyframeId === "legs_fully_extended",
     );
     const ballUpward = result.keyframes.find(
       (k) => k.keyframeId === "ball_starts_upward",
     );
 
     expect(legsExtending).toBeDefined();
+    expect(legsFullyExtended).toBeDefined();
     expect(ballUpward).toBeDefined();
     expect(legsExtending!.frameIndex).not.toBeNull();
     expect(ballUpward!.frameIndex).not.toBeNull();
