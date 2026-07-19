@@ -1258,6 +1258,7 @@
                 inset: 0;
                 width: 100%;
                 height: 100%;
+                object-fit: contain;
                 pointer-events: none;
                 display: none;
               "
@@ -1343,6 +1344,23 @@
               />
               <button id="frameJumpBtn" class="secondary" disabled>Go</button>
             </div>
+            <label
+              class="control-group"
+              id="overlayToggleWrap"
+              title="Draw the detected pose skeleton on top of the video"
+              style="
+                margin-left: 10px;
+                display: none;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+                font-size: 13px;
+                color: #d1d5db;
+              "
+            >
+              <input type="checkbox" id="overlayToggle" checked />
+              Pose overlay
+            </label>
           </div>
 
           <div class="keyboard-hint">
@@ -1497,6 +1515,9 @@
         currentFrameNo: 0,
         // Sidebar view: 'keyframes' or 'metrics' (looked at separately).
         sidebarView: "keyframes",
+        // When a video AND poses are both loaded, draw the pose skeleton over
+        // the video. Toggled by the "Pose overlay" checkbox.
+        overlayPoses: true,
       };
 
       // Shot labeling state
@@ -1525,6 +1546,8 @@
         labelsFileInput: $("labelsFileInput"),
         labelsFileName: $("labelsFileName"),
         poseCanvas: $("poseCanvas"),
+        overlayToggle: $("overlayToggle"),
+        overlayToggleWrap: $("overlayToggleWrap"),
         viewToggle: $("viewToggle"),
         viewKeyframesBtn: $("viewKeyframesBtn"),
         viewMetricsBtn: $("viewMetricsBtn"),
@@ -1727,13 +1750,17 @@
             elements.timeline.max = duration;
             elements.timeline.disabled = false;
 
-            // Hide placeholders + the skeleton canvas; the real video is shown.
+            // Hide placeholders; the real video is shown. The pose canvas is
+            // shown/hidden by updatePoseOverlayVisibility below (it overlays the
+            // video when poses are also loaded and the toggle is on).
             elements.videoPlaceholder.classList.add("hidden");
             elements.loadingPlaceholder.classList.add("hidden");
-            elements.poseCanvas.style.display = "none";
 
             // Mark video as loaded
             appState.videoLoaded = true;
+
+            // Overlay the pose skeleton if poses are already loaded.
+            updatePoseOverlayVisibility();
 
             // Enable navigation controls
             enableControls();
@@ -1881,7 +1908,8 @@
         appState.currentFrameNo = clampedFrame;
 
         if (appState.videoLoaded) {
-          // Seek the real video (targets the middle of the frame interval).
+          // Seek the real video (targets the middle of the frame interval). The
+          // pose overlay redraws on the video's 'seeked' event.
           elements.video.currentTime = clampedFrame / appState.fps;
           if (!elements.video.paused) {
             elements.video.pause();
@@ -2270,6 +2298,8 @@
           elements.statVideo.textContent =
             appState.poseData?.video || "poses loaded";
         }
+        // If a video is also loaded, overlay the skeleton on it.
+        updatePoseOverlayVisibility();
         updateFrameDisplay();
       }
 
@@ -2299,18 +2329,34 @@
 
       // Draws the pose skeleton for a frame onto the overlay canvas. Used when
       // no video is loaded so frame chips still show the corresponding pose.
+      function posesAvailable() {
+        return !!(
+          appState.poseData &&
+          appState.poseData.frames &&
+          appState.poseData.frames.length
+        );
+      }
+
       function drawPoseSkeleton(frameNo) {
         const canvas = elements.poseCanvas;
-        if (!canvas || appState.videoLoaded) return;
+        if (!canvas) return;
+        // Overlay mode = a real video is playing underneath. Only draw when the
+        // overlay is enabled and we actually have poses.
+        const overlayMode = appState.videoLoaded;
+        if (overlayMode && (!appState.overlayPoses || !posesAvailable()))
+          return;
         const ctx = canvas.getContext("2d");
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const frame = appState.poseData?.frames?.[frameNo];
         const lm = frame && frame.landmarks;
         if (!lm || lm.length === 0) {
-          ctx.fillStyle = "#6b7280";
-          ctx.font = "20px sans-serif";
-          ctx.fillText(`Frame ${frameNo}: no pose`, 20, 40);
+          // In overlay mode keep the video unobscured when a frame has no pose.
+          if (!overlayMode) {
+            ctx.fillStyle = "#6b7280";
+            ctx.font = "20px sans-serif";
+            ctx.fillText(`Frame ${frameNo}: no pose`, 20, 40);
+          }
           return;
         }
 
@@ -2377,9 +2423,65 @@
           }
         }
 
-        ctx.fillStyle = "#e5e7eb";
-        ctx.font = "18px sans-serif";
-        ctx.fillText(`Frame ${frameNo}`, 12, 26);
+        if (!overlayMode) {
+          ctx.fillStyle = "#e5e7eb";
+          ctx.font = "18px sans-serif";
+          ctx.fillText(`Frame ${frameNo}`, 12, 26);
+        }
+      }
+
+      // ---- Pose overlay on video -------------------------------------------
+      // While a video plays we can't rely on frame-stepping, so redraw the
+      // skeleton on an animation loop that follows the video's current time.
+      let overlayRafId = null;
+      function overlayTick() {
+        overlayRafId = null;
+        if (
+          appState.videoLoaded &&
+          appState.overlayPoses &&
+          posesAvailable() &&
+          !elements.video.paused
+        ) {
+          drawPoseSkeleton(getCurrentFrame());
+          overlayRafId = requestAnimationFrame(overlayTick);
+        }
+      }
+      function startOverlayLoop() {
+        if (overlayRafId == null)
+          overlayRafId = requestAnimationFrame(overlayTick);
+      }
+
+      // Shows/hides the overlay toggle and canvas based on what's loaded, and
+      // (re)draws the current frame. Safe to call any time state changes.
+      function updatePoseOverlayVisibility() {
+        const canOverlay = appState.videoLoaded && posesAvailable();
+        elements.overlayToggleWrap.style.display = canOverlay ? "flex" : "none";
+
+        // Poses-only mode manages the canvas itself (setupPosePlayback); only
+        // touch the canvas here when a video is loaded.
+        if (!appState.videoLoaded) return;
+
+        if (canOverlay && appState.overlayPoses) {
+          const w =
+            appState.poseData.width || elements.video.videoWidth || 1280;
+          const h =
+            appState.poseData.height || elements.video.videoHeight || 720;
+          if (elements.poseCanvas.width !== w) elements.poseCanvas.width = w;
+          if (elements.poseCanvas.height !== h) elements.poseCanvas.height = h;
+          elements.poseCanvas.style.display = "block";
+          drawPoseSkeleton(getCurrentFrame());
+          if (!elements.video.paused) startOverlayLoop();
+        } else {
+          elements.poseCanvas.style.display = "none";
+          const ctx = elements.poseCanvas.getContext("2d");
+          ctx &&
+            ctx.clearRect(
+              0,
+              0,
+              elements.poseCanvas.width,
+              elements.poseCanvas.height,
+            );
+        }
       }
 
       // Finds the labeled shot whose frame range best overlaps a detected
@@ -4045,10 +4147,27 @@
         highlightCurrentFrame();
       };
 
-      elements.video.onplay = () =>
-        (elements.playPauseBtn.textContent = "Pause");
-      elements.video.onpause = () =>
-        (elements.playPauseBtn.textContent = "Play");
+      elements.video.onplay = () => {
+        elements.playPauseBtn.textContent = "Pause";
+        startOverlayLoop();
+      };
+      elements.video.onpause = () => {
+        elements.playPauseBtn.textContent = "Play";
+        // Loop stops itself on pause; draw the final resting frame.
+        if (appState.overlayPoses && posesAvailable())
+          drawPoseSkeleton(getCurrentFrame());
+      };
+      // Redraw the overlay after a scrub/seek settles on the target frame.
+      elements.video.onseeked = () => {
+        if (appState.videoLoaded && appState.overlayPoses && posesAvailable())
+          drawPoseSkeleton(getCurrentFrame());
+      };
+
+      // Pose-overlay visibility toggle (only shown when video + poses coexist).
+      elements.overlayToggle.onchange = () => {
+        appState.overlayPoses = elements.overlayToggle.checked;
+        updatePoseOverlayVisibility();
+      };
 
       // Keyboard shortcuts
       document.onkeydown = (e) => {
