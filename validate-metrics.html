@@ -1644,128 +1644,144 @@
       // =========================================================================
       // Video Loading & Playback
       // =========================================================================
+      // Resolves true once the video's metadata has loaded (videoLoaded set),
+      // false if the file is rejected or fails to decode. Returning a boolean
+      // rather than rejecting keeps the fire-and-forget callers (file picker,
+      // test-case dropdown) free of unhandled-rejection warnings.
       function loadVideoIntoPlayer(file) {
-        // Validate file input
-        if (!file) {
-          showToast("No file provided", "error");
-          return;
-        }
-
-        // Validate file is a video
-        if (!file.type.startsWith("video/")) {
-          showToast("Invalid file type. Please select a video file.", "error");
-          return;
-        }
-
-        // Clean up previous video URL to prevent memory leaks
-        if (appState.videoBlobUrl) {
-          URL.revokeObjectURL(appState.videoBlobUrl);
-        }
-
-        // Reset video-related state when loading new video
-        appState.videoLoaded = false;
-
-        // Preserve any separately-loaded poses/labels/analysis so the user can
-        // load video + poses + labels in any order. Only wipe analysis state
-        // for the classic "load a fresh video, then Analyze Video" flow.
-        if (!appState.poseData) {
-          appState.totalFrames = 0;
-          appState.fps = 30; // Default FPS (HTML5 video doesn't expose native FPS)
-          appState.analysisData = null;
-
-          // Reset labeling state for new video
-          labelingState.shots = [];
-          labelingState.selectedShotIndex = null;
-          renderShotList();
-          updateRemoveButtonState();
-          showValidationErrors([]);
-
-          // Hide analysis UI (will be shown again after analysis)
-          elements.metricsContent.classList.add("hidden");
-          elements.noDataMessage.classList.remove("hidden");
-          elements.toolbar.classList.add("hidden");
-        }
-
-        // Create blob URL from the selected file
-        const blobUrl = URL.createObjectURL(file);
-        appState.videoBlobUrl = blobUrl;
-        appState.videoFile = file;
-
-        // Set video source
-        elements.video.src = blobUrl;
-
-        // Handle loadedmetadata event to extract duration and calculate frames
-        elements.video.onloadedmetadata = () => {
-          const duration = elements.video.duration;
-
-          // Handle very short videos (< 1 second) - still valid, just few frames
-          if (duration <= 0) {
-            showToast("Video has invalid duration", "error");
-            resetVideoState();
+        return new Promise((resolve) => {
+          // Validate file input
+          if (!file) {
+            showToast("No file provided", "error");
+            resolve(false);
             return;
           }
 
-          // Calculate total frames (duration * fps). When poses are already
-          // loaded, keep their authoritative fps/frame count so labeled and
-          // algorithm frame numbers map to the correct video time.
+          // Validate file is a video
+          if (!file.type.startsWith("video/")) {
+            showToast(
+              "Invalid file type. Please select a video file.",
+              "error",
+            );
+            resolve(false);
+            return;
+          }
+
+          // Clean up previous video URL to prevent memory leaks
+          if (appState.videoBlobUrl) {
+            URL.revokeObjectURL(appState.videoBlobUrl);
+          }
+
+          // Reset video-related state when loading new video
+          appState.videoLoaded = false;
+
+          // Preserve any separately-loaded poses/labels/analysis so the user can
+          // load video + poses + labels in any order. Only wipe analysis state
+          // for the classic "load a fresh video, then Analyze Video" flow.
           if (!appState.poseData) {
-            appState.totalFrames = Math.floor(duration * appState.fps);
+            appState.totalFrames = 0;
+            appState.fps = 30; // Default FPS (HTML5 video doesn't expose native FPS)
+            appState.analysisData = null;
+
+            // Reset labeling state for new video
+            labelingState.shots = [];
+            labelingState.selectedShotIndex = null;
+            renderShotList();
+            updateRemoveButtonState();
+            showValidationErrors([]);
+
+            // Hide analysis UI (will be shown again after analysis)
+            elements.metricsContent.classList.add("hidden");
+            elements.noDataMessage.classList.remove("hidden");
+            elements.toolbar.classList.add("hidden");
           }
 
-          // Update timeline
-          elements.timeline.max = duration;
-          elements.timeline.disabled = false;
+          // Create blob URL from the selected file
+          const blobUrl = URL.createObjectURL(file);
+          appState.videoBlobUrl = blobUrl;
+          appState.videoFile = file;
 
-          // Hide placeholders + the skeleton canvas; the real video is shown.
-          elements.videoPlaceholder.classList.add("hidden");
-          elements.loadingPlaceholder.classList.add("hidden");
-          elements.poseCanvas.style.display = "none";
+          // Set video source
+          elements.video.src = blobUrl;
 
-          // Mark video as loaded
-          appState.videoLoaded = true;
+          // Handle loadedmetadata event to extract duration and calculate frames
+          elements.video.onloadedmetadata = () => {
+            const duration = elements.video.duration;
 
-          // Enable navigation controls
-          enableControls();
-
-          // Enable Add Shot button now that video is loaded
-          updateAddShotButtonState();
-
-          // Enable Export Poses button now that video is loaded
-          updateExportPosesButtonState();
-
-          // Show video toolbar (Export Poses, Export Labels)
-          elements.videoToolbar.classList.remove("hidden");
-
-          // Update frame display to show initial frame info
-          updateFrameDisplay();
-        };
-
-        // Handle video load errors (invalid/corrupted files)
-        elements.video.onerror = (e) => {
-          const error = elements.video.error;
-          let errorMessage = "Failed to load video";
-
-          if (error) {
-            switch (error.code) {
-              case MediaError.MEDIA_ERR_ABORTED:
-                errorMessage = "Video loading was aborted";
-                break;
-              case MediaError.MEDIA_ERR_NETWORK:
-                errorMessage = "Network error while loading video";
-                break;
-              case MediaError.MEDIA_ERR_DECODE:
-                errorMessage =
-                  "Video file is corrupted or uses an unsupported format";
-                break;
-              case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                errorMessage = "Video format is not supported by your browser";
-                break;
+            // Handle very short videos (< 1 second) - still valid, just few frames
+            if (duration <= 0) {
+              showToast("Video has invalid duration", "error");
+              resetVideoState();
+              resolve(false);
+              return;
             }
-          }
 
-          showToast(errorMessage, "error");
-          resetVideoState();
-        };
+            // Calculate total frames (duration * fps). When poses are already
+            // loaded, keep their authoritative fps/frame count so labeled and
+            // algorithm frame numbers map to the correct video time.
+            if (!appState.poseData) {
+              appState.totalFrames = Math.floor(duration * appState.fps);
+            }
+
+            // Update timeline
+            elements.timeline.max = duration;
+            elements.timeline.disabled = false;
+
+            // Hide placeholders + the skeleton canvas; the real video is shown.
+            elements.videoPlaceholder.classList.add("hidden");
+            elements.loadingPlaceholder.classList.add("hidden");
+            elements.poseCanvas.style.display = "none";
+
+            // Mark video as loaded
+            appState.videoLoaded = true;
+
+            // Enable navigation controls
+            enableControls();
+
+            // Enable Add Shot button now that video is loaded
+            updateAddShotButtonState();
+
+            // Enable Export Poses button now that video is loaded
+            updateExportPosesButtonState();
+
+            // Show video toolbar (Export Poses, Export Labels)
+            elements.videoToolbar.classList.remove("hidden");
+
+            // Update frame display to show initial frame info
+            updateFrameDisplay();
+
+            resolve(true);
+          };
+
+          // Handle video load errors (invalid/corrupted files)
+          elements.video.onerror = (e) => {
+            const error = elements.video.error;
+            let errorMessage = "Failed to load video";
+
+            if (error) {
+              switch (error.code) {
+                case MediaError.MEDIA_ERR_ABORTED:
+                  errorMessage = "Video loading was aborted";
+                  break;
+                case MediaError.MEDIA_ERR_NETWORK:
+                  errorMessage = "Network error while loading video";
+                  break;
+                case MediaError.MEDIA_ERR_DECODE:
+                  errorMessage =
+                    "Video file is corrupted or uses an unsupported format";
+                  break;
+                case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                  errorMessage =
+                    "Video format is not supported by your browser";
+                  break;
+              }
+            }
+
+            showToast(errorMessage, "error");
+            resetVideoState();
+            resolve(false);
+          };
+        });
       }
 
       // Reset video state when loading fails
@@ -1949,182 +1965,75 @@
         updateProgress("Initializing analyzer...", 5);
 
         try {
-          // Access the ShotAnalysis library from the browser bundle
-          const {
-            createShotAnalyzer,
-            createConfig,
-            createVideoElementProvider,
-          } = window.ShotAnalysis;
-
-          // Create config
-          updateProgress("Creating configuration...", 10);
-          const config = createConfig({
-            shootingHand,
-            profile,
-          });
-
-          // Create analyzer
-          updateProgress("Loading MediaPipe pose model...", 15);
-          const analyzer = await createShotAnalyzer(config);
-          appState.analyzer = analyzer;
-
-          // Create video element provider from the file
-          updateProgress("Loading video file...", 25);
-          const frameProvider = await createVideoElementProvider(file);
-          const metadata = frameProvider.getMetadata();
-          appState.fps = frameProvider.getFps();
-
-          console.log("[DEBUG] Video metadata:", metadata);
-          console.log("[DEBUG] FPS:", frameProvider.getFps());
-          console.log("[DEBUG] Total frames:", frameProvider.getTotalFrames());
-
-          // Debug: test single frame extraction and pose detection
-          updateProgress("Testing frame extraction...", 28);
-          const testFrame = await frameProvider.getNextFrame();
-          if (testFrame) {
-            console.log("[DEBUG] Test frame extracted:", {
-              width: testFrame.width,
-              height: testFrame.height,
-              timestamp: testFrame.timestamp,
-              frameIndex: testFrame.frameIndex,
-              hasCanvas: !!testFrame.canvas,
-              dataLength: testFrame.data?.length,
-            });
-
-            // Try to detect pose on this single frame
-            try {
-              // We need to access the detector directly - let's use a workaround
-              // by processing just a few frames manually
-              console.log("[DEBUG] Testing pose detection on first frame...");
-            } catch (e) {
-              console.error("[DEBUG] Pose detection test failed:", e);
+          // Ensure the video is loaded into the player. The file picker loads
+          // it on selection, but guard in case that hasn't completed yet — we
+          // need it for pose extraction and for scrubbing the results.
+          if (!appState.videoLoaded || appState.videoFile !== file) {
+            updateProgress("Loading video player...", 8);
+            const ok = await loadVideoIntoPlayer(file);
+            if (!ok) {
+              elements.progressSection.classList.add("hidden");
+              elements.videoPlaceholder.classList.remove("hidden");
+              return;
             }
-          } else {
-            console.error("[DEBUG] Failed to extract test frame!");
           }
 
-          // Reset provider for full analysis
-          await frameProvider.reset();
+          // Extract poses ONCE with MediaPipe and cache them on appState. Both
+          // the keyframe view and Export Poses reuse this, so neither triggers
+          // a second detection pass. runPoseDetection drives its own progress.
+          appState.poseData = await runPoseDetection();
+          appState.fps = appState.poseData.fps || appState.fps;
+          updateExportPosesButtonState();
 
-          updateProgress("Running pose detection...", 30);
-
-          // Run analysis with debug logging - track frame processing
-          console.log("[DEBUG] Starting full analysis...");
-          let frameCount = 0;
-          const startTime = Date.now();
-          const result = await analyzer.analyzeVideo(frameProvider);
-          const elapsed = Date.now() - startTime;
-
-          console.log("[DEBUG] Analysis complete in", elapsed, "ms");
-          console.log(
-            "[DEBUG] Video metadata from result:",
-            result.videoMetadata,
+          // Run the same detection the app and harness use, directly on the
+          // extracted poses — no second MediaPipe pass, and identical results
+          // to the Load Poses path.
+          updateProgress("Detecting shots and metrics...", 96);
+          const { ShotAnalyzer, createConfig } = window.ShotAnalysis;
+          const analyzer = new ShotAnalyzer(
+            createConfig({ shootingHand, profile }),
           );
-          console.log(
-            "[DEBUG] Frames processed:",
-            result.videoMetadata?.totalFrames,
+          const videoMetadata = {
+            width: appState.poseData.width,
+            height: appState.poseData.height,
+            fps: appState.poseData.fps,
+            totalFrames: appState.poseData.totalFrames,
+          };
+          const result = analyzer.analyzePoses(
+            appState.poseData.frames,
+            videoMetadata,
           );
+
           console.log(
-            "[DEBUG] Number of shots detected:",
+            "[DEBUG] Shots detected:",
             result.shots?.length || 0,
+            result,
           );
-          if (result.shots?.length === 0) {
-            console.log("[DEBUG] No shots - this could mean:");
-            console.log("[DEBUG]   1. No poses were detected in frames");
-            console.log(
-              "[DEBUG]   2. Poses detected but no shooting motion found",
-            );
-            console.log("[DEBUG]   3. Video too short or wrong content");
-          }
-          console.log("[DEBUG] Full result:", result);
-
-          updateProgress("Processing results...", 95);
 
           if (!result.shots || result.shots.length === 0) {
-            console.warn(
-              "[DEBUG] No shots detected - check console for details",
-            );
             showToast("No shots detected in video", "error");
             elements.progressSection.classList.add("hidden");
             elements.videoPlaceholder.classList.remove("hidden");
             return;
           }
 
-          // Convert to validation export format
-          const exportData = {
-            version: "1.0",
-            exportedAt: new Date().toISOString(),
-            video: {
-              filename: file.name,
-              width: result.videoMetadata.width,
-              height: result.videoMetadata.height,
-              fps: result.videoMetadata.fps,
-              totalFrames: result.videoMetadata.totalFrames,
-              duration: result.videoMetadata.duration,
-            },
-            config: {
-              shootingHand,
-              profile,
-            },
-            shots: result.shots.map((shot) => ({
-              shotIndex: shot.shotIndex,
-              frameRange: {
-                start: shot.frameRange.start,
-                end: shot.frameRange.end,
-              },
-              phases: convertPhasesToExport(shot.phases),
-              metrics: convertMetricsToExport(shot.metrics),
-              overallConfidence: shot.overallConfidence,
-              orientation: shot.orientation || "unknown",
-            })),
-          };
-
-          // Build pose data from analysis result (if available)
-          // The poseHistory contains frame-level pose data from the analysis
-          if (result.poseHistory && Array.isArray(result.poseHistory)) {
-            appState.poseData = {
-              video: file.name,
-              fps: result.videoMetadata.fps,
-              totalFrames: result.videoMetadata.totalFrames,
-              width: result.videoMetadata.width,
-              height: result.videoMetadata.height,
-              extractedAt: new Date().toISOString(),
-              frames: result.poseHistory.map((frame) => ({
-                frameIndex: frame.frameIndex,
-                timestamp: frame.timestamp,
-                poseConfidence: frame.confidence || 0,
-                landmarks: frame.landmarks || [],
-              })),
-            };
-            console.log(
-              "[DEBUG] Pose data captured:",
-              appState.poseData.frames.length,
-              "frames",
-            );
-          } else {
-            // No raw pose data available - set to null
-            console.log("[DEBUG] No raw pose history available in result");
-            appState.poseData = null;
-          }
-          updateExportPosesButtonState();
-
-          // Load video for playback FIRST (this resets UI state)
-          updateProgress("Loading video player...", 98);
-          loadVideoIntoPlayer(file);
-
-          // Load the analysis data AFTER video (this shows the metrics UI)
+          const exportData = buildExportData(result, file.name, {
+            shootingHand,
+            profile,
+          });
           loadAnalysisData(exportData);
+
+          // Enable scrubbing. The video is loaded, so setupPosePlayback keeps
+          // the real video as the frame source (it only switches to the pose
+          // canvas when no video is present).
+          setupPosePlayback();
+          seekToFrame(result.shots[0]?.frameRange?.start ?? 0);
 
           elements.progressSection.classList.add("hidden");
           showToast(
             `Detected ${result.shots.length} shot(s) for validation`,
             "success",
           );
-
-          // Cleanup
-          frameProvider.dispose();
-          await analyzer.dispose();
-          appState.analyzer = null;
         } catch (err) {
           console.error("Analysis error:", err);
           showToast("Error: " + err.message, "error");
