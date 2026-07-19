@@ -1484,6 +1484,97 @@ const SET_POINT_MIN_DEPTH_DEG = 125;
 /** A local minimum must sit at least this far below the preceding running max to count (rejects shallow noise dips and the shot's starting flex). */
 const SET_POINT_MIN_DIP_DEG = 15;
 
+// "Ball up" gate. The elbow-flex candidate above finds the cocked elbow, but on
+// lower-resolution footage that flex is reached while the ball is still rising
+// through shoulder height — a few frames before the true set, where the ball is
+// up at the set position. So once we have the elbow candidate, advance it
+// forward to the frame where the shooting wrist has actually risen clearly above
+// the shoulder. The gap is measured as (shoulderY - wristY) / torsoLength so it
+// is invariant to camera zoom and framing.
+/** Advance only kicks in for the "detected too early" case: the candidate's wrist is still around/below shoulder (gap <= this). A candidate already well above the shoulder is left untouched, so late/correct detections don't move. */
+const SET_POINT_ADVANCE_GUARD_GAP = 0.1;
+/** Advance forward until the wrist clears the shoulder by this fraction of torso length ("ball up at the set"). */
+const SET_POINT_ABOVE_SHOULDER_GAP = 0.35;
+/** Never advance more than this many frames past the elbow candidate (safety bound against runaway). */
+const SET_POINT_MAX_ADVANCE_FRAMES = 8;
+
+/**
+ * How far the wrists sit above the shoulders as a fraction of torso length
+ * ((shoulderY - wristY) / |hipY - shoulderY|; positive = above). Uses the
+ * average of both sides (at the set both hands are together on the ball, so the
+ * average is steadier and side-independent), falling back to whichever side is
+ * visible for each joint. Returns null when the shoulder, hip, or wrist can't be
+ * located.
+ */
+function wristAboveShoulderGap(
+    frame: Frame,
+    visibilityThreshold: number,
+): number | null {
+    const lm = frame.landmarks;
+    if (!lm) return null;
+    const vis = (l?: TestLandmark) =>
+        l && l.visibility >= visibilityThreshold ? l : null;
+    const avgY = (a: number, b: number): number | null => {
+        const la = vis(lm[a]);
+        const lb = vis(lm[b]);
+        if (la && lb) return (la.y + lb.y) / 2;
+        return la?.y ?? lb?.y ?? null;
+    };
+    const wristY = avgY(LANDMARK_INDICES.LEFT_WRIST, LANDMARK_INDICES.RIGHT_WRIST);
+    const shoulderY = avgY(
+        LANDMARK_INDICES.LEFT_SHOULDER,
+        LANDMARK_INDICES.RIGHT_SHOULDER,
+    );
+    const hipY = avgY(LANDMARK_INDICES.LEFT_HIP, LANDMARK_INDICES.RIGHT_HIP);
+    if (wristY === null || shoulderY === null || hipY === null) return null;
+    const torso = Math.abs(hipY - shoulderY);
+    if (torso < 1e-4) return null;
+    return (shoulderY - wristY) / torso;
+}
+
+/**
+ * Given the elbow-flex set-point candidate, advance it forward to the frame
+ * where the wrists have clearly risen above the shoulders (the ball is up at the
+ * set). Only corrects candidates whose wrist is still around/below the shoulder
+ * — the "detected too early" case; candidates already above the shoulder, and
+ * cases where the torso/wrist signal is unavailable, are returned unchanged so
+ * late and non-side detections don't move.
+ */
+function advanceSetPointToBallUp(
+    frames: readonly Frame[],
+    candidateFrame: number,
+    searchEndFrame: number,
+    config: Required<KeyframeDetectorConfig>,
+): number {
+    const byIndex = new Map<number, Frame>();
+    for (const f of frames) byIndex.set(f.frameIndex, f);
+    const gapAt = (fi: number): number | null => {
+        const f = byIndex.get(fi);
+        return f ? wristAboveShoulderGap(f, config.visibilityThreshold) : null;
+    };
+
+    const startGap = gapAt(candidateFrame);
+    // Wrist already well above the shoulder (or no signal): leave the candidate
+    // where it is.
+    if (startGap === null || startGap > SET_POINT_ADVANCE_GUARD_GAP) {
+        return candidateFrame;
+    }
+
+    // Scan forward for the first frame where the wrist has clearly cleared the
+    // shoulder (the ball is up at the set). If no such frame exists within the
+    // window — an unusually low shot, or dropped tracking — keep the elbow
+    // candidate rather than drifting late.
+    const limit = Math.min(
+        searchEndFrame,
+        candidateFrame + SET_POINT_MAX_ADVANCE_FRAMES,
+    );
+    for (let frame = candidateFrame; frame <= limit; frame++) {
+        const g = gapAt(frame);
+        if (g !== null && g >= SET_POINT_ABOVE_SHOULDER_GAP) return frame;
+    }
+    return candidateFrame;
+}
+
 export function detectSetPoint(
     frames: readonly Frame[],
     ballStartsUpwardFrame: number,
@@ -1638,18 +1729,25 @@ export function detectSetPoint(
     }
 
     if (shootingKey && chosen) {
+        const setFrame = advanceSetPointToBallUp(
+            frames,
+            chosen.frameIndex,
+            searchEndFrame,
+            config,
+        );
+        const advanced = setFrame !== chosen.frameIndex ? ` -> ball-up @${setFrame}` : "";
         emitDiagnostic({
             keyframe: "set_point",
-            frame: chosen.frameIndex,
+            frame: setFrame,
             method: `shooting-${shootingKey}-elbow`,
             detail:
                 `shooting arm=${shootingKey} (flex-run L ${flexRun(arms.left)} / R ${flexRun(arms.right)}, ` +
                 `min L ${minRaw(arms.left) === Infinity ? "n/a" : minRaw(arms.left).toFixed(0) + "°"} / ` +
                 `R ${minRaw(arms.right) === Infinity ? "n/a" : minRaw(arms.right).toFixed(0) + "°"}, ` +
                 `jitter L ${jitter(arms.left).toFixed(1)} / R ${jitter(arms.right).toFixed(1)}). ` +
-                `${how} (${chosen.smooth.toFixed(0)}°) @${chosen.frameIndex}; window ${ballStartsUpwardFrame}-${searchEndFrame}`,
+                `${how} (${chosen.smooth.toFixed(0)}°) @${chosen.frameIndex}${advanced}; window ${ballStartsUpwardFrame}-${searchEndFrame}`,
         });
-        return chosen.frameIndex;
+        return setFrame;
     }
 
     // Both arms occluded (e.g. straight-behind view): use the averaged elbow's
@@ -1678,13 +1776,19 @@ export function detectSetPoint(
     }
     const avgSig = firstSignificantMin(avg);
     if (avgSig) {
+        const setFrame = advanceSetPointToBallUp(
+            frames,
+            avgSig.frameIndex,
+            searchEndFrame,
+            config,
+        );
         emitDiagnostic({
             keyframe: "set_point",
-            frame: avgSig.frameIndex,
+            frame: setFrame,
             method: "avg-elbow-first-flex",
-            detail: `no single arm clearly cocked; averaged elbow first significant flex (${avgSig.smooth.toFixed(0)}°) @${avgSig.frameIndex}, window ${ballStartsUpwardFrame}-${searchEndFrame}`,
+            detail: `no single arm clearly cocked; averaged elbow first significant flex (${avgSig.smooth.toFixed(0)}°) @${avgSig.frameIndex}${setFrame !== avgSig.frameIndex ? ` -> ball-up @${setFrame}` : ""}, window ${ballStartsUpwardFrame}-${searchEndFrame}`,
         });
-        return avgSig.frameIndex;
+        return setFrame;
     }
 
     // Last resort: ball-height peak (min wrist Y). Runs a few frames late.
