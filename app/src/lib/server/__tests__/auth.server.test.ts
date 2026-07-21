@@ -23,7 +23,8 @@ afterAll(() => {
 
 describe("server auth instance", () => {
   it("exposes a handler and api", async () => {
-    const { auth } = await import("../auth");
+    const { getAuth } = await import("../auth");
+    const auth = getAuth();
     expect(typeof auth.handler).toBe("function");
     expect(typeof auth.api.getSession).toBe("function");
   });

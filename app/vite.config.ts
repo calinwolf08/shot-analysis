@@ -9,11 +9,16 @@ const svelteTestingPlugin = svelteTesting() as unknown as PluginOption;
 
 export default defineConfig({
   plugins: [sveltekit()],
-  // better-sqlite3 is a native CommonJS module; it must stay external in the
-  // adapter-node SSR bundle (bundling it breaks on `__filename` in ESM). Only
-  // server-only code imports it, so this never affects the client bundle.
+  // Keep these external in the adapter-node SSR bundle (resolved from
+  // node_modules at runtime). This never affects the client bundle — ssr.external
+  // only applies to server builds, and the client still bundles
+  // `better-auth/client`.
+  //  - better-sqlite3: native CommonJS module (bundling breaks on `__filename`).
+  //  - better-auth: ships its own zod 4.x; bundling deduped it to the app's zod
+  //    3.x and broke on `z.coerce.boolean().meta(...)`. Externalizing lets it use
+  //    its own nested zod at runtime.
   ssr: {
-    external: ["better-sqlite3"],
+    external: ["better-sqlite3", "better-auth"],
   },
   test: {
     projects: [
