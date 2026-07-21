@@ -9,33 +9,33 @@ exports[`fixture rep scores vs placeholder benchmark > scores every fixture shot
     },
     {
       "excluded": 4,
-      "formScore": 28.74,
+      "formScore": 27.45,
     },
     {
       "excluded": 4,
-      "formScore": 22.73,
+      "formScore": 30.06,
     },
   ],
   "20190804_140654": [
     {
       "excluded": 1,
-      "formScore": 22.78,
+      "formScore": 26.4,
     },
     {
       "excluded": 2,
-      "formScore": 19.9,
+      "formScore": 19.05,
     },
     {
       "excluded": 9,
-      "formScore": 32.63,
+      "formScore": 31.25,
     },
     {
       "excluded": 10,
-      "formScore": 16.4,
+      "formScore": 16.36,
     },
     {
       "excluded": 6,
-      "formScore": 33.12,
+      "formScore": 32.86,
     },
     {
       "excluded": 11,
@@ -49,7 +49,7 @@ exports[`fixture rep scores vs placeholder benchmark > scores every fixture shot
   "20201212_134104": [
     {
       "excluded": 11,
-      "formScore": 25.67,
+      "formScore": 24.78,
     },
   ],
 }
