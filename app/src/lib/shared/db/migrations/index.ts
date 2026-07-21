@@ -3,6 +3,7 @@ import { systemClock } from "../../utils";
 import type { DatabaseAdapter } from "../adapter";
 import { initialSchema } from "./001-initial-schema";
 import { playerUserScope } from "./002-player-user-scope";
+import { userScopeSessionsVideos } from "./003-user-scope-sessions-videos";
 import type { Migration } from "./types";
 
 export type { Migration } from "./types";
@@ -11,6 +12,7 @@ export type { Migration } from "./types";
 export const ALL_MIGRATIONS: readonly Migration[] = [
   initialSchema,
   playerUserScope,
+  userScopeSessionsVideos,
 ];
 
 export interface MigrateResult {
