@@ -30,7 +30,7 @@ flowchart TB
   subgraph Client["Client (browser OR Capacitor WebView)"]
     UI["SvelteKit SPA / SSR client"]
     MP["MediaPipe pose extraction<br/>(upload + live, on-device)"]
-    LIVE["Live shot detection<br/>(immediate feedback only)"]
+    LIVE["Live shot-BOUNDARY detection<br/>(immediate; per-attempt only)"]
   end
 
   subgraph Server["SvelteKit server (adapter-node) — single backend"]
@@ -41,7 +41,7 @@ flowchart TB
     DB[("Single SQLite/Postgres DB<br/>all users, user_id scoped")]
   end
 
-  UI -->|"cookie (web) / bearer (mobile)"| HOOK
+  UI -->|"bearer token (web + mobile)"| HOOK
   MP -->|"pose frames JSON"| ANALYSIS
   LIVE -->|"finalized shot pose frames"| ANALYSIS
   HOOK --> AUTH & DATA & ANALYSIS
@@ -52,29 +52,37 @@ flowchart TB
 
 ### What moves where
 
-| Concern                                             | Before                                            | After                                                        |
-| --------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------ |
-| Auth                                                | separate `auth-server/` (better-auth, own SQLite) | SvelteKit `/api/auth/*`, same DB                             |
-| User data (players/sessions/shots/scores…)          | on-device SQLite (sql.js / capacitor-sqlite)      | single server DB, `user_id`-scoped                           |
-| Full shot analysis (detect→keyframes→metrics→score) | client (worker/replay)                            | server `/api/analysis/*` (same library code)                 |
-| MediaPipe pose extraction                           | client                                            | **stays client** (see decision below)                        |
-| Live shot detection (immediate)                     | client                                            | **stays client** for latency; full analysis POSTed to server |
+| Concern                                             | Before                                            | After                                                                                                               |
+| --------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Auth                                                | separate `auth-server/` (better-auth, own SQLite) | SvelteKit `/api/auth/*`, same DB                                                                                    |
+| User data (players/sessions/shots/scores…)          | on-device SQLite (sql.js / capacitor-sqlite)      | single server DB, `user_id`-scoped                                                                                  |
+| Full shot analysis (detect→keyframes→metrics→score) | client (worker/replay)                            | server `/api/analysis/*` (same library code)                                                                        |
+| MediaPipe pose extraction                           | client                                            | **stays client** (see decision below)                                                                               |
+| Live shot **boundary** detection (immediate)        | client                                            | **stays client** for latency; each attempt's full pose data POSTed to server for detailed analysis (same as static) |
 
 ### Key design decisions (read before starting)
 
 - **Pose extraction stays on the client; the deterministic pipeline moves to the
-  server.** The user's own framing — "once the pose data is identified … send to
-  the backend for full analysis" — is exactly this. It also **guarantees
-  identical results**, because the server runs the same
-  `runReplayAnalysis`/library code over the same pose frames. Server-side
-  MediaPipe (uploading video, running pose detection in Node) is deferred to
-  **Appendix A** as an optional later track — it would change the MediaPipe
-  runtime and require re-baselining the golden, which conflicts with the
-  "identical results" requirement.
-- **Mobile auth uses bearer tokens, not cookies.** Web (same-origin) uses
-  session cookies. Capacitor WebViews call a cross-origin API where third-party
-  cookies are unreliable; use better-auth's **bearer plugin** with the token in
-  Capacitor secure storage. `hooks.server.ts` accepts either.
+  server — for BOTH upload and live.** The user's framing: "once the pose data is
+  identified … send the full pose data for each shot attempt to the backend for
+  detailed analysis, just like the static lessons." So the client owns MediaPipe
+  pose extraction, and for live it also owns the fast shot-**boundary** detection
+  (for immediacy); everything after — keyframes, metrics, scoring — runs on the
+  server over the posted pose frames. This also **guarantees identical results**,
+  because the server runs the same `runReplayAnalysis`/library code over the same
+  pose frames. Server-side MediaPipe (uploading video, running pose detection in
+  Node) is deferred to **Appendix A** as an optional later track — it would change
+  the MediaPipe runtime and require re-baselining the golden, which conflicts with
+  the "identical results" requirement.
+- **One unified auth system: bearer tokens for every client (web AND mobile).**
+  There is a single auth mechanism, not one for web and another for mobile. All
+  clients authenticate with better-auth's **bearer plugin** and send
+  `Authorization: Bearer <token>`; `hooks.server.ts` resolves identity from that
+  header only. The token is stored per-platform (web: `localStorage` via a small
+  token-store abstraction; native: Capacitor secure storage) but the wire
+  protocol and server verification are identical. Session cookies are not used by
+  the app — this keeps cross-origin (Capacitor → API) and same-origin (web → API)
+  behavior identical and sidesteps WebView third-party-cookie issues entirely.
 - **One repo, two build targets.** `adapter-node` produces the server (web app +
   API). `adapter-static` (SPA) produces the Capacitor bundle, which points at the
   remote API via `PUBLIC_API_URL`. The adapter is chosen by a `BUILD_TARGET`
@@ -193,7 +201,9 @@ one config.
 baseURL, basePath: "/api/auth", trustedOrigins })`.
   - Use the **same** better-sqlite3 file as `getDb()` (better-auth manages its
     own tables in that file; keep app tables separate).
-  - Add the **bearer plugin** (`better-auth/plugins` → `bearer()`) for mobile.
+  - Add the **bearer plugin** (`better-auth/plugins` → `bearer()`) — this is the
+    single auth mechanism for **all** clients (web and mobile), not a mobile-only
+    add-on. Configure sessions to be returned as a bearer token on sign-in/up.
   - Keep `sendResetPassword` pluggable (dev logs the URL as today; prod wires a
     real mailer — leave a `// TODO(mailer)` and env hook).
 - Run better-auth's migrations at boot (reuse the `getMigrations`/`runMigrations`
@@ -213,32 +223,41 @@ request.
 - Add `app/src/routes/api/auth/[...all]/+server.ts` delegating `GET`/`POST` to
   better-auth's handler (`auth.handler(event.request)`).
 - Add `app/src/hooks.server.ts`:
-  - Resolve the session from cookie **or** `Authorization: Bearer` via
-    `auth.api.getSession({ headers })`; set `event.locals.user`/`session`.
-  - Add CORS for cross-origin native origins (`capacitor://localhost`,
-    `http://localhost`) — reflect allowed origins, `Allow-Credentials: true`,
-    handle `OPTIONS`.
+  - Resolve the session from the `Authorization: Bearer` header via
+    `auth.api.getSession({ headers })`; set `event.locals.user`/`session`. This
+    is the single identity path for every client — no cookie branch.
+  - Add CORS for cross-origin origins (`capacitor://localhost`, `http://localhost`,
+    and the configured web origin) — reflect allowed origins and handle `OPTIONS`.
+    Allow the `Authorization` request header.
 - Add `app/src/app.d.ts` `Locals` typing for `user`/`session`.
 
 **Validation:**
 
 - Port the `auth-server/src-tests/server.test.js` cases to
   `app/src/routes/api/auth/__tests__/auth-routes.test.ts`: sign-up, sign-in
-  (cookie set), get-session, sign-out, password reset (using the dev reset-url
-  hook). Run against a temp DB.
+  (bearer token returned), get-session with the token, sign-out, password reset
+  (using the dev reset-url hook). Run against a temp DB.
 - `npm test` passes.
 
-### Step 2.3 — Point the client at same-origin / bearer
+### Step 2.3 — Unify the client on bearer tokens (web + mobile)
 
-**Goal:** the client talks to the in-app auth; mobile uses bearer tokens.
+**Goal:** one auth mechanism for every client — bearer tokens, stored per
+platform, sent as `Authorization: Bearer`.
 
 **Steps:**
 
+- Add a tiny `TokenStore` abstraction (`app/src/lib/shared/auth/token-store.ts`)
+  with two implementations selected by platform: `localStorage` on web,
+  Capacitor secure storage (`@capacitor/preferences` or a secure plugin) on
+  native. Same interface both sides.
 - Edit `app/src/lib/shared/auth/better-auth-api.ts`:
   - Base URL: same-origin (`""`) on web; `PUBLIC_API_URL` on native
     (`isNative()`).
-  - Enable the better-auth **bearer** client plugin; on native, persist the
-    token via Capacitor Preferences/secure storage and attach it to requests.
+  - Enable the better-auth **bearer** client plugin for all platforms; on
+    sign-in/up, persist the returned token via `TokenStore`; attach it as
+    `Authorization: Bearer` on every request; clear it on sign-out.
+- Ensure the remote repos and analysis client (Phases 5–7) send the same
+  `Authorization` header (share one authed-`fetch` wrapper).
 - Update `app/src/lib/shared/auth/auth-store.svelte.ts` only if needed to store
   the token on sign-in and clear it on sign-out.
 
@@ -479,17 +498,23 @@ the replay backend.
 
 ### Step 7.2 — Live analysis flow
 
-**Goal:** immediate client detection; server full analysis on finalize.
+**Goal:** immediate client-side shot-boundary detection; server does the detailed
+analysis of each attempt — exactly the static-lesson path, applied per rep.
 
 **Steps:**
 
-- Live pose detection + client-side shot detection (immediate feedback) is
-  **unchanged** for latency (`live-session-store.svelte.ts`,
-  `worker-analysis-service` live path).
-- On shot finalize (pose data identified), POST the shot's pose frames to
-  `POST /api/analysis/shot`; use the server response for the persisted score and
-  history. The live overlay/feedback can keep using the client's quick result;
-  the **authoritative** stored result comes from the server.
+- Client-side **pose extraction + fast shot-boundary detection** (immediate
+  feedback) is **unchanged** for latency (`live-session-store.svelte.ts`,
+  `worker-analysis-service` live path). This client step only decides "a shot
+  attempt happened, here are its frames" — it does not compute the detailed
+  metrics/score.
+- When an attempt's boundary is identified, POST that attempt's **full pose
+  frames** to `POST /api/analysis/shot` — the same endpoint and same server
+  pipeline the static/upload flow uses. Use the server response for the
+  authoritative persisted score and history.
+- The live overlay may still show a lightweight client cue for instant feedback,
+  but the **stored, authoritative** result always comes from the server (so live
+  and static reps are analyzed identically).
 
 **Validation:** `live-practice.spec.ts` / `live-debug.spec.ts` pass; a new test
 asserts the finalized rep is persisted server-side and visible in progress.

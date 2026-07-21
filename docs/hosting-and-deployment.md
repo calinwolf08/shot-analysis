@@ -24,7 +24,7 @@ flowchart LR
   node --> web["Web browsers (https://app.example.com)"]
   node --> api[("API + DB<br/>https://app.example.com/api/*")]
   spa --> cap["Capacitor iOS/Android"]
-  web -->|same-origin cookie| api
+  web -->|"bearer token (Authorization header)"| api
   cap -->|"PUBLIC_API_URL + bearer token"| api
 ```
 
@@ -43,8 +43,8 @@ flowchart LR
   disk — see [§5 Database](#5-database).
 - For mobile: Xcode (iOS) and/or Android Studio, plus the Capacitor CLI
   (already a dev dependency).
-- A domain with TLS for the API (cookies require `Secure`; mobile requires
-  HTTPS).
+- A domain with TLS for the API (bearer tokens must only travel over HTTPS; the
+  native app requires HTTPS).
 
 ---
 
@@ -135,17 +135,20 @@ npx cap open ios            # opens Xcode; set signing team, then Run/Archive
 npx cap open android        # opens Android Studio; Run or build a signed bundle
 ```
 
-### Native auth specifics
+### Auth (one system for web and mobile)
 
-- The WebView runs at `capacitor://localhost` (iOS) / `http://localhost`
-  (Android). These origins must be in `AUTH_TRUSTED_ORIGINS` on the server.
-- The native client authenticates with **bearer tokens** (better-auth bearer
-  plugin), stored in Capacitor secure storage and sent as
-  `Authorization: Bearer <token>` — this avoids unreliable third-party cookies in
-  WebViews. The web client uses same-origin session cookies and needs none of
-  this.
-- All API calls from the app go to `PUBLIC_API_URL`. Verify with the health
-  endpoint from the device during first bring-up.
+- **All clients use the same auth mechanism: bearer tokens** (better-auth bearer
+  plugin), sent as `Authorization: Bearer <token>`. There is no separate
+  cookie-based path for web — web and native verify identically on the server
+  (`hooks.server.ts`). This avoids WebView third-party-cookie problems and keeps
+  cross-origin (native) and same-origin (web) behavior identical.
+- The token is stored per platform: `localStorage` on web, Capacitor secure
+  storage on native. The wire protocol is the same.
+- The native WebView runs at `capacitor://localhost` (iOS) / `http://localhost`
+  (Android); these origins plus your web origin must be in `AUTH_TRUSTED_ORIGINS`
+  (needed for CORS on the cross-origin native calls).
+- All API calls from the native app go to `PUBLIC_API_URL`. Verify with the
+  health endpoint from the device during first bring-up.
 
 ### Deploy the web SPA without a Node server (optional)
 
