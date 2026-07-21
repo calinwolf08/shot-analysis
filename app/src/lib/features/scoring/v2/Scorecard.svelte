@@ -148,7 +148,8 @@
   }
   .head-sub {
     font-size: 0.72rem;
-    color: #6b7280;
+    /* #9ca3af meets WCAG AA (>=4.5:1) on the dark cards; #6b7280 did not. */
+    color: #9ca3af;
   }
   .category {
     margin-bottom: 12px;
@@ -169,8 +170,16 @@
   .metric {
     padding: 4px 0;
   }
-  .metric.unmeasured {
+  /* De-emphasize unmeasured metrics without dropping text below AA contrast:
+     dim the non-text decorations via opacity, and use an AA-compliant muted
+     color for the text (a blanket opacity:0.5 pushed the text under 4.5:1). */
+  .metric.unmeasured .dot,
+  .metric.unmeasured .bar {
     opacity: 0.5;
+  }
+  .metric.unmeasured .metric-label,
+  .metric.unmeasured .metric-value {
+    color: #9ca3af;
   }
   .metric-top {
     display: flex;
@@ -224,6 +233,7 @@
   }
   .band-text {
     font-size: 0.68rem;
-    color: #6b7280;
+    /* #9ca3af meets WCAG AA (>=4.5:1) on the dark cards; #6b7280 did not. */
+    color: #9ca3af;
   }
 </style>
