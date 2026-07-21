@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
+    "build:static": "BUILD_TARGET=static vite build",
+    "build:node": "BUILD_TARGET=node vite build",
+    "start": "BUILD_TARGET=node node build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "lint": "prettier --check . && eslint .",
@@ -38,6 +41,7 @@
     "@capacitor/cli": "^7.6.7",
     "@eslint/js": "^9.18.0",
     "@playwright/test": "1.58.2",
+    "@sveltejs/adapter-node": "^5.5.7",
     "@sveltejs/adapter-static": "^3.0.8",
     "@sveltejs/kit": "^2.16.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
