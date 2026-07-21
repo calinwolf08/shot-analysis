@@ -43,4 +43,9 @@ export { poseDataSchema, frameSchema } from "./testing/types";
 // Pose detector factory (used by the app's analysis worker with
 // locally-hosted assets)
 export { createPoseDetector, } from "./pose/factory";
+// v2 metrics (Sequencing / Structure overhaul) — extraction + measurement types
+export { extractShotMetrics, metricsForShot, computeSequencing, computeStructure, } from "./metrics/v2";
+export { detectKeyframesFromFrames, poseLandmarksToFrames, } from "./detection/keyframe-phases";
+export { deriveThresholds } from "./metrics/v2";
+export { scoreShot } from "./scoring/v2";
 //# sourceMappingURL=index.js.map

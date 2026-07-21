@@ -120,6 +120,10 @@ export declare function calculateKneeAngle(hip: TestLandmark | null, knee: TestL
  * This corresponds to the "leg_bend_low_point" keyframe in the Load phase.
  * The search is limited to the first portion of the shot (configurable).
  *
+ * Primary signal is the hip drop (hips lowest relative to the ankles = deepest
+ * bend); the onset of that basin is the low point. Falls back to the knee angle
+ * when the hips barely move (e.g. hips/ankles not tracked).
+ *
  * @param frames - Array of frames with pose data
  * @param startFrame - Shot start frame index (inclusive)
  * @param endFrame - Shot end frame index (inclusive)
@@ -175,6 +179,23 @@ export declare function calculateSmoothedVelocity(values: number[], windowSize: 
  * @returns Frame index where knee extension starts, or null if not detectable
  */
 export declare function detectLegsStartExtending(frames: readonly Frame[], legBendLowPointFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
+/**
+ * Detects the frame where the legs reach FULL extension (the drive is complete).
+ *
+ * This corresponds to the "legs_fully_extended" keyframe — event #6 of the
+ * shooting sequence, after "legs start rising". The hips reach their highest
+ * point relative to the ankles (legs straightest / player up on the drive), so
+ * the hip-drop signal (ankleY − hipY) reaches its MAXIMUM. We return the onset
+ * of that peak (first frame within a small band of the max). Falls back to the
+ * straightest knee angle when the hips barely move.
+ *
+ * @param frames - Array of frames with pose data
+ * @param legsStartExtendingFrame - Frame where the legs began extending
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index of full leg extension, or null if not detectable
+ */
+export declare function detectLegsFullyExtended(frames: readonly Frame[], legsStartExtendingFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 /**
  * Detects the frame where the ball starts moving upward (wrist Y starts decreasing).
  *

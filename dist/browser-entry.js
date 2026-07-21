@@ -36,6 +36,10 @@ MediaStreamProvider, createMediaStreamProvider, MediaStreamEndedError, MediaStre
 InvalidFpsError, } from "./providers";
 export { ShotAnalyzer, createShotAnalyzer, ShotAnalyzerNotInitializedError, ShotAnalyzerAlreadyInitializedError, } from "./analyzer";
 export { createEmptyMetricValue, createEmptyShotAnalysis, createEmptyVideoMetadata, createEmptyAnalysisResult, isSuccessfulMetricResult, getAverageMetricConfidence, filterMetricsByConfidence, } from "./metrics/types";
+// v2 metrics (Sequencing / Structure) — extraction for the validator + app
+export { extractShotMetrics, metricsForShot, computeSequencing, computeStructure, } from "./metrics/v2";
+export { deriveThresholds, referenceOnFrame } from "./metrics/v2";
+export { scoreShot } from "./scoring/v2";
 export { DEFAULT_FEEDBACK_MESSAGES, createEmptyComparisonSummary, createEmptyProfileComparison, isNumericTarget, isCategoricalTarget, getFeedbackMessage, } from "./profiles/types";
 export { ProfileRegistry, getProfileRegistry } from "./profiles/registry";
 export { ProfileComparisonEngine, } from "./profiles/comparison";

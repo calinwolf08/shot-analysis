@@ -30,4 +30,10 @@ export type { Orientation } from "./metrics/types";
 export { poseDataSchema, frameSchema } from "./testing/types";
 export type { PoseData, Frame as PoseDataFrame } from "./testing/types";
 export { createPoseDetector, type PoseDetectorConfig, type PoseDetectorRuntime, } from "./pose/factory";
+export { extractShotMetrics, metricsForShot, computeSequencing, computeStructure, } from "./metrics/v2";
+export { detectKeyframesFromFrames, poseLandmarksToFrames, } from "./detection/keyframe-phases";
+export type { ShotMetricsV2, SequencingMetrics, StructureMetrics, Measurement, ExtractOptions, Thresholds, MetricThreshold, } from "./metrics/v2";
+export { deriveThresholds } from "./metrics/v2";
+export { scoreShot } from "./scoring/v2";
+export type { ShotScore, CategoryScore, MetricScore } from "./scoring/v2";
 //# sourceMappingURL=index.d.ts.map

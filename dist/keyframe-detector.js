@@ -396,10 +396,111 @@ function getFrameWristAngle(frame, visibilityThreshold) {
     return null;
 }
 /**
+ * Knee angle of the MOST-VISIBLE leg (never an average of the two).
+ *
+ * In side views the far leg is occluded and MediaPipe fabricates a near-
+ * straight angle for it; averaging both legs (as {@link getFrameKneeAngle}
+ * does) then shifts the deepest-bend frame. Picking the single leg whose
+ * hip/knee/ankle are most visible keeps the bend signal honest.
+ */
+function getReliableKneeAngle(frame, visibilityThreshold) {
+    if (!frame.landmarks)
+        return null;
+    const lm = frame.landmarks;
+    const legVis = (hip, knee, ankle) => Math.min(lm[hip]?.visibility ?? 0, lm[knee]?.visibility ?? 0, lm[ankle]?.visibility ?? 0);
+    const lVis = legVis(LANDMARK_INDICES.LEFT_HIP, LANDMARK_INDICES.LEFT_KNEE, LANDMARK_INDICES.LEFT_ANKLE);
+    const rVis = legVis(LANDMARK_INDICES.RIGHT_HIP, LANDMARK_INDICES.RIGHT_KNEE, LANDMARK_INDICES.RIGHT_ANKLE);
+    if (Math.max(lVis, rVis) < visibilityThreshold)
+        return null;
+    if (lVis >= rVis) {
+        return calculateKneeAngle(lm[LANDMARK_INDICES.LEFT_HIP], lm[LANDMARK_INDICES.LEFT_KNEE], lm[LANDMARK_INDICES.LEFT_ANKLE]);
+    }
+    return calculateKneeAngle(lm[LANDMARK_INDICES.RIGHT_HIP], lm[LANDMARK_INDICES.RIGHT_KNEE], lm[LANDMARK_INDICES.RIGHT_ANKLE]);
+}
+/**
+ * Minimum hip drop (basin depth) required to trust the hip-drop signal over the
+ * knee angle. Below this the hip barely moves (e.g. synthetic fixtures, or a
+ * view where hips/ankles aren't tracked well) and we fall back to the knee.
+ */
+const HIP_DROP_MIN_RANGE = 0.02;
+/**
+ * Vertical hip-to-ankle distance (ankleY − hipY) of the most-visible side, or
+ * null. As the legs bend the hips drop toward the ankles, so this SHRINKS —
+ * a cleaner "how bent are the legs" signal than knee angle, which depends on
+ * the occluded far leg in side views. Lower = more bent.
+ */
+function getHipAnkleDrop(frame, visibilityThreshold) {
+    if (!frame.landmarks)
+        return null;
+    const lm = frame.landmarks;
+    const side = (hipI, ankleI) => {
+        const hip = lm[hipI];
+        const ankle = lm[ankleI];
+        if (!hip || !ankle)
+            return null;
+        return {
+            vis: Math.min(hip.visibility ?? 0, ankle.visibility ?? 0),
+            drop: ankle.y - hip.y,
+        };
+    };
+    const l = side(LANDMARK_INDICES.LEFT_HIP, LANDMARK_INDICES.LEFT_ANKLE);
+    const r = side(LANDMARK_INDICES.RIGHT_HIP, LANDMARK_INDICES.RIGHT_ANKLE);
+    const best = l && r ? (l.vis >= r.vis ? l : r) : (l ?? r);
+    if (!best || best.vis < visibilityThreshold)
+        return null;
+    return best.drop;
+}
+/**
+ * Builds the centered-smoothed hip-drop series over [lo, hi] and its min/range.
+ * Returns null when there aren't enough tracked frames to be useful.
+ */
+function hipDropBasin(frames, lo, hi, visibilityThreshold) {
+    const pts = [];
+    for (const frame of frames) {
+        const idx = frame.frameIndex;
+        if (idx < lo || idx > hi)
+            continue;
+        const drop = getHipAnkleDrop(frame, visibilityThreshold);
+        if (drop !== null)
+            pts.push({ frameIndex: idx, v: drop });
+    }
+    if (pts.length < 3)
+        return null;
+    pts.sort((a, b) => a.frameIndex - b.frameIndex);
+    const series = pts.map((p, i) => {
+        const prev = pts[i - 1]?.v;
+        const next = pts[i + 1]?.v;
+        let sum = p.v;
+        let n = 1;
+        if (prev !== undefined) {
+            sum += prev;
+            n++;
+        }
+        if (next !== undefined) {
+            sum += next;
+            n++;
+        }
+        return { frameIndex: p.frameIndex, v: sum / n };
+    });
+    let min = Infinity;
+    let max = -Infinity;
+    for (const p of series) {
+        if (p.v < min)
+            min = p.v;
+        if (p.v > max)
+            max = p.v;
+    }
+    return { series, min, range: max - min };
+}
+/**
  * Detects the frame with the deepest knee bend (minimum knee angle).
  *
  * This corresponds to the "leg_bend_low_point" keyframe in the Load phase.
  * The search is limited to the first portion of the shot (configurable).
+ *
+ * Primary signal is the hip drop (hips lowest relative to the ankles = deepest
+ * bend); the onset of that basin is the low point. Falls back to the knee angle
+ * when the hips barely move (e.g. hips/ankles not tracked).
  *
  * @param frames - Array of frames with pose data
  * @param startFrame - Shot start frame index (inclusive)
@@ -410,18 +511,63 @@ function getFrameWristAngle(frame, visibilityThreshold) {
 export function detectLegBendLowPoint(frames, startFrame, endFrame, config = DEFAULT_CONFIG) {
     const shotDuration = endFrame - startFrame + 1;
     const searchEndFrame = startFrame + Math.floor(shotDuration * config.legBendSearchWindow);
-    let minAngle = Infinity;
-    let minAngleFrame = null;
+    // Primary: hip-drop basin ONSET — the first frame the hips reach the bottom
+    // of their drop (within a small band of the minimum). Only trusted when the
+    // hips actually drop a meaningful amount.
+    const basin = hipDropBasin(frames, startFrame, searchEndFrame, config.visibilityThreshold);
+    if (basin && basin.range >= HIP_DROP_MIN_RANGE) {
+        const eps = Math.max(0.002, 0.05 * basin.range);
+        for (const p of basin.series) {
+            if (p.v <= basin.min + eps) {
+                emitDiagnostic({
+                    keyframe: "leg_bend_low_point",
+                    frame: p.frameIndex,
+                    method: "hip-drop-basin-onset",
+                    detail: `hips lowest vs ankles (drop ${basin.min.toFixed(3)}, range ${basin.range.toFixed(3)}) in window ${startFrame}-${searchEndFrame}`,
+                });
+                return p.frameIndex;
+            }
+        }
+    }
+    // Fallback: collect the knee-angle series over the window, then take the
+    // deepest bend on a CENTERED-smoothed signal. The raw argmin latches onto a
+    // single noisy frame (giving a few-frame scatter in either direction);
+    // smoothing settles it on the true bottom of the bend.
+    const pts = [];
     for (const frame of frames) {
         const frameIdx = frame.frameIndex;
-        // Only search within the start to search window
         if (frameIdx < startFrame || frameIdx > searchEndFrame) {
             continue;
         }
-        const kneeAngle = getFrameKneeAngle(frame, config.visibilityThreshold);
-        if (kneeAngle !== null && kneeAngle < minAngle) {
-            minAngle = kneeAngle;
-            minAngleFrame = frameIdx;
+        const kneeAngle = getReliableKneeAngle(frame, config.visibilityThreshold);
+        if (kneeAngle !== null) {
+            pts.push({ frameIndex: frameIdx, angle: kneeAngle });
+        }
+    }
+    let minAngle = Infinity;
+    let minAngleFrame = null;
+    if (pts.length > 0) {
+        pts.sort((a, b) => a.frameIndex - b.frameIndex);
+        const sm = pts.map((p, i) => {
+            const prev = pts[i - 1]?.angle;
+            const next = pts[i + 1]?.angle;
+            let sum = p.angle;
+            let n = 1;
+            if (prev !== undefined) {
+                sum += prev;
+                n++;
+            }
+            if (next !== undefined) {
+                sum += next;
+                n++;
+            }
+            return sum / n;
+        });
+        for (let i = 0; i < sm.length; i++) {
+            if (sm[i] < minAngle) {
+                minAngle = sm[i];
+                minAngleFrame = pts[i].frameIndex;
+            }
         }
     }
     // Edge case: No clear dip - return frame closest to start if we found any valid frames
@@ -468,47 +614,81 @@ export function detectLegBendLowPoint(frames, startFrame, endFrame, config = DEF
 export function detectBallLowPoint(frames, startFrame, endFrame, config = DEFAULT_CONFIG) {
     const shotDuration = endFrame - startFrame + 1;
     const searchEndFrame = startFrame + Math.floor(shotDuration * config.ballLowPointSearchWindow);
-    // Helper function to find max wrist Y frame with given visibility threshold
-    const findMaxWristYFrame = (visThreshold) => {
-        let maxWristY = -Infinity;
-        let maxWristYFrame = null;
+    // The ball hovers near the bottom of the dip for several frames, so the
+    // absolute argmax of wrist Y lands at the END of that basin — consistently
+    // a few frames later than a human marks the low point. Instead we take the
+    // ONSET of the basin: the earliest frame whose (centered-smoothed) wrist Y
+    // is within a small band of the window maximum (lowest ball position).
+    const findBasinOnset = (visThreshold) => {
+        const pts = [];
         for (const frame of frames) {
             const frameIdx = frame.frameIndex;
             if (frameIdx < startFrame || frameIdx > searchEndFrame) {
                 continue;
             }
             const wristY = getFrameWristY(frame, visThreshold);
-            if (wristY !== null && wristY > maxWristY) {
-                maxWristY = wristY;
-                maxWristYFrame = frameIdx;
+            if (wristY !== null) {
+                pts.push({ frameIndex: frameIdx, y: wristY });
             }
         }
-        return maxWristYFrame;
+        if (pts.length === 0)
+            return null;
+        pts.sort((a, b) => a.frameIndex - b.frameIndex);
+        // Centered 3-tap smoothing (no trailing lag, unlike movingAverage).
+        const sm = pts.map((p, i) => {
+            const prev = pts[i - 1]?.y;
+            const next = pts[i + 1]?.y;
+            let sum = p.y;
+            let n = 1;
+            if (prev !== undefined) {
+                sum += prev;
+                n++;
+            }
+            if (next !== undefined) {
+                sum += next;
+                n++;
+            }
+            return sum / n;
+        });
+        let maxY = -Infinity;
+        let minY = Infinity;
+        for (const v of sm) {
+            if (v > maxY)
+                maxY = v;
+            if (v < minY)
+                minY = v;
+        }
+        // "At the bottom" band: a fraction of the dip depth, floored so a
+        // shallow (or noisy) dip still gets a sensible tolerance.
+        const eps = Math.max(0.002, 0.03 * (maxY - minY));
+        for (let i = 0; i < sm.length; i++) {
+            if (sm[i] >= maxY - eps)
+                return pts[i].frameIndex;
+        }
+        return pts[pts.length - 1].frameIndex;
     };
     // First pass with normal visibility threshold
-    let maxWristYFrame = findMaxWristYFrame(config.visibilityThreshold);
-    // For "behind" views, early frames have low wrist visibility but valid Y positions.
-    // Only use the low-visibility fallback when the configured threshold is not stricter
-    // than the default (0.3). This respects user-configured visibility thresholds while
-    // still allowing detection in difficult "behind" view scenarios.
+    let lowPointFrame = findBasinOnset(config.visibilityThreshold);
+    // For "behind" views, early frames have low wrist visibility but valid Y
+    // positions. Only use the low-visibility fallback when the configured
+    // threshold is not stricter than the default (0.3), so user-configured
+    // thresholds are respected while difficult "behind" views still detect.
     if (config.visibilityThreshold <= 0.3) {
-        // If we found a frame but it's in the latter half of the search window,
-        // retry with a very low threshold to catch early low-visibility frames.
+        // If the onset landed in the latter half of the window, early low-
+        // visibility frames may have been skipped — retry with a low threshold
+        // and prefer an earlier onset.
         const firstHalfEnd = startFrame + Math.floor((searchEndFrame - startFrame) / 2);
-        if (maxWristYFrame !== null && maxWristYFrame > firstHalfEnd) {
-            // The detected frame is late in the window - try with lower threshold
-            const lowVisFrame = findMaxWristYFrame(0.01);
-            if (lowVisFrame !== null && lowVisFrame < maxWristYFrame) {
-                // Found an earlier frame with low visibility - use it
-                maxWristYFrame = lowVisFrame;
+        if (lowPointFrame !== null && lowPointFrame > firstHalfEnd) {
+            const lowVisFrame = findBasinOnset(0.01);
+            if (lowVisFrame !== null && lowVisFrame < lowPointFrame) {
+                lowPointFrame = lowVisFrame;
             }
         }
-        // Edge case: No clear dip - try with very low visibility threshold as fallback
-        if (maxWristYFrame === null) {
-            maxWristYFrame = findMaxWristYFrame(0.01);
+        if (lowPointFrame === null) {
+            lowPointFrame = findBasinOnset(0.01);
         }
     }
-    return maxWristYFrame;
+    return lowPointFrame;
 }
 /**
  * Calculates velocity (frame-to-frame change) from a sequence of values.
@@ -556,7 +736,28 @@ export function calculateSmoothedVelocity(values, windowSize) {
 export function detectLegsStartExtending(frames, legBendLowPointFrame, endFrame, config = DEFAULT_CONFIG) {
     const shotDuration = endFrame - legBendLowPointFrame + 1;
     const searchEndFrame = legBendLowPointFrame + Math.floor(shotDuration * config.riseSearchWindow);
-    // Extract knee angles for frames in the search window
+    // Primary: hip-drop basin TURN — the last frame the hips are still at the
+    // bottom of their drop, i.e. where they begin rising again as the legs push
+    // up. Only trusted when the hips drop a meaningful amount.
+    const basin = hipDropBasin(frames, legBendLowPointFrame, searchEndFrame, config.visibilityThreshold);
+    if (basin && basin.range >= HIP_DROP_MIN_RANGE) {
+        const eps = Math.max(0.002, 0.05 * basin.range);
+        let lastIdx = -1;
+        for (let i = 0; i < basin.series.length; i++) {
+            if (basin.series[i].v <= basin.min + eps)
+                lastIdx = i;
+        }
+        if (lastIdx >= 0) {
+            emitDiagnostic({
+                keyframe: "legs_start_extending",
+                frame: basin.series[lastIdx].frameIndex,
+                method: "hip-drop-basin-turn",
+                detail: `hips begin rising after the bottom (drop ${basin.min.toFixed(3)}, range ${basin.range.toFixed(3)}) in window ${legBendLowPointFrame}-${searchEndFrame}`,
+            });
+            return basin.series[lastIdx].frameIndex;
+        }
+    }
+    // Fallback: extract knee angles for frames in the search window
     const frameAngles = [];
     for (const frame of frames) {
         const frameIdx = frame.frameIndex;
@@ -598,6 +799,89 @@ export function detectLegsStartExtending(frames, legBendLowPointFrame, endFrame,
     return null;
 }
 /**
+ * Detects the frame where the legs reach FULL extension (the drive is complete).
+ *
+ * This corresponds to the "legs_fully_extended" keyframe — event #6 of the
+ * shooting sequence, after "legs start rising". The hips reach their highest
+ * point relative to the ankles (legs straightest / player up on the drive), so
+ * the hip-drop signal (ankleY − hipY) reaches its MAXIMUM. We return the onset
+ * of that peak (first frame within a small band of the max). Falls back to the
+ * straightest knee angle when the hips barely move.
+ *
+ * @param frames - Array of frames with pose data
+ * @param legsStartExtendingFrame - Frame where the legs began extending
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index of full leg extension, or null if not detectable
+ */
+export function detectLegsFullyExtended(frames, legsStartExtendingFrame, endFrame, config = DEFAULT_CONFIG) {
+    const shotDuration = endFrame - legsStartExtendingFrame + 1;
+    // Full extension completes on the drive, a bit before the top of the jump;
+    // search most of the remaining shot from where extension began.
+    const searchEndFrame = legsStartExtendingFrame + Math.floor(shotDuration * 0.7);
+    // Primary: hip-drop basin PEAK — the first frame the hips reach the top of
+    // their rise (within a small band of the maximum ankle-to-hip distance).
+    const basin = hipDropBasin(frames, legsStartExtendingFrame, Math.min(searchEndFrame, endFrame), config.visibilityThreshold);
+    if (basin && basin.range >= HIP_DROP_MIN_RANGE) {
+        const max = basin.min + basin.range;
+        const eps = Math.max(0.002, 0.05 * basin.range);
+        for (const p of basin.series) {
+            if (p.v >= max - eps) {
+                emitDiagnostic({
+                    keyframe: "legs_fully_extended",
+                    frame: p.frameIndex,
+                    method: "hip-drop-basin-peak",
+                    detail: `hips highest vs ankles (drop ${max.toFixed(3)}, range ${basin.range.toFixed(3)}) in window ${legsStartExtendingFrame}-${searchEndFrame}`,
+                });
+                return p.frameIndex;
+            }
+        }
+    }
+    // Fallback: straightest knee (max reliable knee angle) on a smoothed signal.
+    const pts = [];
+    for (const frame of frames) {
+        const idx = frame.frameIndex;
+        if (idx < legsStartExtendingFrame || idx > searchEndFrame)
+            continue;
+        const angle = getReliableKneeAngle(frame, config.visibilityThreshold);
+        if (angle !== null)
+            pts.push({ frameIndex: idx, angle });
+    }
+    if (pts.length < 3)
+        return null;
+    pts.sort((a, b) => a.frameIndex - b.frameIndex);
+    const sm = pts.map((p, i) => {
+        const prev = pts[i - 1]?.angle;
+        const next = pts[i + 1]?.angle;
+        let sum = p.angle;
+        let n = 1;
+        if (prev !== undefined) {
+            sum += prev;
+            n++;
+        }
+        if (next !== undefined) {
+            sum += next;
+            n++;
+        }
+        return sum / n;
+    });
+    let maxAngle = -Infinity;
+    let maxFrame = null;
+    for (let i = 0; i < sm.length; i++) {
+        if (sm[i] > maxAngle) {
+            maxAngle = sm[i];
+            maxFrame = pts[i].frameIndex;
+        }
+    }
+    emitDiagnostic({
+        keyframe: "legs_fully_extended",
+        frame: maxFrame,
+        method: "knee-angle-max",
+        detail: `straightest knee (${maxAngle === -Infinity ? "n/a" : maxAngle.toFixed(0) + "°"}) in window ${legsStartExtendingFrame}-${searchEndFrame}`,
+    });
+    return maxFrame;
+}
+/**
  * Detects the frame where the ball starts moving upward (wrist Y starts decreasing).
  *
  * This corresponds to the "ball_starts_upward" keyframe in the Rise phase.
@@ -613,7 +897,11 @@ export function detectLegsStartExtending(frames, legBendLowPointFrame, endFrame,
 export function detectBallStartsUpward(frames, ballLowPointFrame, endFrame, config = DEFAULT_CONFIG) {
     const shotDuration = endFrame - ballLowPointFrame + 1;
     const searchEndFrame = ballLowPointFrame + Math.floor(shotDuration * config.riseSearchWindow);
-    // Helper function to detect ball starts upward with given visibility threshold
+    // The ball starts rising when it LEAVES the bottom of the dip, so
+    // ball_starts_upward is the last frame at the bottom plateau (within a small
+    // band of the deepest ball position) before the ascent. Detecting the basin
+    // end directly avoids the ~3-frame lag of a trailing-smoothed velocity
+    // trigger that needs several confirming frames.
     const findBallStartsUpward = (visThreshold) => {
         const framePositions = [];
         for (const frame of frames) {
@@ -626,27 +914,52 @@ export function detectBallStartsUpward(frames, ballLowPointFrame, endFrame, conf
                 framePositions.push({ frameIndex: frameIdx, wristY: wristY });
             }
         }
+        // Need enough frames to establish a bottom and a rise after it.
         if (framePositions.length < config.minConsecutiveFrames + 1) {
             return null;
         }
         framePositions.sort((a, b) => a.frameIndex - b.frameIndex);
-        const wristYValues = framePositions.map((fp) => fp.wristY);
-        const smoothedVelocities = calculateSmoothedVelocity(wristYValues, config.smoothingWindowSize);
-        let consecutiveNegative = 0;
-        for (let i = 0; i < smoothedVelocities.length; i++) {
-            const velocity = smoothedVelocities[i];
-            if (velocity < config.wristVelocityThreshold) {
-                consecutiveNegative++;
-                if (consecutiveNegative >= config.minConsecutiveFrames) {
-                    const startIdx = i - config.minConsecutiveFrames + 1;
-                    return framePositions[startIdx + 1].frameIndex;
-                }
+        // Centered 3-tap smoothing (no trailing lag).
+        const sm = framePositions.map((p, i) => {
+            const prev = framePositions[i - 1]?.wristY;
+            const next = framePositions[i + 1]?.wristY;
+            let sum = p.wristY;
+            let n = 1;
+            if (prev !== undefined) {
+                sum += prev;
+                n++;
             }
-            else {
-                consecutiveNegative = 0;
+            if (next !== undefined) {
+                sum += next;
+                n++;
             }
+            return sum / n;
+        });
+        let maxY = -Infinity;
+        let minY = Infinity;
+        for (const v of sm) {
+            if (v > maxY)
+                maxY = v;
+            if (v < minY)
+                minY = v;
         }
-        return null;
+        // No meaningful dip → the ball never settles then rises.
+        if (maxY - minY < 0.01)
+            return null;
+        // Deepest ball = the turn from descent to ascent = ball starts upward.
+        // Take the LAST frame reaching the max (within a tiny FP epsilon so a
+        // flat bottom resolves to its final frame, i.e. where the ascent
+        // begins, rather than an arbitrary earlier tie).
+        const EPS = 1e-6;
+        let maxIdx = -1;
+        for (let i = 0; i < sm.length; i++) {
+            if (sm[i] >= maxY - EPS)
+                maxIdx = i;
+        }
+        // The bottom runs to the end of the window → no ascent captured here.
+        if (maxIdx < 0 || maxIdx === sm.length - 1)
+            return null;
+        return framePositions[maxIdx].frameIndex;
     };
     // First pass with normal visibility threshold
     let result = findBallStartsUpward(config.visibilityThreshold);
@@ -670,8 +983,8 @@ export function detectBallStartsUpward(frames, ballLowPointFrame, endFrame, conf
     emitDiagnostic({
         keyframe: "ball_starts_upward",
         frame: result,
-        method: "wristY-velocity",
-        detail: `first sustained upward wrist motion (<${config.wristVelocityThreshold}/frame for ${config.minConsecutiveFrames} frames) after ball_low_point@${ballLowPointFrame}, window ${ballLowPointFrame}-${searchEndFrame}`,
+        method: "wristY-bottom",
+        detail: `deepest ball (max smoothed wrist Y) in rise window ${ballLowPointFrame}-${searchEndFrame} — the ball starts rising here`,
     });
     return result;
 }
@@ -838,6 +1151,83 @@ const SET_POINT_FLEX_MAX_DEG = 140;
 const SET_POINT_MIN_DEPTH_DEG = 125;
 /** A local minimum must sit at least this far below the preceding running max to count (rejects shallow noise dips and the shot's starting flex). */
 const SET_POINT_MIN_DIP_DEG = 15;
+// "Ball up" gate. The elbow-flex candidate above finds the cocked elbow, but on
+// lower-resolution footage that flex is reached while the ball is still rising
+// through shoulder height — a few frames before the true set, where the ball is
+// up at the set position. So once we have the elbow candidate, advance it
+// forward to the frame where the shooting wrist has actually risen clearly above
+// the shoulder. The gap is measured as (shoulderY - wristY) / torsoLength so it
+// is invariant to camera zoom and framing.
+/** Advance only kicks in for the "detected too early" case: the candidate's wrist is still around/below shoulder (gap <= this). A candidate already well above the shoulder is left untouched, so late/correct detections don't move. */
+const SET_POINT_ADVANCE_GUARD_GAP = 0.1;
+/** Advance forward until the wrist clears the shoulder by this fraction of torso length ("ball up at the set"). */
+const SET_POINT_ABOVE_SHOULDER_GAP = 0.35;
+/** Never advance more than this many frames past the elbow candidate (safety bound against runaway). */
+const SET_POINT_MAX_ADVANCE_FRAMES = 8;
+/**
+ * How far the wrists sit above the shoulders as a fraction of torso length
+ * ((shoulderY - wristY) / |hipY - shoulderY|; positive = above). Uses the
+ * average of both sides (at the set both hands are together on the ball, so the
+ * average is steadier and side-independent), falling back to whichever side is
+ * visible for each joint. Returns null when the shoulder, hip, or wrist can't be
+ * located.
+ */
+function wristAboveShoulderGap(frame, visibilityThreshold) {
+    const lm = frame.landmarks;
+    if (!lm)
+        return null;
+    const vis = (l) => l && l.visibility >= visibilityThreshold ? l : null;
+    const avgY = (a, b) => {
+        const la = vis(lm[a]);
+        const lb = vis(lm[b]);
+        if (la && lb)
+            return (la.y + lb.y) / 2;
+        return la?.y ?? lb?.y ?? null;
+    };
+    const wristY = avgY(LANDMARK_INDICES.LEFT_WRIST, LANDMARK_INDICES.RIGHT_WRIST);
+    const shoulderY = avgY(LANDMARK_INDICES.LEFT_SHOULDER, LANDMARK_INDICES.RIGHT_SHOULDER);
+    const hipY = avgY(LANDMARK_INDICES.LEFT_HIP, LANDMARK_INDICES.RIGHT_HIP);
+    if (wristY === null || shoulderY === null || hipY === null)
+        return null;
+    const torso = Math.abs(hipY - shoulderY);
+    if (torso < 1e-4)
+        return null;
+    return (shoulderY - wristY) / torso;
+}
+/**
+ * Given the elbow-flex set-point candidate, advance it forward to the frame
+ * where the wrists have clearly risen above the shoulders (the ball is up at the
+ * set). Only corrects candidates whose wrist is still around/below the shoulder
+ * — the "detected too early" case; candidates already above the shoulder, and
+ * cases where the torso/wrist signal is unavailable, are returned unchanged so
+ * late and non-side detections don't move.
+ */
+function advanceSetPointToBallUp(frames, candidateFrame, searchEndFrame, config) {
+    const byIndex = new Map();
+    for (const f of frames)
+        byIndex.set(f.frameIndex, f);
+    const gapAt = (fi) => {
+        const f = byIndex.get(fi);
+        return f ? wristAboveShoulderGap(f, config.visibilityThreshold) : null;
+    };
+    const startGap = gapAt(candidateFrame);
+    // Wrist already well above the shoulder (or no signal): leave the candidate
+    // where it is.
+    if (startGap === null || startGap > SET_POINT_ADVANCE_GUARD_GAP) {
+        return candidateFrame;
+    }
+    // Scan forward for the first frame where the wrist has clearly cleared the
+    // shoulder (the ball is up at the set). If no such frame exists within the
+    // window — an unusually low shot, or dropped tracking — keep the elbow
+    // candidate rather than drifting late.
+    const limit = Math.min(searchEndFrame, candidateFrame + SET_POINT_MAX_ADVANCE_FRAMES);
+    for (let frame = candidateFrame; frame <= limit; frame++) {
+        const g = gapAt(frame);
+        if (g !== null && g >= SET_POINT_ABOVE_SHOULDER_GAP)
+            return frame;
+    }
+    return candidateFrame;
+}
 export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config = DEFAULT_CONFIG) {
     const shotDuration = endFrame - ballStartsUpwardFrame + 1;
     const searchEndFrame = ballStartsUpwardFrame +
@@ -962,17 +1352,19 @@ export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config =
         how = "deepest flex (no significant local min)";
     }
     if (shootingKey && chosen) {
+        const setFrame = advanceSetPointToBallUp(frames, chosen.frameIndex, searchEndFrame, config);
+        const advanced = setFrame !== chosen.frameIndex ? ` -> ball-up @${setFrame}` : "";
         emitDiagnostic({
             keyframe: "set_point",
-            frame: chosen.frameIndex,
+            frame: setFrame,
             method: `shooting-${shootingKey}-elbow`,
             detail: `shooting arm=${shootingKey} (flex-run L ${flexRun(arms.left)} / R ${flexRun(arms.right)}, ` +
                 `min L ${minRaw(arms.left) === Infinity ? "n/a" : minRaw(arms.left).toFixed(0) + "°"} / ` +
                 `R ${minRaw(arms.right) === Infinity ? "n/a" : minRaw(arms.right).toFixed(0) + "°"}, ` +
                 `jitter L ${jitter(arms.left).toFixed(1)} / R ${jitter(arms.right).toFixed(1)}). ` +
-                `${how} (${chosen.smooth.toFixed(0)}°) @${chosen.frameIndex}; window ${ballStartsUpwardFrame}-${searchEndFrame}`,
+                `${how} (${chosen.smooth.toFixed(0)}°) @${chosen.frameIndex}${advanced}; window ${ballStartsUpwardFrame}-${searchEndFrame}`,
         });
-        return chosen.frameIndex;
+        return setFrame;
     }
     // Both arms occluded (e.g. straight-behind view): use the averaged elbow's
     // first significant flex if available, else the ball-height peak.
@@ -994,13 +1386,14 @@ export function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config =
     }
     const avgSig = firstSignificantMin(avg);
     if (avgSig) {
+        const setFrame = advanceSetPointToBallUp(frames, avgSig.frameIndex, searchEndFrame, config);
         emitDiagnostic({
             keyframe: "set_point",
-            frame: avgSig.frameIndex,
+            frame: setFrame,
             method: "avg-elbow-first-flex",
-            detail: `no single arm clearly cocked; averaged elbow first significant flex (${avgSig.smooth.toFixed(0)}°) @${avgSig.frameIndex}, window ${ballStartsUpwardFrame}-${searchEndFrame}`,
+            detail: `no single arm clearly cocked; averaged elbow first significant flex (${avgSig.smooth.toFixed(0)}°) @${avgSig.frameIndex}${setFrame !== avgSig.frameIndex ? ` -> ball-up @${setFrame}` : ""}, window ${ballStartsUpwardFrame}-${searchEndFrame}`,
         });
-        return avgSig.frameIndex;
+        return setFrame;
     }
     // Last resort: ball-height peak (min wrist Y). Runs a few frames late.
     let peak = null;
@@ -1403,6 +1796,15 @@ export class KeyframeDetector {
             keyframeId: "legs_start_extending",
             frameIndex: legsExtendingFrame,
             confidence: legsExtendingFrame !== null ? 0.8 : 0.0,
+        });
+        // Detect legs_fully_extended (full drive) — needs legs_start_extending.
+        const legsFullyExtendedFrame = legsExtendingFrame !== null
+            ? detectLegsFullyExtended(frames, legsExtendingFrame, endFrame, this.config)
+            : null;
+        keyframes.push({
+            keyframeId: "legs_fully_extended",
+            frameIndex: legsFullyExtendedFrame,
+            confidence: legsFullyExtendedFrame !== null ? 0.8 : 0.0,
         });
         // Detect ball_starts_upward
         const ballUpwardFrame = detectBallStartsUpward(frames, ballLowPointFrame, endFrame, this.config);

@@ -141,16 +141,47 @@ export declare class ShotBoundaryDetector {
      */
     private avgKneeAngle;
     /**
+     * Knee angle (hip-knee-ankle) of the MOST-VISIBLE leg, or null when neither
+     * leg is reliable. Lower = more bent.
+     *
+     * Unlike {@link avgKneeAngle} this never averages the two legs: in
+     * side/behind views the far leg is occluded and MediaPipe fabricates a
+     * near-straight angle for it, which drags the average toward "standing" even
+     * while the visible leg is clearly bent. Picking the single most-visible leg
+     * keeps the signal honest — used by the deep-stance fallback below.
+     */
+    private reliableKnee;
+    /**
      * Refines a shot start to the frame the knees BEGAN bending (legs_start_
      * bending) — the shot-boundary "start" fires on the ball's upward motion,
-     * which is after the gather. Two phases, because `armStart` can land after
-     * the deepest bend (during leg extension):
-     *   1. Find the knee-angle minimum (deepest bend) near armStart.
-     *   2. From there walk back to the straightest knee (the bend onset),
-     *      stopping when the knee bends again (a separate earlier motion) or
-     *      the legs drop out of view.
+     * which is after the gather.
+     *
+     * Two strategies, tried in order:
+     *   A. CLEAN gather (the common side view): the legs were clearly straight
+     *      (a standing plateau) then bent substantially. Conservative and
+     *      reliable — the primary path.
+     *   B. DEEP-STANCE fallback (only when A declines): the player starts from
+     *      an already-bent athletic stance, so the legs never straighten. If the
+     *      most-visible knee is clearly bent AT the ball-based start (we are deep
+     *      in a gather, so the start is late) and was meaningfully straighter a
+     *      few frames earlier, trace back to that recent bend's onset.
      */
     private findKneeBendStartFromArmStart;
+    /**
+     * Strategy A — the standing-plateau gather (see {@link
+     * findKneeBendStartFromArmStart}). Returns armStart unchanged when there is
+     * no clean plateau-then-bend, so the caller can try the fallback.
+     */
+    private cleanGatherStart;
+    /**
+     * Strategy B — the deep-stance fallback (see {@link
+     * findKneeBendStartFromArmStart}). Uses the most-visible leg and fires only
+     * when the knee is clearly bent at the ball-based start. Returns armStart
+     * unchanged when the preconditions aren't met.
+     */
+    private deepStanceStart;
+    /** Centered 3-tap moving average, preserving nulls. */
+    private smooth;
     /**
      * Finds shot start and end boundaries based on velocity patterns.
      * Uses gap tolerance to handle small breaks in upward motion.
