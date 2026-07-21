@@ -33,25 +33,16 @@ export default defineConfig({
   ],
   webServer: [
     {
-      // E2E builds enable the debug/test surfaces (VITE_E2E) and serve the
-      // replay fixtures alongside the app (kept out of production builds).
+      // One SvelteKit adapter-node server: the SPA + the backend API
+      // (/api/auth, /api/health, …) on a single origin. VITE_E2E enables the
+      // debug/test surfaces; the replay fixtures are copied into the node
+      // output. AUTH_E2E exposes the password-reset link for the reset test.
+      // Specs use unique emails, so the on-disk e2e DB can persist across runs.
       command:
-        "VITE_E2E=1 npm run build && node scripts/copy-fixtures-to-build.mjs && npm run preview -- --port 4173 --strictPort",
-      port: 4173,
+        "VITE_E2E=1 BUILD_TARGET=node npm run build && node scripts/copy-fixtures-to-build.mjs && AUTH_E2E=1 DATABASE_PATH=data/e2e.sqlite AUTH_SECRET=e2e-secret-change-me-000000 ORIGIN=http://localhost:4173 AUTH_BASE_URL=http://localhost:4173 PORT=4173 node build",
+      url: "http://localhost:4173/api/health",
       reuseExistingServer: !process.env.CI,
       timeout: 300_000,
-    },
-    {
-      // Real auth: the better-auth server the SPA talks to. AUTH_E2E
-      // additionally exposes the password-reset link for the reset flow
-      // test. Specs use unique emails, so the on-disk e2e DB can persist
-      // across runs.
-      command:
-        "AUTH_E2E=1 AUTH_PORT=5174 AUTH_DB=data/e2e-auth.sqlite npm start",
-      cwd: "../auth-server",
-      url: "http://localhost:5174/health",
-      reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
     },
   ],
 });

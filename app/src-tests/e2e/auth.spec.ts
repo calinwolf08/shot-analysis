@@ -79,9 +79,9 @@ test("forgot → emailed link → reset → sign in with the new password", asyn
   await fresh.getByTestId("auth-submit").click();
   await expect(fresh.getByTestId("auth-forgot-sent")).toBeVisible();
 
-  // The auth server's e2e endpoint stands in for the mailbox.
+  // The server's e2e-only endpoint stands in for the mailbox (same origin).
   const lookup = await fresh.request.get(
-    `http://localhost:5174/__test/reset-url?email=${encodeURIComponent(email)}`,
+    `/api/auth-test/reset-url?email=${encodeURIComponent(email)}`,
   );
   const { url } = (await lookup.json()) as { url: string | null };
   expect(url).toBeTruthy();

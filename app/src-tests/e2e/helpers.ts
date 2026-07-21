@@ -1,8 +1,8 @@
 /**
- * Shared e2e flows. Every spec runs against real auth (the auth-server
- * workspace boots next to the preview server, see playwright.config.ts),
- * so a fresh browser context must create an account before it can reach
- * the app — `onboard` does sign-up + onboarding in one go.
+ * Shared e2e flows. Every spec runs against the real backend (the single
+ * SvelteKit adapter-node server boots from playwright.config.ts and serves
+ * both the app and /api/*), so a fresh browser context must create an account
+ * before it can reach the app — `onboard` does sign-up + onboarding in one go.
  */
 import { type Page } from "@playwright/test";
 

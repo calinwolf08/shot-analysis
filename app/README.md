@@ -16,98 +16,91 @@ Deep dive on how it all fits together (with diagrams):
 
 The product is **two deployables**, and you always run both:
 
-1. **`shotcoach`** (this workspace) — the SvelteKit **static SPA**
-   (`adapter-static`, client-rendered). Analysis (MediaPipe + the
-   `basketball-shot-analysis` library) runs entirely in the browser; app
-   data lives in a client-side SQLite (sql.js) database. Ships to web and,
-   via Capacitor, to iOS/Android.
-2. **`shotcoach-auth-server`** (`../auth-server`) — a tiny Node service
-   ([better-auth] email/password, its own server-side SQLite). The SPA
-   can't host credentials, so identity gets its own process. The app
-   reaches it at `VITE_AUTH_URL`.
+This is **one SvelteKit workspace** with two build targets from the same
+codebase (see [`docs/server-migration-plan.md`](../docs/server-migration-plan.md)
+and [`docs/hosting-and-deployment.md`](../docs/hosting-and-deployment.md)):
 
-Config for each is a `.env` file; copy the template and edit:
+- **Server build** (`BUILD_TARGET=node`, `adapter-node`) — the web app **and**
+  the backend API (`/api/auth`, `/api/health`, … over a single server-side
+  SQLite). Auth is [better-auth] email/password with the **bearer plugin** (one
+  mechanism for web and native). This is the thing you host.
+- **Static SPA build** (`BUILD_TARGET=static`, default, `adapter-static`) — a
+  client bundle wrapped by Capacitor for iOS/Android that calls the hosted API
+  at `VITE_API_URL`.
 
-```bash
-cp app/.env.example app/.env                 # VITE_AUTH_URL, backend, debug…
-cp auth-server/.env.example auth-server/.env # AUTH_SECRET, DB, origins…
-```
-
-Every value has a working local default, so for local dev you can skip the
-copy entirely. See each `.env.example` for the full annotated list.
+Config is `app/.env` (copy `app/.env.example`); every value has a working local
+default, so for local dev you can skip it. Server secrets (`AUTH_SECRET`,
+`DATABASE_PATH`) come from the process environment — see
+[`docs/hosting-and-deployment.md`](../docs/hosting-and-deployment.md).
 
 ## Running locally
 
 ```bash
 # from the repo root (npm workspaces)
 npm install
-npm run build                                 # build the library the app depends on
+npm run build                       # build the library the app depends on
 
-# terminal 1 — auth server (http://localhost:5174)
-npm start --workspace shotcoach-auth-server
-
-# terminal 2 — app dev server (http://localhost:5173)
-npm run dev --workspace shotcoach
+# app + API on one origin (http://localhost:5173)
+AUTH_SECRET=dev-only npm run dev --workspace shotcoach
 ```
 
-Open http://localhost:5173, create an account, and you're in. Sanity check
-that the auth server is up: `curl http://localhost:5174/health` →
-`{"ok":true}`. If it isn't running, the app throws a CORS/`(null)` error on
-every auth call.
+Open http://localhost:5173, create an account, and you're in — auth, data, and
+analysis are all served under `/api/*` by the same dev server. Sanity check:
+`curl http://localhost:5173/api/health` → `{"ok":true}`.
 
 - All routes except `/auth/*` require a session; sign-up flows straight
-  into onboarding. Player data is scoped per account (migration 002).
-- Password-reset links are **logged to the auth-server console** in dev
-  (no SMTP); wire a real sender for production — see `../auth-server/README.md`.
+  into onboarding. Player data is scoped per account.
+- Password-reset links are **logged to the server console** in dev (no SMTP);
+  wire a real sender for production (`app/src/lib/server/auth.ts`).
 - Prefer working on UI without a camera/MediaPipe? Append `?e2e=replay` to
   any URL (see [Replay / e2e mode](#replay--e2e-mode)).
 
 ## Running in production
 
-**App (static SPA).** `VITE_`-prefixed vars are **baked in at build time**,
-so set them before building:
+Full deployment details (web server + Capacitor) live in
+[`docs/hosting-and-deployment.md`](../docs/hosting-and-deployment.md). In short:
+
+**Web + API (server build).** Run the adapter-node server on a host with a
+persistent disk for its SQLite file, behind TLS:
 
 ```bash
 npm run build --workspace basketball-shot-analysis   # the library (repo root)
-VITE_AUTH_URL=https://auth.example.com \
-  npm run build --workspace shotcoach                # → app/build/ (static files)
+BUILD_TARGET=node npm run build --workspace shotcoach # → app/build/ (node server)
+
+AUTH_SECRET=<openssl rand -base64 32> \
+DATABASE_PATH=/var/lib/shotcoach/shotcoach.sqlite \
+AUTH_TRUSTED_ORIGINS=https://app.example.com,capacitor://localhost,http://localhost \
+ORIGIN=https://app.example.com \
+  node app/build                                     # serves app + /api/*
 ```
 
-Serve `app/build/` from any static host / CDN with SPA fallback to
-`index.html` (the adapter already emits it). No Node runtime is needed for
-the app itself. For the native shells, `npm run cap:sync` copies this build
-into `android/`/`ios/` (see [Native shells](#native-shells)).
-
-**Auth server (Node service).** Run it on a host with a persistent disk for
-its SQLite file, behind TLS:
+**Native app (static build).** `VITE_`-prefixed vars are baked in at build
+time; point the app at the hosted API and sync into the shells:
 
 ```bash
-# auth-server/.env (or real environment)
-AUTH_SECRET=<openssl rand -base64 32>          # REQUIRED — signs sessions
-AUTH_DB=/var/lib/shotcoach/auth.sqlite         # persistent volume
-AUTH_TRUSTED_ORIGINS=https://app.example.com,capacitor://localhost,http://localhost
-AUTH_PORT=5174
-
-npm start --workspace shotcoach-auth-server
+VITE_API_URL=https://app.example.com BUILD_TARGET=static \
+  npm run build --workspace shotcoach
+npm run cap:sync --workspace shotcoach               # → android/ , ios/
 ```
 
 Production checklist:
 
 - **Set `AUTH_SECRET`** to a strong random value (the dev fallback is
-  insecure).
+  insecure) and keep `DATABASE_PATH` on a persistent volume.
 - **`AUTH_TRUSTED_ORIGINS` must list every app origin** exactly (scheme +
   host + port, no trailing slash) — the web origin plus `capacitor://localhost`
   and `http://localhost` for the mobile shells. A missing origin is the #1
   cause of production CORS failures.
-- **`VITE_AUTH_URL` must be the public auth URL** and set at app _build_
-  time. Serve both over HTTPS.
-- **Replace the reset-email transport** (`../auth-server/src/auth.js`) with
-  a real email sender.
+- **`VITE_API_URL` must be the public API URL** for the native build, set at
+  build time. Serve over HTTPS (bearer tokens travel in the Authorization
+  header).
+- **Replace the reset-email transport** (`app/src/lib/server/auth.ts`) with a
+  real email sender.
 - **Never set `AUTH_E2E` or `VITE_E2E`** in production — they expose test
   hooks. `npm run check:stripped` verifies the app build contains no debug
   surfaces.
 
-Playwright starts the auth server automatically for `npm run test:e2e`, so
+Playwright starts the single server automatically for `npm run test:e2e`, so
 no manual setup is needed to run the e2e suite.
 
 [better-auth]: https://better-auth.com
