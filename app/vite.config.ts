@@ -9,6 +9,12 @@ const svelteTestingPlugin = svelteTesting() as unknown as PluginOption;
 
 export default defineConfig({
   plugins: [sveltekit()],
+  // better-sqlite3 is a native CommonJS module; it must stay external in the
+  // adapter-node SSR bundle (bundling it breaks on `__filename` in ESM). Only
+  // server-only code imports it, so this never affects the client bundle.
+  ssr: {
+    external: ["better-sqlite3"],
+  },
   test: {
     projects: [
       {

@@ -9,13 +9,13 @@ Part of the [server migration](../../../../../docs/server-migration-plan.md).
 
 ## What lives here
 
-| Module | Purpose |
-| --- | --- |
-| `db.ts` | The single server-side database singleton (`getDb()`), built on the `better-sqlite3` driver, migrated on first access. |
-| `auth.ts` (Phase 2) | better-auth instance (bearer tokens for all clients), same DB file. |
-| `repos.ts` (Phase 3) | `createServerRepos(db, userId)` — the shared repo set bound to an authenticated user, ownership enforced on every read/write. |
-| `context.ts` / `http.ts` (Phase 4) | `requireUser(event)` and JSON/error helpers for `/api/*` route handlers. |
-| `analysis.ts` (Phase 6) | Runs the deterministic library pipeline server-side over posted pose frames (same results as the client replay path). |
+| Module                             | Purpose                                                                                                                       |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `db.ts`                            | The single server-side database singleton (`getDb()`), built on the `better-sqlite3` driver, migrated on first access.        |
+| `auth.ts` (Phase 2)                | better-auth instance (bearer tokens for all clients), same DB file.                                                           |
+| `repos.ts` (Phase 3)               | `createServerRepos(db, userId)` — the shared repo set bound to an authenticated user, ownership enforced on every read/write. |
+| `context.ts` / `http.ts` (Phase 4) | `requireUser(event)` and JSON/error helpers for `/api/*` route handlers.                                                      |
+| `analysis.ts` (Phase 6)            | Runs the deterministic library pipeline server-side over posted pose frames (same results as the client replay path).         |
 
 ## Rules
 
