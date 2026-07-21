@@ -1,14 +1,28 @@
 /**
- * AuthApi implementation over the real better-auth client. The server is
- * the standalone auth-server workspace; its base URL comes from
- * VITE_AUTH_URL (dev/e2e default: the local auth server).
+ * AuthApi over the real better-auth client, using **bearer tokens** for every
+ * platform (web and native alike — see docs/server-migration-plan.md).
+ *
+ * The server (SvelteKit `/api/auth/*`) returns the session token in a
+ * `set-auth-token` header on sign-in/up; we persist it via {@link TokenStore}
+ * and attach it as `Authorization: Bearer` on every request. Web talks to the
+ * same origin; the native app talks to `VITE_API_URL`.
  */
 import { createAuthClient } from "better-auth/client";
 import type { AuthApi, AuthUser } from "./types";
+import { createTokenStore, type TokenStore } from "./token-store";
+import { isNative } from "$lib/shared/config/platform";
 
-export const AUTH_BASE_URL: string =
-  (import.meta.env.VITE_AUTH_URL as string | undefined) ??
-  "http://localhost:5174";
+/** API origin: same-origin on web, the configured remote on native. */
+export function apiBaseUrl(): string {
+  if (isNative()) {
+    return (import.meta.env.VITE_API_URL as string | undefined) ?? "";
+  }
+  if (typeof window !== "undefined") return window.location.origin;
+  return ""; // SSR / build: unused (the client only runs in the browser).
+}
+
+// Back-compat export (older modules referenced this name).
+export const AUTH_BASE_URL: string = apiBaseUrl();
 
 type Client = ReturnType<typeof createAuthClient>;
 
@@ -18,8 +32,28 @@ function errorOf(result: {
   return result.error ? (result.error.message ?? "Something went wrong") : null;
 }
 
+/** A better-auth client wired to capture + send the bearer token. */
+export function createBearerAuthClient(tokens: TokenStore): Client {
+  return createAuthClient({
+    baseURL: apiBaseUrl(),
+    fetchOptions: {
+      // Capture the token the server mints on sign-in/up.
+      onSuccess: (ctx) => {
+        const token = ctx.response.headers.get("set-auth-token");
+        if (token) tokens.set(token);
+      },
+      // Attach it to every request.
+      auth: {
+        type: "Bearer",
+        token: () => tokens.get() ?? "",
+      },
+    },
+  });
+}
+
 export function createBetterAuthApi(
-  client: Client = createAuthClient({ baseURL: AUTH_BASE_URL }),
+  tokens: TokenStore = createTokenStore(),
+  client: Client = createBearerAuthClient(tokens),
 ): AuthApi {
   return {
     async getSession(): Promise<AuthUser | null> {
@@ -39,6 +73,7 @@ export function createBetterAuthApi(
 
     async signOut() {
       await client.signOut();
+      tokens.clear();
     },
 
     async requestPasswordReset(email, redirectTo) {
