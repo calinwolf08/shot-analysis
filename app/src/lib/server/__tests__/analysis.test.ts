@@ -6,7 +6,16 @@ import { createReplayAnalysisService } from "$lib/features/analysis/replay/repla
 import { analyzePoseData, parsePoseData } from "../analysis";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixturesDir = join(here, "..", "..", "..", "..", "src-tests", "fixtures", "poses");
+const fixturesDir = join(
+  here,
+  "..",
+  "..",
+  "..",
+  "..",
+  "src-tests",
+  "fixtures",
+  "poses",
+);
 
 interface ManifestEntry {
   id: string;

@@ -2,7 +2,15 @@ import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import type { AnalysisResult } from "basketball-shot-analysis";
 import { resetDbSingletonForTests } from "$lib/server/db";
 import { createApiClient } from "$lib/shared/api/client";
@@ -25,7 +33,17 @@ import type {
 import { LiveSessionStore } from "../loop/live-session-store.svelte";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixturesDir = join(here, "..", "..", "..", "..", "..", "src-tests", "fixtures", "poses");
+const fixturesDir = join(
+  here,
+  "..",
+  "..",
+  "..",
+  "..",
+  "..",
+  "src-tests",
+  "fixtures",
+  "poses",
+);
 const manifest = JSON.parse(
   readFileSync(join(fixturesDir, "manifest.json"), "utf8"),
 ) as { fixtures: { id: string; fps: number }[] };

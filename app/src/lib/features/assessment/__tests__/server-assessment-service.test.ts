@@ -15,7 +15,17 @@ import { createReplayAnalysisService } from "$lib/features/analysis/replay/repla
 import { createServerAssessmentService } from "../services/server-assessment-service";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixturesDir = join(here, "..", "..", "..", "..", "..", "src-tests", "fixtures", "poses");
+const fixturesDir = join(
+  here,
+  "..",
+  "..",
+  "..",
+  "..",
+  "..",
+  "src-tests",
+  "fixtures",
+  "poses",
+);
 const manifest = JSON.parse(
   readFileSync(join(fixturesDir, "manifest.json"), "utf8"),
 ) as { fixtures: { id: string; expectedShots: number }[] };
@@ -81,9 +91,9 @@ describe("server-backed AssessmentService (client extracts poses, server analyze
       shootingHand: "right",
       level: "advanced",
     });
-    const outcome = await service.runAssessment(
-      [{ input: { kind: "fixture", fixtureId: fixture.id }, name: fixture.id }],
-    );
+    const outcome = await service.runAssessment([
+      { input: { kind: "fixture", fixtureId: fixture.id }, name: fixture.id },
+    ]);
 
     await service.setShotExcluded(outcome.shots[0]!.id, true);
     const rescored = await service.rescoreSession(outcome.sessionId);

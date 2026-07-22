@@ -241,7 +241,10 @@ export function createWorkerAnalysisService(
           if (p.totalFrames === undefined && estimatedTotalFrames) {
             onProgress({
               ...p,
-              framesProcessed: Math.min(p.framesProcessed, estimatedTotalFrames),
+              framesProcessed: Math.min(
+                p.framesProcessed,
+                estimatedTotalFrames,
+              ),
               totalFrames: estimatedTotalFrames,
             });
           } else {

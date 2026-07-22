@@ -36,7 +36,10 @@ async function optsForPlayer(
 }
 
 /** Scores + diagnoses a fully-populated session (shared by run + rescore). */
-export async function scoreAndDiagnoseSession(ctx: UserContext, sessionId: string) {
+export async function scoreAndDiagnoseSession(
+  ctx: UserContext,
+  sessionId: string,
+) {
   const benchmark = await ctx.domain.benchmarks.getActive();
   const { session, shots } = await ctx.domain.scoring.scoreAndPersistSession(
     sessionId,
@@ -83,10 +86,10 @@ export async function runSessionAnalysis(
     const video = await ctx.repos.video.create({
       playerId: input.playerId,
       source: "upload",
-      ...(item.durationMs ?? meta.duration
+      ...((item.durationMs ?? meta.duration)
         ? { durationMs: item.durationMs ?? meta.duration }
         : {}),
-      ...(item.fps ?? meta.fps ? { fps: item.fps ?? meta.fps } : {}),
+      ...((item.fps ?? meta.fps) ? { fps: item.fps ?? meta.fps } : {}),
       ...(meta.width ? { width: meta.width } : {}),
       ...(meta.height ? { height: meta.height } : {}),
     });
@@ -135,7 +138,11 @@ export async function runShotAnalysis(
       analysis,
     });
     scored.push(
-      await ctx.domain.scoring.scoreAndPersistShot(shot, benchmark, focusMetric),
+      await ctx.domain.scoring.scoreAndPersistShot(
+        shot,
+        benchmark,
+        focusMetric,
+      ),
     );
   }
   return { shots: scored };

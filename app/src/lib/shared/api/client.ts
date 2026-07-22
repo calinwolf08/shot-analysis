@@ -10,7 +10,10 @@
  * remote repos/services) can stay terse.
  */
 import { apiBaseUrl } from "$lib/shared/auth/better-auth-api";
-import { createTokenStore, type TokenStore } from "$lib/shared/auth/token-store";
+import {
+  createTokenStore,
+  type TokenStore,
+} from "$lib/shared/auth/token-store";
 
 export class ApiError extends Error {
   constructor(
@@ -42,10 +45,7 @@ export function createApiClient(deps: ApiClientDeps = {}): ApiClient {
   const baseUrl = deps.baseUrl ?? apiBaseUrl();
   const tokens = deps.tokens ?? createTokenStore();
 
-  async function request<T>(
-    path: string,
-    init: RequestInit = {},
-  ): Promise<T> {
+  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const token = tokens.get();
     const headers = new Headers(init.headers);
     if (token) headers.set("Authorization", `Bearer ${token}`);

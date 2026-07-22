@@ -14,7 +14,10 @@ const userB: SessionUser = { id: "user-b", email: "b@ex.com", name: "B" };
 
 function reposFor(user: SessionUser | null): AppRepos {
   return createRemoteRepos(
-    createApiClient({ fetch: inProcessFetch(user), baseUrl: "http://localhost" }),
+    createApiClient({
+      fetch: inProcessFetch(user),
+      baseUrl: "http://localhost",
+    }),
   );
 }
 
@@ -69,7 +72,8 @@ describe("remote AppRepos over the real endpoints", () => {
     await a.shot.setExcluded(shot.id, true);
     expect((await a.shot.listBySession(session.id)).length).toBe(0);
     expect(
-      (await a.shot.listBySession(session.id, { includeExcluded: true })).length,
+      (await a.shot.listBySession(session.id, { includeExcluded: true }))
+        .length,
     ).toBe(1);
 
     const score = await a.score.insert({

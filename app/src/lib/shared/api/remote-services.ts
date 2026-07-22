@@ -92,7 +92,9 @@ export function createRemoteProgress(api: ApiClient): ProgressService {
   const pid = (id: string) => `playerId=${encodeURIComponent(id)}`;
   return {
     scoreHistory: (playerId) =>
-      api.get<ScoreHistoryPoint[]>(`/api/progress?${pid(playerId)}&kind=history`),
+      api.get<ScoreHistoryPoint[]>(
+        `/api/progress?${pid(playerId)}&kind=history`,
+      ),
     metricTrend: (playerId, metric: MetricName) =>
       api.get<MetricTrendPoint[]>(
         `/api/progress?${pid(playerId)}&kind=trend&metric=${encodeURIComponent(metric)}`,
@@ -113,10 +115,12 @@ export function createRemoteTrainingPlan(api: ApiClient): TrainingPlanService {
         playerId,
         planItemId,
       }),
-    getPlan: (planId) => getOrNull(api.get<PlanWithItems>(`/api/plans/${planId}`)),
+    getPlan: (planId) =>
+      getOrNull(api.get<PlanWithItems>(`/api/plans/${planId}`)),
     getActivePlan: (playerId) =>
       api.get<PlanWithItems | null>(`/api/plans?${pid(playerId)}`),
-    getItem: (itemId) => getOrNull(api.get<PlanItem>(`/api/plans/items/${itemId}`)),
+    getItem: (itemId) =>
+      getOrNull(api.get<PlanItem>(`/api/plans/items/${itemId}`)),
     async completeItem(itemId) {
       await api.send(`/api/plans/items/${itemId}`, {}, "PATCH");
     },

@@ -13,7 +13,16 @@ import {
 } from "$lib/shared/api/__tests__/in-process-server";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixturesDir = join(here, "..", "..", "..", "..", "src-tests", "fixtures", "poses");
+const fixturesDir = join(
+  here,
+  "..",
+  "..",
+  "..",
+  "..",
+  "src-tests",
+  "fixtures",
+  "poses",
+);
 const manifest = JSON.parse(
   readFileSync(join(fixturesDir, "manifest.json"), "utf8"),
 ) as { fixtures: { id: string; expectedShots: number }[] };
@@ -89,10 +98,13 @@ describe("/api/analysis endpoints", () => {
       shootingHand: "right",
       level: "advanced",
     });
-    const outcome = await api.send<{ sessionId: string; shots: { id: string }[] }>(
-      "/api/analysis/session",
-      { playerId: player.id, videos: [{ poseData }] },
-    );
+    const outcome = await api.send<{
+      sessionId: string;
+      shots: { id: string }[];
+    }>("/api/analysis/session", {
+      playerId: player.id,
+      videos: [{ poseData }],
+    });
 
     // Exclude the first shot, then re-score.
     await repos.shot.setExcluded(outcome.shots[0]!.id, true);

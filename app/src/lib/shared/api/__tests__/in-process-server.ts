@@ -31,9 +31,15 @@ import {
   GET as shotGet,
   PATCH as shotPatch,
 } from "../../../../routes/api/shots/[id]/+server";
-import { GET as scoresGet, POST as scoresPost } from "../../../../routes/api/scores/+server";
+import {
+  GET as scoresGet,
+  POST as scoresPost,
+} from "../../../../routes/api/scores/+server";
 import { POST as latestForRefs } from "../../../../routes/api/scores/latest-for-refs/+server";
-import { GET as repsGet, POST as repsPost } from "../../../../routes/api/reps/+server";
+import {
+  GET as repsGet,
+  POST as repsPost,
+} from "../../../../routes/api/reps/+server";
 import {
   GET as settingGet,
   PUT as settingPut,
@@ -43,7 +49,10 @@ import { GET as drillsList } from "../../../../routes/api/drills/+server";
 import { GET as drillGet } from "../../../../routes/api/drills/[id]/+server";
 import { GET as progressGet } from "../../../../routes/api/progress/+server";
 import { GET as diagnosisGet } from "../../../../routes/api/diagnosis/+server";
-import { GET as plansGet, POST as plansPost } from "../../../../routes/api/plans/+server";
+import {
+  GET as plansGet,
+  POST as plansPost,
+} from "../../../../routes/api/plans/+server";
 import { GET as planGet } from "../../../../routes/api/plans/[id]/+server";
 import { PATCH as planItemPatch } from "../../../../routes/api/plans/items/[id]/+server";
 import { POST as plansReassess } from "../../../../routes/api/plans/reassess/+server";
