@@ -18,6 +18,7 @@ const executablePath =
 
 export default defineConfig({
   testDir: "src-tests/e2e",
+  globalSetup: "./src-tests/e2e/global-setup.ts",
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   use: {

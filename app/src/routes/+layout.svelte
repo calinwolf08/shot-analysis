@@ -60,7 +60,6 @@
       .then(([s]) => {
         if (cancelled) return;
         services = s;
-        exposeE2eHooks(s);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -102,27 +101,6 @@
     ) {
       await goto(`/onboarding${page.url.search}`, { replaceState: true });
     }
-  }
-
-  /**
-   * When the page is loaded with ?e2e in the query string, expose a tiny
-   * debug API for Playwright (raw db access). Inert in normal use.
-   */
-  function exposeE2eHooks(s: AppServices) {
-    if (!new URLSearchParams(window.location.search).has("e2e")) return;
-    (
-      window as unknown as {
-        __shotcoach?: {
-          run: (sql: string, params?: unknown[]) => Promise<unknown>;
-          query: (sql: string, params?: unknown[]) => Promise<unknown>;
-        };
-      }
-    ).__shotcoach = {
-      run: (sql, params) =>
-        s.db.run(sql, params as Parameters<typeof s.db.run>[1]),
-      query: (sql, params) =>
-        s.db.query(sql, params as Parameters<typeof s.db.query>[1]),
-    };
   }
 </script>
 
