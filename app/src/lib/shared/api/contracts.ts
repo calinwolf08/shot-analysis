@@ -96,6 +96,28 @@ export const createRepBody = z.object({
 // --- settings --------------------------------------------------------------
 export const setSettingBody = z.object({ value: z.unknown() });
 
+// --- analysis --------------------------------------------------------------
+// `poseData` is validated separately by the library's poseDataSchema on the
+// server; here we only shape the request envelope.
+export const analyzeShotBody = z.object({
+  sessionId: z.string().min(1),
+  playerId: z.string().min(1),
+  poseData: z.unknown(),
+});
+export const analyzeSessionBody = z.object({
+  playerId: z.string().min(1),
+  planItemId: z.string().optional(),
+  videos: z
+    .array(
+      z.object({
+        poseData: z.unknown(),
+        durationMs: z.number().optional(),
+        fps: z.number().optional(),
+      }),
+    )
+    .min(1),
+});
+
 // --- training plans --------------------------------------------------------
 export const generatePlanBody = z.object({
   sessionId: z.string().min(1),
