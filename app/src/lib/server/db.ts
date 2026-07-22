@@ -14,6 +14,7 @@ import { dirname } from "node:path";
 import type { DatabaseAdapter } from "$lib/shared/db";
 import { migrate } from "$lib/shared/db";
 import { createBetterSqliteAdapter } from "$lib/shared/db/drivers/better-sqlite3";
+import { seedGlobals } from "./services";
 
 /** Resolves the DB file path from env, defaulting to a local dev file. */
 export function databasePath(): string {
@@ -33,6 +34,7 @@ async function open(): Promise<DatabaseAdapter> {
   }
   const db = createBetterSqliteAdapter({ path });
   await migrate(db);
+  await seedGlobals(db);
   return db;
 }
 

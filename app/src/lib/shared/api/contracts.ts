@@ -95,3 +95,14 @@ export const createRepBody = z.object({
 
 // --- settings --------------------------------------------------------------
 export const setSettingBody = z.object({ value: z.unknown() });
+
+// --- training plans --------------------------------------------------------
+export const generatePlanBody = z.object({
+  sessionId: z.string().min(1),
+  playerId: z.string().min(1),
+});
+export const reassessPlanBody = z.object({
+  sessionId: z.string().min(1),
+  playerId: z.string().min(1),
+  planItemId: z.string().min(1),
+});
