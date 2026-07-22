@@ -25,45 +25,54 @@ command/tooling reference lives in the root [`README`](../README.md).
 
 ## 1. System topology
 
-The product is two deployables. The app is a **static SPA** — all analysis
-runs in the browser; there is no app server. A separate **auth server**
-owns identity because credentials can't live in a client-side database.
+One codebase, one deployable. A single **SvelteKit server** (adapter-node)
+owns auth, the single user-scoped database, the domain endpoints, and the
+authoritative full analysis; it also serves the SPA. Clients — web and the
+Capacitor shells — extract pose landmarks on-device (for latency) but hold
+**no data locally**: every read and write, and the detailed analysis, go to
+the server, scoped to the signed-in user by a bearer token. The same server
+build (`adapter-static`) is emitted for the Capacitor bundle, which points at
+the hosted API via `VITE_API_URL`.
 
 ```mermaid
 flowchart TB
     subgraph Client["Browser / Capacitor shell"]
-        UI["SvelteKit SPA<br/>(adapter-static, ssr=false)"]
+        UI["SvelteKit SPA (client)"]
         Worker["Analysis Web Worker<br/>MediaPipe pose (WASM + WebGL)"]
-        Lib["basketball-shot-analysis<br/>(ShotDetector + metrics)"]
-        DB[("Client SQLite<br/>sql.js + IndexedDB<br/>players, sessions, shots…")]
-        AuthClient["better-auth client"]
-        UI <-->|"RGBA frames / landmarks"| Worker
-        UI -->|"stage 2 in-process"| Lib
-        UI <-->|"app data"| DB
-        UI --> AuthClient
+        Remote["Remote repos + services<br/>(bearer-token fetch)"]
+        Token["TokenStore (localStorage)"]
+        UI <-->|"RGBA frames → pose frames"| Worker
+        UI --> Remote
+        Remote --> Token
     end
 
-    subgraph AuthSvc["auth-server (Node)"]
-        BA["better-auth<br/>email + password"]
-        AuthDB[("Server SQLite<br/>better-sqlite3<br/>users, sessions")]
-        BA <--> AuthDB
+    subgraph Server["SvelteKit server (adapter-node)"]
+        API["/api/* endpoints<br/>auth · repos · domain · analysis"]
+        Auth["better-auth (bearer)"]
+        Analysis["server analysis runner<br/>runReplayAnalysis (Node-safe)"]
+        DB[("Single SQLite<br/>better-sqlite3<br/>users + all app data")]
+        API --> Auth
+        API --> Analysis
+        API <--> DB
+        Auth <--> DB
     end
 
-    Static["Static host / CDN<br/>serves app/build + /mediapipe assets"]
-    AuthClient <-->|"HTTPS + cookies<br/>VITE_AUTH_URL, CORS"| BA
-    UI -.->|"loaded from"| Static
+    Remote <-->|"HTTPS + Authorization: Bearer<br/>same-origin (web) / VITE_API_URL (native)"| API
 
     classDef store fill:#1f2a3a,stroke:#3d5a80,color:#e8f0ff;
-    class DB,AuthDB,Static store;
+    class DB store;
 ```
 
-**Why split.** `adapter-static` (required by the Capacitor shells) can't
-host server routes, and the app's only database is client-side sql.js —
-neither can verify a password or hold a session. So identity gets a small
-dedicated Node service and the SPA talks to it over HTTPS with cookies.
-Everything else — the entire analysis pipeline and all app data — stays on
-the device. See [deviations](../app/docs/deviations.md) for the full
-rationale.
+**Why unified.** One repo with one server removes the split-brain of a
+static SPA plus a separate auth service: identity, data, and analysis share a
+single origin and a single database, so a user's data is the same on any
+device they sign in from. Pose **extraction** stays on the client (it needs
+the camera and low latency), but the **stored, authoritative** analysis is
+always the server's — for both the upload and live paths — so results never
+depend on which client produced them. The client no longer bundles sql.js or
+opens an on-device database. See [deviations](../app/docs/deviations.md) for
+history and [hosting-and-deployment](./hosting-and-deployment.md) for the
+build targets and env vars.
 
 ---
 
@@ -98,6 +107,13 @@ flowchart LR
   `MetricOrchestrator`, driven by one function, `runReplayAnalysis()`
   (`replay/replay-pipeline.ts`). Turns landmarks into detected shots,
   phases, and 26 metrics.
+
+Stage 1 (pose extraction) runs on the **client**; stage 2 (full analysis)
+runs on the **server** (`$lib/server/analysis.ts` wraps the same
+`runReplayAnalysis`), so the client POSTs pose frames and the server returns
+the authoritative result. The pipeline is Node-safe and byte-for-byte
+identical to the client replay path (guarded by a deep-equal test), so moving
+it across the wire changes nothing about the numbers.
 
 The `?e2e=replay` backend swaps **stage 1** for recorded pose fixtures
 (stage 2 is unchanged), which is how the deterministic tests exercise the
@@ -343,56 +359,66 @@ Thresholds and reference skeletons are currently **placeholders** built from
 
 ## 7. Authentication & data scoping
 
-better-auth (email + password) in the auth-server; the SPA uses its client.
-A root-layout guard gates every non-`/auth` route on a session, and player
-data is scoped to the signed-in user.
+better-auth (email + password) runs **inside the app server** with the
+**bearer** plugin — one token mechanism for every client (web and native).
+The client captures the token from the `set-auth-token` header on sign-in/up,
+persists it in `TokenStore` (localStorage), and sends it as
+`Authorization: Bearer` on every `/api/*` call. A root-layout guard gates
+every non-`/auth` route on a session; the server scopes all data to the token's
+user.
 
 ```mermaid
 sequenceDiagram
     participant U as User
     participant App as SPA (root layout guard)
     participant AS as AuthStore
-    participant Srv as auth-server (better-auth)
+    participant Srv as SvelteKit server (/api/auth, better-auth)
 
     U->>App: open any route
     App->>AS: init() → getSession()
-    AS->>Srv: GET /api/auth/get-session (cookie)
+    AS->>Srv: GET /api/auth/get-session (Bearer)
     alt no session
         Srv-->>AS: null
         App->>U: redirect → /auth/sign-in
         U->>App: sign up / sign in
         App->>Srv: POST /api/auth/sign-up|sign-in/email
-        Srv-->>App: Set-Cookie (session)
-        App->>App: setCurrentUser(userId) + claimUnowned()
-        App->>U: → onboarding (no player yet) or home
+        Srv-->>App: set-auth-token header
+        App->>App: TokenStore.set(token)
+        App->>U: → onboarding (GET /api/players/current is null) or home
     else has session
         Srv-->>AS: { user }
-        App->>U: render app (player scoped to user)
+        App->>U: render app (server scopes data to user)
     end
 ```
 
 - **Guard**: `app/src/routes/+layout.svelte` — signed-out → `/auth/sign-in`;
-  signed-in on an auth page → home. `/__debug/*` excepted.
-- **Scoping**: migration 002 adds `players.user_id`; `PlayerRepo` filters
-  by the current user. Rows created before auth existed are claimed by the
-  first account to sign in. Two accounts on one device keep separate
-  players.
+  signed-in on an auth page → home. `/__debug/*` excepted. Onboarding check
+  reads `GET /api/players/current`.
+- **Scoping (server-side)**: `hooks.server.ts` resolves the bearer token to
+  `event.locals.user`; `$lib/server/repos.ts` builds a user-scoped repo set
+  where every read filters to `user_id` and every write verifies ownership
+  first (rooted at `players.user_id`, migrations 002/003), throwing 403 on a
+  cross-user id. Domain endpoints re-check ownership at the boundary for
+  resources the repos don't cover (plans, plan items, session focus areas).
 - **Flows**: sign-up, sign-in, sign-out, forgot/reset password (token via
-  emailed link — logged to console in dev), change password (revokes other
-  sessions). Reset-email transport is a stub to replace for production
-  (`auth-server/src/auth.js`).
+  emailed link — logged in dev; `AUTH_E2E` exposes it for the reset test),
+  change password (revokes other sessions). Reset-email transport is a stub
+  to wire for production (`MAILER_*`).
 
 ---
 
 ## 8. Persistence & data model
 
-Two independent SQLite databases, each owned by the side that can protect
-it.
+A **single SQLite database** on the server (better-sqlite3), created lazily
+and migrated on first access (`$lib/server/db.ts`). better-auth owns the
+`user`/`session`/`account`/`verification` tables; the app owns the rest.
+Clients keep no database — they read and write through the `/api/*` endpoints.
 
 ```mermaid
 flowchart LR
-    subgraph AppDB["Client DB (sql.js, in the browser)"]
+    subgraph DB["Server DB (single SQLite, better-sqlite3)"]
         direction TB
+        users["user / session / account"] --> players
         players --> sessions
         sessions --> shots
         sessions --> scores
@@ -401,24 +427,25 @@ flowchart LR
         plans --> plan_items
         players --> plans
         videos
+        benchmarks
+        drills
     end
-    subgraph AuthDB["Server DB (better-sqlite3)"]
-        direction TB
-        users --> authsessions["sessions"]
-        users --> accounts["accounts (password hash)"]
-    end
-    players -.->|"user_id (migration 002)"| users
+    players -.->|"user_id (migrations 002/003)"| users
 
     classDef store fill:#1f2a3a,stroke:#3d5a80,color:#e8f0ff;
-    class AppDB,AuthDB store;
+    class DB store;
 ```
 
-- **Client DB** — the system of record for all app data (players,
+- **One system of record** for identity and all app data: players,
   assessment/practice sessions, detected shots + their full `ShotAnalysis`
-  JSON, scores, diagnosed focus areas, training plans, videos metadata).
-  sql.js in memory, persisted to IndexedDB; migrations run on boot
-  (`db/migrations`).
-- **Server DB** — identity only (users, sessions, password accounts).
-- The only link between them is `players.user_id`, so the browser DB scopes
-  app data to the authenticated user without the auth server ever seeing
-  shooting data.
+  JSON, scores, diagnosed focus areas, training plans, video metadata, plus
+  the global `benchmarks`/`drills` catalogs (seeded at DB open). Every owned
+  table roots to `user_id`, so a bearer token scopes the whole graph to its
+  user.
+- **Client transport** — `createRemoteRepos` / remote domain services
+  (`$lib/shared/api/*`) implement the same repo/service interfaces the app
+  already consumed, over bearer-authenticated `fetch`. The domain logic is
+  unchanged; only where it runs (server) and how the client reaches it (HTTP)
+  differ.
+- **Path** — `DATABASE_PATH` on a persistent volume; must survive restarts
+  (see [hosting-and-deployment](./hosting-and-deployment.md)).
