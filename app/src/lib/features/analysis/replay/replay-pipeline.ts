@@ -64,6 +64,43 @@ export function poseDataToLandmarkFrames(pose: PoseData): LandmarkFrame[] {
   }));
 }
 
+/**
+ * Inverse of {@link poseDataToLandmarkFrames}: serializes a live rep window
+ * (LandmarkFrames) into {@link PoseData} so it can be POSTed to the server for
+ * authoritative analysis. Per-landmark `confidence` is dropped (the server
+ * re-derives it from visibility, matching the recorded-fixture convention);
+ * timestamps become seconds. Mirrors the worker's `finalizePoses` payload.
+ */
+export function landmarkFramesToPoseData(
+  frames: readonly LandmarkFrame[],
+  fps: number,
+  // Frame dimensions are informational (videoMetadata only — analysis runs on
+  // normalized landmarks). Pass real dims when known; the positive placeholder
+  // keeps the payload valid against poseDataSchema when they aren't.
+  dims: { width?: number; height?: number } = {},
+): PoseData {
+  return {
+    video: "live",
+    fps,
+    totalFrames: frames.length,
+    width: dims.width && dims.width > 0 ? Math.round(dims.width) : 1,
+    height: dims.height && dims.height > 0 ? Math.round(dims.height) : 1,
+    extractedAt: new Date().toISOString(),
+    frames: frames.map((f) => ({
+      frameIndex: f.frameIndex,
+      timestamp: f.timestamp / 1000,
+      poseConfidence: f.poseConfidence,
+      landmarks:
+        f.landmarks?.map((l) => ({
+          x: l.x,
+          y: l.y,
+          z: l.z,
+          visibility: l.visibility,
+        })) ?? null,
+    })),
+  };
+}
+
 interface PreparedFrames {
   detection: DetectionPoseLandmarks[];
   metrics: MetricsPoseLandmarks[];

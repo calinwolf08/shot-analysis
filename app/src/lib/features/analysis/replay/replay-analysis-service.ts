@@ -119,6 +119,9 @@ function createReplayLiveSession(
   let fps = 30;
 
   return {
+    get fps() {
+      return fps;
+    },
     onFrame(cb) {
       subscribers.add(cb);
       return () => subscribers.delete(cb);

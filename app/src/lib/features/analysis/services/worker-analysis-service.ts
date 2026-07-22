@@ -321,6 +321,7 @@ export function createWorkerAnalysisService(
       const fps = 15;
 
       return {
+        fps,
         onFrame(cb) {
           subscribers.add(cb);
           return () => subscribers.delete(cb);

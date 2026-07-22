@@ -3,21 +3,32 @@
  * persistence, and audio feedback. Every rep is persisted (shot + rep +
  * score rows) regardless of what the feedback card surfaces.
  */
-import type { ShotAnalysis } from "basketball-shot-analysis";
 import type {
   BenchmarkProfile,
   BenchmarkService,
   MetricName,
 } from "$lib/features/benchmarks";
-import type { CueSelection, ScoringService } from "$lib/features/scoring";
+import type {
+  CueSelection,
+  RepScore,
+  ScoringService,
+} from "$lib/features/scoring";
+import { landmarkFramesToPoseData } from "$lib/features/analysis/replay/replay-pipeline";
+import type { ApiClient } from "$lib/shared/api/client";
 import type { AudioFeedbackService } from "$lib/shared/audio";
 import type { AppRepos } from "$lib/shared/config/services";
+import type { ShotRecord } from "$lib/shared/db/repos";
 import type { DatabaseAdapter } from "$lib/shared/db";
 import { flushDb } from "$lib/shared/db";
 import type {
   CoordinatorEvents,
   LiveRepCoordinator,
 } from "../coordinator/coordinator";
+
+/** Server response from POST /api/analysis/shot. */
+interface ScoredShotResponse {
+  shots: { shot: ShotRecord; repScore: RepScore; cues: CueSelection }[];
+}
 
 export interface RepEntry {
   repIndex: number; // 1-based
@@ -49,6 +60,10 @@ export interface LiveSessionStoreDeps {
   repos: AppRepos;
   scoring: ScoringService;
   benchmarks: BenchmarkService;
+  /** Transport for the per-rep server analysis (POST /api/analysis/shot). */
+  api: ApiClient;
+  /** Frame rate of the rep windows, used to reconstruct PoseData. */
+  fps: number;
   db: DatabaseAdapter;
   coordinator: LiveRepCoordinator;
   audio: AudioFeedbackService;
@@ -68,6 +83,7 @@ export class LiveSessionStore {
   error = $state<string | null>(null);
 
   private benchmark: BenchmarkProfile | null = null;
+  private playerId: string | null = null;
   private unsubscribes: (() => void)[] = [];
   private dismissTimer: ReturnType<typeof setTimeout> | null = null;
   private flashTimer: ReturnType<typeof setTimeout> | null = null;
@@ -96,6 +112,7 @@ export class LiveSessionStore {
     const { repos, coordinator } = this.deps;
     const player = await repos.player.getFirst();
     if (!player) throw new Error("No player onboarded");
+    this.playerId = player.id;
     const session = await repos.session.create({
       playerId: player.id,
       type: "live_practice",
@@ -122,20 +139,28 @@ export class LiveSessionStore {
   private async handleRepResult(
     event: CoordinatorEvents["repResult"],
   ): Promise<void> {
-    const { repos, scoring } = this.deps;
-    if (!this.sessionId || !this.benchmark) return;
+    const { repos, api } = this.deps;
+    if (!this.sessionId || !this.playerId) return;
     try {
-      const analysis = event.analysis.shots[0] as ShotAnalysis;
       const previousAverage = this.average;
-      const record = await repos.shot.saveAnalysis({
-        sessionId: this.sessionId,
-        analysis,
-      });
-      const scored = await scoring.scoreAndPersistShot(
-        record,
-        this.benchmark,
-        this.deps.focusMetric ?? undefined,
+      // Client detected the rep boundary; the server runs the authoritative
+      // full analysis + scoring on the window's pose frames (identical to the
+      // upload path — see docs/server-migration-plan Step 7.2).
+      const poseData = landmarkFramesToPoseData(
+        event.window.frames,
+        this.deps.fps,
       );
+      const { shots } = await api.send<ScoredShotResponse>(
+        "/api/analysis/shot",
+        { sessionId: this.sessionId, playerId: this.playerId, poseData },
+      );
+      if (shots.length === 0) {
+        // The server saw no shot in the window; surface it like a miss.
+        this.flashNoShot();
+        return;
+      }
+      const scored = shots[0]!;
+      const record = scored.shot;
       const score = scored.repScore.formScore;
       await repos.rep.create({
         sessionId: this.sessionId,

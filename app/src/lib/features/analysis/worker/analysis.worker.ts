@@ -25,7 +25,10 @@ if (typeof workerSelf.import !== "function") {
 import { createPoseDetector } from "basketball-shot-analysis";
 import type { PoseData } from "basketball-shot-analysis";
 import type { AnalyzeOptions, LandmarkFrame } from "../types";
-import { runReplayAnalysis } from "../replay/replay-pipeline";
+import {
+  landmarkFramesToPoseData,
+  runReplayAnalysis,
+} from "../replay/replay-pipeline";
 import {
   parseToWorker,
   type FramePayload,
@@ -42,6 +45,9 @@ interface WorkerState {
   collected: LandmarkFrame[];
   framesProcessed: number;
   cancelled: boolean;
+  /** Frame dimensions, captured from the incoming RGBA frames. */
+  width: number;
+  height: number;
 }
 
 const state: WorkerState = {
@@ -52,6 +58,8 @@ const state: WorkerState = {
   collected: [],
   framesProcessed: 0,
   cancelled: false,
+  width: 0,
+  height: 0,
 };
 
 /**
@@ -75,6 +83,10 @@ async function handleFrames(frames: FramePayload[]): Promise<void> {
   if (!state.detector) throw new Error("worker not initialized");
   for (const frame of frames) {
     if (state.cancelled) return;
+    if (state.width === 0) {
+      state.width = frame.width;
+      state.height = frame.height;
+    }
     const pose = await state.detector.detect({
       data: frame.data,
       width: frame.width,
@@ -124,26 +136,11 @@ function handleFinalize(): void {
  * rebased to seconds from the frame index so the payload is self-describing.
  */
 function handleFinalizePoses(): void {
-  const poseData: PoseData = {
-    video: "upload",
-    fps: state.fps,
-    totalFrames: state.collected.length,
-    width: 0,
-    height: 0,
-    extractedAt: new Date().toISOString(),
-    frames: state.collected.map((f) => ({
-      frameIndex: f.frameIndex,
-      timestamp: f.timestamp / 1000,
-      poseConfidence: f.poseConfidence,
-      landmarks:
-        f.landmarks?.map((l) => ({
-          x: l.x,
-          y: l.y,
-          z: l.z,
-          visibility: l.visibility,
-        })) ?? null,
-    })),
-  };
+  const poseData: PoseData = landmarkFramesToPoseData(
+    state.collected,
+    state.fps,
+    { width: state.width, height: state.height },
+  );
   post({ type: "poses", poseData });
 }
 
@@ -158,6 +155,8 @@ self.onmessage = async (event: MessageEvent) => {
         state.collected = [];
         state.framesProcessed = 0;
         state.cancelled = false;
+        state.width = 0;
+        state.height = 0;
         state.detector = await createPoseDetector({
           runtime: "browser",
           wasmBasePath: message.assets.wasmBasePath,

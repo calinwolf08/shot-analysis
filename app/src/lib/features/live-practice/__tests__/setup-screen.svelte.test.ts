@@ -11,6 +11,7 @@ import { makeCursor, stillPose } from "../coordinator/synthetic-streams";
 function fakeSession() {
   const callbacks = new Set<(f: LandmarkFrame) => void>();
   const session: LiveAnalysisSession = {
+    fps: 15,
     onFrame(cb) {
       callbacks.add(cb);
       return () => callbacks.delete(cb);

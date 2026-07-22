@@ -14,6 +14,7 @@
   } from "$lib/features/live-practice";
   import { createPlanRepo } from "$lib/features/training-plan";
   import { useAppServices } from "$lib/shared/config/services-context";
+  import { createApiClient } from "$lib/shared/api/client";
   import { createWebAudioFeedbackService } from "$lib/shared/audio";
   import {
     createBrowserCaptureService,
@@ -104,6 +105,8 @@
       repos: services.repos,
       scoring: services.scoring,
       benchmarks: services.benchmarks,
+      api: createApiClient(),
+      fps: session.fps,
       db: services.db,
       coordinator,
       audio,

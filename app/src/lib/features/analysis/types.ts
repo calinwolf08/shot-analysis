@@ -61,6 +61,12 @@ export interface LandmarkFrame {
  * buffer when it thinks a rep happened.
  */
 export interface LiveAnalysisSession {
+  /**
+   * Frame rate of the emitted landmark stream. Used to reconstruct PoseData
+   * from a rep window for server-side analysis (see docs/server-migration-plan
+   * Step 7.2). Known after `start()`; a stable default before then.
+   */
+  readonly fps: number;
   /** Subscribe to per-frame landmarks. Returns an unsubscribe function. */
   onFrame(cb: (frame: LandmarkFrame) => void): () => void;
   /** Full shot detection + metrics over a bounded frame window. */
