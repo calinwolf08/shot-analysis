@@ -67,9 +67,12 @@ test("full journey", async ({ page }) => {
   await page.getByTestId("summary-done").click();
   await page.waitForURL(/\/\?e2e=replay$/);
 
-  // 6. Progress: both sessions on the dashboard.
+  // 6. Progress: both sessions on the dashboard. Wait for the dashboard to
+  // finish loading (data now streams from the server) before the one-shot
+  // count() — the local DB used to make this instantaneous.
   await page.getByTestId("tab-progress").click();
   await page.waitForURL("**/progress**");
+  await expect(page.getByTestId("progress-dashboard")).toBeVisible();
   expect(await page.locator('[data-testid="progress-history"] a').count()).toBe(
     2,
   );
