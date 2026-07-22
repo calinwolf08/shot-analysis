@@ -133,3 +133,50 @@ or remove before shipping.
 - Add direct unit tests for the v2 helpers flagged in the
   [test plan](./test-plan.md) (`normalize`, `stats`, `posture`, `phases`).
 - Per-orientation threshold sets (side vs front) once data supports it.
+
+---
+
+## 5. Server migration — remaining work
+
+The [server migration](./server-migration-plan.md) is largely complete: the
+SvelteKit server now owns auth (better-auth, bearer tokens for web + native),
+the single user-scoped SQLite database, all domain endpoints, and the
+authoritative full analysis (`/api/analysis/session` + `/api/analysis/shot`).
+The client composition root (`createAppServices`) uses a remote data layer —
+no on-device database — and the upload/assessment flow extracts poses on the
+client and scores them on the server. Items 2.1 (auth) and data-scoping from
+the original plan are resolved.
+
+Two pieces remain, both needing a browser/e2e verification pass (they touch
+Web Worker / MediaPipe / Playwright paths that unit tests can't exercise):
+
+### 5.1 Live per-rep server analysis (plan Step 7.2)
+
+Live data already persists server-side through the remote repos, and the
+client's live `analyzeWindow` runs the identical deterministic pipeline the
+server would. To make the **stored** live score authoritative-from-server like
+the upload path, route each detected rep's pose window
+(`event.window.frames`, already available in `LiveSessionStore.handleRepResult`)
+to `POST /api/analysis/shot` instead of scoring locally. Needs: an `ApiClient`
++ `playerId` on the store, a `LandmarkFrame[] → PoseData` conversion with the
+session fps threaded through, and a rewrite of `live-session-store.svelte.test`
+against the in-process server harness
+(`src/lib/shared/api/__tests__/in-process-server.ts`). Verify with
+`live-practice.spec.ts` / a device run.
+
+### 5.2 E2E spec + reset migration (plan Step 8.2)
+
+`playwright.config.ts` already boots a single `BUILD_TARGET=node` server, but
+the specs and the `?e2e` window hooks in `+layout.svelte` still assume a
+client-side `db` (raw `s.db.run/query`), which the composition swap replaced
+with a no-op stub. Migrate the reset/seed hooks to a server endpoint gated by
+`AUTH_E2E=1` (drop + remigrate the throwaway DB) and update the specs to seed
+via the API. Then run `npm run test:e2e` to validate the full journey with
+multi-user data isolation (plan Phase 9).
+
+### 5.3 Cleanup (plan Step 8.3)
+
+`static/sqljs/sql-wasm.wasm` is still copied into builds but no longer imported
+by the client bundle — drop it (and the sql.js dep from the client path) once
+5.2 no longer needs a client DB for e2e. Update `docs/architecture.md` for the
+single-server topology.
