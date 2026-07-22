@@ -27,6 +27,9 @@ const analysisStub: AnalysisService = {
       "TestServices.analysis is a stub — inject a ReplayAnalysisService (see createNodeFixtureLoader in shared/testing)",
     );
   },
+  extractPoses: () => {
+    throw new Error("TestServices.analysis is a stub — inject one");
+  },
   createLiveSession: () => {
     throw new Error("TestServices.analysis is a stub — inject one");
   },

@@ -23,6 +23,7 @@ if (typeof workerSelf.import !== "function") {
 }
 
 import { createPoseDetector } from "basketball-shot-analysis";
+import type { PoseData } from "basketball-shot-analysis";
 import type { AnalyzeOptions, LandmarkFrame } from "../types";
 import { runReplayAnalysis } from "../replay/replay-pipeline";
 import {
@@ -63,7 +64,8 @@ type FromWorkerPost =
       type: "result";
       result: import("basketball-shot-analysis").AnalysisResult;
     }
-  | { type: "landmarks"; frame: LandmarkFrame };
+  | { type: "landmarks"; frame: LandmarkFrame }
+  | { type: "poses"; poseData: PoseData };
 
 function post(message: FromWorkerPost): void {
   (self as unknown as Worker).postMessage(message);
@@ -115,6 +117,36 @@ function handleFinalize(): void {
   post({ type: "result", result });
 }
 
+/**
+ * Returns the collected poses (for server-side analysis) instead of running the
+ * pipeline. Landmark visibility doubles as the persisted confidence (the
+ * server's poseDataToLandmarkFrames uses visibility), and timestamps are
+ * rebased to seconds from the frame index so the payload is self-describing.
+ */
+function handleFinalizePoses(): void {
+  const poseData: PoseData = {
+    video: "upload",
+    fps: state.fps,
+    totalFrames: state.collected.length,
+    width: 0,
+    height: 0,
+    extractedAt: new Date().toISOString(),
+    frames: state.collected.map((f) => ({
+      frameIndex: f.frameIndex,
+      timestamp: f.timestamp / 1000,
+      poseConfidence: f.poseConfidence,
+      landmarks:
+        f.landmarks?.map((l) => ({
+          x: l.x,
+          y: l.y,
+          z: l.z,
+          visibility: l.visibility,
+        })) ?? null,
+    })),
+  };
+  post({ type: "poses", poseData });
+}
+
 self.onmessage = async (event: MessageEvent) => {
   try {
     const message = parseToWorker(event.data);
@@ -140,6 +172,9 @@ self.onmessage = async (event: MessageEvent) => {
         break;
       case "finalize":
         handleFinalize();
+        break;
+      case "finalizePoses":
+        handleFinalizePoses();
         break;
       case "cancel":
         state.cancelled = true;
