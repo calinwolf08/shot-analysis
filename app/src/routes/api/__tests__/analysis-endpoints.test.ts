@@ -81,6 +81,34 @@ describe("/api/analysis endpoints", () => {
     expect(bShots).toEqual([]);
   });
 
+  it("re-scores a session after an exclusion via /rescore", async () => {
+    const api = clientFor(userA);
+    const repos = createRemoteRepos(api);
+    const player = await repos.player.create({
+      name: "A",
+      shootingHand: "right",
+      level: "advanced",
+    });
+    const outcome = await api.send<{ sessionId: string; shots: { id: string }[] }>(
+      "/api/analysis/session",
+      { playerId: player.id, videos: [{ poseData }] },
+    );
+
+    // Exclude the first shot, then re-score.
+    await repos.shot.setExcluded(outcome.shots[0]!.id, true);
+    const rescored = await api.send<{ sessionId: string; shots: unknown[] }>(
+      `/api/sessions/${outcome.sessionId}/rescore`,
+      {},
+    );
+    expect(rescored.sessionId).toBe(outcome.sessionId);
+    expect(rescored.shots.length).toBe(outcome.shots.length - 1);
+
+    // A stranger cannot re-score A's session.
+    await expect(
+      clientFor(userB).send(`/api/sessions/${outcome.sessionId}/rescore`, {}),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
   it("analyzes a single live window against an existing session", async () => {
     const api = clientFor(userA);
     const repos = createRemoteRepos(api);

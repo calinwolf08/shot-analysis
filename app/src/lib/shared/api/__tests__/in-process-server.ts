@@ -49,6 +49,7 @@ import { PATCH as planItemPatch } from "../../../../routes/api/plans/items/[id]/
 import { POST as plansReassess } from "../../../../routes/api/plans/reassess/+server";
 import { POST as analysisShot } from "../../../../routes/api/analysis/shot/+server";
 import { POST as analysisSession } from "../../../../routes/api/analysis/session/+server";
+import { POST as sessionRescore } from "../../../../routes/api/sessions/[id]/rescore/+server";
 
 type Handler = (event: RequestEvent) => Promise<Response>;
 interface Route {
@@ -67,6 +68,7 @@ const routes: Route[] = [
   ["GET", "/api/videos/:id", videoGet],
   ["GET", "/api/sessions", sessionsGet],
   ["POST", "/api/sessions", sessionsPost],
+  ["POST", "/api/sessions/:id/rescore", sessionRescore],
   ["GET", "/api/sessions/:id", sessionGet],
   ["PATCH", "/api/sessions/:id", sessionPatch],
   ["GET", "/api/shots", shotsGet],
