@@ -3,7 +3,6 @@
   import { page } from "$app/state";
   import { builtInBenchmarks, type MetricName } from "$lib/features/benchmarks";
   import type { RepScore } from "$lib/features/scoring";
-  import { createPlanRepo } from "$lib/features/training-plan";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { flushDb } from "$lib/shared/db";
   import type {
@@ -80,11 +79,12 @@
     }
 
     if (session?.planItemId) {
-      const planRepo = createPlanRepo(services);
-      const item = await planRepo.getItem(session.planItemId);
-      if (item) {
-        const items = await planRepo.getItems(item.planId);
-        blockFinished = items
+      const item = await services.trainingPlan.getItem(session.planItemId);
+      const plan = item
+        ? await services.trainingPlan.getPlan(item.planId)
+        : null;
+      if (item && plan) {
+        blockFinished = plan.items
           .filter((i) => i.type !== "reassessment" && i.id !== item.id)
           .every((i) => i.status !== "pending");
       }

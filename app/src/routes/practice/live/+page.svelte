@@ -12,7 +12,6 @@
     SetupScreen,
     type LiveRepCoordinator,
   } from "$lib/features/live-practice";
-  import { createPlanRepo } from "$lib/features/training-plan";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { createApiClient } from "$lib/shared/api/client";
   import { createWebAudioFeedbackService } from "$lib/shared/audio";
@@ -78,7 +77,7 @@
     shootingHand = player.shootingHand;
     const planItemId = page.url.searchParams.get("planItem");
     if (planItemId) {
-      const item = await createPlanRepo(services).getItem(planItemId);
+      const item = await services.trainingPlan.getItem(planItemId);
       if (item?.focusMetric) {
         focusMetric = item.focusMetric as MetricName;
         const target = builtInBenchmarks()[0]!.targets[focusMetric];

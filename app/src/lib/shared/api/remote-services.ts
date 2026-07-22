@@ -116,6 +116,7 @@ export function createRemoteTrainingPlan(api: ApiClient): TrainingPlanService {
     getPlan: (planId) => getOrNull(api.get<PlanWithItems>(`/api/plans/${planId}`)),
     getActivePlan: (playerId) =>
       api.get<PlanWithItems | null>(`/api/plans?${pid(playerId)}`),
+    getItem: (itemId) => getOrNull(api.get<PlanItem>(`/api/plans/items/${itemId}`)),
     async completeItem(itemId) {
       await api.send(`/api/plans/items/${itemId}`, {}, "PATCH");
     },
