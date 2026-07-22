@@ -39,8 +39,11 @@ export default defineConfig({
       // debug/test surfaces; the replay fixtures are copied into the node
       // output. AUTH_E2E exposes the password-reset link for the reset test.
       // Specs use unique emails, so the on-disk e2e DB can persist across runs.
+      // BODY_SIZE_LIMIT is raised well above adapter-node's 512K default:
+      // assessment/live POST multi-MB pose payloads to /api/analysis/* (see
+      // docs/hosting-and-deployment.md).
       command:
-        "VITE_E2E=1 BUILD_TARGET=node npm run build && node scripts/copy-fixtures-to-build.mjs && AUTH_E2E=1 DATABASE_PATH=data/e2e.sqlite AUTH_SECRET=e2e-secret-change-me-000000 ORIGIN=http://localhost:4173 AUTH_BASE_URL=http://localhost:4173 PORT=4173 node build",
+        "VITE_E2E=1 BUILD_TARGET=node npm run build && node scripts/copy-fixtures-to-build.mjs && AUTH_E2E=1 BODY_SIZE_LIMIT=64M DATABASE_PATH=data/e2e.sqlite AUTH_SECRET=e2e-secret-change-me-000000 ORIGIN=http://localhost:4173 AUTH_BASE_URL=http://localhost:4173 PORT=4173 node build",
       url: "http://localhost:4173/api/health",
       reuseExistingServer: !process.env.CI,
       timeout: 300_000,

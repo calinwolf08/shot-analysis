@@ -59,6 +59,7 @@ Set these on the **server** deployment:
 | `AUTH_TRUSTED_ORIGINS` | ✅        | `https://app.example.com,capacitor://localhost,http://localhost` | Web origin + the two native origins.                               |
 | `PORT`                 | –         | `3000`                                                           | adapter-node listen port (default 3000).                           |
 | `ORIGIN`               | ✅        | `https://app.example.com`                                        | adapter-node needs the public origin for correct URLs/CSRF.        |
+| `BODY_SIZE_LIMIT`      | ✅        | `64M`                                                            | Raise above adapter-node's 512K default: clients POST multi-MB pose payloads to `/api/analysis/*`. |
 | `MAILER_*`             | prod      | –                                                                | Wire a real transport for `sendResetPassword` (dev logs the link). |
 | `AUTH_E2E`             | test only | `1`                                                              | Enables reset-url + db-reset endpoints. **Never set in prod.**     |
 
