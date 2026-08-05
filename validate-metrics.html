@@ -4004,7 +4004,17 @@
             const opt = document.createElement("option");
             opt.value = c.name;
             opt.dataset.video = c.video || "";
-            opt.textContent = c.video ? `${c.name} (video)` : c.name;
+            opt.dataset.poses = c.poses ? "1" : "";
+            opt.dataset.labels = c.labels ? "1" : "";
+            // Tag which artifacts the folder has, so it's clear at a glance.
+            const tags = [
+              c.poses && "poses",
+              c.labels && "labels",
+              c.video && "video",
+            ].filter(Boolean);
+            opt.textContent = tags.length
+              ? `${c.name} (${tags.join(", ")})`
+              : c.name;
             sel.appendChild(opt);
           }
         } catch (err) {
@@ -4015,25 +4025,17 @@
         }
       }
 
-      async function loadTestCase(name, videoFile) {
+      async function loadTestCase(name, opts) {
+        const { videoFile, hasPoses, hasLabels } = opts;
         elements.testCaseHint.textContent = `Loading ${name}…`;
         try {
-          const [posesRes, labelsRes] = await Promise.all([
-            fetch(`/test-data/${encodeURIComponent(name)}/poses.json`),
-            fetch(`/test-data/${encodeURIComponent(name)}/labels.json`),
-          ]);
-          if (!posesRes.ok) throw new Error("poses.json not found");
-          if (!labelsRes.ok) throw new Error("labels.json not found");
-          const posesText = await posesRes.text();
-          const labelsText = await labelsRes.text();
-
           // Video first (if any) so poses-only playback knows a video exists;
-          // loadVideoIntoPlayer preserves already-loaded poses.
+          // loadVideoIntoPlayer preserves already-loaded poses. Videos live
+          // inside the case folder now (local-only; may be absent on a clone).
           if (videoFile) {
             try {
-              // Source videos live in the shared test-data/videos/ folder.
               const vRes = await fetch(
-                `/test-data/videos/${encodeURIComponent(videoFile)}`,
+                `/test-data/${encodeURIComponent(name)}/${encodeURIComponent(videoFile)}`,
               );
               if (vRes.ok) {
                 const blob = await vRes.blob();
@@ -4048,15 +4050,38 @@
             }
           }
 
-          await loadPosesFromFile({
-            text: async () => posesText,
-            name: `${name}/poses.json`,
-          });
-          await loadLabelsFromFile({
-            text: async () => labelsText,
-            name: `${name}/labels.json`,
-          });
-          elements.testCaseHint.textContent = `Loaded ${name}`;
+          // Poses and labels are each optional — load whatever the folder has.
+          const loaded = [];
+          if (hasPoses) {
+            const posesRes = await fetch(
+              `/test-data/${encodeURIComponent(name)}/poses.json`,
+            );
+            if (posesRes.ok) {
+              const posesText = await posesRes.text();
+              await loadPosesFromFile({
+                text: async () => posesText,
+                name: `${name}/poses.json`,
+              });
+              loaded.push("poses");
+            }
+          }
+          if (hasLabels) {
+            const labelsRes = await fetch(
+              `/test-data/${encodeURIComponent(name)}/labels.json`,
+            );
+            if (labelsRes.ok) {
+              const labelsText = await labelsRes.text();
+              await loadLabelsFromFile({
+                text: async () => labelsText,
+                name: `${name}/labels.json`,
+              });
+              loaded.push("labels");
+            }
+          }
+          if (videoFile) loaded.push("video");
+          elements.testCaseHint.textContent = loaded.length
+            ? `Loaded ${name} (${loaded.join(", ")})`
+            : `Loaded ${name}`;
         } catch (err) {
           console.error("Load test case error:", err);
           showToast(`Failed to load ${name}: ${err.message}`, "error");
@@ -4068,8 +4093,12 @@
         const sel = elements.testCaseSelect;
         const name = sel.value;
         if (!name) return;
-        const videoFile = sel.options[sel.selectedIndex]?.dataset.video || null;
-        loadTestCase(name, videoFile);
+        const opt = sel.options[sel.selectedIndex];
+        loadTestCase(name, {
+          videoFile: opt?.dataset.video || null,
+          hasPoses: opt?.dataset.poses === "1",
+          hasLabels: opt?.dataset.labels === "1",
+        });
       };
 
       populateTestCases();

@@ -9,3 +9,10 @@ coverage/
 
 # Generated NBA reference metrics
 reference-data/out/
+
+# Local-only test-data videos (large; kept per-case on disk, never pushed).
+# The validator loads them when present; poses.json/labels.json are the
+# committed source of truth.
+test-data/**/*.mp4
+test-data/**/*.mov
+test-data/**/*.webm
