@@ -269,6 +269,13 @@ export const labeledShotSchema = z.object({
   arms_fully_extended: keyframeFieldSchema,
   feet_leave_ground: keyframeFieldSchema,
   feet_land: keyframeFieldSchema,
+
+  // Range ends for the two keyframes that are durations, not instants: set
+  // point (ball held) and release (wrist snap → arm extension). Optional and
+  // backward-compatible — when absent the matching keyframe is a single frame.
+  // `set_point`/`release` are the range START; these are the END.
+  set_point_end: keyframeFieldSchema,
+  release_end: keyframeFieldSchema,
 });
 
 /**

@@ -572,6 +572,73 @@
         font-variant-numeric: tabular-nums;
       }
 
+      /* Per-keyframe editor (selected shot). */
+      .kfe {
+        margin-top: 8px;
+        border-top: 1px solid #374151;
+        padding-top: 8px;
+      }
+      .kfe-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 0.78rem;
+        color: #9ca3af;
+        margin-bottom: 6px;
+      }
+      .kfe-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .kfe-row {
+        display: grid;
+        grid-template-columns: 1fr auto auto auto;
+        align-items: center;
+        gap: 8px;
+      }
+      .kfe-name {
+        color: #d1d5db;
+        font-size: 0.82rem;
+      }
+      .kfe-val {
+        min-width: 34px;
+        text-align: right;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: #fff;
+        cursor: pointer;
+      }
+      .kfe-val.unset {
+        color: #6b7280;
+        cursor: default;
+        font-weight: 400;
+      }
+      .kfe-btn {
+        padding: 2px 8px;
+        background: #1a1a1a;
+        border: 1px solid #374151;
+        border-radius: 6px;
+        color: #d1d5db;
+        font-size: 0.78rem;
+        cursor: pointer;
+      }
+      .kfe-btn:hover:not(:disabled) {
+        border-color: #2563eb;
+        background: #1e3a5f;
+      }
+      .kfe-btn:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .kfe-clear {
+        padding: 2px 7px;
+      }
+      .kfe-seed {
+        color: #93c5fd;
+      }
+
       .metric-card {
         background: #1a1a1a;
         border-radius: 8px;
@@ -2247,6 +2314,10 @@
             KEYFRAME_ORDER.forEach((id) => {
               if (typeof s[id] === "number") keyframes[id] = s[id];
             });
+            // Carry the optional range ends for set point / release.
+            Object.values(RANGE_END_KEYFRAME).forEach((endId) => {
+              if (typeof s[endId] === "number") keyframes[endId] = s[endId];
+            });
             return {
               shotNumber: s.shotNumber ?? i + 1,
               startFrame: s.startFrame ?? null,
@@ -2660,6 +2731,14 @@
         feet_land: "Feet land",
       };
 
+      // Keyframes that are durations (ranges), not instants: the primary field
+      // is the range START, the mapped field is the END. The validator lets you
+      // label both; other keyframes are single frames.
+      const RANGE_END_KEYFRAME = {
+        set_point: "set_point_end",
+        release: "release_end",
+      };
+
       // Runs the keyframe algorithm on the captured pose frames for this shot
       // and renders each detected keyframe as a seekable chip. This is the
       // same detection the runtime derives phases from, so the chips are the
@@ -2747,7 +2826,19 @@
             diffHtml = `<span class="kf-diff ${cls}">${d > 0 ? "+" + d : d}</span>`;
           }
 
-          html += `<div class="kf-name">${name}</div>${cell(algo)}${hasLabels ? cell(lab) : '<span class="kf-frame missing">n/a</span>'}${diffHtml}`;
+          // Show the labeled range (start–end) for set point / release when an
+          // end was labeled; a plain frame otherwise.
+          const endId = RANGE_END_KEYFRAME[id];
+          const labEnd =
+            endId && typeof labeledKf[endId] === "number"
+              ? labeledKf[endId]
+              : null;
+          const labCell =
+            lab != null && labEnd != null
+              ? `<span class="kf-frame" onclick="seekToFrame(${lab})">${lab}–${labEnd}</span>`
+              : cell(lab);
+
+          html += `<div class="kf-name">${name}</div>${cell(algo)}${hasLabels ? labCell : '<span class="kf-frame missing">n/a</span>'}${diffHtml}`;
         });
         html += "</div>";
 
@@ -3251,18 +3342,29 @@
           appState.analysisData?.video?.filename ||
           appState.videoFile?.name ||
           "unknown";
-        const labeling = getLabelingData();
-
+        // Read from labelingState directly (getLabelingData() strips keyframes).
         return {
           video: videoName,
           labeledBy: "human",
           labeledAt: new Date().toISOString(),
-          shots: labeling.shots.map((shot) => ({
-            shotNumber: shot.shotNumber,
-            startFrame: shot.startFrame,
-            endFrame: shot.endFrame,
-            cameraOrientation: shot.cameraOrientation || "front",
-          })),
+          shots: labelingState.shots.map((shot) => {
+            const out = {
+              shotNumber: shot.shotNumber,
+              startFrame: shot.startFrame,
+              endFrame: shot.endFrame,
+              cameraOrientation: shot.cameraOrientation || "front",
+            };
+            // Write every labeled keyframe (single frames) and the optional
+            // set-point / release range ends. Unlabeled keyframes are omitted.
+            const kf = shot.keyframes || {};
+            KEYFRAME_ORDER.forEach((id) => {
+              if (typeof kf[id] === "number") out[id] = kf[id];
+            });
+            Object.values(RANGE_END_KEYFRAME).forEach((endId) => {
+              if (typeof kf[endId] === "number") out[endId] = kf[endId];
+            });
+            return out;
+          }),
         };
       }
 
@@ -3787,6 +3889,110 @@
       /**
        * Renders the shot list in the UI
        */
+      // Builds the per-keyframe editor for the selected shot: each keyframe the
+      // algorithm identifies gets a "Set" (to the current frame) + clear
+      // control; set point and release additionally get a range END row.
+      function renderKeyframeEditor(shot, index) {
+        const kf = shot.keyframes || {};
+        const row = (id, labelText) => {
+          const v = typeof kf[id] === "number" ? kf[id] : null;
+          const valHtml =
+            v == null
+              ? '<span class="kfe-val unset">—</span>'
+              : `<span class="kfe-val" onclick="event.stopPropagation();seekToFrame(${v})">${v}</span>`;
+          return `<div class="kfe-row">
+              <span class="kfe-name">${labelText}</span>
+              ${valHtml}
+              <button type="button" class="kfe-btn" onclick="event.stopPropagation();vkfSet(${index},'${id}')">Set</button>
+              <button type="button" class="kfe-btn kfe-clear" title="Clear" onclick="event.stopPropagation();vkfClear(${index},'${id}')" ${v == null ? "disabled" : ""}>×</button>
+            </div>`;
+        };
+        const rows = [];
+        KEYFRAME_ORDER.forEach((id) => {
+          const name = KEYFRAME_NAMES[id] || id;
+          if (RANGE_END_KEYFRAME[id]) {
+            rows.push(row(id, `${name} (start)`));
+            rows.push(row(RANGE_END_KEYFRAME[id], `${name} (end)`));
+          } else {
+            rows.push(row(id, name));
+          }
+        });
+        return `
+          <div class="kfe" onclick="event.stopPropagation()">
+            <div class="kfe-head">
+              <span>Keyframes — "Set" captures the current frame</span>
+              <button type="button" class="kfe-btn kfe-seed" onclick="event.stopPropagation();vkfSeed(${index})">Seed from algorithm</button>
+            </div>
+            <div class="kfe-grid">${rows.join("")}</div>
+          </div>`;
+      }
+
+      // Set a keyframe (or range end) on a shot to the current scrubbed frame.
+      window.vkfSet = function (index, id) {
+        const shot = labelingState.shots[index];
+        if (!shot) return;
+        if (!isScrubbable()) {
+          showToast("Load a video or poses first", "error");
+          return;
+        }
+        shot.keyframes = shot.keyframes || {};
+        shot.keyframes[id] = getCurrentFrame();
+        renderShotList();
+      };
+
+      window.vkfClear = function (index, id) {
+        const shot = labelingState.shots[index];
+        if (!shot || !shot.keyframes) return;
+        delete shot.keyframes[id];
+        renderShotList();
+      };
+
+      // Seed the shot's keyframes from the algorithm's detection over its
+      // labeled frame range, as a starting point to hand-adjust. release_end is
+      // seeded from arms_fully_extended (the algorithm's release-range end);
+      // set_point_end has no algorithm equivalent and is labeled by hand.
+      window.vkfSeed = function (index) {
+        const shot = labelingState.shots[index];
+        if (!shot) return;
+        const frames = appState.poseData && appState.poseData.frames;
+        if (
+          !frames ||
+          !window.ShotAnalysis ||
+          typeof ShotAnalysis.detectKeyframesFromFrames !== "function"
+        ) {
+          showToast("Load poses first to seed from the algorithm", "error");
+          return;
+        }
+        if (shot.startFrame == null || shot.endFrame == null) {
+          showToast("Set the shot start and end first", "error");
+          return;
+        }
+        let detected;
+        try {
+          detected = ShotAnalysis.detectKeyframesFromFrames(
+            frames,
+            shot.startFrame,
+            shot.endFrame,
+          );
+        } catch (err) {
+          showToast(`Seed failed: ${err.message}`, "error");
+          return;
+        }
+        const get = (id) => (detected.get ? detected.get(id) : detected[id]);
+        shot.keyframes = shot.keyframes || {};
+        KEYFRAME_ORDER.forEach((id) => {
+          const f = get(id);
+          if (typeof f === "number") shot.keyframes[id] = f;
+        });
+        const relEnd = get("arms_fully_extended");
+        if (typeof relEnd === "number") shot.keyframes.release_end = relEnd;
+        renderShotList();
+        showToast(
+          `Seeded shot ${shot.shotNumber} keyframes from the algorithm`,
+          "success",
+        );
+      };
+
       function renderShotList() {
         if (labelingState.shots.length === 0) {
           elements.shotLabelingEmpty.classList.remove("hidden");
@@ -3826,9 +4032,13 @@
           // Get current orientation value
           const orientation = shot.cameraOrientation || "front";
 
-          // Labeled keyframe chips (present when labels were loaded from file).
+          // Keyframes: an editable editor for the selected shot (label every
+          // keyframe the algorithm identifies, incl. set-point/release ranges);
+          // compact read-only chips for the rest.
           let keyframesHtml = "";
-          if (shot.keyframes && Object.keys(shot.keyframes).length > 0) {
+          if (index === labelingState.selectedShotIndex) {
+            keyframesHtml = renderKeyframeEditor(shot, index);
+          } else if (shot.keyframes && Object.keys(shot.keyframes).length > 0) {
             const chips = KEYFRAME_ORDER.filter(
               (id) => typeof shot.keyframes[id] === "number",
             )
