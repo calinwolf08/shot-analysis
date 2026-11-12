@@ -81,6 +81,16 @@ export function createRemoteRepos(api: ApiClient): AppRepos {
             includeExcluded: opts?.includeExcluded ? "true" : undefined,
           }),
       ),
+    listByPlayer: (playerId, opts) =>
+      api.get<ShotRecord[]>(
+        "/api/shots" +
+          qs({
+            playerId,
+            includeExcluded: opts?.includeExcluded ? "true" : undefined,
+            since: opts?.since?.toString(),
+            limit: opts?.limit?.toString(),
+          }),
+      ),
     async setExcluded(id, excluded) {
       await api.send(`/api/shots/${id}`, { excluded }, "PATCH");
     },

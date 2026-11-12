@@ -16,7 +16,14 @@ const EXPECTED_TABLES: Record<string, string[]> = {
     "plan_item_id",
     "focus_metric",
   ],
-  shots: ["id", "session_id", "shot_index", "excluded", "analysis_json"],
+  shots: [
+    "id",
+    "player_id",
+    "session_id",
+    "shot_index",
+    "excluded",
+    "analysis_json",
+  ],
   shot_metrics: [
     "shot_id",
     "metric_name",
@@ -138,6 +145,53 @@ describe("migrate", () => {
     const m1: Migration = { version: 2, name: "a", up: [] };
     const m2: Migration = { version: 1, name: "b", up: [] };
     await expect(migrate(db, [m1, m2])).rejects.toThrow(/out of order/i);
+  });
+
+  it("004 backfills shots.player_id from the session and allows null session_id", async () => {
+    db = createBetterSqliteAdapter();
+    // Migrate only up to v3, then seed a session-rooted shot the old way.
+    const upToV3 = ALL_MIGRATIONS.filter((m) => m.version <= 3);
+    await migrate(db, upToV3);
+    await db.run(
+      `INSERT INTO players (id, name, shooting_hand, level, created_at, updated_at, user_id)
+       VALUES ('p1', 'A', 'right', 'youth', 0, 0, 'u1')`,
+    );
+    await db.run(
+      `INSERT INTO sessions (id, player_id, type, status, started_at, user_id)
+       VALUES ('sess1', 'p1', 'assessment', 'completed', 0, 'u1')`,
+    );
+    await db.run(
+      `INSERT INTO shots (id, session_id, shot_index, excluded, analysis_json, created_at)
+       VALUES ('shot1', 'sess1', 0, 0, '{}', 100)`,
+    );
+
+    // Apply v4.
+    const result = await migrate(db);
+    expect(result.applied).toEqual([4]);
+
+    const [row] = await db.query<{ player_id: string; session_id: string }>(
+      "SELECT player_id, session_id FROM shots WHERE id = 'shot1'",
+    );
+    expect(row?.player_id).toBe("p1"); // backfilled from the session
+    expect(row?.session_id).toBe("sess1"); // preserved
+
+    // A session-less live shot is now allowed…
+    await db.run(
+      `INSERT INTO shots (id, player_id, shot_index, excluded, analysis_json, created_at)
+       VALUES ('shot2', 'p1', 0, 0, '{}', 200)`,
+    );
+    const [live] = await db.query<{ session_id: string | null }>(
+      "SELECT session_id FROM shots WHERE id = 'shot2'",
+    );
+    expect(live?.session_id).toBeNull();
+
+    // …but player_id is required.
+    await expect(
+      db.run(
+        `INSERT INTO shots (id, shot_index, excluded, analysis_json, created_at)
+         VALUES ('shot3', 0, 0, '{}', 300)`,
+      ),
+    ).rejects.toThrow();
   });
 
   it("resumes after a failed migration once it is fixed", async () => {

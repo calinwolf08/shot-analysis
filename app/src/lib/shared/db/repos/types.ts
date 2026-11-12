@@ -47,7 +47,10 @@ export interface Session {
 
 export interface ShotRecord {
   id: string;
-  sessionId: string;
+  /** Owning player — the root a shot hangs off (live shots have no session). */
+  playerId: string;
+  /** Owning session, or null for de-sessioned live shots. */
+  sessionId: string | null;
   videoId: string | null;
   shotIndex: number;
   orientation: string | null;

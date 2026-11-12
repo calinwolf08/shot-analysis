@@ -17,6 +17,7 @@ export {
 export {
   createShotRepo,
   type SaveAnalysisInput,
+  type ListByPlayerOptions,
   type ShotRepo,
 } from "./shot-repo";
 export {

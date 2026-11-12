@@ -12,6 +12,7 @@ import { AssessmentStore } from "../stores/assessment-store.svelte";
 function makeShotRecord(id: string, excluded = false): ShotRecord {
   return {
     id,
+    playerId: "player-1",
     sessionId: "sess-1",
     videoId: null,
     shotIndex: 0,

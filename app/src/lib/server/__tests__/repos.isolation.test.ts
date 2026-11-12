@@ -100,6 +100,32 @@ describe("server repos — per-user isolation", () => {
     );
   });
 
+  it("isolates de-sessioned (player-rooted) shots", async () => {
+    const pA = await A.player.create({
+      name: "A",
+      shootingHand: "right",
+      level: "advanced",
+    });
+    // A live shot with no session, rooted directly on A's player.
+    const shot = await A.shot.saveAnalysis({
+      playerId: pA.id,
+      analysis: fakeAnalysis(),
+    });
+    expect(shot.sessionId).toBeNull();
+
+    // A sees it via listByPlayer; B sees nothing and cannot read it.
+    expect((await A.shot.listByPlayer(pA.id)).map((s) => s.id)).toEqual([
+      shot.id,
+    ]);
+    expect(await B.shot.listByPlayer(pA.id)).toEqual([]);
+    expect(await B.shot.get(shot.id)).toBeNull();
+
+    // B cannot create a shot under A's player.
+    await expect(
+      B.shot.saveAnalysis({ playerId: pA.id, analysis: fakeAnalysis(1) }),
+    ).rejects.toThrow(ForbiddenError);
+  });
+
   it("isolates scores and reps", async () => {
     const pA = await A.player.create({
       name: "A",

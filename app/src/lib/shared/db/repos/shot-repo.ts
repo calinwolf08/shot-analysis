@@ -3,9 +3,22 @@ import { fromBool, parseJson, toBool, type RepoContext } from "../repo-base";
 import type { ShotRecord } from "./types";
 
 export interface SaveAnalysisInput {
-  sessionId: string;
+  /** Owning player. Required for de-sessioned live shots; derived from the
+   * session when omitted (assessment path). */
+  playerId?: string;
+  /** Owning session, or null/omitted for live shots. */
+  sessionId?: string | null;
   videoId?: string;
   analysis: ShotAnalysis;
+}
+
+/** Filters for the player-rooted shot listing (Shots / Insights reads). */
+export interface ListByPlayerOptions {
+  includeExcluded?: boolean;
+  /** Only shots with created_at >= this epoch-ms. */
+  since?: number;
+  /** Cap the number of (newest-first) shots returned. */
+  limit?: number;
 }
 
 export interface ShotRepo {
@@ -19,12 +32,18 @@ export interface ShotRepo {
     sessionId: string,
     opts?: { includeExcluded?: boolean },
   ): Promise<ShotRecord[]>;
+  /** All of a player's shots, newest first (the de-sessioned live history). */
+  listByPlayer(
+    playerId: string,
+    opts?: ListByPlayerOptions,
+  ): Promise<ShotRecord[]>;
   setExcluded(id: string, excluded: boolean): Promise<void>;
 }
 
 interface ShotRow {
   id: string;
-  session_id: string;
+  player_id: string;
+  session_id: string | null;
   video_id: string | null;
   shot_index: number;
   orientation: string | null;
@@ -39,6 +58,7 @@ interface ShotRow {
 function toShot(r: ShotRow): ShotRecord {
   return {
     id: r.id,
+    playerId: r.player_id,
     sessionId: r.session_id,
     videoId: r.video_id,
     shotIndex: r.shot_index,
@@ -57,9 +77,23 @@ export function createShotRepo(ctx: RepoContext): ShotRepo {
   return {
     async saveAnalysis(input) {
       const { analysis } = input;
+      const sessionId = input.sessionId ?? null;
+      let playerId = input.playerId ?? null;
+      if (!playerId) {
+        if (!sessionId) {
+          throw new Error("saveAnalysis requires playerId or sessionId");
+        }
+        const rows = await db.query<{ player_id: string }>(
+          "SELECT player_id FROM sessions WHERE id = ?",
+          [sessionId],
+        );
+        playerId = rows[0]?.player_id ?? null;
+        if (!playerId) throw new Error(`session ${sessionId} not found`);
+      }
       const shot: ShotRecord = {
         id: ids.next(),
-        sessionId: input.sessionId,
+        playerId,
+        sessionId,
         videoId: input.videoId ?? null,
         shotIndex: analysis.shotIndex,
         orientation: analysis.orientation ?? null,
@@ -73,11 +107,12 @@ export function createShotRepo(ctx: RepoContext): ShotRepo {
 
       await db.transaction(async (tx) => {
         await tx.run(
-          `INSERT INTO shots (id, session_id, video_id, shot_index, orientation,
+          `INSERT INTO shots (id, player_id, session_id, video_id, shot_index, orientation,
              start_frame, end_frame, overall_confidence, excluded, analysis_json, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             shot.id,
+            shot.playerId,
             shot.sessionId,
             shot.videoId,
             shot.shotIndex,
@@ -125,6 +160,23 @@ export function createShotRepo(ctx: RepoContext): ShotRepo {
         `SELECT * FROM shots WHERE ${where} ORDER BY shot_index`,
         [sessionId],
       );
+      return rows.map(toShot);
+    },
+
+    async listByPlayer(playerId, opts = {}) {
+      const clauses = ["player_id = ?"];
+      const params: (string | number)[] = [playerId];
+      if (!opts.includeExcluded) clauses.push("excluded = 0");
+      if (opts.since !== undefined) {
+        clauses.push("created_at >= ?");
+        params.push(opts.since);
+      }
+      let sql = `SELECT * FROM shots WHERE ${clauses.join(" AND ")} ORDER BY created_at DESC, shot_index DESC`;
+      if (opts.limit !== undefined) {
+        sql += " LIMIT ?";
+        params.push(opts.limit);
+      }
+      const rows = await db.query<ShotRow>(sql, params);
       return rows.map(toShot);
     },
 

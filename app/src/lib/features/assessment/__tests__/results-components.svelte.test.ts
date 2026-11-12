@@ -68,6 +68,7 @@ function shotRecord(
 ): ShotRecord {
   return {
     id: `s-${index}`,
+    playerId: "player",
     sessionId: "sess",
     videoId: null,
     shotIndex: index,

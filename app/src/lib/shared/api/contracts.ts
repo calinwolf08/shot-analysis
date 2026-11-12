@@ -59,11 +59,16 @@ export const shotAnalysisSchema = z
     metrics: z.record(z.any()),
   })
   .passthrough();
-export const saveAnalysisBody = z.object({
-  sessionId: z.string().min(1),
-  videoId: z.string().optional(),
-  analysis: shotAnalysisSchema,
-});
+export const saveAnalysisBody = z
+  .object({
+    playerId: z.string().min(1).optional(),
+    sessionId: z.string().min(1).optional(),
+    videoId: z.string().optional(),
+    analysis: shotAnalysisSchema,
+  })
+  .refine((b) => b.playerId !== undefined || b.sessionId !== undefined, {
+    message: "playerId or sessionId is required",
+  });
 export const setExcludedBody = z.object({ excluded: z.boolean() });
 
 // --- scores ----------------------------------------------------------------

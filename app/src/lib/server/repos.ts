@@ -115,7 +115,8 @@ const toSession = (r: SessionRow): Session => ({
 
 interface ShotRow {
   id: string;
-  session_id: string;
+  player_id: string;
+  session_id: string | null;
   video_id: string | null;
   shot_index: number;
   orientation: string | null;
@@ -128,6 +129,7 @@ interface ShotRow {
 }
 const toShot = (r: ShotRow): ShotRecord => ({
   id: r.id,
+  playerId: r.player_id,
   sessionId: r.session_id,
   videoId: r.video_id,
   shotIndex: r.shot_index,
@@ -208,8 +210,8 @@ export function createServerRepos(
     owns("SELECT 1 FROM sessions WHERE id = ? AND user_id = ?", [id, userId]);
   const shotOwned = (id: string) =>
     owns(
-      `SELECT 1 FROM shots s JOIN sessions se ON s.session_id = se.id
-       WHERE s.id = ? AND se.user_id = ?`,
+      `SELECT 1 FROM shots s JOIN players p ON s.player_id = p.id
+       WHERE s.id = ? AND p.user_id = ?`,
       [id, userId],
     );
   const videoOwned = (id: string) =>
@@ -397,12 +399,29 @@ export function createServerRepos(
   // --- shot ----------------------------------------------------------------
   const shot: ShotRepo = {
     async saveAnalysis(input: SaveAnalysisInput) {
-      await assert(sessionOwned(input.sessionId), "session");
+      const sessionId = input.sessionId ?? null;
+      if (sessionId) await assert(sessionOwned(sessionId), "session");
       if (input.videoId) await assert(videoOwned(input.videoId), "video");
+
+      // Resolve the owning player: explicit (live) or from the session
+      // (assessment). Verify ownership either way.
+      let playerId = input.playerId ?? null;
+      if (playerId) {
+        await assert(playerOwned(playerId), "player");
+      } else if (sessionId) {
+        const rows = await db.query<{ player_id: string }>(
+          "SELECT player_id FROM sessions WHERE id = ? AND user_id = ?",
+          [sessionId, userId],
+        );
+        playerId = rows[0]?.player_id ?? null;
+      }
+      if (!playerId) throw new ForbiddenError("not your player");
+
       const { analysis } = input;
       const rec: ShotRecord = {
         id: ids.next(),
-        sessionId: input.sessionId,
+        playerId,
+        sessionId,
         videoId: input.videoId ?? null,
         shotIndex: analysis.shotIndex,
         orientation: analysis.orientation ?? null,
@@ -415,11 +434,12 @@ export function createServerRepos(
       };
       await db.transaction(async (tx) => {
         await tx.run(
-          `INSERT INTO shots (id, session_id, video_id, shot_index, orientation,
+          `INSERT INTO shots (id, player_id, session_id, video_id, shot_index, orientation,
              start_frame, end_frame, overall_confidence, excluded, analysis_json, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             rec.id,
+            rec.playerId,
             rec.sessionId,
             rec.videoId,
             rec.shotIndex,
@@ -453,8 +473,8 @@ export function createServerRepos(
     },
     async get(id) {
       const rows = await db.query<ShotRow>(
-        `SELECT s.* FROM shots s JOIN sessions se ON s.session_id = se.id
-         WHERE s.id = ? AND se.user_id = ?`,
+        `SELECT s.* FROM shots s JOIN players p ON s.player_id = p.id
+         WHERE s.id = ? AND p.user_id = ?`,
         [id, userId],
       );
       return rows[0] ? toShot(rows[0]) : null;
@@ -466,6 +486,23 @@ export function createServerRepos(
          WHERE s.session_id = ? AND se.user_id = ? ${excl} ORDER BY s.shot_index`,
         [sessionId, userId],
       );
+      return rows.map(toShot);
+    },
+    async listByPlayer(playerId, opts = {}) {
+      const clauses = ["s.player_id = ?", "p.user_id = ?"];
+      const params: (string | number)[] = [playerId, userId];
+      if (!opts.includeExcluded) clauses.push("s.excluded = 0");
+      if (opts.since !== undefined) {
+        clauses.push("s.created_at >= ?");
+        params.push(opts.since);
+      }
+      let sql = `SELECT s.* FROM shots s JOIN players p ON s.player_id = p.id
+         WHERE ${clauses.join(" AND ")} ORDER BY s.created_at DESC, s.shot_index DESC`;
+      if (opts.limit !== undefined) {
+        sql += " LIMIT ?";
+        params.push(opts.limit);
+      }
+      const rows = await db.query<ShotRow>(sql, params);
       return rows.map(toShot);
     },
     async setExcluded(id, excluded) {
@@ -481,7 +518,7 @@ export function createServerRepos(
   // Ownership subquery for a given scope: the set of ref ids this user owns.
   const ownedRefsSubquery = (scope: ScoreScope) =>
     scope === "shot"
-      ? `SELECT s.id FROM shots s JOIN sessions se ON s.session_id = se.id WHERE se.user_id = ?`
+      ? `SELECT s.id FROM shots s JOIN players p ON s.player_id = p.id WHERE p.user_id = ?`
       : `SELECT id FROM sessions WHERE user_id = ?`;
 
   const score: ScoreRepo = {

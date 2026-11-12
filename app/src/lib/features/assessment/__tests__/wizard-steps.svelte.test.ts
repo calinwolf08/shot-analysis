@@ -59,6 +59,7 @@ describe("AnalyzeStep", () => {
 function makeShotRecord(index: number, excluded = false): ShotRecord {
   return {
     id: `shot-${index}`,
+    playerId: "player",
     sessionId: "sess",
     videoId: null,
     shotIndex: index,
