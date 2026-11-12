@@ -94,3 +94,20 @@ export interface RepRecord {
   feedback: unknown;
   createdAt: number;
 }
+
+/** One frame of a shot's 2D skeleton track for the review scrubber. */
+export interface ReviewPoseFrame {
+  /** Analysis-aligned frame index (matches keyframes + metric frame refs). */
+  readonly frameIndex: number;
+  readonly landmarks: {
+    readonly x: number;
+    readonly y: number;
+    readonly visibility: number;
+  }[];
+}
+
+/** A shot's persisted review pose track (the skeleton-fallback source). */
+export interface ShotReviewPoses {
+  readonly fps: number;
+  readonly frames: ReviewPoseFrame[];
+}

@@ -140,6 +140,30 @@ describe("ShotRepo player-rooted (de-sessioned) shots", () => {
     ).rejects.toThrow();
   });
 
+  it("persists and reads back a review pose track", async () => {
+    const repo = createShotRepo(services);
+    const reviewPoses = {
+      fps: 30,
+      frames: [
+        { frameIndex: 0, landmarks: [{ x: 0.1, y: 0.2, visibility: 0.9 }] },
+        { frameIndex: 1, landmarks: [{ x: 0.15, y: 0.25, visibility: 0.8 }] },
+      ],
+    };
+    const saved = await repo.saveAnalysis({
+      playerId,
+      analysis: makeShotAnalysis(),
+      reviewPoses,
+    });
+    expect(await repo.getPoses(saved.id)).toEqual(reviewPoses);
+
+    // A shot saved without poses has none.
+    const bare = await repo.saveAnalysis({
+      playerId,
+      analysis: makeShotAnalysis(),
+    });
+    expect(await repo.getPoses(bare.id)).toBeNull();
+  });
+
   it("listByPlayer returns newest-first and honors since/limit/excluded", async () => {
     const repo = createShotRepo(services);
     const a = await repo.saveAnalysis({

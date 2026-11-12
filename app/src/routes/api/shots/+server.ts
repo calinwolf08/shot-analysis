@@ -33,6 +33,9 @@ export const POST = withUser(async ({ repos }, event) => {
       ...(input.sessionId !== undefined ? { sessionId: input.sessionId } : {}),
       videoId: input.videoId,
       analysis: input.analysis as unknown as ShotAnalysis,
+      ...(input.reviewPoses !== undefined
+        ? { reviewPoses: input.reviewPoses }
+        : {}),
     }),
     201,
   );

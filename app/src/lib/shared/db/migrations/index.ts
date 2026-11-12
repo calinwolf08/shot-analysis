@@ -5,6 +5,7 @@ import { initialSchema } from "./001-initial-schema";
 import { playerUserScope } from "./002-player-user-scope";
 import { userScopeSessionsVideos } from "./003-user-scope-sessions-videos";
 import { shotsPlayerRoot } from "./004-shots-player-root";
+import { shotPoses } from "./005-shot-poses";
 import type { Migration } from "./types";
 
 export type { Migration } from "./types";
@@ -15,6 +16,7 @@ export const ALL_MIGRATIONS: readonly Migration[] = [
   playerUserScope,
   userScopeSessionsVideos,
   shotsPlayerRoot,
+  shotPoses,
 ];
 
 export interface MigrateResult {

@@ -31,6 +31,7 @@ import {
   GET as shotGet,
   PATCH as shotPatch,
 } from "../../../../routes/api/shots/[id]/+server";
+import { GET as shotPosesGet } from "../../../../routes/api/shots/[id]/poses/+server";
 import {
   GET as scoresGet,
   POST as scoresPost,
@@ -83,6 +84,7 @@ const routes: Route[] = [
   ["PATCH", "/api/sessions/:id", sessionPatch],
   ["GET", "/api/shots", shotsGet],
   ["POST", "/api/shots", shotsPost],
+  ["GET", "/api/shots/:id/poses", shotPosesGet],
   ["GET", "/api/shots/:id", shotGet],
   ["PATCH", "/api/shots/:id", shotPatch],
   ["GET", "/api/scores/latest-for-refs", () => notFound()],

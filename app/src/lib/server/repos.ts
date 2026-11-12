@@ -38,6 +38,7 @@ import {
   type ShootingHand,
   type ShotRecord,
   type ShotRepo,
+  type ShotReviewPoses,
   type Player,
   type Video,
   type VideoRepo,
@@ -468,8 +469,26 @@ export function createServerRepos(
             ],
           );
         }
+        if (input.reviewPoses) {
+          await tx.run(
+            `INSERT INTO shot_poses (shot_id, poses_json) VALUES (?, ?)`,
+            [rec.id, JSON.stringify(input.reviewPoses)],
+          );
+        }
       });
       return rec;
+    },
+    async getPoses(id) {
+      const rows = await db.query<{ poses_json: string }>(
+        `SELECT sp.poses_json FROM shot_poses sp
+         JOIN shots s ON sp.shot_id = s.id
+         JOIN players p ON s.player_id = p.id
+         WHERE sp.shot_id = ? AND p.user_id = ?`,
+        [id, userId],
+      );
+      return rows[0]
+        ? parseJson<ShotReviewPoses>(rows[0].poses_json, `shot_poses.${id}`)
+        : null;
     },
     async get(id) {
       const rows = await db.query<ShotRow>(

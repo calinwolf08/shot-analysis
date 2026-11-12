@@ -1,6 +1,6 @@
 import type { ShotAnalysis } from "basketball-shot-analysis";
 import { fromBool, parseJson, toBool, type RepoContext } from "../repo-base";
-import type { ShotRecord } from "./types";
+import type { ShotRecord, ShotReviewPoses } from "./types";
 
 export interface SaveAnalysisInput {
   /** Owning player. Required for de-sessioned live shots; derived from the
@@ -10,6 +10,8 @@ export interface SaveAnalysisInput {
   sessionId?: string | null;
   videoId?: string;
   analysis: ShotAnalysis;
+  /** Optional review pose track to persist alongside the shot (step 7). */
+  reviewPoses?: ShotReviewPoses;
 }
 
 /** Filters for the player-rooted shot listing (Shots / Insights reads). */
@@ -42,6 +44,8 @@ export interface ShotRepo {
     opts?: ListByPlayerOptions,
   ): Promise<ShotRecord[]>;
   setExcluded(id: string, excluded: boolean): Promise<void>;
+  /** The persisted review pose track for a shot, or null when none was stored. */
+  getPoses(id: string): Promise<ShotReviewPoses | null>;
 }
 
 interface ShotRow {
@@ -145,8 +149,24 @@ export function createShotRepo(ctx: RepoContext): ShotRepo {
             ],
           );
         }
+        if (input.reviewPoses) {
+          await tx.run(
+            `INSERT INTO shot_poses (shot_id, poses_json) VALUES (?, ?)`,
+            [shot.id, JSON.stringify(input.reviewPoses)],
+          );
+        }
       });
       return shot;
+    },
+
+    async getPoses(id) {
+      const rows = await db.query<{ poses_json: string }>(
+        "SELECT poses_json FROM shot_poses WHERE shot_id = ?",
+        [id],
+      );
+      return rows[0]
+        ? parseJson<ShotReviewPoses>(rows[0].poses_json, `shot_poses.${id}`)
+        : null;
     },
 
     async get(id) {

@@ -57,6 +57,7 @@ export {
 } from "./setup/angle-gate";
 export {
   analyzeAndScore,
+  scorecardForShot,
   createRepoShotStore,
   createLiveShotPipeline,
   createLocalPipeline,
@@ -70,6 +71,7 @@ export {
   type ProcessedShot,
 } from "./pipeline";
 export { default as PracticeScreen } from "./loop/PracticeScreen.svelte";
+export { default as ShotReviewScreen } from "./review/ShotReviewScreen.svelte";
 export {
   createPresenceTracker,
   type PresenceState,

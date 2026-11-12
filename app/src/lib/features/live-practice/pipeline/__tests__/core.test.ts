@@ -62,6 +62,14 @@ describe("analyzeAndScore (isomorphic core)", () => {
       expect(w.scored).toBe(true);
       expect(w.inBand).toBe(false);
     }
+
+    // Review poses span the shot's frame range and align with its indexes.
+    const { analysis, reviewPoses } = shots[0]!;
+    const span = analysis.frameRange.end - analysis.frameRange.start + 1;
+    expect(reviewPoses.frames).toHaveLength(span);
+    expect(reviewPoses.frames[0]!.frameIndex).toBe(analysis.frameRange.start);
+    expect(reviewPoses.frames.at(-1)!.frameIndex).toBe(analysis.frameRange.end);
+    expect(reviewPoses.fps).toBe(pose.fps);
   });
 
   it("returns no shots (not an error) for a window too short to detect one", () => {

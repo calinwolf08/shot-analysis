@@ -59,12 +59,24 @@ export const shotAnalysisSchema = z
     metrics: z.record(z.any()),
   })
   .passthrough();
+export const reviewPosesSchema = z.object({
+  fps: z.number(),
+  frames: z.array(
+    z.object({
+      frameIndex: z.number().int().nonnegative(),
+      landmarks: z.array(
+        z.object({ x: z.number(), y: z.number(), visibility: z.number() }),
+      ),
+    }),
+  ),
+});
 export const saveAnalysisBody = z
   .object({
     playerId: z.string().min(1).optional(),
     sessionId: z.string().min(1).optional(),
     videoId: z.string().optional(),
     analysis: shotAnalysisSchema,
+    reviewPoses: reviewPosesSchema.optional(),
   })
   .refine((b) => b.playerId !== undefined || b.sessionId !== undefined, {
     message: "playerId or sessionId is required",

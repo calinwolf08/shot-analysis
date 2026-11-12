@@ -110,8 +110,18 @@ describe("server repos — per-user isolation", () => {
     const shot = await A.shot.saveAnalysis({
       playerId: pA.id,
       analysis: fakeAnalysis(),
+      reviewPoses: {
+        fps: 30,
+        frames: [
+          { frameIndex: 0, landmarks: [{ x: 0.1, y: 0.2, visibility: 1 }] },
+        ],
+      },
     });
     expect(shot.sessionId).toBeNull();
+
+    // Review poses are scoped too: A reads them, B cannot.
+    expect((await A.shot.getPoses(shot.id))?.frames).toHaveLength(1);
+    expect(await B.shot.getPoses(shot.id)).toBeNull();
 
     // A sees it via listByPlayer; B sees nothing and cannot read it.
     expect((await A.shot.listByPlayer(pA.id)).map((s) => s.id)).toEqual([

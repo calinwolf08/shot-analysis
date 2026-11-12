@@ -55,7 +55,11 @@ export function createLocalPipeline(deps: {
       const scored = analyzeAndScore(poseData, opts, deps.targets);
       const out: ProcessedShot[] = [];
       for (const s of scored) {
-        const shot = await deps.store.save({ playerId, analysis: s.analysis });
+        const shot = await deps.store.save({
+          playerId,
+          analysis: s.analysis,
+          reviewPoses: s.reviewPoses,
+        });
         out.push({ shot, scorecard: s.scorecard, worst: s.worst });
       }
       return out;

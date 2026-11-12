@@ -1,5 +1,5 @@
 // Public barrel for the swappable live shot-analysis pipeline.
-export { analyzeAndScore, type ScoredShot } from "./core";
+export { analyzeAndScore, scorecardForShot, type ScoredShot } from "./core";
 export {
   createRepoShotStore,
   type ShotStore,

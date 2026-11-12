@@ -68,6 +68,7 @@ const EXPECTED_TABLES: Record<string, string[]> = {
     "primary_cue",
   ],
   settings: ["key", "value"],
+  shot_poses: ["shot_id", "poses_json"],
   schema_migrations: ["version", "applied_at"],
 };
 
@@ -165,9 +166,9 @@ describe("migrate", () => {
        VALUES ('shot1', 'sess1', 0, 0, '{}', 100)`,
     );
 
-    // Apply v4.
+    // Apply the rest (v4 de-sessions shots; v5 adds shot_poses).
     const result = await migrate(db);
-    expect(result.applied).toEqual([4]);
+    expect(result.applied).toEqual([4, 5]);
 
     const [row] = await db.query<{ player_id: string; session_id: string }>(
       "SELECT player_id, session_id FROM shots WHERE id = 'shot1'",

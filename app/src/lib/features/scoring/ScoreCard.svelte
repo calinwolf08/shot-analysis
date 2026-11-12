@@ -14,7 +14,10 @@
     ShotScorecard,
   } from "./deviation";
 
-  let { card }: { card: ShotScorecard } = $props();
+  let {
+    card,
+    highlightPhase = null,
+  }: { card: ShotScorecard; highlightPhase?: string | null } = $props();
 
   const GREEN = "#34d399";
   const AMBER = "#fbbf24";
@@ -103,6 +106,7 @@
       {#each section.phases as group (group.phase)}
         <div
           class="phase"
+          class:highlight={group.phase === highlightPhase}
           data-testid="sc-phase-{section.section}-{group.phase}"
         >
           <div class="phase-head">
@@ -198,6 +202,12 @@
   }
   .phase {
     margin-bottom: 8px;
+    border-radius: 6px;
+  }
+  .phase.highlight {
+    background: rgba(37, 99, 235, 0.18);
+    outline: 1px solid rgba(37, 99, 235, 0.5);
+    padding: 4px 6px;
   }
   .phase-head {
     display: flex;

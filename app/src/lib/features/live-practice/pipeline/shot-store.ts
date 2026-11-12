@@ -12,11 +12,17 @@
  * @see docs/live-redesign-plan.md §3.5
  */
 import type { StoredShotAnalysis } from "$lib/features/analysis";
-import type { ShotRecord, ShotRepo } from "$lib/shared/db/repos";
+import type {
+  ShotRecord,
+  ShotRepo,
+  ShotReviewPoses,
+} from "$lib/shared/db/repos";
 
 export interface SaveShotInput {
   readonly playerId: string;
   readonly analysis: StoredShotAnalysis;
+  /** Review pose track persisted with the shot (skeleton-fallback source). */
+  readonly reviewPoses?: ShotReviewPoses;
 }
 
 export interface ShotStore {
@@ -28,8 +34,12 @@ export interface ShotStore {
 /** A ShotStore backed by a (server or remote) ShotRepo. */
 export function createRepoShotStore(shotRepo: ShotRepo): ShotStore {
   return {
-    save: ({ playerId, analysis }) =>
-      shotRepo.saveAnalysis({ playerId, analysis }),
+    save: ({ playerId, analysis, reviewPoses }) =>
+      shotRepo.saveAnalysis({
+        playerId,
+        analysis,
+        ...(reviewPoses ? { reviewPoses } : {}),
+      }),
     setExcluded: (id, excluded) => shotRepo.setExcluded(id, excluded),
   };
 }

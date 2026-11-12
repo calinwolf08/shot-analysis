@@ -24,6 +24,7 @@ import type {
   SettingsRepo,
   ShotRecord,
   ShotRepo,
+  ShotReviewPoses,
   VideoRepo,
 } from "$lib/shared/db/repos";
 
@@ -93,6 +94,13 @@ export function createRemoteRepos(api: ApiClient): AppRepos {
       ),
     async setExcluded(id, excluded) {
       await api.send(`/api/shots/${id}`, { excluded }, "PATCH");
+    },
+    async getPoses(id) {
+      try {
+        return await api.get<ShotReviewPoses>(`/api/shots/${id}/poses`);
+      } catch {
+        return null; // 404 → no stored poses for this shot
+      }
     },
   };
 

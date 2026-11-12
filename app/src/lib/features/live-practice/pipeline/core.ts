@@ -13,7 +13,7 @@
  *
  * @see docs/live-redesign-plan.md §3.2, §3.5
  */
-import type { PoseData } from "basketball-shot-analysis";
+import type { PoseData, ShotAnalysis } from "basketball-shot-analysis";
 import {
   poseDataToLandmarkFrames,
   runReplayAnalysis,
@@ -27,12 +27,39 @@ import {
   type MetricDeviation,
   type ShotScorecard,
 } from "$lib/features/scoring";
+import type { ReviewPoseFrame, ShotReviewPoses } from "$lib/shared/db/repos";
 
 export interface ScoredShot {
   /** The full analysis for one detected shot (incl. v2 metrics + keyframes). */
   readonly analysis: StoredShotAnalysis;
   readonly scorecard: ShotScorecard;
   readonly worst: readonly MetricDeviation[];
+  /**
+   * Analysis-aligned 2D skeleton track for the shot (for scrub review).
+   * Frame indexes match the analysis keyframes + metric frame refs.
+   */
+  readonly reviewPoses: ShotReviewPoses;
+}
+
+/**
+ * The filtered, rebased 2D landmark track for the whole window — mirrors the
+ * replay pipeline's `prepare` (drop no-pose frames, reindex from 0), so the
+ * indexes line up with `analysis.frameRange` / keyframes / metric frames.
+ */
+function filteredReviewFrames(pose: PoseData): ReviewPoseFrame[] {
+  const out: ReviewPoseFrame[] = [];
+  for (const f of poseDataToLandmarkFrames(pose)) {
+    if (!f.landmarks || f.landmarks.length === 0) continue;
+    out.push({
+      frameIndex: out.length,
+      landmarks: f.landmarks.map((l) => ({
+        x: l.x,
+        y: l.y,
+        visibility: l.visibility,
+      })),
+    });
+  }
+  return out;
 }
 
 /**
@@ -52,11 +79,33 @@ export function analyzeAndScore(
     width: pose.width,
     height: pose.height,
   });
+  const allFrames = filteredReviewFrames(pose);
   return result.shots.map((a) => {
     const analysis = a as StoredShotAnalysis;
     const scorecard = analysis.v2Metrics
       ? scoreShotDeviation(analysis.v2Metrics, targets)
       : scoreDeviation([], targets);
-    return { analysis, scorecard, worst: scorecard.worst };
+    const reviewPoses: ShotReviewPoses = {
+      fps: pose.fps,
+      frames: allFrames.slice(
+        analysis.frameRange.start,
+        analysis.frameRange.end + 1,
+      ),
+    };
+    return { analysis, scorecard, worst: scorecard.worst, reviewPoses };
   });
+}
+
+/**
+ * Recomputes a stored shot's deviation scorecard from its persisted v2 metrics
+ * against the current targets — the read-side path for the Shots list, review,
+ * and Insights (score is recomputed, never stored; see docs/live-redesign-plan
+ * §3.5). Returns an empty scorecard when the shot carries no v2 metrics.
+ */
+export function scorecardForShot(
+  analysis: ShotAnalysis,
+  targets: LiveTargets,
+): ShotScorecard {
+  const v2 = (analysis as StoredShotAnalysis).v2Metrics;
+  return v2 ? scoreShotDeviation(v2, targets) : scoreDeviation([], targets);
 }
