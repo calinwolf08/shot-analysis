@@ -49,7 +49,11 @@ export interface ShotRecord {
   id: string;
   /** Owning player — the root a shot hangs off (live shots have no session). */
   playerId: string;
-  /** Owning session, or null for de-sessioned live shots. */
+  /**
+   * Owning session. Null for the de-sessioned live flow (the primary path);
+   * set only by the hidden assessment/upload path, which still groups shots
+   * into sessions. Not read by live practice, scoring, or insights.
+   */
   sessionId: string | null;
   videoId: string | null;
   shotIndex: number;

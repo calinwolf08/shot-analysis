@@ -479,6 +479,7 @@ export function createServerRepos(
       );
       return rows[0] ? toShot(rows[0]) : null;
     },
+    // Assessment/upload path only; the live flow uses listByPlayer.
     async listBySession(sessionId, opts = {}) {
       const excl = opts.includeExcluded ? "" : "AND s.excluded = 0";
       const rows = await db.query<ShotRow>(

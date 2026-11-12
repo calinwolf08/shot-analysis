@@ -19,6 +19,7 @@ export const GET = withUser(async ({ repos }, event) => {
       }),
     );
   }
+  // sessionId branch: assessment/upload path only (live uses playerId above).
   const sessionId = q.get("sessionId");
   if (!sessionId) return json({ error: "playerId or sessionId required" }, 400);
   return json(await repos.shot.listBySession(sessionId, { includeExcluded }));

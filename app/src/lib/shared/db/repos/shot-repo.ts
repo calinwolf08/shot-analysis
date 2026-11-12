@@ -28,6 +28,10 @@ export interface ShotRepo {
    */
   saveAnalysis(input: SaveAnalysisInput): Promise<ShotRecord>;
   get(id: string): Promise<ShotRecord | null>;
+  /**
+   * Assessment/upload path only — the de-sessioned live flow uses
+   * {@link ShotRepo.listByPlayer}. Kept for the hidden upload feature.
+   */
   listBySession(
     sessionId: string,
     opts?: { includeExcluded?: boolean },
