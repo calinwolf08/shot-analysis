@@ -21,6 +21,8 @@ export interface SaveShotInput {
 
 export interface ShotStore {
   save(input: SaveShotInput): Promise<ShotRecord>;
+  /** Mark a shot excluded / included (the "not a shot" affordance). */
+  setExcluded(id: string, excluded: boolean): Promise<void>;
 }
 
 /** A ShotStore backed by a (server or remote) ShotRepo. */
@@ -28,5 +30,6 @@ export function createRepoShotStore(shotRepo: ShotRepo): ShotStore {
   return {
     save: ({ playerId, analysis }) =>
       shotRepo.saveAnalysis({ playerId, analysis }),
+    setExcluded: (id, excluded) => shotRepo.setExcluded(id, excluded),
   };
 }

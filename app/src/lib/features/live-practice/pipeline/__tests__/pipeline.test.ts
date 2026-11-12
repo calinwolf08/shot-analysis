@@ -49,6 +49,7 @@ describe("createLocalPipeline (on-device analysis)", () => {
   it("analyzes + scores on device and persists via the store", async () => {
     const saved: StoredShotAnalysis[] = [];
     const store: ShotStore = {
+      async setExcluded() {},
       async save({ playerId, analysis }) {
         saved.push(analysis);
         return {
