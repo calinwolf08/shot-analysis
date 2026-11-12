@@ -14,6 +14,7 @@ coaches the player.
 
 | Doc                                                                          | What it covers                                                              |
 | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [`SETUP.md`](SETUP.md)                                                       | Install, run locally, build, and publish the iOS/Android apps               |
 | [`docs/architecture.md`](docs/architecture.md)                               | System topology, analysis stack, scoring, auth, persistence (with diagrams) |
 | [`docs/shot-detection-and-analysis.md`](docs/shot-detection-and-analysis.md) | The detection & analysis algorithm in plain language (granular diagrams)    |
 | [`docs/metrics-by-phase.md`](docs/metrics-by-phase.md)                       | Every metric, organized by shot phase                                       |
