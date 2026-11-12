@@ -23,7 +23,8 @@
     "format": "prettier --write .",
     "validate": "npm run build:browser && npx tsx server.ts",
     "metrics:golden": "tsx src/testing/build-metrics-golden.ts",
-    "metrics:reference": "tsx src/testing/build-placeholder-reference.ts"
+    "metrics:reference": "tsx src/testing/build-placeholder-reference.ts",
+    "targets:build": "tsx src/testing/build-live-targets.ts"
   },
   "keywords": [
     "basketball",

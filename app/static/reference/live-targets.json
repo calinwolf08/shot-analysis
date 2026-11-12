@@ -1,0 +1,2394 @@
+{
+  "version": 1,
+  "builtFrom": "stephen-curry-1",
+  "source": "test-data/stephen-curry-1",
+  "shootingHand": "right",
+  "shots": 7,
+  "generatedAt": "2026-11-12T03:43:54.207Z",
+  "notes": [
+    "PLACEHOLDER baseline derived from a small set of approved reference shots.",
+    "ideal = mean across the approved shots; passMin/passMax = observed min/max;",
+    "rampSd scales the 1..10 deviation score (≈ one point per SD outside the band).",
+    "Hand-tune freely — this file is the tuning surface and is not clobbered by the pipeline.",
+    "`*.ankles` posture metrics are ≈0 by construction and left unscored (docs/follow-up-work.md §1.2).",
+    "`unit`/`direction` default by metric family; refine per metric where a precise unit is known."
+  ],
+  "metrics": {
+    "followThrough.elbow_extension_angle": {
+      "section": "structure",
+      "phase": "followThrough",
+      "label": "Elbow extension angle",
+      "unit": "",
+      "ideal": 171.28272244771523,
+      "sd": 4.870511902343745,
+      "passMin": 161.61292416298755,
+      "passMax": 177.89045364045148,
+      "rampSd": 4.870511902343745,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 171.28272244771523,
+        "sd": 4.870511902343745,
+        "median": 172.12803176942293,
+        "min": 161.61292416298755,
+        "max": 177.89045364045148,
+        "p25": 170.9550358429854,
+        "p75": 172.7187879375868,
+        "iqr": 1.7637520946013865
+      }
+    },
+    "followThrough.wrist_snap_angle": {
+      "section": "structure",
+      "phase": "followThrough",
+      "label": "Wrist snap angle",
+      "unit": "",
+      "ideal": 147.1557327134173,
+      "sd": 5.250195150894717,
+      "passMin": 140.66124309887286,
+      "passMax": 156.90048740061417,
+      "rampSd": 5.250195150894717,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 147.1557327134173,
+        "sd": 5.250195150894717,
+        "median": 146.37547016797353,
+        "min": 140.66124309887286,
+        "max": 156.90048740061417,
+        "p25": 144.22482433312803,
+        "p75": 148.85163983010233,
+        "iqr": 4.626815496974302
+      }
+    },
+    "gather.ankles": {
+      "section": "structure",
+      "phase": "gather",
+      "label": "Ankles",
+      "unit": "",
+      "ideal": 0,
+      "sd": 0,
+      "passMin": 0,
+      "passMax": 0,
+      "rampSd": 0.000001,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": false,
+      "stats": {
+        "n": 7,
+        "mean": 0,
+        "sd": 0,
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "p25": 0,
+        "p75": 0,
+        "iqr": 0
+      }
+    },
+    "gather.ball_height": {
+      "section": "structure",
+      "phase": "gather",
+      "label": "Ball height",
+      "unit": "",
+      "ideal": 0.6549217036317949,
+      "sd": 0.06771423585687639,
+      "passMin": 0.5796818548612984,
+      "passMax": 0.7433205426626116,
+      "rampSd": 0.06771423585687639,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 5,
+        "mean": 0.6549217036317949,
+        "sd": 0.06771423585687639,
+        "median": 0.6273800668043091,
+        "min": 0.5796818548612984,
+        "max": 0.7433205426626116,
+        "p25": 0.6173720538289315,
+        "p75": 0.7068540000018237,
+        "iqr": 0.08948194617289229
+      }
+    },
+    "gather.head": {
+      "section": "structure",
+      "phase": "gather",
+      "label": "Head",
+      "unit": "",
+      "ideal": -0.08432864511661722,
+      "sd": 0.019647039378033426,
+      "passMin": -0.1117556755937456,
+      "passMax": -0.052738325941493545,
+      "rampSd": 0.019647039378033426,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.08432864511661722,
+        "sd": 0.019647039378033426,
+        "median": -0.09157652962775363,
+        "min": -0.1117556755937456,
+        "max": -0.052738325941493545,
+        "p25": -0.09355944064551854,
+        "p75": -0.07355555168114536,
+        "iqr": 0.020003888964373176
+      }
+    },
+    "gather.hips": {
+      "section": "structure",
+      "phase": "gather",
+      "label": "Hips",
+      "unit": "",
+      "ideal": -0.008422583055006188,
+      "sd": 0.012582558181453311,
+      "passMin": -0.03323445278131847,
+      "passMax": 0.006332187554041537,
+      "rampSd": 0.012582558181453311,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.008422583055006188,
+        "sd": 0.012582558181453311,
+        "median": -0.0073367608584260354,
+        "min": -0.03323445278131847,
+        "max": 0.006332187554041537,
+        "p25": -0.010763924532970048,
+        "p75": -0.001595603116700122,
+        "iqr": 0.009168321416269925
+      }
+    },
+    "gather.knees": {
+      "section": "structure",
+      "phase": "gather",
+      "label": "Knees",
+      "unit": "",
+      "ideal": -0.02886854314059264,
+      "sd": 0.012242107554952381,
+      "passMin": -0.041852006445605903,
+      "passMax": -0.005404805166193273,
+      "rampSd": 0.012242107554952381,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.02886854314059264,
+        "sd": 0.012242107554952381,
+        "median": -0.026886272368672057,
+        "min": -0.041852006445605903,
+        "max": -0.005404805166193273,
+        "p25": -0.037504093493016755,
+        "p75": -0.026464265508821874,
+        "iqr": 0.01103982798419488
+      }
+    },
+    "gather.shoulders": {
+      "section": "structure",
+      "phase": "gather",
+      "label": "Shoulders",
+      "unit": "",
+      "ideal": -0.02762028750240617,
+      "sd": 0.015604186078413244,
+      "passMin": -0.04819701287889231,
+      "passMax": -0.006429722460192785,
+      "rampSd": 0.015604186078413244,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.02762028750240617,
+        "sd": 0.015604186078413244,
+        "median": -0.030389853999565838,
+        "min": -0.04819701287889231,
+        "max": -0.006429722460192785,
+        "p25": -0.03784924577695371,
+        "p75": -0.01631346581214242,
+        "iqr": 0.021535779964811295
+      }
+    },
+    "load.ankles_delta": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Ankles delta",
+      "unit": "",
+      "ideal": 0,
+      "sd": 0,
+      "passMin": 0,
+      "passMax": 0,
+      "rampSd": 0.000001,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": false,
+      "stats": {
+        "n": 7,
+        "mean": 0,
+        "sd": 0,
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "p25": 0,
+        "p75": 0,
+        "iqr": 0
+      }
+    },
+    "load.ankles_end": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Ankles end",
+      "unit": "",
+      "ideal": 0,
+      "sd": 0,
+      "passMin": 0,
+      "passMax": 0,
+      "rampSd": 0.000001,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": false,
+      "stats": {
+        "n": 7,
+        "mean": 0,
+        "sd": 0,
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "p25": 0,
+        "p75": 0,
+        "iqr": 0
+      }
+    },
+    "load.ankles_start": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Ankles start",
+      "unit": "",
+      "ideal": 0,
+      "sd": 0,
+      "passMin": 0,
+      "passMax": 0,
+      "rampSd": 0.000001,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": false,
+      "stats": {
+        "n": 7,
+        "mean": 0,
+        "sd": 0,
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "p25": 0,
+        "p75": 0,
+        "iqr": 0
+      }
+    },
+    "load.ball_low_height": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Ball low height",
+      "unit": "",
+      "ideal": 0.6002497773754908,
+      "sd": 0.022716008312403807,
+      "passMin": 0.5795939759324259,
+      "passMax": 0.6307319685616224,
+      "rampSd": 0.022716008312403807,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.6002497773754908,
+        "sd": 0.022716008312403807,
+        "median": 0.5864856299028729,
+        "min": 0.5795939759324259,
+        "max": 0.6307319685616224,
+        "p25": 0.5823428854619765,
+        "p75": 0.6201255481537805,
+        "iqr": 0.03778266269180397
+      }
+    },
+    "load.depth_drop": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Depth drop",
+      "unit": "",
+      "ideal": 0.033410715588238556,
+      "sd": 0.027487609486655067,
+      "passMin": 0.010512177377711207,
+      "passMax": 0.09279742829104204,
+      "rampSd": 0.027487609486655067,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.033410715588238556,
+        "sd": 0.027487609486655067,
+        "median": 0.025706397141143755,
+        "min": 0.010512177377711207,
+        "max": 0.09279742829104204,
+        "p25": 0.020231298944894505,
+        "p75": 0.03219820420899194,
+        "iqr": 0.011966905264097438
+      }
+    },
+    "load.head_delta": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Head delta",
+      "unit": "",
+      "ideal": 0.03622569104372286,
+      "sd": 0.026890374789886512,
+      "passMin": 0.010694689474659416,
+      "passMax": 0.0774094350526974,
+      "rampSd": 0.026890374789886512,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.03622569104372286,
+        "sd": 0.026890374789886512,
+        "median": 0.023827302071206438,
+        "min": 0.010694689474659416,
+        "max": 0.0774094350526974,
+        "p25": 0.019091785476674717,
+        "p75": 0.05173241987707366,
+        "iqr": 0.03264063440039894
+      }
+    },
+    "load.head_end": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Head end",
+      "unit": "",
+      "ideal": -0.04810295407289437,
+      "sd": 0.02431782742475862,
+      "passMin": -0.08088184015309421,
+      "passMax": -0.015948735838832197,
+      "rampSd": 0.02431782742475862,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.04810295407289437,
+        "sd": 0.02431782742475862,
+        "median": -0.05075815714914179,
+        "min": -0.08088184015309421,
+        "max": -0.015948735838832197,
+        "p25": -0.06405139179405026,
+        "p75": -0.03051458089054591,
+        "iqr": 0.03353681090350434
+      }
+    },
+    "load.head_start": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Head start",
+      "unit": "",
+      "ideal": -0.08432864511661722,
+      "sd": 0.019647039378033426,
+      "passMin": -0.1117556755937456,
+      "passMax": -0.052738325941493545,
+      "rampSd": 0.019647039378033426,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.08432864511661722,
+        "sd": 0.019647039378033426,
+        "median": -0.09157652962775363,
+        "min": -0.1117556755937456,
+        "max": -0.052738325941493545,
+        "p25": -0.09355944064551854,
+        "p75": -0.07355555168114536,
+        "iqr": 0.020003888964373176
+      }
+    },
+    "load.hip_depth": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Hip depth",
+      "unit": "",
+      "ideal": 0.472160678913891,
+      "sd": 0.016692102216046587,
+      "passMin": 0.4397447483136319,
+      "passMax": 0.48701441805989665,
+      "rampSd": 0.016692102216046587,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.472160678913891,
+        "sd": 0.016692102216046587,
+        "median": 0.4753900985098124,
+        "min": 0.4397447483136319,
+        "max": 0.48701441805989665,
+        "p25": 0.4668423608546687,
+        "p75": 0.4846453829022793,
+        "iqr": 0.01780302204761064
+      }
+    },
+    "load.hips_delta": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Hips delta",
+      "unit": "",
+      "ideal": -0.0002416198732157239,
+      "sd": 0.011984436172586566,
+      "passMin": -0.0145826653419526,
+      "passMax": 0.01685020501622381,
+      "rampSd": 0.011984436172586566,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.0002416198732157239,
+        "sd": 0.011984436172586566,
+        "median": -0.003893380012712641,
+        "min": -0.0145826653419526,
+        "max": 0.01685020501622381,
+        "p25": -0.007236369911248155,
+        "p75": 0.007203620524213836,
+        "iqr": 0.014439990435461993
+      }
+    },
+    "load.hips_end": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Hips end",
+      "unit": "",
+      "ideal": -0.00866420292822191,
+      "sd": 0.009414210829092348,
+      "passMin": -0.021545808807758086,
+      "passMax": 0.007864385610380636,
+      "rampSd": 0.009414210829092348,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.00866420292822191,
+        "sd": 0.009414210829092348,
+        "median": -0.008379312765739454,
+        "min": -0.021545808807758086,
+        "max": 0.007864385610380636,
+        "p25": -0.013520766986242317,
+        "p75": -0.005773575280975921,
+        "iqr": 0.007747191705266396
+      }
+    },
+    "load.hips_start": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Hips start",
+      "unit": "",
+      "ideal": -0.008422583055006188,
+      "sd": 0.012582558181453311,
+      "passMin": -0.03323445278131847,
+      "passMax": 0.006332187554041537,
+      "rampSd": 0.012582558181453311,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.008422583055006188,
+        "sd": 0.012582558181453311,
+        "median": -0.0073367608584260354,
+        "min": -0.03323445278131847,
+        "max": 0.006332187554041537,
+        "p25": -0.010763924532970048,
+        "p75": -0.001595603116700122,
+        "iqr": 0.009168321416269925
+      }
+    },
+    "load.knees_delta": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Knees delta",
+      "unit": "",
+      "ideal": -0.018587660814062552,
+      "sd": 0.02002885860070461,
+      "passMin": -0.048462266883392696,
+      "passMax": 0.0073846609117180495,
+      "rampSd": 0.02002885860070461,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.018587660814062552,
+        "sd": 0.02002885860070461,
+        "median": -0.020972578468773945,
+        "min": -0.048462266883392696,
+        "max": 0.0073846609117180495,
+        "p25": -0.0284303480898681,
+        "p75": -0.005601372539126556,
+        "iqr": 0.022828975550741544
+      }
+    },
+    "load.knees_end": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Knees end",
+      "unit": "",
+      "ideal": -0.047456203954655204,
+      "sd": 0.009521446925692033,
+      "passMin": -0.05891079351455119,
+      "passMax": -0.03436040975747313,
+      "rampSd": 0.009521446925692033,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.047456203954655204,
+        "sd": 0.009521446925692033,
+        "median": -0.05091875751101223,
+        "min": -0.05891079351455119,
+        "max": -0.03436040975747313,
+        "p25": -0.05285879717819973,
+        "p75": -0.0411429362715752,
+        "iqr": 0.011715860906624534
+      }
+    },
+    "load.knees_start": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Knees start",
+      "unit": "",
+      "ideal": -0.02886854314059264,
+      "sd": 0.012242107554952381,
+      "passMin": -0.041852006445605903,
+      "passMax": -0.005404805166193273,
+      "rampSd": 0.012242107554952381,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.02886854314059264,
+        "sd": 0.012242107554952381,
+        "median": -0.026886272368672057,
+        "min": -0.041852006445605903,
+        "max": -0.005404805166193273,
+        "p25": -0.037504093493016755,
+        "p75": -0.026464265508821874,
+        "iqr": 0.01103982798419488
+      }
+    },
+    "load.shoulders_delta": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Shoulders delta",
+      "unit": "",
+      "ideal": 0.023904220305558718,
+      "sd": 0.02365276274207724,
+      "passMin": -0.0033011682393046006,
+      "passMax": 0.05989787717693007,
+      "rampSd": 0.02365276274207724,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.023904220305558718,
+        "sd": 0.02365276274207724,
+        "median": 0.0181908829621281,
+        "min": -0.0033011682393046006,
+        "max": 0.05989787717693007,
+        "p25": 0.009233987532524877,
+        "p75": 0.03703698758705384,
+        "iqr": 0.027803000054528966
+      }
+    },
+    "load.shoulders_end": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Shoulders end",
+      "unit": "",
+      "ideal": -0.003716067196847456,
+      "sd": 0.018937285259778544,
+      "passMin": -0.03369102223887044,
+      "passMax": 0.020491928024672344,
+      "rampSd": 0.018937285259778544,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.003716067196847456,
+        "sd": 0.018937285259778544,
+        "median": -0.004583749084670647,
+        "min": -0.03369102223887044,
+        "max": 0.020491928024672344,
+        "p25": -0.01383843345704302,
+        "p75": 0.009723619917511299,
+        "iqr": 0.023562053374554318
+      }
+    },
+    "load.shoulders_start": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Shoulders start",
+      "unit": "",
+      "ideal": -0.02762028750240617,
+      "sd": 0.015604186078413244,
+      "passMin": -0.04819701287889231,
+      "passMax": -0.006429722460192785,
+      "rampSd": 0.015604186078413244,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.02762028750240617,
+        "sd": 0.015604186078413244,
+        "median": -0.030389853999565838,
+        "min": -0.04819701287889231,
+        "max": -0.006429722460192785,
+        "p25": -0.03784924577695371,
+        "p75": -0.01631346581214242,
+        "iqr": 0.021535779964811295
+      }
+    },
+    "load.start_height": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Start height",
+      "unit": "",
+      "ideal": 0.5055713945021295,
+      "sd": 0.01588445795852341,
+      "passMin": 0.4805214877214279,
+      "passMax": 0.532542176604674,
+      "rampSd": 0.01588445795852341,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.5055713945021295,
+        "sd": 0.01588445795852341,
+        "median": 0.5020376792072301,
+        "min": 0.4805214877214279,
+        "max": 0.532542176604674,
+        "p25": 0.4999766738184892,
+        "p75": 0.5119725351722982,
+        "iqr": 0.011995861353809034
+      }
+    },
+    "load.wrist_cock_delta": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Wrist cock delta",
+      "unit": "",
+      "ideal": -20.218941575315796,
+      "sd": 4.464533836871511,
+      "passMin": -23.375843726204437,
+      "passMax": -17.062039424427155,
+      "rampSd": 4.464533836871511,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 2,
+        "mean": -20.218941575315796,
+        "sd": 4.464533836871511,
+        "median": -20.218941575315796,
+        "min": -23.375843726204437,
+        "max": -17.062039424427155,
+        "p25": -21.797392650760116,
+        "p75": -18.640490499871476,
+        "iqr": 3.156902150888641
+      }
+    },
+    "load.wrist_cock_end": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Wrist cock end",
+      "unit": "",
+      "ideal": 156.74696912613177,
+      "sd": 10.923187415911936,
+      "passMin": 143.23615601905087,
+      "passMax": 169.3541626815533,
+      "rampSd": 10.923187415911936,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 5,
+        "mean": 156.74696912613177,
+        "sd": 10.923187415911936,
+        "median": 156.62231037722987,
+        "min": 143.23615601905087,
+        "max": 169.3541626815533,
+        "p25": 149.03807735105292,
+        "p75": 165.48413920177182,
+        "iqr": 16.446061850718905
+      }
+    },
+    "load.wrist_cock_start": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Wrist cock start",
+      "unit": "",
+      "ideal": 170.63210710602934,
+      "sd": 3.634158133268352,
+      "passMin": 166.6119997452553,
+      "passMax": 173.68434980165702,
+      "rampSd": 3.634158133268352,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 3,
+        "mean": 170.63210710602934,
+        "sd": 3.634158133268352,
+        "median": 171.59997177117572,
+        "min": 166.6119997452553,
+        "max": 173.68434980165702,
+        "p25": 169.10598575821552,
+        "p75": 172.64216078641635,
+        "iqr": 3.53617502820083
+      }
+    },
+    "load.wrist_dist_delta": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Wrist dist delta",
+      "unit": "",
+      "ideal": 0.13899297450422377,
+      "sd": 0.07806852750822961,
+      "passMin": 0.016645587659734784,
+      "passMax": 0.22223624834404376,
+      "rampSd": 0.07806852750822961,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 5,
+        "mean": 0.13899297450422377,
+        "sd": 0.07806852750822961,
+        "median": 0.14139159227258044,
+        "min": 0.016645587659734784,
+        "max": 0.22223624834404376,
+        "p25": 0.12733693853743294,
+        "p75": 0.1873545057073269,
+        "iqr": 0.060017567169893954
+      }
+    },
+    "load.wrist_dist_end": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Wrist dist end",
+      "unit": "",
+      "ideal": 0.3258466192664378,
+      "sd": 0.06653027652344619,
+      "passMin": 0.19980814302710845,
+      "passMax": 0.40236888477546046,
+      "rampSd": 0.06653027652344619,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.3258466192664378,
+        "sd": 0.06653027652344619,
+        "median": 0.31787134353358193,
+        "min": 0.19980814302710845,
+        "max": 0.40236888477546046,
+        "p25": 0.3104914842346648,
+        "p75": 0.369947497529792,
+        "iqr": 0.059456013295127175
+      }
+    },
+    "load.wrist_dist_start": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Wrist dist start",
+      "unit": "",
+      "ideal": 0.21365639515665108,
+      "sd": 0.06738946376186301,
+      "passMin": 0.16085497968695328,
+      "passMax": 0.29863421347515245,
+      "rampSd": 0.06738946376186301,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 5,
+        "mean": 0.21365639515665108,
+        "sd": 0.06738946376186301,
+        "median": 0.16944926132126006,
+        "min": 0.16085497968695328,
+        "max": 0.29863421347515245,
+        "p25": 0.16431157506186198,
+        "p75": 0.2750319462380275,
+        "iqr": 0.11072037117616554
+      }
+    },
+    "load.wrist_height_delta": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Wrist height delta",
+      "unit": "",
+      "ideal": 0.13776563266024605,
+      "sd": 0.08664965193412254,
+      "passMin": 0.01875667611837084,
+      "passMax": 0.2573609697953224,
+      "rampSd": 0.08664965193412254,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 5,
+        "mean": 0.13776563266024605,
+        "sd": 0.08664965193412254,
+        "median": 0.12358443755834192,
+        "min": 0.01875667611837084,
+        "max": 0.2573609697953224,
+        "p25": 0.11933451900770986,
+        "p75": 0.16979156082148517,
+        "iqr": 0.050457041813775305
+      }
+    },
+    "load.wrist_height_end": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Wrist height end",
+      "unit": "",
+      "ideal": 0.7859592347642627,
+      "sd": 0.05713752553501103,
+      "passMin": 0.6812158326021868,
+      "passMax": 0.8459289846330718,
+      "rampSd": 0.05713752553501103,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.7859592347642627,
+        "sd": 0.05713752553501103,
+        "median": 0.7875774949863432,
+        "min": 0.6812158326021868,
+        "max": 0.8459289846330718,
+        "p25": 0.7650242094958701,
+        "p75": 0.8284719560682485,
+        "iqr": 0.0634477465723784
+      }
+    },
+    "load.wrist_height_start": {
+      "section": "structure",
+      "phase": "load",
+      "label": "Wrist height start",
+      "unit": "",
+      "ideal": 0.6688186304920158,
+      "sd": 0.0683328667506773,
+      "passMin": 0.586462759576187,
+      "passMax": 0.7515326822451629,
+      "rampSd": 0.0683328667506773,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 5,
+        "mean": 0.6688186304920158,
+        "sd": 0.0683328667506773,
+        "median": 0.6433286219435026,
+        "min": 0.586462759576187,
+        "max": 0.7515326822451629,
+        "p25": 0.6361746230698646,
+        "p75": 0.7265944656253619,
+        "iqr": 0.09041984255549729
+      }
+    },
+    "release.ankles_delta": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Ankles delta",
+      "unit": "",
+      "ideal": 0,
+      "sd": 0,
+      "passMin": 0,
+      "passMax": 0,
+      "rampSd": 0.000001,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": false,
+      "stats": {
+        "n": 7,
+        "mean": 0,
+        "sd": 0,
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "p25": 0,
+        "p75": 0,
+        "iqr": 0
+      }
+    },
+    "release.ankles_end": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Ankles end",
+      "unit": "",
+      "ideal": 0,
+      "sd": 0,
+      "passMin": 0,
+      "passMax": 0,
+      "rampSd": 0.000001,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": false,
+      "stats": {
+        "n": 7,
+        "mean": 0,
+        "sd": 0,
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "p25": 0,
+        "p75": 0,
+        "iqr": 0
+      }
+    },
+    "release.ankles_start": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Ankles start",
+      "unit": "",
+      "ideal": 0,
+      "sd": 0,
+      "passMin": 0,
+      "passMax": 0,
+      "rampSd": 0.000001,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": false,
+      "stats": {
+        "n": 7,
+        "mean": 0,
+        "sd": 0,
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "p25": 0,
+        "p75": 0,
+        "iqr": 0
+      }
+    },
+    "release.elbow_height_vs_head": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Elbow height vs head",
+      "unit": "",
+      "ideal": 0.0005812183761722708,
+      "sd": 0.05189044380702501,
+      "passMin": -0.11321885238455434,
+      "passMax": 0.03873641146406151,
+      "rampSd": 0.05189044380702501,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.0005812183761722708,
+        "sd": 0.05189044380702501,
+        "median": 0.020277191298693143,
+        "min": -0.11321885238455434,
+        "max": 0.03873641146406151,
+        "p25": 0.0025813367081443618,
+        "p75": 0.026555552419358433,
+        "iqr": 0.02397421571121407
+      }
+    },
+    "release.guide_hand_duration": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Guide hand duration",
+      "unit": "",
+      "ideal": 0.12016806722689073,
+      "sd": 0.021539505240296273,
+      "passMin": 0.09999999999999998,
+      "passMax": 0.1428571428571428,
+      "rampSd": 0.021539505240296273,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 3,
+        "mean": 0.12016806722689073,
+        "sd": 0.021539505240296273,
+        "median": 0.11764705882352944,
+        "min": 0.09999999999999998,
+        "max": 0.1428571428571428,
+        "p25": 0.10882352941176471,
+        "p75": 0.13025210084033612,
+        "iqr": 0.021428571428571408
+      }
+    },
+    "release.head_delta": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Head delta",
+      "unit": "",
+      "ideal": 0.007772236300684862,
+      "sd": 0.012354039353772038,
+      "passMin": -0.013905694408973344,
+      "passMax": 0.020814213495961093,
+      "rampSd": 0.012354039353772038,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.007772236300684862,
+        "sd": 0.012354039353772038,
+        "median": 0.00554938165605488,
+        "min": -0.013905694408973344,
+        "max": 0.020814213495961093,
+        "p25": 0.002899558986645208,
+        "p75": 0.018074317694230492,
+        "iqr": 0.015174758707585284
+      }
+    },
+    "release.head_end": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Head end",
+      "unit": "",
+      "ideal": -0.005898188128206139,
+      "sd": 0.025242403989962754,
+      "passMin": -0.052194530569421846,
+      "passMax": 0.0342801611437018,
+      "rampSd": 0.025242403989962754,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.005898188128206139,
+        "sd": 0.025242403989962754,
+        "median": -0.0063572832388031665,
+        "min": -0.052194530569421846,
+        "max": 0.0342801611437018,
+        "p25": -0.007910776408130612,
+        "p75": -0.0005970557083292648,
+        "iqr": 0.007313720699801347
+      }
+    },
+    "release.head_start": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Head start",
+      "unit": "",
+      "ideal": -0.013670424428891001,
+      "sd": 0.016413044038472085,
+      "passMin": -0.0382888361604485,
+      "passMax": 0.016307759173648725,
+      "rampSd": 0.016413044038472085,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.013670424428891001,
+        "sd": 0.016413044038472085,
+        "median": -0.012488056980424043,
+        "min": -0.0382888361604485,
+        "max": 0.016307759173648725,
+        "p25": -0.020092279165513767,
+        "p75": -0.010519639351992821,
+        "iqr": 0.009572639813520946
+      }
+    },
+    "release.hips_delta": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Hips delta",
+      "unit": "",
+      "ideal": 0.018653846600400554,
+      "sd": 0.010857041101188973,
+      "passMin": 0.008953534287751148,
+      "passMax": 0.03446452004346358,
+      "rampSd": 0.010857041101188973,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.018653846600400554,
+        "sd": 0.010857041101188973,
+        "median": 0.01081711154620204,
+        "min": 0.008953534287751148,
+        "max": 0.03446452004346358,
+        "p25": 0.010526549360766559,
+        "p75": 0.02764433080192699,
+        "iqr": 0.01711778144116043
+      }
+    },
+    "release.hips_end": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Hips end",
+      "unit": "",
+      "ideal": -0.017707212807741075,
+      "sd": 0.016005539018834183,
+      "passMin": -0.04406249737231623,
+      "passMax": 0.006757962773850221,
+      "rampSd": 0.016005539018834183,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.017707212807741075,
+        "sd": 0.016005539018834183,
+        "median": -0.014667893784304128,
+        "min": -0.04406249737231623,
+        "max": 0.006757962773850221,
+        "p25": -0.02460571700612243,
+        "p75": -0.01138331362958626,
+        "iqr": 0.013222403376536171
+      }
+    },
+    "release.hips_start": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Hips start",
+      "unit": "",
+      "ideal": -0.036361059408141626,
+      "sd": 0.012020932630757252,
+      "passMin": -0.05487960891851827,
+      "passMax": -0.022001079018715137,
+      "rampSd": 0.012020932630757252,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.036361059408141626,
+        "sd": 0.012020932630757252,
+        "median": -0.040315384904227765,
+        "min": -0.05487960891851827,
+        "max": -0.022001079018715137,
+        "p25": -0.04231241163956631,
+        "p75": -0.02635325986819879,
+        "iqr": 0.01595915177136752
+      }
+    },
+    "release.knees_delta": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Knees delta",
+      "unit": "",
+      "ideal": 0.027790321216477936,
+      "sd": 0.00837711857429232,
+      "passMin": 0.016799316111466928,
+      "passMax": 0.03983813492908034,
+      "rampSd": 0.00837711857429232,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.027790321216477936,
+        "sd": 0.00837711857429232,
+        "median": 0.02722860615763139,
+        "min": 0.016799316111466928,
+        "max": 0.03983813492908034,
+        "p25": 0.02200115070478897,
+        "p75": 0.033331944953794476,
+        "iqr": 0.011330794249005505
+      }
+    },
+    "release.knees_end": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Knees end",
+      "unit": "",
+      "ideal": -0.018322869358227935,
+      "sd": 0.012030973965754739,
+      "passMin": -0.042147247995519,
+      "passMax": -0.0055941676388913675,
+      "rampSd": 0.012030973965754739,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.018322869358227935,
+        "sd": 0.012030973965754739,
+        "median": -0.014745684339755412,
+        "min": -0.042147247995519,
+        "max": -0.0055941676388913675,
+        "p25": -0.02048842620596447,
+        "p75": -0.012398066560750407,
+        "iqr": 0.008090359645214065
+      }
+    },
+    "release.knees_start": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Knees start",
+      "unit": "",
+      "ideal": -0.046113190574705865,
+      "sd": 0.007869074731582798,
+      "passMin": -0.05894656410698593,
+      "passMax": -0.03682672757551732,
+      "rampSd": 0.007869074731582798,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.046113190574705865,
+        "sd": 0.007869074731582798,
+        "median": -0.044336564332456356,
+        "min": -0.05894656410698593,
+        "max": -0.03682672757551732,
+        "p25": -0.05103196693367204,
+        "p75": -0.0403092720703187,
+        "iqr": 0.010722694863353338
+      }
+    },
+    "release.shoulders_delta": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Shoulders delta",
+      "unit": "",
+      "ideal": 0.011772674999370998,
+      "sd": 0.008690034047185529,
+      "passMin": -0.0011592137992765816,
+      "passMax": 0.022049722832945522,
+      "rampSd": 0.008690034047185529,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.011772674999370998,
+        "sd": 0.008690034047185529,
+        "median": 0.007720922450087483,
+        "min": -0.0011592137992765816,
+        "max": 0.022049722832945522,
+        "p25": 0.007277374341909134,
+        "p75": 0.01962127241401114,
+        "iqr": 0.012343898072102006
+      }
+    },
+    "release.shoulders_end": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Shoulders end",
+      "unit": "",
+      "ideal": 0.0006994110701423081,
+      "sd": 0.022831634947385677,
+      "passMin": -0.039059077965821205,
+      "passMax": 0.0390517862801798,
+      "rampSd": 0.022831634947385677,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.0006994110701423081,
+        "sd": 0.022831634947385677,
+        "median": 0.0018040075074957878,
+        "min": -0.039059077965821205,
+        "max": 0.0390517862801798,
+        "p25": -0.003111202216689978,
+        "p75": 0.004660783051260865,
+        "iqr": 0.007771985267950843
+      }
+    },
+    "release.shoulders_start": {
+      "section": "structure",
+      "phase": "release",
+      "label": "Shoulders start",
+      "unit": "",
+      "ideal": -0.011073263929228685,
+      "sd": 0.0174887578973422,
+      "passMin": -0.037899864166544624,
+      "passMax": 0.01910552994297909,
+      "rampSd": 0.0174887578973422,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.011073263929228685,
+        "sd": 0.0174887578973422,
+        "median": -0.01282227633112138,
+        "min": -0.037899864166544624,
+        "max": 0.01910552994297909,
+        "p25": -0.017954026049444828,
+        "p75": -0.004994092425512121,
+        "iqr": 0.012959933623932707
+      }
+    },
+    "rise.ankles_delta": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Ankles delta",
+      "unit": "",
+      "ideal": 0,
+      "sd": 0,
+      "passMin": 0,
+      "passMax": 0,
+      "rampSd": 0.000001,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": false,
+      "stats": {
+        "n": 7,
+        "mean": 0,
+        "sd": 0,
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "p25": 0,
+        "p75": 0,
+        "iqr": 0
+      }
+    },
+    "rise.ankles_end": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Ankles end",
+      "unit": "",
+      "ideal": 0,
+      "sd": 0,
+      "passMin": 0,
+      "passMax": 0,
+      "rampSd": 0.000001,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": false,
+      "stats": {
+        "n": 7,
+        "mean": 0,
+        "sd": 0,
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "p25": 0,
+        "p75": 0,
+        "iqr": 0
+      }
+    },
+    "rise.ankles_start": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Ankles start",
+      "unit": "",
+      "ideal": 0,
+      "sd": 0,
+      "passMin": 0,
+      "passMax": 0,
+      "rampSd": 0.000001,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": false,
+      "stats": {
+        "n": 7,
+        "mean": 0,
+        "sd": 0,
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "p25": 0,
+        "p75": 0,
+        "iqr": 0
+      }
+    },
+    "rise.head_delta": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Head delta",
+      "unit": "",
+      "ideal": 0.03443252964400337,
+      "sd": 0.018766815920792344,
+      "passMin": -0.002731205345463429,
+      "passMax": 0.05844673351740286,
+      "rampSd": 0.018766815920792344,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.03443252964400337,
+        "sd": 0.018766815920792344,
+        "median": 0.03656145003557299,
+        "min": -0.002731205345463429,
+        "max": 0.05844673351740286,
+        "p25": 0.032266090983925605,
+        "p75": 0.04210927366632995,
+        "iqr": 0.009843182682404347
+      }
+    },
+    "rise.head_end": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Head end",
+      "unit": "",
+      "ideal": -0.013670424428891001,
+      "sd": 0.016413044038472085,
+      "passMin": -0.0382888361604485,
+      "passMax": 0.016307759173648725,
+      "rampSd": 0.016413044038472085,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.013670424428891001,
+        "sd": 0.016413044038472085,
+        "median": -0.012488056980424043,
+        "min": -0.0382888361604485,
+        "max": 0.016307759173648725,
+        "p25": -0.020092279165513767,
+        "p75": -0.010519639351992821,
+        "iqr": 0.009572639813520946
+      }
+    },
+    "rise.head_start": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Head start",
+      "unit": "",
+      "ideal": -0.04810295407289437,
+      "sd": 0.02431782742475862,
+      "passMin": -0.08088184015309421,
+      "passMax": -0.015948735838832197,
+      "rampSd": 0.02431782742475862,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.04810295407289437,
+        "sd": 0.02431782742475862,
+        "median": -0.05075815714914179,
+        "min": -0.08088184015309421,
+        "max": -0.015948735838832197,
+        "p25": -0.06405139179405026,
+        "p75": -0.03051458089054591,
+        "iqr": 0.03353681090350434
+      }
+    },
+    "rise.hips_delta": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Hips delta",
+      "unit": "",
+      "ideal": -0.027696856479919717,
+      "sd": 0.007597914284610041,
+      "passMin": -0.03849536115342361,
+      "passMax": -0.014503894944340668,
+      "rampSd": 0.007597914284610041,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.027696856479919717,
+        "sd": 0.007597914284610041,
+        "median": -0.029658098696837793,
+        "min": -0.03849536115342361,
+        "max": -0.014503894944340668,
+        "p25": -0.031028103774322614,
+        "p75": -0.02458221650809535,
+        "iqr": 0.006445887266227263
+      }
+    },
+    "rise.hips_end": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Hips end",
+      "unit": "",
+      "ideal": -0.036361059408141626,
+      "sd": 0.012020932630757252,
+      "passMin": -0.05487960891851827,
+      "passMax": -0.022001079018715137,
+      "rampSd": 0.012020932630757252,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.036361059408141626,
+        "sd": 0.012020932630757252,
+        "median": -0.040315384904227765,
+        "min": -0.05487960891851827,
+        "max": -0.022001079018715137,
+        "p25": -0.04231241163956631,
+        "p75": -0.02635325986819879,
+        "iqr": 0.01595915177136752
+      }
+    },
+    "rise.hips_start": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Hips start",
+      "unit": "",
+      "ideal": -0.00866420292822191,
+      "sd": 0.009414210829092348,
+      "passMin": -0.021545808807758086,
+      "passMax": 0.007864385610380636,
+      "rampSd": 0.009414210829092348,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.00866420292822191,
+        "sd": 0.009414210829092348,
+        "median": -0.008379312765739454,
+        "min": -0.021545808807758086,
+        "max": 0.007864385610380636,
+        "p25": -0.013520766986242317,
+        "p75": -0.005773575280975921,
+        "iqr": 0.007747191705266396
+      }
+    },
+    "rise.knees_delta": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Knees delta",
+      "unit": "",
+      "ideal": 0.001343013379949331,
+      "sd": 0.007841462634741357,
+      "passMin": -0.007096041800172433,
+      "passMax": 0.010991799433745217,
+      "rampSd": 0.007841462634741357,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.001343013379949331,
+        "sd": 0.007841462634741357,
+        "median": 0.0007417432002938124,
+        "min": -0.007096041800172433,
+        "max": 0.010991799433745217,
+        "p25": -0.005895394424638208,
+        "p75": 0.008277190837527568,
+        "iqr": 0.014172585262165777
+      }
+    },
+    "rise.knees_end": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Knees end",
+      "unit": "",
+      "ideal": -0.046113190574705865,
+      "sd": 0.007869074731582798,
+      "passMin": -0.05894656410698593,
+      "passMax": -0.03682672757551732,
+      "rampSd": 0.007869074731582798,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.046113190574705865,
+        "sd": 0.007869074731582798,
+        "median": -0.044336564332456356,
+        "min": -0.05894656410698593,
+        "max": -0.03682672757551732,
+        "p25": -0.05103196693367204,
+        "p75": -0.0403092720703187,
+        "iqr": 0.010722694863353338
+      }
+    },
+    "rise.knees_start": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Knees start",
+      "unit": "",
+      "ideal": -0.047456203954655204,
+      "sd": 0.009521446925692033,
+      "passMin": -0.05891079351455119,
+      "passMax": -0.03436040975747313,
+      "rampSd": 0.009521446925692033,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.047456203954655204,
+        "sd": 0.009521446925692033,
+        "median": -0.05091875751101223,
+        "min": -0.05891079351455119,
+        "max": -0.03436040975747313,
+        "p25": -0.05285879717819973,
+        "p75": -0.0411429362715752,
+        "iqr": 0.011715860906624534
+      }
+    },
+    "rise.shoulders_delta": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Shoulders delta",
+      "unit": "",
+      "ideal": -0.007357196732381234,
+      "sd": 0.008228101269624854,
+      "passMin": -0.02212829160716854,
+      "passMax": 0.0037285200974555947,
+      "rampSd": 0.008228101269624854,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.007357196732381234,
+        "sd": 0.008228101269624854,
+        "median": -0.006087129298875487,
+        "min": -0.02212829160716854,
+        "max": 0.0037285200974555947,
+        "p25": -0.010330289252238941,
+        "p75": -0.0031764489068011586,
+        "iqr": 0.007153840345437782
+      }
+    },
+    "rise.shoulders_end": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Shoulders end",
+      "unit": "",
+      "ideal": -0.011073263929228685,
+      "sd": 0.0174887578973422,
+      "passMin": -0.037899864166544624,
+      "passMax": 0.01910552994297909,
+      "rampSd": 0.0174887578973422,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.011073263929228685,
+        "sd": 0.0174887578973422,
+        "median": -0.01282227633112138,
+        "min": -0.037899864166544624,
+        "max": 0.01910552994297909,
+        "p25": -0.017954026049444828,
+        "p75": -0.004994092425512121,
+        "iqr": 0.012959933623932707
+      }
+    },
+    "rise.shoulders_start": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Shoulders start",
+      "unit": "",
+      "ideal": -0.003716067196847456,
+      "sd": 0.018937285259778544,
+      "passMin": -0.03369102223887044,
+      "passMax": 0.020491928024672344,
+      "rampSd": 0.018937285259778544,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.003716067196847456,
+        "sd": 0.018937285259778544,
+        "median": -0.004583749084670647,
+        "min": -0.03369102223887044,
+        "max": 0.020491928024672344,
+        "p25": -0.01383843345704302,
+        "p75": 0.009723619917511299,
+        "iqr": 0.023562053374554318
+      }
+    },
+    "rise.wrist_cock_peak": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Wrist cock peak",
+      "unit": "",
+      "ideal": 140.678835381349,
+      "sd": 3.308226735597838,
+      "passMin": 136.07621686396982,
+      "passMax": 144.79240833730157,
+      "rampSd": 3.308226735597838,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 140.678835381349,
+        "sd": 3.308226735597838,
+        "median": 140.26420801572257,
+        "min": 136.07621686396982,
+        "max": 144.79240833730157,
+        "p25": 138.67583851898584,
+        "p75": 143.13366870723857,
+        "iqr": 4.4578301882527285
+      }
+    },
+    "rise.wrist_cock_peak_t": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Wrist cock peak t",
+      "unit": "",
+      "ideal": 0.4954589108370621,
+      "sd": 0.11025882234499486,
+      "passMin": 0.35294117647058826,
+      "passMax": 0.6363636363636364,
+      "rampSd": 0.11025882234499486,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.4954589108370621,
+        "sd": 0.11025882234499486,
+        "median": 0.5,
+        "min": 0.35294117647058826,
+        "max": 0.6363636363636364,
+        "p25": 0.40588235294117647,
+        "p75": 0.5835714285714286,
+        "iqr": 0.17768907563025216
+      }
+    },
+    "rise.wrist_cock_start": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Wrist cock start",
+      "unit": "",
+      "ideal": 156.74696912613177,
+      "sd": 10.923187415911936,
+      "passMin": 143.23615601905087,
+      "passMax": 169.3541626815533,
+      "rampSd": 10.923187415911936,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 5,
+        "mean": 156.74696912613177,
+        "sd": 10.923187415911936,
+        "median": 156.62231037722987,
+        "min": 143.23615601905087,
+        "max": 169.3541626815533,
+        "p25": 149.03807735105292,
+        "p75": 165.48413920177182,
+        "iqr": 16.446061850718905
+      }
+    },
+    "rise.wrist_path_deviation": {
+      "section": "structure",
+      "phase": "rise",
+      "label": "Wrist path deviation",
+      "unit": "",
+      "ideal": 0.034279454515069044,
+      "sd": 0.016414877439868143,
+      "passMin": 0.008550740355795727,
+      "passMax": 0.06139957432263627,
+      "rampSd": 0.016414877439868143,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.034279454515069044,
+        "sd": 0.016414877439868143,
+        "median": 0.029730810413899644,
+        "min": 0.008550740355795727,
+        "max": 0.06139957432263627,
+        "p25": 0.02831775384807357,
+        "p75": 0.04181977440850228,
+        "iqr": 0.013502020560428707
+      }
+    },
+    "seq.ball_low__ball_rise": {
+      "section": "sequencing",
+      "phase": null,
+      "label": "Ball low → Ball rise",
+      "unit": "Δt",
+      "ideal": 0.03159554730983302,
+      "sd": 0.03640896326892069,
+      "passMin": 0,
+      "passMax": 0.1,
+      "rampSd": 0.03640896326892069,
+      "direction": {
+        "low": "early",
+        "high": "late"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.03159554730983302,
+        "sd": 0.03640896326892069,
+        "median": 0.0357142857142857,
+        "min": 0,
+        "max": 0.1,
+        "p25": 0,
+        "p75": 0.042727272727272725,
+        "iqr": 0.042727272727272725
+      }
+    },
+    "seq.ball_rise__leg_low": {
+      "section": "sequencing",
+      "phase": null,
+      "label": "Ball rise → Leg low",
+      "unit": "Δt",
+      "ideal": 0.17953981592637056,
+      "sd": 0.05248507080913445,
+      "passMin": 0.14285714285714285,
+      "passMax": 0.29411764705882354,
+      "rampSd": 0.05248507080913445,
+      "direction": {
+        "low": "early",
+        "high": "late"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.17953981592637056,
+        "sd": 0.05248507080913445,
+        "median": 0.15999999999999998,
+        "min": 0.14285714285714285,
+        "max": 0.29411764705882354,
+        "p25": 0.15075757575757576,
+        "p75": 0.17914438502673796,
+        "iqr": 0.028386809269162205
+      }
+    },
+    "seq.leg_low__legs_rise": {
+      "section": "sequencing",
+      "phase": null,
+      "label": "Leg low → Legs rise",
+      "unit": "Δt",
+      "ideal": 0.0513459929426316,
+      "sd": 0.030222118762054998,
+      "passMin": 0,
+      "passMax": 0.09999999999999998,
+      "rampSd": 0.030222118762054998,
+      "direction": {
+        "low": "early",
+        "high": "late"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.0513459929426316,
+        "sd": 0.030222118762054998,
+        "median": 0.05882352941176469,
+        "min": 0,
+        "max": 0.09999999999999998,
+        "p25": 0.040584415584415584,
+        "p75": 0.05971479500891269,
+        "iqr": 0.019130379424497107
+      }
+    },
+    "seq.legs_extend__release": {
+      "section": "sequencing",
+      "phase": null,
+      "label": "Legs extend → Release",
+      "unit": "Δt",
+      "ideal": -0.09835679726436028,
+      "sd": 0.06545031355826303,
+      "passMin": -0.19999999999999996,
+      "passMax": -0.040000000000000036,
+      "rampSd": 0.06545031355826303,
+      "direction": {
+        "low": "early",
+        "high": "late"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.09835679726436028,
+        "sd": 0.06545031355826303,
+        "median": -0.06060606060606055,
+        "min": -0.19999999999999996,
+        "max": -0.040000000000000036,
+        "p25": -0.14180672268907563,
+        "p75": -0.05213903743315507,
+        "iqr": 0.08966768525592056
+      }
+    },
+    "seq.legs_rise__set_point": {
+      "section": "sequencing",
+      "phase": null,
+      "label": "Legs rise → Set point",
+      "unit": "Δt",
+      "ideal": 0.13216632107388412,
+      "sd": 0.04695463595758109,
+      "passMin": 0.05882352941176466,
+      "passMax": 0.18181818181818182,
+      "rampSd": 0.04695463595758109,
+      "direction": {
+        "low": "early",
+        "high": "late"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.13216632107388412,
+        "sd": 0.04695463595758109,
+        "median": 0.15000000000000002,
+        "min": 0.05882352941176466,
+        "max": 0.18181818181818182,
+        "p25": 0.09902597402597407,
+        "p75": 0.16823529411764707,
+        "iqr": 0.069209320091673
+      }
+    },
+    "seq.release__arm_extension": {
+      "section": "sequencing",
+      "phase": null,
+      "label": "Release → Arm extension",
+      "unit": "Δt",
+      "ideal": 0.1500170977481902,
+      "sd": 0.07930070542570515,
+      "passMin": 0.030303030303030276,
+      "passMax": 0.25,
+      "rampSd": 0.07930070542570515,
+      "direction": {
+        "low": "early",
+        "high": "late"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.1500170977481902,
+        "sd": 0.07930070542570515,
+        "median": 0.16000000000000003,
+        "min": 0.030303030303030276,
+        "max": 0.25,
+        "p25": 0.09902597402597402,
+        "p75": 0.20588235294117646,
+        "iqr": 0.10685637891520244
+      }
+    },
+    "seq.set_point__legs_extend": {
+      "section": "sequencing",
+      "phase": null,
+      "label": "Set point → Legs extend",
+      "unit": "Δt",
+      "ideal": 0.17486958419731527,
+      "sd": 0.08331666565427145,
+      "passMin": 0.09090909090909083,
+      "passMax": 0.2941176470588236,
+      "rampSd": 0.08331666565427145,
+      "direction": {
+        "low": "early",
+        "high": "late"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.17486958419731527,
+        "sd": 0.08331666565427145,
+        "median": 0.1428571428571428,
+        "min": 0.09090909090909083,
+        "max": 0.2941176470588236,
+        "p25": 0.10545454545454541,
+        "p75": 0.24264705882352944,
+        "iqr": 0.13719251336898403
+      }
+    },
+    "setPoint.ankles": {
+      "section": "structure",
+      "phase": "setPoint",
+      "label": "Ankles",
+      "unit": "",
+      "ideal": 0,
+      "sd": 0,
+      "passMin": 0,
+      "passMax": 0,
+      "rampSd": 0.000001,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": false,
+      "stats": {
+        "n": 7,
+        "mean": 0,
+        "sd": 0,
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "p25": 0,
+        "p75": 0,
+        "iqr": 0
+      }
+    },
+    "setPoint.elbow_angle": {
+      "section": "structure",
+      "phase": "setPoint",
+      "label": "Elbow angle",
+      "unit": "",
+      "ideal": 143.64194011790065,
+      "sd": 7.019002283713994,
+      "passMin": 134.62682754712887,
+      "passMax": 152.23335495226388,
+      "rampSd": 7.019002283713994,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 143.64194011790065,
+        "sd": 7.019002283713994,
+        "median": 144.82438939358582,
+        "min": 134.62682754712887,
+        "max": 152.23335495226388,
+        "p25": 138.0331015733271,
+        "p75": 148.87140289283593,
+        "iqr": 10.838301319508844
+      }
+    },
+    "setPoint.elbow_flare": {
+      "section": "structure",
+      "phase": "setPoint",
+      "label": "Elbow flare",
+      "unit": "",
+      "ideal": 94.24185935359026,
+      "sd": 7.549012584398881,
+      "passMin": 83.40183760594695,
+      "passMax": 102.76486559099497,
+      "rampSd": 7.549012584398881,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 94.24185935359026,
+        "sd": 7.549012584398881,
+        "median": 96.64276759867705,
+        "min": 83.40183760594695,
+        "max": 102.76486559099497,
+        "p25": 89.17937648494834,
+        "p75": 99.26239585480812,
+        "iqr": 10.083019369859784
+      }
+    },
+    "setPoint.head": {
+      "section": "structure",
+      "phase": "setPoint",
+      "label": "Head",
+      "unit": "",
+      "ideal": -0.013670424428891001,
+      "sd": 0.016413044038472085,
+      "passMin": -0.0382888361604485,
+      "passMax": 0.016307759173648725,
+      "rampSd": 0.016413044038472085,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.013670424428891001,
+        "sd": 0.016413044038472085,
+        "median": -0.012488056980424043,
+        "min": -0.0382888361604485,
+        "max": 0.016307759173648725,
+        "p25": -0.020092279165513767,
+        "p75": -0.010519639351992821,
+        "iqr": 0.009572639813520946
+      }
+    },
+    "setPoint.hips": {
+      "section": "structure",
+      "phase": "setPoint",
+      "label": "Hips",
+      "unit": "",
+      "ideal": -0.036361059408141626,
+      "sd": 0.012020932630757252,
+      "passMin": -0.05487960891851827,
+      "passMax": -0.022001079018715137,
+      "rampSd": 0.012020932630757252,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.036361059408141626,
+        "sd": 0.012020932630757252,
+        "median": -0.040315384904227765,
+        "min": -0.05487960891851827,
+        "max": -0.022001079018715137,
+        "p25": -0.04231241163956631,
+        "p75": -0.02635325986819879,
+        "iqr": 0.01595915177136752
+      }
+    },
+    "setPoint.knees": {
+      "section": "structure",
+      "phase": "setPoint",
+      "label": "Knees",
+      "unit": "",
+      "ideal": -0.046113190574705865,
+      "sd": 0.007869074731582798,
+      "passMin": -0.05894656410698593,
+      "passMax": -0.03682672757551732,
+      "rampSd": 0.007869074731582798,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.046113190574705865,
+        "sd": 0.007869074731582798,
+        "median": -0.044336564332456356,
+        "min": -0.05894656410698593,
+        "max": -0.03682672757551732,
+        "p25": -0.05103196693367204,
+        "p75": -0.0403092720703187,
+        "iqr": 0.010722694863353338
+      }
+    },
+    "setPoint.shoulders": {
+      "section": "structure",
+      "phase": "setPoint",
+      "label": "Shoulders",
+      "unit": "",
+      "ideal": -0.011073263929228685,
+      "sd": 0.0174887578973422,
+      "passMin": -0.037899864166544624,
+      "passMax": 0.01910552994297909,
+      "rampSd": 0.0174887578973422,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": -0.011073263929228685,
+        "sd": 0.0174887578973422,
+        "median": -0.01282227633112138,
+        "min": -0.037899864166544624,
+        "max": 0.01910552994297909,
+        "p25": -0.017954026049444828,
+        "p75": -0.004994092425512121,
+        "iqr": 0.012959933623932707
+      }
+    },
+    "setPoint.wrist_cock": {
+      "section": "structure",
+      "phase": "setPoint",
+      "label": "Wrist cock",
+      "unit": "",
+      "ideal": 149.5047467810102,
+      "sd": 7.691384689596911,
+      "passMin": 139.64636153819038,
+      "passMax": 162.33804858346065,
+      "rampSd": 7.691384689596911,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 149.5047467810102,
+        "sd": 7.691384689596911,
+        "median": 149.72806761779353,
+        "min": 139.64636153819038,
+        "max": 162.33804858346065,
+        "p25": 144.20828546225357,
+        "p75": 153.20208940155985,
+        "iqr": 8.993803939306275
+      }
+    },
+    "setPoint.wrist_height_vs_head": {
+      "section": "structure",
+      "phase": "setPoint",
+      "label": "Wrist height vs head",
+      "unit": "",
+      "ideal": 0.017455112181924432,
+      "sd": 0.027515514265110654,
+      "passMin": -0.01852583948103448,
+      "passMax": 0.05965038184307716,
+      "rampSd": 0.027515514265110654,
+      "direction": {
+        "low": "low",
+        "high": "high"
+      },
+      "scored": true,
+      "stats": {
+        "n": 7,
+        "mean": 0.017455112181924432,
+        "sd": 0.027515514265110654,
+        "median": 0.01624502228852172,
+        "min": -0.01852583948103448,
+        "max": 0.05965038184307716,
+        "p25": -0.0019259508032648965,
+        "p75": 0.0343340611147182,
+        "iqr": 0.036260011917983094
+      }
+    }
+  }
+}
