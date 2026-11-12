@@ -116,12 +116,8 @@ export const setSettingBody = z.object({ value: z.unknown() });
 // --- analysis --------------------------------------------------------------
 // `poseData` is validated separately by the library's poseDataSchema on the
 // server; here we only shape the request envelope.
-export const analyzeShotBody = z.object({
-  sessionId: z.string().min(1),
-  playerId: z.string().min(1),
-  poseData: z.unknown(),
-});
-// De-sessioned live analysis: one rep window, rooted on the player.
+// De-sessioned live analysis: one rep window, rooted on the player. (The old
+// session-bound POST /api/analysis/shot was retired in the live-first redesign.)
 export const analyzeLiveShotBody = z.object({
   playerId: z.string().min(1),
   poseData: z.unknown(),

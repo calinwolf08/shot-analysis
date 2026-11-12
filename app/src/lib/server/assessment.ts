@@ -9,7 +9,6 @@
  * Server-only.
  */
 import type { PoseData } from "basketball-shot-analysis";
-import type { MetricName } from "$lib/features/benchmarks";
 import { profileForLevel } from "$lib/features/assessment";
 import type { AnalyzeOptions } from "$lib/features/analysis";
 import type { UserContext } from "./context";
@@ -111,39 +110,4 @@ export async function runSessionAnalysis(
   const outcome = await scoreAndDiagnoseSession(ctx, session.id);
   await ctx.repos.session.complete(session.id);
   return outcome;
-}
-
-/**
- * Live/single-window analysis: analyze one pose window against an existing
- * session, persist the detected shots, and score each against the active
- * benchmark. Returns the scored shots.
- */
-export async function runShotAnalysis(
-  ctx: UserContext,
-  input: { sessionId: string; playerId: string; poseData: PoseData },
-) {
-  const opts = await optsForPlayer(ctx, input.playerId);
-  const session = await ctx.repos.session.get(input.sessionId);
-  if (!session) throw new ForbiddenError("not your session");
-  const focusMetric = (session.focusMetric ?? undefined) as
-    | MetricName
-    | undefined;
-  const benchmark = await ctx.domain.benchmarks.getActive();
-  const result = analyzePoseData(input.poseData, opts);
-
-  const scored = [];
-  for (const analysis of result.shots) {
-    const shot = await ctx.repos.shot.saveAnalysis({
-      sessionId: input.sessionId,
-      analysis,
-    });
-    scored.push(
-      await ctx.domain.scoring.scoreAndPersistShot(
-        shot,
-        benchmark,
-        focusMetric,
-      ),
-    );
-  }
-  return { shots: scored };
 }

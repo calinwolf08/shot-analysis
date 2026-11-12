@@ -121,31 +121,6 @@ describe("/api/analysis endpoints", () => {
     ).rejects.toMatchObject({ status: 403 });
   });
 
-  it("analyzes a single live window against an existing session", async () => {
-    const api = clientFor(userA);
-    const repos = createRemoteRepos(api);
-    const player = await repos.player.create({
-      name: "A",
-      shootingHand: "right",
-      level: "advanced",
-    });
-    const session = await repos.session.create({
-      playerId: player.id,
-      type: "live_practice",
-    });
-
-    const result = await api.send<{ shots: { shot: { id: string } }[] }>(
-      "/api/analysis/shot",
-      { sessionId: session.id, playerId: player.id, poseData },
-    );
-    expect(result.shots.length).toBeGreaterThan(0);
-    const shots = await repos.shot.listBySession(session.id);
-    expect(shots.length).toBe(result.shots.length);
-    // Each shot has a persisted shot-scope score.
-    const score = await repos.score.latestForRef("shot", shots[0]!.id);
-    expect(score).toBeTruthy();
-  });
-
   it("rejects a stranger analyzing against another user's player", async () => {
     const a = createRemoteRepos(clientFor(userA));
     const player = await a.player.create({

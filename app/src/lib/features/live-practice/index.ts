@@ -30,14 +30,6 @@ export {
   meanLuma,
 } from "./setup/checks";
 export { default as SetupScreen } from "./setup/SetupScreen.svelte";
-export {
-  LiveSessionStore,
-  type LiveSessionStoreDeps,
-  type LoopPhase,
-  type RepEntry,
-  type RepFeedback,
-} from "./loop/live-session-store.svelte";
-export { default as PracticeLoopScreen } from "./loop/PracticeLoopScreen.svelte";
 export { default as LiveDebugHud } from "./loop/LiveDebugHud.svelte";
 
 // Live-first redesign (steps 4–6): the de-sessioned store, swappable analysis
@@ -45,6 +37,7 @@ export { default as LiveDebugHud } from "./loop/LiveDebugHud.svelte";
 export {
   LivePracticeStore,
   type LivePracticeStoreDeps,
+  type LoopPhase,
   type ShotEntry,
   type ShotFeedback,
 } from "./loop/live-practice-store.svelte";
@@ -78,5 +71,3 @@ export {
   type PresenceTracker,
   type PresenceTrackerOptions,
 } from "./loop/presence";
-export { compareHalves, type HalvesComparison } from "./summary/summary-logic";
-export { default as SummaryScreen } from "./summary/SummaryScreen.svelte";

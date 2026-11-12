@@ -7,7 +7,18 @@ and the sequencing to build it. Companion docs:
 [shot detection & analysis](./shot-detection-and-analysis.md),
 [follow-up work](./follow-up-work.md).
 
-> Status: **plan only — not yet approved for implementation.**
+> Status: **implemented.** Steps 1–10 landed on `claude/shooting-form-training-app-zxengy`:
+> Curry-derived targets, deviation scoring, the de-sessioned shot model, the
+> swappable on-device/server analysis pipeline, the continuous practice store
+> with voice + angle gate, the deviation scorecard + live-page swap + dev
+> `/__debug/replay` route, per-shot pose persistence with the Shots scrub
+> review, the time-window Insights tab, the Practice/Shots/Insights/Profile nav,
+> and the cleanup that retired the old session-bound live path.
+>
+> Deferred (not yet built): on-device clip **video** capture + the "keep video
+> for last N shots" retention setting (the server skeleton track covers review
+> today); full 3D raw-pose persistence for re-analysis; and refreshing the
+> Playwright e2e specs that targeted the old nav/flow.
 
 ---
 
