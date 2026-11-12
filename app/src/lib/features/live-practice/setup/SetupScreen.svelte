@@ -1,10 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { detectOrientation } from "basketball-shot-analysis";
   import type {
     LandmarkFrame,
     LiveAnalysisSession,
   } from "$lib/features/analysis";
+  import { landmarkFramesToPoseData } from "$lib/features/analysis/replay/replay-pipeline";
   import type { AudioFeedbackService } from "$lib/shared/audio";
+  import type { SideOrientation } from "./angle-gate";
   import type {
     CaptureHandle,
     CaptureService,
@@ -29,6 +32,7 @@
     capture = null,
     audio,
     focusLabel = null,
+    requiredOrientation,
     onstart,
     onexit,
     onerror,
@@ -39,6 +43,12 @@
     capture?: CaptureService | null;
     audio: AudioFeedbackService;
     focusLabel?: string | null;
+    /**
+     * When set, the side-view check requires this exact side-on orientation
+     * (the shooting-arm side for the player's hand) — not merely any side view.
+     * Omitted (e.g. in unit tests) → the legacy any-side-on check.
+     */
+    requiredOrientation?: SideOrientation;
     /** Fired when the countdown finishes: the practice loop takes over. */
     onstart: () => void;
     onexit: () => void;
@@ -173,7 +183,17 @@
     if (recentFrames.length > CHECK_DEFAULTS.sideViewWindow) {
       recentFrames = recentFrames.slice(-CHECK_DEFAULTS.sideViewWindow);
     }
-    pass["side-view"] ||= isSideView(recentFrames);
+    if (requiredOrientation) {
+      // Gate on the exact side-on orientation (shooting-arm toward the camera).
+      if (!pass["side-view"] && recentFrames.length >= 3) {
+        const detected = detectOrientation(
+          landmarkFramesToPoseData(recentFrames, session.fps),
+        );
+        pass["side-view"] = detected === requiredOrientation;
+      }
+    } else {
+      pass["side-view"] ||= isSideView(recentFrames);
+    }
   }
 
   function sampleLighting() {
@@ -270,7 +290,11 @@
       {@const ok = pass[check.id] || overridden[check.id]}
       <li data-testid="check-{check.id}" data-state={ok ? "pass" : "pending"}>
         <span class="tick" class:ok>{ok ? "✓" : "○"}</span>
-        <span class="label">{check.label}</span>
+        <span class="label">
+          {check.id === "side-view" && requiredOrientation
+            ? "Shooting arm toward camera"
+            : check.label}
+        </span>
         {#if !pass[check.id]}
           <button
             class="override"

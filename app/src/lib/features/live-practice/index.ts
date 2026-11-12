@@ -39,6 +39,37 @@ export {
 } from "./loop/live-session-store.svelte";
 export { default as PracticeLoopScreen } from "./loop/PracticeLoopScreen.svelte";
 export { default as LiveDebugHud } from "./loop/LiveDebugHud.svelte";
+
+// Live-first redesign (steps 4–6): the de-sessioned store, swappable analysis
+// pipeline, voice readback, and angle gate.
+export {
+  LivePracticeStore,
+  type LivePracticeStoreDeps,
+  type ShotEntry,
+  type ShotFeedback,
+} from "./loop/live-practice-store.svelte";
+export { buildWorstReadback, phraseFor } from "./loop/readback";
+export {
+  evaluateAngleGate,
+  requiredOrientation,
+  type AngleGateResult,
+  type SideOrientation,
+} from "./setup/angle-gate";
+export {
+  analyzeAndScore,
+  createRepoShotStore,
+  createLiveShotPipeline,
+  createLocalPipeline,
+  createServerPipeline,
+  resolvePipelineLocation,
+  type ScoredShot,
+  type ShotStore,
+  type LiveShotPipeline,
+  type PipelineLocation,
+  type ProcessInput,
+  type ProcessedShot,
+} from "./pipeline";
+export { default as PracticeScreen } from "./loop/PracticeScreen.svelte";
 export {
   createPresenceTracker,
   type PresenceState,

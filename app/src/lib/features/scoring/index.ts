@@ -43,3 +43,4 @@ export {
   type DeviationOptions,
 } from "./deviation";
 export { loadLiveTargets, resetLiveTargetsCache } from "./live-targets";
+export { default as ScoreCard } from "./ScoreCard.svelte";

@@ -3,15 +3,19 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import type { LiveAnalysisSession } from "$lib/features/analysis";
-  import { builtInBenchmarks, type MetricName } from "$lib/features/benchmarks";
   import {
     createLiveRepCoordinator,
+    createLiveShotPipeline,
+    createRepoShotStore,
     LiveDebugHud,
-    LiveSessionStore,
-    PracticeLoopScreen,
+    LivePracticeStore,
+    PracticeScreen,
+    requiredOrientation,
     SetupScreen,
     type LiveRepCoordinator,
+    type SideOrientation,
   } from "$lib/features/live-practice";
+  import { loadLiveTargets, type LiveTargets } from "$lib/features/scoring";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { createApiClient } from "$lib/shared/api/client";
   import { createWebAudioFeedbackService } from "$lib/shared/audio";
@@ -24,14 +28,13 @@
   const services = useAppServices();
   const audio = createWebAudioFeedbackService();
 
-  // Replay mode (e2e / forced backend) has no camera to preview.
   const replayMode =
     page.url.searchParams.get("e2e") === "replay" ||
     import.meta.env.VITE_ANALYSIS_BACKEND === "replay";
 
   // Dev/e2e only: `?liveVideo=<url>` plays a recorded clip as the "camera"
-  // through the real pipeline (no webcam) so live shot detection can be
-  // validated from a video file. Constant-folds away in production builds.
+  // through the real pipeline (no webcam) so the full live flow can be driven
+  // from a video file. Constant-folds away in production builds.
   const liveVideoUrl =
     import.meta.env.DEV || import.meta.env.VITE_E2E === "1"
       ? page.url.searchParams.get("liveVideo")
@@ -42,12 +45,8 @@
     : liveVideoUrl
       ? createFileCaptureService(liveVideoUrl)
       : createBrowserCaptureService();
-  // Wall-clock feedback dwell; short in e2e so multi-rep runs stay fast.
   const feedbackMs = replayMode ? 1500 : 4000;
 
-  // Debug HUD gate. Both terms constant-fold to false in production
-  // builds (no VITE_LIVE_DEBUG, DEV=false, no VITE_E2E), so the HUD and
-  // its markers are stripped — enforced by check-debug-stripped.
   const liveDebug =
     import.meta.env.VITE_LIVE_DEBUG === "1" ||
     ((import.meta.env.DEV || import.meta.env.VITE_E2E === "1") &&
@@ -55,13 +54,14 @@
 
   let phase = $state<"loading" | "setup" | "running" | "error">("loading");
   let session = $state<LiveAnalysisSession | null>(null);
-  let focusMetric = $state<MetricName | null>(null);
-  let focusLabel = $state<string | null>(null);
-  let store = $state<LiveSessionStore | null>(null);
+  let store = $state<LivePracticeStore | null>(null);
   let coordinator = $state<LiveRepCoordinator | null>(null);
   let cameraStream = $state<MediaStream | null>(null);
   let errorMessage = $state<string | null>(null);
   let shootingHand: "left" | "right" = "right";
+  let requiredSide = $state<SideOrientation>("side-left");
+  let playerId = "";
+  let targets: LiveTargets | null = null;
 
   $effect(() => {
     void boot();
@@ -74,16 +74,10 @@
       await goto(`/${page.url.search}`);
       return;
     }
+    playerId = player.id;
     shootingHand = player.shootingHand;
-    const planItemId = page.url.searchParams.get("planItem");
-    if (planItemId) {
-      const item = await services.trainingPlan.getItem(planItemId);
-      if (item?.focusMetric) {
-        focusMetric = item.focusMetric as MetricName;
-        const target = builtInBenchmarks()[0]!.targets[focusMetric];
-        focusLabel = target?.displayName ?? item.focusMetric;
-      }
-    }
+    requiredSide = requiredOrientation(shootingHand);
+    targets = await loadLiveTargets();
     session = services.analysis.createLiveSession({
       shootingHand,
       profile: "pro-form",
@@ -92,44 +86,36 @@
   }
 
   async function beginLoop() {
-    if (!session) return;
+    if (!session || !targets) return;
     coordinator = createLiveRepCoordinator(
       { analyze: (frames) => session!.analyzeWindow(frames) },
       { shootingHand },
     );
     const activeCoordinator = coordinator;
-    // The setup screen already started the pose stream; route frames in.
     session.onFrame((frame) => activeCoordinator.pushFrame(frame));
-    store = new LiveSessionStore({
-      repos: services.repos,
-      scoring: services.scoring,
-      benchmarks: services.benchmarks,
+
+    const shotStore = createRepoShotStore(services.repos.shot);
+    const pipeline = createLiveShotPipeline({
+      targets,
+      store: shotStore,
       api: createApiClient(),
-      fps: session.fps,
-      db: services.db,
+    });
+    store = new LivePracticeStore({
       coordinator,
+      pipeline,
+      shotStore,
       audio,
-      focusMetric,
-      planItemId: page.url.searchParams.get("planItem"),
+      playerId,
+      opts: { shootingHand, profile: "pro-form" },
+      fps: session.fps,
       feedbackMs,
     });
-    // The camera opened during setup is reused here (SetupScreen handed its
-    // stream up via onstream). Re-opening a second stream froze the feed on
-    // shared-camera devices, so the loop keeps the same one.
-    await store.start();
+    store.start();
     phase = "running";
   }
 
-  async function endLoop(sessionId: string | null) {
-    if (sessionId) {
-      await goto(`/practice/summary/${sessionId}${page.url.search}`);
-    } else {
-      await goto(`/${page.url.search}`);
-    }
-  }
-
   onDestroy(() => {
-    void store?.end();
+    store?.stop();
     void session?.stop();
     if (cameraStream) {
       for (const track of cameraStream.getTracks()) track.stop();
@@ -157,20 +143,14 @@
     {session}
     {capture}
     {audio}
-    {focusLabel}
+    requiredOrientation={requiredSide}
     onstart={() => void beginLoop()}
     onexit={exit}
     onerror={handleSetupError}
     onstream={(s) => (cameraStream = s)}
   />
 {:else if phase === "running" && store}
-  <PracticeLoopScreen
-    {store}
-    {session}
-    {focusLabel}
-    stream={cameraStream}
-    onend={endLoop}
-  />
+  <PracticeScreen {store} {session} stream={cameraStream} onexit={exit} />
   {#if liveDebug && coordinator}
     <LiveDebugHud {coordinator} />
   {/if}
