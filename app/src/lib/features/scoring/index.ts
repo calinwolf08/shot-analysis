@@ -42,3 +42,4 @@ export {
   type ShotScorecard,
   type DeviationOptions,
 } from "./deviation";
+export { loadLiveTargets, resetLiveTargetsCache } from "./live-targets";

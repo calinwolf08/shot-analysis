@@ -57,6 +57,7 @@ import { GET as planGet } from "../../../../routes/api/plans/[id]/+server";
 import { PATCH as planItemPatch } from "../../../../routes/api/plans/items/[id]/+server";
 import { POST as plansReassess } from "../../../../routes/api/plans/reassess/+server";
 import { POST as analysisShot } from "../../../../routes/api/analysis/shot/+server";
+import { POST as analysisLiveShot } from "../../../../routes/api/analysis/live-shot/+server";
 import { POST as analysisSession } from "../../../../routes/api/analysis/session/+server";
 import { POST as sessionRescore } from "../../../../routes/api/sessions/[id]/rescore/+server";
 
@@ -104,6 +105,7 @@ const routes: Route[] = [
   ["GET", "/api/plans", plansGet],
   ["POST", "/api/plans", plansPost],
   ["POST", "/api/analysis/shot", analysisShot],
+  ["POST", "/api/analysis/live-shot", analysisLiveShot],
   ["POST", "/api/analysis/session", analysisSession],
 ].map(([method, path, handler]) => ({
   method: method as string,

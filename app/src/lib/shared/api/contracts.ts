@@ -109,6 +109,11 @@ export const analyzeShotBody = z.object({
   playerId: z.string().min(1),
   poseData: z.unknown(),
 });
+// De-sessioned live analysis: one rep window, rooted on the player.
+export const analyzeLiveShotBody = z.object({
+  playerId: z.string().min(1),
+  poseData: z.unknown(),
+});
 export const analyzeSessionBody = z.object({
   playerId: z.string().min(1),
   planItemId: z.string().optional(),
