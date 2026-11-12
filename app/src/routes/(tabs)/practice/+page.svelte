@@ -1,26 +1,23 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import { Button, Card } from "$lib/shared/ui";
+
+  function startLive() {
+    void goto(`/practice/live${page.url.search}`);
+  }
 </script>
 
 <h1>Practice</h1>
 <div class="options">
   <Card>
     <h2>Live practice</h2>
-    <p>Shoot with real-time feedback after every rep.</p>
-    <Button testid="practice-live" onclick={() => goto("/practice/live")}>
+    <p>
+      Shoot with real-time feedback after every rep. Set up side-on with your
+      shooting arm toward the camera, then take your shots.
+    </p>
+    <Button testid="practice-live" onclick={startLive}>
       Start live practice
-    </Button>
-  </Card>
-  <Card>
-    <h2>Upload shots</h2>
-    <p>Analyze recorded videos for a full assessment.</p>
-    <Button
-      variant="secondary"
-      testid="practice-upload"
-      onclick={() => goto("/assess")}
-    >
-      Upload videos
     </Button>
   </Card>
 </div>
