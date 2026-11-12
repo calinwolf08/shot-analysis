@@ -29,3 +29,16 @@ export {
   type ScoringService,
   type ScoringServiceDeps,
 } from "./service";
+export {
+  scoreDeviation,
+  scoreShotDeviation,
+  scoreMetricDeviation,
+  type LiveTarget,
+  type LiveTargets,
+  type Section,
+  type MetricDeviation,
+  type PhaseGroup,
+  type SectionDeviation,
+  type ShotScorecard,
+  type DeviationOptions,
+} from "./deviation";

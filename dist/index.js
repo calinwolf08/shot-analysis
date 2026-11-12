@@ -48,4 +48,7 @@ export { extractShotMetrics, metricsForShot, computeSequencing, computeStructure
 export { detectKeyframesFromFrames, poseLandmarksToFrames, } from "./detection/keyframe-phases";
 export { deriveThresholds } from "./metrics/v2";
 export { scoreShot } from "./scoring/v2";
+// v2 flattening + id helpers — the flat `{ id, value, reliable }` shape that
+// thresholds and the live deviation targets are keyed by.
+export { flattenMetrics, categoryOf, labelFor, categoryLabel } from "./metrics/v2";
 //# sourceMappingURL=index.js.map

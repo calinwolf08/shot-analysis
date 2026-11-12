@@ -302,6 +302,8 @@ export declare const labeledShotSchema: z.ZodObject<{
     arms_fully_extended: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     feet_leave_ground: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     feet_land: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    set_point_end: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    release_end: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
 }, "strip", z.ZodTypeAny, {
     shotNumber: number;
     startFrame: number;
@@ -318,6 +320,8 @@ export declare const labeledShotSchema: z.ZodObject<{
     arms_fully_extended?: number | null | undefined;
     feet_leave_ground?: number | null | undefined;
     feet_land?: number | null | undefined;
+    set_point_end?: number | null | undefined;
+    release_end?: number | null | undefined;
 }, {
     shotNumber: number;
     startFrame: number;
@@ -334,6 +338,8 @@ export declare const labeledShotSchema: z.ZodObject<{
     arms_fully_extended?: number | null | undefined;
     feet_leave_ground?: number | null | undefined;
     feet_land?: number | null | undefined;
+    set_point_end?: number | null | undefined;
+    release_end?: number | null | undefined;
 }>;
 /**
  * Ground truth label data for a video.
@@ -375,6 +381,8 @@ export declare const labelDataSchema: z.ZodObject<{
         arms_fully_extended: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
         feet_leave_ground: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
         feet_land: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        set_point_end: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        release_end: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     }, "strip", z.ZodTypeAny, {
         shotNumber: number;
         startFrame: number;
@@ -391,6 +399,8 @@ export declare const labelDataSchema: z.ZodObject<{
         arms_fully_extended?: number | null | undefined;
         feet_leave_ground?: number | null | undefined;
         feet_land?: number | null | undefined;
+        set_point_end?: number | null | undefined;
+        release_end?: number | null | undefined;
     }, {
         shotNumber: number;
         startFrame: number;
@@ -407,6 +417,8 @@ export declare const labelDataSchema: z.ZodObject<{
         arms_fully_extended?: number | null | undefined;
         feet_leave_ground?: number | null | undefined;
         feet_land?: number | null | undefined;
+        set_point_end?: number | null | undefined;
+        release_end?: number | null | undefined;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     video: string;
@@ -428,6 +440,8 @@ export declare const labelDataSchema: z.ZodObject<{
         arms_fully_extended?: number | null | undefined;
         feet_leave_ground?: number | null | undefined;
         feet_land?: number | null | undefined;
+        set_point_end?: number | null | undefined;
+        release_end?: number | null | undefined;
     }[];
 }, {
     video: string;
@@ -449,6 +463,8 @@ export declare const labelDataSchema: z.ZodObject<{
         arms_fully_extended?: number | null | undefined;
         feet_leave_ground?: number | null | undefined;
         feet_land?: number | null | undefined;
+        set_point_end?: number | null | undefined;
+        release_end?: number | null | undefined;
     }[];
 }>;
 /**
