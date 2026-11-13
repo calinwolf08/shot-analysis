@@ -12,13 +12,14 @@ test("a profile persists across reload via the server database", async ({
 }) => {
   await onboard(page, "?e2e=replay", "Persisted");
 
-  // A signed-in user with a player lands on home, not onboarding.
+  // A signed-in user with a player lands on the app (Practice), not onboarding.
   await page.goto("/?e2e=replay");
   await page.waitForSelector('[data-testid="db-ready"]', { state: "attached" });
-  await expect(page).toHaveURL(/\/\?e2e=replay$/);
+  await expect(page).toHaveURL(/\/practice\?e2e=replay$/);
 
-  // Reload again: still home — the player was read back from the server.
+  // Reload: still in the app — the player was read back from the server.
   await page.reload();
   await page.waitForSelector('[data-testid="db-ready"]', { state: "attached" });
-  await expect(page).toHaveURL(/\/\?e2e=replay$/);
+  await expect(page).toHaveURL(/\/practice\?e2e=replay$/);
+  await expect(page.getByTestId("practice-live")).toBeVisible();
 });

@@ -5,7 +5,7 @@
  * log rep events as the fixture loops.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { onboard as freshUser } from "./helpers";
+import { onboard as freshUser, startLiveLoop } from "./helpers";
 
 test.describe.configure({ timeout: 240_000 });
 
@@ -20,14 +20,7 @@ test("debug HUD shows coordinator state and logs rep events", async ({
 }) => {
   await onboard(page);
   await page.goto(`/practice/live${QUERY}`);
-
-  await expect(page.getByTestId("setup-start")).toBeEnabled({
-    timeout: 30_000,
-  });
-  await page.getByTestId("setup-start").click();
-  await expect(page.getByTestId("practice-loop")).toBeVisible({
-    timeout: 30_000,
-  });
+  await startLiveLoop(page);
 
   // HUD is mounted and streaming per-frame diagnostics.
   await expect(page.getByTestId("live-debug-hud")).toBeVisible();
@@ -47,12 +40,6 @@ test("debug HUD shows coordinator state and logs rep events", async ({
 test("HUD stays hidden without the debug flag", async ({ page }) => {
   await onboard(page);
   await page.goto(`/practice/live${QUERY.replace("&debug=live", "")}`);
-  await expect(page.getByTestId("setup-start")).toBeEnabled({
-    timeout: 30_000,
-  });
-  await page.getByTestId("setup-start").click();
-  await expect(page.getByTestId("practice-loop")).toBeVisible({
-    timeout: 30_000,
-  });
+  await startLiveLoop(page);
   await expect(page.getByTestId("live-debug-hud")).toHaveCount(0);
 });

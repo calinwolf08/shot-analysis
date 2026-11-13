@@ -141,7 +141,7 @@ test("change password from profile, sign out, sign back in", async ({
   await page.getByTestId("auth-email").fill(email);
   await page.getByTestId("auth-password").fill("next-password-22");
   await page.getByTestId("auth-submit").click();
-  await page.waitForURL((url) => url.pathname === "/");
+  await page.waitForURL("**/practice**");
 });
 
 test("two accounts on one device keep separate player profiles", async ({
@@ -163,7 +163,7 @@ test("two accounts on one device keep separate player profiles", async ({
   await page.getByTestId("onboarding-name").fill("UserB");
   await page.getByTestId("onboarding-to-camera").click();
   await page.getByTestId("onboarding-finish").click();
-  await page.waitForURL((url) => url.pathname === "/");
+  await page.waitForURL("**/practice**");
   await page.getByTestId("tab-profile").click();
   await expect(page.getByTestId("profile-name")).toHaveText("UserB");
 
@@ -173,7 +173,7 @@ test("two accounts on one device keep separate player profiles", async ({
   await page.getByTestId("auth-email").fill(emailA);
   await page.getByTestId("auth-password").fill(E2E_PASSWORD);
   await page.getByTestId("auth-submit").click();
-  await page.waitForURL((url) => url.pathname === "/");
+  await page.waitForURL("**/practice**");
   await page.getByTestId("tab-profile").click();
   await expect(page.getByTestId("profile-name")).toHaveText("UserA");
 });

@@ -31,7 +31,7 @@ export async function signUp(
   return email;
 }
 
-/** Fresh profile end to end: sign-up → onboarding → home. */
+/** Fresh profile end to end: sign-up → onboarding → Practice (the entry tab). */
 export async function onboard(
   page: Page,
   query = "?e2e=replay",
@@ -44,6 +44,29 @@ export async function onboard(
   await page.getByTestId("onboarding-name").fill(name);
   await page.getByTestId("onboarding-to-camera").click();
   await page.getByTestId("onboarding-finish").click();
-  await page.waitForURL((url) => url.pathname === "/");
+  // The entry route "/" redirects to Practice in the live-first app.
+  await page.waitForURL("**/practice**");
+  await page.getByTestId("tab-practice").waitFor();
   return email;
+}
+
+/**
+ * Drives the live-practice setup screen to a startable state and begins the
+ * loop. The angle-gate "shooting arm toward camera" check can't pass from a
+ * replay fixture that isn't the required side, so overrides stand in; the other
+ * checks pass from the replayed pose stream.
+ */
+export async function startLiveLoop(page: Page): Promise<void> {
+  await page.getByTestId("live-setup").waitFor();
+  const start = page.getByTestId("setup-start");
+  // Give the replayed pose stream a moment to satisfy the auto checks.
+  await page.waitForTimeout(1500);
+  if (await start.isDisabled()) {
+    for (const id of ["full-body", "side-view", "lighting", "stability"]) {
+      const override = page.getByTestId(`override-${id}`);
+      if (await override.count()) await override.click();
+    }
+  }
+  await start.click();
+  await page.getByTestId("practice-loop").waitFor();
 }

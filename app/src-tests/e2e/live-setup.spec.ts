@@ -1,22 +1,22 @@
-import { expect, test, type Page } from "@playwright/test";
-import { onboard as freshUser } from "./helpers";
+import { expect, test } from "@playwright/test";
+import { onboard } from "./helpers";
 
-/** Complete onboarding quickly (fresh context per test). */
-async function onboard(page: Page) {
-  await freshUser(page, "?e2e=replay", "LiveTester");
-}
-
-test("live setup reaches all-green from replayed pose and starts a session", async ({
+/**
+ * The live-practice setup + angle gate. Lighting/stability auto-pass in replay
+ * (no camera); full-body flips as the replayed pose streams in. The "shooting
+ * arm toward camera" check requires the exact side-on orientation for the
+ * player's hand — the replay fixture isn't it, so the gate holds Start until the
+ * user overrides, then the loop begins.
+ */
+test("live setup: the angle gate holds Start until the side check passes", async ({
   page,
 }) => {
-  await onboard(page);
+  await onboard(page, "?e2e=replay", "LiveTester");
 
-  await page.getByTestId("go-live-practice").click();
+  await page.getByTestId("practice-live").click();
   await page.waitForURL("**/practice/live**");
   await expect(page.getByTestId("live-setup")).toBeVisible();
 
-  // No camera in replay mode → lighting/stability pass immediately;
-  // full-body and side-view flip as the replayed fixture pose streams in.
   await expect(page.getByTestId("check-lighting")).toHaveAttribute(
     "data-state",
     "pass",
@@ -30,17 +30,19 @@ test("live setup reaches all-green from replayed pose and starts a session", asy
     "pass",
     { timeout: 20_000 },
   );
+
+  // The angle gate (side-view) does not pass for an off-side fixture, so Start
+  // stays disabled until it's satisfied or overridden.
   await expect(page.getByTestId("check-side-view")).toHaveAttribute(
     "data-state",
-    "pass",
-    { timeout: 20_000 },
+    "pending",
   );
+  await expect(page.getByTestId("setup-start")).toBeDisabled();
 
-  const start = page.getByTestId("setup-start");
-  await expect(start).toBeEnabled();
-  await start.click();
+  await page.getByTestId("override-side-view").click();
+  await expect(page.getByTestId("setup-start")).toBeEnabled();
+  await page.getByTestId("setup-start").click();
 
-  // 3-2-1 countdown, then the session hand-off.
   await expect(page.getByTestId("setup-countdown")).toBeVisible();
   await expect(page.getByTestId("practice-loop")).toBeVisible({
     timeout: 30_000,

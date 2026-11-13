@@ -22,6 +22,7 @@
   } from "$lib/shared/ui/pose-skeleton";
   import { ScoreCard } from "$lib/features/scoring";
   import { createPresenceTracker, type PresenceState } from "./presence";
+  import { phraseFor } from "./readback";
   import type { LivePracticeStore } from "./live-practice-store.svelte";
 
   let {
@@ -186,10 +187,7 @@
         {#if fb.worst.length > 0}
           <div class="chips">
             {#each fb.worst.slice(0, 5) as m (m.id)}
-              <span class="chip">
-                {m.label}{#if m.direction}
-                  {m.direction} by {m.magnitude}{/if}
-              </span>
+              <span class="chip">{phraseFor(m)}</span>
             {/each}
           </div>
         {:else}

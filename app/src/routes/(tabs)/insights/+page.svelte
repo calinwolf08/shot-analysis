@@ -59,12 +59,22 @@
   }
   const fmt = (n: number | null) => (n === null ? "–" : n.toFixed(1));
   const pct = (n: number) => `${Math.round(n * 100)}%`;
+  const PHASE_LABELS: Record<string, string> = {
+    gather: "Gather",
+    load: "Load",
+    rise: "Rise",
+    setPoint: "Set Point",
+    release: "Release",
+    followThrough: "Follow-through",
+    sequencing: "Sequencing",
+  };
+  const phaseLabel = (p: string) => PHASE_LABELS[p] ?? p;
 </script>
 
 <main class="insights" data-testid="insights">
   <h1>Insights</h1>
 
-  <div class="windows" role="tablist">
+  <div class="windows">
     {#each INSIGHTS_WINDOWS as w (w.key)}
       <button
         class:active={w.key === windowKey}
@@ -118,7 +128,7 @@
                 <span class="label">{issue.label}</span>
                 <span class="freq">
                   off in {issue.occurrences} of {summary.shotCount}
-                  ({pct(issue.frequency)}) · {issue.phase}
+                  ({pct(issue.frequency)}) · {phaseLabel(issue.phase)}
                 </span>
               </span>
             </li>
@@ -162,7 +172,8 @@
   }
   .windows button.active {
     background: var(--sc-primary);
-    color: #fff;
+    color: #0b1220;
+    font-weight: 700;
     border-color: var(--sc-primary);
   }
   .dim {
@@ -224,6 +235,5 @@
   .freq {
     font-size: 0.78rem;
     color: var(--sc-text-dim);
-    text-transform: capitalize;
   }
 </style>
