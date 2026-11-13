@@ -27,10 +27,13 @@ COPY package.json package-lock.json ./
 COPY app/package.json app/package.json
 RUN npm ci
 
-# Build: library dist/ first (the app imports it), then the adapter-node server,
-# then drop dev dependencies from the installed tree.
+# Build: stage MediaPipe assets into app/static (WASM is gitignored, so it is
+# copied fresh from node_modules here — the early `npm ci` postinstall no-ops
+# because app/scripts wasn't copied yet), then the library dist/ (the app
+# imports it), then the adapter-node server, then drop dev dependencies.
 COPY . .
-RUN npm run build \
+RUN npm run stage:mediapipe \
+  && npm run build \
   && npm run build:node --workspace shotcoach \
   && npm prune --omit=dev
 

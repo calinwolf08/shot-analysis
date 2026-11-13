@@ -45,6 +45,16 @@ npm install            # installs the library + the app workspace
 npm run build          # build the library (dist/) the app imports
 ```
 
+`npm install` also stages the MediaPipe assets the live camera needs — the
+WASM runtime (`app/static/mediapipe/wasm/`, ~22 MB, gitignored) is copied from
+`@mediapipe/tasks-vision` by a `postinstall` hook, and the pose model
+(`pose_landmarker_full.task`) is committed. If the live session ever 404s
+`/mediapipe/wasm/*`, re-stage manually:
+
+```bash
+npm run stage:mediapipe
+```
+
 Optional app config (local dev works with **no** config):
 
 ```bash
