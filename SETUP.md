@@ -110,6 +110,52 @@ npm run start --workspace shotcoach
 Full hosting guidance (reverse proxy, persistent volume, checklist) is in
 [`docs/hosting-and-deployment.md`](docs/hosting-and-deployment.md).
 
+### Docker image (CI) → Coolify
+
+A GitHub Action (`.github/workflows/docker-image.yml`) builds the web app + API
+into a Docker image and pushes it to Docker Hub on every push to `master` (and
+on manual dispatch). The image is `docker.io/<DOCKERHUB_USERNAME>/shotcoach`
+(tags `latest` and `sha-<commit>`).
+
+**One-time GitHub setup** — add two repo secrets (Settings → Secrets and
+variables → Actions):
+
+- `DOCKERHUB_USERNAME` — your Docker Hub username (also the image namespace).
+- `DOCKERHUB_TOKEN` — a Docker Hub access token with read/write.
+
+**Build the image locally** (optional, to test before pushing):
+
+```bash
+docker build -t shotcoach:local .
+docker run --rm -p 3000:3000 \
+  -e AUTH_SECRET="$(openssl rand -base64 32)" \
+  -e DATABASE_PATH=/data/shotcoach.sqlite \
+  -e ORIGIN=http://localhost:3000 \
+  -e AUTH_TRUSTED_ORIGINS=http://localhost:3000,capacitor://localhost,http://localhost \
+  -v shotcoach-data:/data \
+  shotcoach:local
+# → http://localhost:3000 ; GET /api/health → {"ok":true}
+```
+
+**Deploy on Coolify:**
+
+1. New Resource → **Docker Image**, image `<DOCKERHUB_USERNAME>/shotcoach:latest`
+   (add a registry credential if the Docker Hub repo is private).
+2. **Port:** the container listens on **3000**.
+3. **Persistent storage:** mount a volume at `/data` (SQLite lives here).
+4. **Environment variables:**
+   - `AUTH_SECRET` — `openssl rand -base64 32`
+   - `DATABASE_PATH` — `/data/shotcoach.sqlite`
+   - `ORIGIN` — your public HTTPS URL, e.g. `https://app.example.com`
+   - `AUTH_TRUSTED_ORIGINS` — `https://app.example.com,capacitor://localhost,http://localhost`
+   - (optional) `PORT` (3000), `BODY_SIZE_LIMIT` (64M) — image defaults are fine.
+5. Set the domain + TLS in Coolify and deploy. Health check: `GET /api/health`.
+
+To ship a new build: push to `master` (the Action rebuilds `:latest`), then
+**Redeploy** in Coolify (or enable its registry polling / webhook). The same
+`<DOCKERHUB_USERNAME>/shotcoach` image is also the API the mobile build points
+at via `VITE_API_URL` (§5).
+
 ---
 
 ## 5. Publish the mobile apps (iOS & Android)
