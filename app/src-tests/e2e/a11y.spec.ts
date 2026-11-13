@@ -3,7 +3,8 @@
  * or critical violations allowed.
  */
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { type Page } from "@playwright/test";
 import { signUp } from "./helpers";
 
 test.describe.configure({ timeout: 300_000 });

@@ -4,7 +4,8 @@
  * the replay backend: the HUD must show live state + velocity numbers and
  * log rep events as the fixture loops.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { type Page } from "@playwright/test";
 import { onboard as freshUser, startLiveLoop } from "./helpers";
 
 test.describe.configure({ timeout: 240_000 });

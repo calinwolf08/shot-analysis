@@ -16,7 +16,11 @@
  * @see docs/live-redesign-plan.md §3.2
  */
 
-import { flattenMetrics, type FlatMetric, type ShotMetricsV2 } from "basketball-shot-analysis";
+import {
+  flattenMetrics,
+  type FlatMetric,
+  type ShotMetricsV2,
+} from "basketball-shot-analysis";
 
 // ============================================================================
 // Target shape (live-targets.json)

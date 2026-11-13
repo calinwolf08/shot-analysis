@@ -1,0 +1,78 @@
+name: CI
+
+# Quality gate + end-to-end tests. Runs on PRs to master and on any non-master
+# branch push, so dev-only and real-UI breakage is caught before it reaches
+# master. (Image build is covered separately by docker-validate.yml.)
+
+on:
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - "ios/**"
+      - "android/**"
+      - "docs/**"
+      - "**/*.md"
+  push:
+    branches-ignore: [master]
+    paths-ignore:
+      - "ios/**"
+      - "android/**"
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, types & unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # npm ci runs the root postinstall, which stages the MediaPipe WASM.
+      - run: npm ci
+      # Fails on case-only filename collisions (e.g. Toast.svelte vs
+      # toast.svelte.ts) that resolve wrong on Vite dev / case-insensitive FS.
+      - run: npm run check:case
+      - name: Build library (dist/ the app imports)
+        run: npm run build
+      - name: Library unit tests
+        run: npm test
+      - name: App types (svelte-check)
+        run: npm run check --workspace shotcoach
+      - name: App lint (prettier + eslint)
+        run: npm run lint --workspace shotcoach
+      - name: App unit tests
+        run: npm test --workspace shotcoach
+
+  e2e:
+    name: End-to-end (prod build + dev parity)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build library
+        run: npm run build
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: app
+      # Playwright boots both servers itself: the adapter-node prod build on
+      # :4173 (full suite) and `vite dev` on :5174 (parity smoke).
+      - name: Run e2e
+        run: npm run test:e2e --workspace shotcoach
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: app/playwright-report
+          retention-days: 7

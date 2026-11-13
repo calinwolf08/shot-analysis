@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("app boots with no console errors (fresh profile → sign-in)", async ({
   page,

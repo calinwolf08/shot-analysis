@@ -3,7 +3,7 @@
  * sign-up validation + account creation, session persistence, and
  * sign-in with wrong/right credentials from a clean browser context.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { E2E_PASSWORD, onboard, signUp, uniqueEmail } from "./helpers";
 
 test("unauthenticated visits are redirected to sign-in", async ({ page }) => {
@@ -113,7 +113,13 @@ test("forgot → emailed link → reset → sign in with the new password", asyn
 
 test("change password from profile, sign out, sign back in", async ({
   page,
+  allowConsoleErrors,
 }) => {
+  // This test deliberately submits a wrong current password; the change-password
+  // API answers 400, which the browser logs as a failed resource load. Allow
+  // only that expected 400 — a real asset 404 uses the same string and must
+  // still fail the suite.
+  allowConsoleErrors(/Failed to load resource.*\b400\b/);
   const email = await onboard(page, "?e2e=replay", "Changer");
 
   await page.getByTestId("tab-profile").click();

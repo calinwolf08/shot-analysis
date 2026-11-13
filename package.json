@@ -13,6 +13,7 @@
     "build:browser": "npx tsx build-browser.ts",
     "postinstall": "node -e \"try{var f='app/scripts/fetch-mediapipe-assets.ts';if(require('fs').existsSync(f))require('child_process').execSync('tsx '+f,{stdio:'inherit'})}catch(e){console.warn('[postinstall] MediaPipe staging skipped:',e.message,'- run: npm run stage:mediapipe')}\"",
     "stage:mediapipe": "tsx app/scripts/fetch-mediapipe-assets.ts",
+    "check:case": "node scripts/check-case-collisions.mjs",
     "check": "tsc --noEmit",
     "test:unit": "vitest",
     "test:integration": "vitest --config vitest.integration.config.ts",

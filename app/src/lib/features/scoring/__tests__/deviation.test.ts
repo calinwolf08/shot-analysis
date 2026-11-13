@@ -54,7 +54,11 @@ const flat = (id: string, value: number, reliable = true): FlatMetric => ({
 
 describe("scoreMetricDeviation", () => {
   it("scores a value inside the band as a perfect 1, no direction", () => {
-    const d = scoreMetricDeviation("setPoint.elbow_flare", 90, structureTarget());
+    const d = scoreMetricDeviation(
+      "setPoint.elbow_flare",
+      90,
+      structureTarget(),
+    );
     expect(d.inBand).toBe(true);
     expect(d.score).toBe(1);
     expect(d.direction).toBeNull();
@@ -63,7 +67,11 @@ describe("scoreMetricDeviation", () => {
 
   it("flags a value below the band as 'low' with edge-distance magnitude", () => {
     // value 80: passMin 85 → magnitude 5; normDev = |80-90|/5 = 2 → score 3
-    const d = scoreMetricDeviation("setPoint.elbow_flare", 80, structureTarget());
+    const d = scoreMetricDeviation(
+      "setPoint.elbow_flare",
+      80,
+      structureTarget(),
+    );
     expect(d.inBand).toBe(false);
     expect(d.direction).toBe("low");
     expect(d.magnitude).toBe(5);
@@ -71,22 +79,38 @@ describe("scoreMetricDeviation", () => {
   });
 
   it("flags a value above the band as 'high'", () => {
-    const d = scoreMetricDeviation("setPoint.elbow_flare", 100, structureTarget());
+    const d = scoreMetricDeviation(
+      "setPoint.elbow_flare",
+      100,
+      structureTarget(),
+    );
     expect(d.direction).toBe("high");
     expect(d.magnitude).toBe(5); // 100 - passMax 95
     expect(d.score).toBe(3); // 1 + |100-90|/5
   });
 
   it("clamps the score at 10 for far-out values", () => {
-    const d = scoreMetricDeviation("setPoint.elbow_flare", 200, structureTarget());
+    const d = scoreMetricDeviation(
+      "setPoint.elbow_flare",
+      200,
+      structureTarget(),
+    );
     expect(d.score).toBe(10);
     expect(d.normDev).toBe(22); // |200-90|/5
   });
 
   it("uses the sequencing direction vocabulary (early/late)", () => {
-    const low = scoreMetricDeviation("seq.legs_extend__release", -0.3, seqTarget());
+    const low = scoreMetricDeviation(
+      "seq.legs_extend__release",
+      -0.3,
+      seqTarget(),
+    );
     expect(low.direction).toBe("early"); // below passMin
-    const high = scoreMetricDeviation("seq.legs_extend__release", 0.0, seqTarget());
+    const high = scoreMetricDeviation(
+      "seq.legs_extend__release",
+      0.0,
+      seqTarget(),
+    );
     expect(high.direction).toBe("late"); // above passMax
   });
 
