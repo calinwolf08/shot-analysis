@@ -28,7 +28,9 @@ concurrency:
 jobs:
   quality:
     name: Lint, types & unit tests
-    runs-on: ubuntu-latest
+    # Pinned: GitHub's ubuntu-latest (26.04) isn't yet supported by
+    # Playwright's dependency installer used in the e2e job; pin both for parity.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,7 +55,9 @@ jobs:
 
   e2e:
     name: End-to-end (prod build + dev parity)
-    runs-on: ubuntu-latest
+    # Playwright 1.58.2's `--with-deps` doesn't recognize ubuntu 26.04
+    # (current ubuntu-latest), so pin to 24.04 which it supports.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
