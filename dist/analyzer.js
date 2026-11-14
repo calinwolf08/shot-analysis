@@ -58,6 +58,7 @@
 import { validateConfig } from "./config";
 import { ProfileComparisonEngine } from "./profiles/comparison";
 import { createPoseDetector } from "./pose/factory";
+import { createEmptyPoseLandmarks } from "./pose/types";
 import { ShotDetector, } from "./detection/integrated-shot-detector";
 import { MetricOrchestrator, createShootingArmCalculators, createGuideArmCalculators, createBallMetricCalculators, createLowerBodyCalculators, createPostureCalculators, createTimingCalculators, } from "./metrics";
 import { getProfileRegistry } from "./profiles/registry";
@@ -401,6 +402,58 @@ export class ShotAnalyzer {
             fps,
             totalFrames,
         };
+        // Detect shots and extract metrics from the collected landmark sequence.
+        return this.analyzePoseSequence(allPoseLandmarks, allMetricsLandmarks, videoMetadata);
+    }
+    /**
+     * Runs analysis on an already-extracted pose sequence, skipping MediaPipe
+     * pose detection entirely. This is the fast path for the validator/harness:
+     * given a `poses.json`-style frame list, it runs shot detection, phase
+     * detection and metric extraction and returns the same `AnalysisResult` as
+     * {@link analyzeVideo}.
+     *
+     * Does **not** require {@link initialize} — no pose model is loaded, since
+     * the poses are supplied. Frame ordering is by array position (dense pose
+     * data, one entry per frame, as `poses.json` provides); each frame's own
+     * `frameIndex`/`timestamp` is used for metric timing when present.
+     *
+     * @param frames - Pre-extracted poses (e.g. `poses.json` `frames`)
+     * @param videoMetadata - Video dimensions/fps/frame count for the clip
+     * @returns Analysis result with per-shot phases and metrics
+     */
+    analyzePoses(frames, videoMetadata) {
+        const fps = videoMetadata.fps || 30;
+        const allPoseLandmarks = [];
+        const allMetricsLandmarks = [];
+        frames.forEach((frame, i) => {
+            // poses.json keeps one entry per frame index (dense), but frames where
+            // no pose was detected carry null/absent landmarks. Substitute a
+            // zero-visibility pose so array position stays equal to the real frame
+            // index — keeping shot frameRanges and keyframes in real frame numbers,
+            // the way the labels are recorded.
+            const hasPose = frame != null &&
+                Array.isArray(frame.landmarks) &&
+                frame.landmarks.length > 0;
+            const pose = hasPose
+                ? {
+                    landmarks: frame.landmarks,
+                    poseConfidence: frame.poseConfidence ?? 0,
+                }
+                : createEmptyPoseLandmarks();
+            allPoseLandmarks.push(pose);
+            const frameIndex = frame?.frameIndex ?? i;
+            const timestamp = frame?.timestamp ?? (i / fps) * 1000;
+            allMetricsLandmarks.push(convertToMetricsPoseLandmarks(pose, frameIndex, timestamp));
+        });
+        return this.analyzePoseSequence(allPoseLandmarks, allMetricsLandmarks, videoMetadata);
+    }
+    /**
+     * Shared post-extraction pipeline: shot boundary + phase detection, then
+     * metric extraction and orientation per shot. Used by both
+     * {@link analyzeVideo} (poses from MediaPipe) and {@link analyzePoses}
+     * (poses supplied directly).
+     */
+    analyzePoseSequence(allPoseLandmarks, allMetricsLandmarks, videoMetadata) {
         // Handle empty video or no landmarks
         if (allPoseLandmarks.length < 2) {
             return {
@@ -413,7 +466,9 @@ export class ShotAnalyzer {
         this.shotDetector.reset();
         console.log(`[Analyzer] Running shot detection on ${allPoseLandmarks.length} pose frames...`);
         // Detect shots from the landmark sequence
-        const detectedShots = this.shotDetector.processFrames(allPoseLandmarks);
+        const detectedShots = this.shotDetector.processFrames([
+            ...allPoseLandmarks,
+        ]);
         console.log(`[Analyzer] Shot detection complete, found ${detectedShots.length} shots`);
         // Extract metrics for each detected shot
         const shotAnalyses = [];

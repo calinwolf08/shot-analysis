@@ -64,6 +64,11 @@ import {
   type DetectedShot,
 } from "./shot-detector";
 import { PhaseDetector, type PhaseDetectorConfig } from "./phase-detector";
+import {
+  detectKeyframesFromFrames,
+  phasesFromKeyframes,
+  poseLandmarksToFrames,
+} from "./keyframe-phases";
 
 /**
  * Configuration options for the integrated shot detector.
@@ -78,6 +83,16 @@ export interface ShotDetectorConfig {
    * Configuration for phase detection.
    */
   readonly phaseConfig?: PhaseDetectorConfig;
+
+  /**
+   * When true (default), phase ranges are derived from the keyframe
+   * algorithm — the same detection scored against the self-labeled corpus —
+   * so the runtime identifies the same frames as the labels. The heuristic
+   * `phase-detector` output is used as a fallback for any boundary the
+   * keyframes don't yield (e.g. an occluded elbow). Set false to use the
+   * legacy `phase-detector`-only behaviour.
+   */
+  readonly useKeyframePhases?: boolean;
 }
 
 /**
@@ -165,11 +180,13 @@ interface ShotState {
 export class ShotDetector {
   private readonly boundaryDetector: ShotBoundaryDetector;
   private readonly phaseDetector: PhaseDetector;
+  private readonly useKeyframePhases: boolean;
   private state: ShotState;
 
   constructor(config: ShotDetectorConfig = {}) {
     this.boundaryDetector = new ShotBoundaryDetector(config.boundaryConfig);
     this.phaseDetector = new PhaseDetector(config.phaseConfig);
+    this.useKeyframePhases = config.useKeyframePhases ?? true;
     this.state = this.createInitialState();
   }
 
@@ -371,6 +388,21 @@ export class ShotDetector {
       endFrame,
     );
 
+    // Derive phase ranges from the keyframe algorithm (same detection scored
+    // against the self-labeled corpus) and merge them over the heuristic
+    // output, so any boundary the keyframes don't yield still has a value.
+    let phases = phaseResult.phases as ShotPhases;
+    if (this.useKeyframePhases) {
+      const kfFrames = poseLandmarksToFrames(sequence);
+      const keyframes = detectKeyframesFromFrames(
+        kfFrames,
+        startFrame,
+        endFrame,
+      );
+      const kfPhases = phasesFromKeyframes(keyframes, startFrame, endFrame);
+      phases = { ...phases, ...kfPhases } as ShotPhases;
+    }
+
     // Calculate overall confidence from boundary and phase detection
     const boundaryConfidence =
       (detected.start.confidence + detected.end.confidence) / 2;
@@ -382,7 +414,7 @@ export class ShotDetector {
         start: startFrame,
         end: endFrame,
       },
-      phases: phaseResult.phases as ShotPhases,
+      phases,
       confidence: overallConfidence,
     };
   }

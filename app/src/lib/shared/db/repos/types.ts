@@ -47,7 +47,14 @@ export interface Session {
 
 export interface ShotRecord {
   id: string;
-  sessionId: string;
+  /** Owning player — the root a shot hangs off (live shots have no session). */
+  playerId: string;
+  /**
+   * Owning session. Null for the de-sessioned live flow (the primary path);
+   * set only by the hidden assessment/upload path, which still groups shots
+   * into sessions. Not read by live practice, scoring, or insights.
+   */
+  sessionId: string | null;
   videoId: string | null;
   shotIndex: number;
   orientation: string | null;
@@ -86,4 +93,21 @@ export interface RepRecord {
   primaryCue: string | null;
   feedback: unknown;
   createdAt: number;
+}
+
+/** One frame of a shot's 2D skeleton track for the review scrubber. */
+export interface ReviewPoseFrame {
+  /** Analysis-aligned frame index (matches keyframes + metric frame refs). */
+  readonly frameIndex: number;
+  readonly landmarks: {
+    readonly x: number;
+    readonly y: number;
+    readonly visibility: number;
+  }[];
+}
+
+/** A shot's persisted review pose track (the skeleton-fallback source). */
+export interface ShotReviewPoses {
+  readonly fps: number;
+  readonly frames: ReviewPoseFrame[];
 }

@@ -48,7 +48,10 @@ function makeFakeWorker(
   };
 }
 
-function makeFakeProvider(frameCount: number): FrameProvider {
+function makeFakeProvider(
+  frameCount: number,
+  durationMs?: number,
+): FrameProvider {
   let i = 0;
   return {
     async getNextFrame(): Promise<VideoFrame | null> {
@@ -64,7 +67,11 @@ function makeFakeProvider(frameCount: number): FrameProvider {
       return frame;
     },
     getFps: () => 30,
-    getMetadata: () => ({ width: 1, height: 1 }),
+    getMetadata: () => ({
+      width: 1,
+      height: 1,
+      ...(durationMs !== undefined ? { duration: durationMs } : {}),
+    }),
   };
 }
 
@@ -119,6 +126,42 @@ describe("WorkerAnalysisService.analyzeVideoFile (mocked worker)", () => {
     expect(types.filter((t) => t === "frames")).toHaveLength(3);
     expect(progress.length).toBeGreaterThan(0);
     expect(fake.terminated).toBe(true); // cleaned up
+  });
+
+  it("enriches totals-less worker progress with an estimated totalFrames", async () => {
+    const fake = makeFakeWorker(happyBehavior);
+    const service = createWorkerAnalysisService({
+      makeWorker: () => fake.worker,
+      // 1 s at 30 fps → estimated 30 total frames.
+      makeFrameProvider: async () => makeFakeProvider(7, 1000),
+      batchSize: 3,
+    });
+
+    const progress: AnalysisProgress[] = [];
+    await service.analyzeVideoFile(new Blob(["v"]), opts, (p) =>
+      progress.push(p),
+    );
+
+    expect(progress.length).toBeGreaterThan(0);
+    for (const p of progress) {
+      expect(p.totalFrames).toBe(30);
+      expect(p.framesProcessed).toBeLessThanOrEqual(30);
+    }
+  });
+
+  it("passes progress through untouched when duration is unknown", async () => {
+    const fake = makeFakeWorker(happyBehavior);
+    const service = createWorkerAnalysisService({
+      makeWorker: () => fake.worker,
+      makeFrameProvider: async () => makeFakeProvider(3),
+      batchSize: 3,
+    });
+    const progress: AnalysisProgress[] = [];
+    await service.analyzeVideoFile(new Blob(["v"]), opts, (p) =>
+      progress.push(p),
+    );
+    expect(progress.length).toBeGreaterThan(0);
+    for (const p of progress) expect(p.totalFrames).toBeUndefined();
   });
 
   it("sends the shooting options and local asset paths in init", async () => {

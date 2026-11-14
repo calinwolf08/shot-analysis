@@ -2,9 +2,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { DrillPlayerScreen, type Drill } from "$lib/features/drills";
-  import { createPlanRepo } from "$lib/features/training-plan";
   import { useAppServices } from "$lib/shared/config/services-context";
-  import { flushDb } from "$lib/shared/db";
   import { toasts } from "$lib/shared/ui";
 
   const services = useAppServices();
@@ -32,8 +30,7 @@
     // standalone plays just acknowledge.
     const planItemId = page.url.searchParams.get("planItem");
     if (planItemId) {
-      await createPlanRepo(services).updateItemStatus(planItemId, "done");
-      await flushDb(services.db);
+      await services.trainingPlan.completeItem(planItemId);
     }
     toasts.show("Drill completed — nice work!", "success");
   }

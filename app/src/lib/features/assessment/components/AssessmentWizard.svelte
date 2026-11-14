@@ -5,6 +5,10 @@
   import { Button, Card, EmptyState } from "$lib/shared/ui";
   import { AssessmentStore } from "../stores/assessment-store.svelte";
   import type { AssessmentVideoInput } from "../services/assessment-service";
+  import {
+    captureShotThumbnails,
+    type ShotFrameInfo,
+  } from "../services/frame-thumbnails";
   import AnalyzeStep from "./AnalyzeStep.svelte";
   import ReviewStep from "./ReviewStep.svelte";
 
@@ -24,6 +28,44 @@
   ];
 
   let finishing = $state(false);
+
+  // Start/end frame stills per shot id, captured from the uploaded files
+  // once review begins (fixture inputs have no pixels to capture).
+  let frameInfo = $state<Record<string, ShotFrameInfo>>({});
+  let thumbedSessionId: string | null = null;
+
+  $effect(() => {
+    if (store.phase !== "reviewing" || !store.outcome) return;
+    const outcome = store.outcome;
+    if (thumbedSessionId === outcome.sessionId) return;
+    thumbedSessionId = outcome.sessionId;
+
+    const blobs = store.inputs
+      .map((i) => i.input)
+      .filter((input): input is Blob => input instanceof Blob);
+    // Videos are analyzed in input order, so distinct videoIds appear in
+    // outcome.shots in the same order as the picked files.
+    const videoIds: string[] = [];
+    for (const shot of outcome.shots) {
+      if (shot.videoId && !videoIds.includes(shot.videoId)) {
+        videoIds.push(shot.videoId);
+      }
+    }
+    if (blobs.length !== videoIds.length) return;
+
+    void (async () => {
+      for (const [idx, videoId] of videoIds.entries()) {
+        const record = await services.repos.video.get(videoId);
+        if (!record?.fps) continue;
+        const captured = await captureShotThumbnails(
+          blobs[idx]!,
+          record.fps,
+          outcome.shots.filter((s) => s.videoId === videoId),
+        );
+        frameInfo = { ...frameInfo, ...captured };
+      }
+    })();
+  });
 
   function onFilesPicked(event: Event) {
     const files = (event.target as HTMLInputElement).files;
@@ -140,6 +182,7 @@
   {:else if store.phase === "reviewing" && store.outcome}
     <ReviewStep
       shots={store.outcome.shots}
+      {frameInfo}
       isExcluded={(shot) => store.isExcluded(shot)}
       ontoggle={(shot) => store.toggleExclude(shot)}
       onfinish={finishReview}

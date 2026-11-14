@@ -707,10 +707,10 @@ describe("compareKeyframes", () => {
     };
   }
 
-  it("returns 10 keyframe comparison results", () => {
+  it("returns 11 keyframe comparison results", () => {
     const labeledShot = createLabeledShotWithKeyframes({});
     const result = compareKeyframes(labeledShot);
-    expect(result).toHaveLength(10);
+    expect(result).toHaveLength(11);
   });
 
   it("returns all keyframe IDs in order", () => {
@@ -725,6 +725,7 @@ describe("compareKeyframes", () => {
       "legs_start_extending",
       "ball_starts_upward",
       "set_point",
+      "legs_fully_extended",
       "release",
       "arms_fully_extended",
       "feet_leave_ground",
@@ -936,7 +937,7 @@ describe("compareResults - keyframe integration", () => {
     const result = compareResults(detection, labels, poseData);
 
     expect(result.shots[0]!.keyframes).toBeDefined();
-    expect(result.shots[0]!.keyframes).toHaveLength(10);
+    expect(result.shots[0]!.keyframes).toHaveLength(11);
   });
 
   it("fails overall when any labeled keyframe fails", () => {

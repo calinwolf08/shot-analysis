@@ -3,6 +3,7 @@ import {
   CameraPermissionError,
   createBrowserCaptureService,
   createFakeCaptureService,
+  createFileCaptureService,
 } from "../capture";
 
 describe("createFakeCaptureService", () => {
@@ -34,5 +35,13 @@ describe("createBrowserCaptureService", () => {
     const capture = createBrowserCaptureService();
     expect(capture.isAvailable()).toBe(false);
     await expect(capture.start()).rejects.toThrow(CameraPermissionError);
+  });
+});
+
+describe("createFileCaptureService", () => {
+  it("reports unavailable without a DOM (node)", () => {
+    // No document/HTMLVideoElement.captureStream in the node unit env → the
+    // guard must short-circuit to false rather than throw.
+    expect(createFileCaptureService("/clip.mp4").isAvailable()).toBe(false);
   });
 });

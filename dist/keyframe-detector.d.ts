@@ -60,6 +60,23 @@ export interface KeyframeDetectionResult {
     /** Overall confidence for the detection */
     readonly confidence: number;
 }
+/** One explanation of how a keyframe was determined for a shot. */
+export interface KeyframeDiagnostic {
+    /** Keyframe id (e.g. "set_point"). */
+    readonly keyframe: string;
+    /** Chosen frame, or null when not detectable. */
+    readonly frame: number | null;
+    /** Short method tag (e.g. "elbow-extension", "wristY-peak-fallback"). */
+    readonly method: string;
+    /** Human-readable reasoning, including the deciding numbers. */
+    readonly detail: string;
+}
+/**
+ * Installs (or clears with `null`) a sink that receives a diagnostic for every
+ * keyframe the detectors resolve. Set it before running detection and clear it
+ * afterwards. Not reentrant — one sink at a time.
+ */
+export declare function setKeyframeDiagnosticsSink(sink: ((d: KeyframeDiagnostic) => void) | null): void;
 /**
  * Calculates the angle at the elbow joint (shoulder-elbow-wrist).
  *
@@ -102,6 +119,10 @@ export declare function calculateKneeAngle(hip: TestLandmark | null, knee: TestL
  *
  * This corresponds to the "leg_bend_low_point" keyframe in the Load phase.
  * The search is limited to the first portion of the shot (configurable).
+ *
+ * Primary signal is the hip drop (hips lowest relative to the ankles = deepest
+ * bend); the onset of that basin is the low point. Falls back to the knee angle
+ * when the hips barely move (e.g. hips/ankles not tracked).
  *
  * @param frames - Array of frames with pose data
  * @param startFrame - Shot start frame index (inclusive)
@@ -159,6 +180,23 @@ export declare function calculateSmoothedVelocity(values: number[], windowSize: 
  */
 export declare function detectLegsStartExtending(frames: readonly Frame[], legBendLowPointFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 /**
+ * Detects the frame where the legs reach FULL extension (the drive is complete).
+ *
+ * This corresponds to the "legs_fully_extended" keyframe — event #6 of the
+ * shooting sequence, after "legs start rising". The hips reach their highest
+ * point relative to the ankles (legs straightest / player up on the drive), so
+ * the hip-drop signal (ankleY − hipY) reaches its MAXIMUM. We return the onset
+ * of that peak (first frame within a small band of the max). Falls back to the
+ * straightest knee angle when the hips barely move.
+ *
+ * @param frames - Array of frames with pose data
+ * @param legsStartExtendingFrame - Frame where the legs began extending
+ * @param endFrame - Shot end frame index (inclusive)
+ * @param config - Detection configuration
+ * @returns Frame index of full leg extension, or null if not detectable
+ */
+export declare function detectLegsFullyExtended(frames: readonly Frame[], legsStartExtendingFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
+/**
  * Detects the frame where the ball starts moving upward (wrist Y starts decreasing).
  *
  * This corresponds to the "ball_starts_upward" keyframe in the Rise phase.
@@ -187,6 +225,7 @@ export declare function detectBallStartsUpward(frames: readonly Frame[], ballLow
  * @param config - Detection configuration
  * @returns Frame index of set point, or null if not detectable
  */
+export declare function detectSetPoint_old(frames: readonly Frame[], ballStartsUpwardFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 export declare function detectSetPoint(frames: readonly Frame[], ballStartsUpwardFrame: number, endFrame: number, config?: Required<KeyframeDetectorConfig>): number | null;
 /**
  * Detects the "release" frame - the frame of maximum wrist flexion (snap).

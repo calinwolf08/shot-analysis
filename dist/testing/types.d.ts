@@ -189,12 +189,6 @@ export declare const poseDataSchema: z.ZodObject<{
         }[] | null;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
-    video: string;
-    fps: number;
-    totalFrames: number;
-    width: number;
-    height: number;
-    extractedAt: string;
     frames: {
         frameIndex: number;
         timestamp: number;
@@ -206,13 +200,13 @@ export declare const poseDataSchema: z.ZodObject<{
             visibility: number;
         }[] | null;
     }[];
+    video: string;
+    fps: number;
+    totalFrames: number;
+    width: number;
+    height: number;
+    extractedAt: string;
 }, {
-    video: string;
-    fps: number;
-    totalFrames: number;
-    width: number;
-    height: number;
-    extractedAt: string;
     frames: {
         frameIndex: number;
         timestamp: number;
@@ -224,6 +218,12 @@ export declare const poseDataSchema: z.ZodObject<{
             visibility: number;
         }[] | null;
     }[];
+    video: string;
+    fps: number;
+    totalFrames: number;
+    width: number;
+    height: number;
+    extractedAt: string;
 }>;
 /**
  * Identifiers for each keyframe in a basketball shot.
@@ -233,10 +233,10 @@ export declare const poseDataSchema: z.ZodObject<{
  * - Load: legs_start_bending, leg_bend_low_point, ball_low_point
  * - Rise: legs_start_extending, ball_starts_upward
  * - Set Point: set_point
- * - Release: release, arms_fully_extended
+ * - Release: legs_fully_extended, release, arms_fully_extended
  * - Follow-through: feet_leave_ground, feet_land
  */
-export type KeyframeId = "legs_start_bending" | "leg_bend_low_point" | "ball_low_point" | "legs_start_extending" | "ball_starts_upward" | "set_point" | "release" | "arms_fully_extended" | "feet_leave_ground" | "feet_land";
+export type KeyframeId = "legs_start_bending" | "leg_bend_low_point" | "ball_low_point" | "legs_start_extending" | "ball_starts_upward" | "set_point" | "legs_fully_extended" | "release" | "arms_fully_extended" | "feet_leave_ground" | "feet_land";
 /**
  * All keyframe IDs in chronological order.
  */
@@ -271,6 +271,8 @@ export interface LabeledShot {
     readonly ball_starts_upward?: number | null | undefined;
     /** Frame where ball is at peak before release (Set Point) */
     readonly set_point?: number | null | undefined;
+    /** Frame where the legs reach full extension (the drive is complete) */
+    readonly legs_fully_extended?: number | null | undefined;
     /** Frame where wrist snaps and ball leaves hand (Release) */
     readonly release?: number | null | undefined;
     /** Frame of maximum arm extension */
@@ -295,10 +297,13 @@ export declare const labeledShotSchema: z.ZodObject<{
     legs_start_extending: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     ball_starts_upward: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     set_point: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    legs_fully_extended: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     release: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     arms_fully_extended: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     feet_leave_ground: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     feet_land: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    set_point_end: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    release_end: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
 }, "strip", z.ZodTypeAny, {
     shotNumber: number;
     startFrame: number;
@@ -311,9 +316,12 @@ export declare const labeledShotSchema: z.ZodObject<{
     legs_start_extending?: number | null | undefined;
     ball_starts_upward?: number | null | undefined;
     set_point?: number | null | undefined;
+    legs_fully_extended?: number | null | undefined;
     arms_fully_extended?: number | null | undefined;
     feet_leave_ground?: number | null | undefined;
     feet_land?: number | null | undefined;
+    set_point_end?: number | null | undefined;
+    release_end?: number | null | undefined;
 }, {
     shotNumber: number;
     startFrame: number;
@@ -326,9 +334,12 @@ export declare const labeledShotSchema: z.ZodObject<{
     legs_start_extending?: number | null | undefined;
     ball_starts_upward?: number | null | undefined;
     set_point?: number | null | undefined;
+    legs_fully_extended?: number | null | undefined;
     arms_fully_extended?: number | null | undefined;
     feet_leave_ground?: number | null | undefined;
     feet_land?: number | null | undefined;
+    set_point_end?: number | null | undefined;
+    release_end?: number | null | undefined;
 }>;
 /**
  * Ground truth label data for a video.
@@ -365,10 +376,13 @@ export declare const labelDataSchema: z.ZodObject<{
         legs_start_extending: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
         ball_starts_upward: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
         set_point: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        legs_fully_extended: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
         release: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
         arms_fully_extended: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
         feet_leave_ground: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
         feet_land: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        set_point_end: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        release_end: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     }, "strip", z.ZodTypeAny, {
         shotNumber: number;
         startFrame: number;
@@ -381,9 +395,12 @@ export declare const labelDataSchema: z.ZodObject<{
         legs_start_extending?: number | null | undefined;
         ball_starts_upward?: number | null | undefined;
         set_point?: number | null | undefined;
+        legs_fully_extended?: number | null | undefined;
         arms_fully_extended?: number | null | undefined;
         feet_leave_ground?: number | null | undefined;
         feet_land?: number | null | undefined;
+        set_point_end?: number | null | undefined;
+        release_end?: number | null | undefined;
     }, {
         shotNumber: number;
         startFrame: number;
@@ -396,12 +413,17 @@ export declare const labelDataSchema: z.ZodObject<{
         legs_start_extending?: number | null | undefined;
         ball_starts_upward?: number | null | undefined;
         set_point?: number | null | undefined;
+        legs_fully_extended?: number | null | undefined;
         arms_fully_extended?: number | null | undefined;
         feet_leave_ground?: number | null | undefined;
         feet_land?: number | null | undefined;
+        set_point_end?: number | null | undefined;
+        release_end?: number | null | undefined;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     video: string;
+    labeledBy: string;
+    labeledAt: string;
     shots: {
         shotNumber: number;
         startFrame: number;
@@ -414,14 +436,17 @@ export declare const labelDataSchema: z.ZodObject<{
         legs_start_extending?: number | null | undefined;
         ball_starts_upward?: number | null | undefined;
         set_point?: number | null | undefined;
+        legs_fully_extended?: number | null | undefined;
         arms_fully_extended?: number | null | undefined;
         feet_leave_ground?: number | null | undefined;
         feet_land?: number | null | undefined;
+        set_point_end?: number | null | undefined;
+        release_end?: number | null | undefined;
     }[];
-    labeledBy: string;
-    labeledAt: string;
 }, {
     video: string;
+    labeledBy: string;
+    labeledAt: string;
     shots: {
         shotNumber: number;
         startFrame: number;
@@ -434,12 +459,13 @@ export declare const labelDataSchema: z.ZodObject<{
         legs_start_extending?: number | null | undefined;
         ball_starts_upward?: number | null | undefined;
         set_point?: number | null | undefined;
+        legs_fully_extended?: number | null | undefined;
         arms_fully_extended?: number | null | undefined;
         feet_leave_ground?: number | null | undefined;
         feet_land?: number | null | undefined;
+        set_point_end?: number | null | undefined;
+        release_end?: number | null | undefined;
     }[];
-    labeledBy: string;
-    labeledAt: string;
 }>;
 /**
  * Result of comparing a single keyframe between detected and labeled values.

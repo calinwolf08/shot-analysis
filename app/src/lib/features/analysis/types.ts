@@ -1,4 +1,4 @@
-import type { AnalysisResult } from "basketball-shot-analysis";
+import type { AnalysisResult, PoseData } from "basketball-shot-analysis";
 
 export interface AnalyzeOptions {
   shootingHand: "left" | "right";
@@ -61,6 +61,12 @@ export interface LandmarkFrame {
  * buffer when it thinks a rep happened.
  */
 export interface LiveAnalysisSession {
+  /**
+   * Frame rate of the emitted landmark stream. Used to reconstruct PoseData
+   * from a rep window for server-side analysis (see docs/server-migration-plan
+   * Step 7.2). Known after `start()`; a stable default before then.
+   */
+  readonly fps: number;
   /** Subscribe to per-frame landmarks. Returns an unsubscribe function. */
   onFrame(cb: (frame: LandmarkFrame) => void): () => void;
   /** Full shot detection + metrics over a bounded frame window. */
@@ -81,12 +87,22 @@ export interface LiveAnalysisSession {
 }
 
 export interface AnalysisService {
-  /** Analyze an uploaded/recorded video end-to-end. */
+  /** Analyze an uploaded/recorded video end-to-end (client-only path). */
   analyzeVideoFile(
     input: AnalysisInput,
     opts: AnalyzeOptions,
     onProgress?: ProgressCallback,
   ): Promise<AnalysisResult>;
+  /**
+   * Extract pose frames from a video (client-side pose detection only) so the
+   * server can run the authoritative full analysis. This is the production
+   * upload/assessment path: the browser detects poses, the server scores them.
+   */
+  extractPoses(
+    input: AnalysisInput,
+    opts: AnalyzeOptions,
+    onProgress?: ProgressCallback,
+  ): Promise<PoseData>;
   /** Create a live session (camera-backed in production, replay in tests). */
   createLiveSession(opts: AnalyzeOptions): LiveAnalysisSession;
 }

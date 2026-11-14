@@ -71,6 +71,15 @@ export interface ShotDetectorConfig {
      * Configuration for phase detection.
      */
     readonly phaseConfig?: PhaseDetectorConfig;
+    /**
+     * When true (default), phase ranges are derived from the keyframe
+     * algorithm — the same detection scored against the self-labeled corpus —
+     * so the runtime identifies the same frames as the labels. The heuristic
+     * `phase-detector` output is used as a fallback for any boundary the
+     * keyframes don't yield (e.g. an occluded elbow). Set false to use the
+     * legacy `phase-detector`-only behaviour.
+     */
+    readonly useKeyframePhases?: boolean;
 }
 /**
  * Result of processing a single frame.
@@ -126,6 +135,7 @@ export interface FrameAnalysisResult {
 export declare class ShotDetector {
     private readonly boundaryDetector;
     private readonly phaseDetector;
+    private readonly useKeyframePhases;
     private state;
     constructor(config?: ShotDetectorConfig);
     /**

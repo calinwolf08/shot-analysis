@@ -21,7 +21,7 @@
  * @see Feature 5.4 - Ball Position Metrics (Inferred)
  */
 import { getHandednessMapping } from "../config";
-import { calculateDistance } from "../utils/geometry";
+import { calculateAngle, calculateDistance } from "../utils/geometry";
 import { ShotPhase } from "../detection/types";
 import { LANDMARK_INDICES } from "../types";
 /**
@@ -70,6 +70,76 @@ function getNosePosition(pose) {
     if (!nose)
         return null;
     return nose.position;
+}
+/**
+ * Max per-frame movement of the shooting wrist relative to the shooting
+ * shoulder (in shoulder-widths) for the ball to count as "held in place". Above
+ * this the arm is moving the ball through space (rise or release).
+ */
+const SET_POINT_HOLD_MAX_VEL = 0.08;
+/**
+ * Position of the shooting wrist RELATIVE TO the shooting shoulder, normalized
+ * by shoulder width — a point in the shooter's own body frame. It stays fixed
+ * while the ball is held in the set pocket even as the legs extend and the
+ * whole body translates up (both wrist and shoulder rise together); it changes
+ * when the arm ROTATES the ball through space. So "this point frozen" ==
+ * "ball held in place", which a bare elbow angle can't capture (a 90° elbow
+ * can rotate up while the back lifts). Returns null when landmarks are missing.
+ */
+function wristShoulderRel(pose, shoulderIdx, wristIdx, minVisibility = 0.2) {
+    const s = pose.landmarks[shoulderIdx];
+    const w = pose.landmarks[wristIdx];
+    if (!s || !w)
+        return null;
+    if (s.visibility < minVisibility || w.visibility < minVisibility)
+        return null;
+    // Normalize by the 2D shoulder width (image plane). The 3D distance includes
+    // the noisy depth (z) estimate, which inflates and destabilizes the scale.
+    const ls = pose.landmarks[LANDMARK_INDICES.LEFT_SHOULDER];
+    const rs = pose.landmarks[LANDMARK_INDICES.RIGHT_SHOULDER];
+    const scale = ls && rs
+        ? Math.max(Math.hypot(ls.position.x - rs.position.x, ls.position.y - rs.position.y), 0.05)
+        : 0.15;
+    return {
+        x: (w.position.x - s.position.x) / scale,
+        y: (w.position.y - s.position.y) / scale,
+    };
+}
+/** Elbow-joint angle (shoulder-elbow-wrist) for a given arm, or null. */
+function armElbowAngle(pose, shoulderIdx, elbowIdx, wristIdx, minVisibility = 0.2) {
+    const s = pose.landmarks[shoulderIdx];
+    const e = pose.landmarks[elbowIdx];
+    const w = pose.landmarks[wristIdx];
+    if (!s || !e || !w)
+        return null;
+    if (s.visibility < minVisibility ||
+        e.visibility < minVisibility ||
+        w.visibility < minVisibility) {
+        return null;
+    }
+    return calculateAngle(s.position, e.position, w.position);
+}
+/**
+ * Picks the "cocked" arm at the set point — the more flexed (smaller elbow
+ * angle) of the two arms — and returns its landmark indices, so the hold can
+ * be tracked on the same arm across frames. Handedness config is only a hint;
+ * whichever arm is actually cocked wins.
+ */
+function pickCockedArm(pose, config) {
+    const m = getHandednessMapping(config.shootingHand);
+    const arms = [
+        { shoulder: m.shootingShoulder, elbow: m.shootingElbow, wrist: m.shootingWrist },
+        { shoulder: m.guideShoulder, elbow: m.guideElbow, wrist: m.guideWrist },
+    ];
+    let best = null;
+    for (const arm of arms) {
+        const a = armElbowAngle(pose, arm.shoulder, arm.elbow, arm.wrist);
+        if (a === null)
+            continue;
+        if (best === null || a < best.angle)
+            best = { arm, angle: a };
+    }
+    return best?.arm ?? null;
 }
 /**
  * Determines if hands are together (holding the ball).
@@ -362,35 +432,108 @@ export class SetPointDurationCalculator {
     description = "Duration ball stays at set point (milliseconds)";
     unit = "ms";
     calculate(context) {
-        const { poseLandmarks, phases } = context;
+        const { poseLandmarks, phases, config } = context;
         // Get set point phase
         const setPointPhase = phases[ShotPhase.SetPoint];
         if (!setPointPhase) {
             return { error: "SetPoint phase not detected" };
         }
-        // Calculate duration in frames
-        const durationFrames = setPointPhase.endFrame - setPointPhase.startFrame + 1;
-        // Convert to milliseconds using frame timestamps
-        let durationMs;
-        const startPose = getPoseAtFrame(poseLandmarks, setPointPhase.startFrame);
-        const endPose = getPoseAtFrame(poseLandmarks, setPointPhase.endFrame);
-        if (startPose && endPose) {
-            durationMs = endPose.timestamp - startPose.timestamp;
-            // For single frame, estimate from surrounding frames
-            if (durationMs <= 0 && poseLandmarks.length >= 2) {
-                const fps = 1000 /
-                    ((poseLandmarks[1]?.timestamp ?? 33.33) -
-                        (poseLandmarks[0]?.timestamp ?? 0));
-                durationMs = (durationFrames / fps) * 1000;
+        // Some shooters hold the set for several frames; others move continuously
+        // through it. The SetPoint phase itself is a single frame, so we measure
+        // the hold as the span the ball is kept "in place" — the shooting wrist
+        // stationary RELATIVE TO the shooting shoulder (a point in the body frame).
+        // This holds constant while the legs extend and the whole body rises (wrist
+        // and shoulder rise together), but changes as soon as the arm rotates the
+        // ball up into the release. Holding a 90° elbow while the back lifts is NOT
+        // a hold — and, unlike a bare elbow angle, this catches that (the wrist
+        // swings relative to the shoulder).
+        const setFrame = setPointPhase.startFrame;
+        const setPose = getPoseAtFrame(poseLandmarks, setFrame);
+        const arm = setPose ? pickCockedArm(setPose, config) : null;
+        let holdStart = setFrame;
+        let holdEnd = setFrame;
+        if (arm) {
+            // Body-frame wrist position (x,y) per frame. NOT smoothed: smoothing the
+            // position before differencing washes out the movement signal, making
+            // everything look stationary. Velocity is computed raw; isolated jitter
+            // is tolerated in the walk below.
+            const relX = poseLandmarks.map((p) => wristShoulderRel(p, arm.shoulder, arm.wrist)?.x ?? null);
+            const relY = poseLandmarks.map((p) => wristShoulderRel(p, arm.shoulder, arm.wrist)?.y ?? null);
+            const setIdx = poseLandmarks.findIndex((p) => p.frameIndex === setFrame);
+            // Per-frame movement of the body-frame wrist position (== how fast the
+            // ball moves in the shooter's frame). Near zero while the ball is held.
+            const vel = (i) => {
+                const x = relX[i];
+                const y = relY[i];
+                const px = relX[i - 1];
+                const py = relY[i - 1];
+                if (x === null ||
+                    x === undefined ||
+                    y === null ||
+                    y === undefined ||
+                    px === null ||
+                    px === undefined ||
+                    py === null ||
+                    py === undefined) {
+                    return null;
+                }
+                return Math.hypot(x - px, y - py);
+            };
+            if (setIdx >= 0) {
+                // The detected set point can sit at the edge of the pause (e.g. at the
+                // deepest flex, just before the release push), so anchor to the least-
+                // moving frame in a small window around it, then grow the stationary
+                // (held-in-place) run outward.
+                let anchor = setIdx;
+                let bestVel = Infinity;
+                for (let i = Math.max(1, setIdx - 5); i <= setIdx + 2; i++) {
+                    const v = vel(i);
+                    if (v !== null && v < bestVel) {
+                        bestVel = v;
+                        anchor = i;
+                    }
+                }
+                if (bestVel <= SET_POINT_HOLD_MAX_VEL) {
+                    holdStart = poseLandmarks[anchor].frameIndex;
+                    holdEnd = poseLandmarks[anchor].frameIndex;
+                    for (let i = anchor; i >= 1; i--) {
+                        const v = vel(i);
+                        if (v === null || v > SET_POINT_HOLD_MAX_VEL)
+                            break;
+                        holdStart = poseLandmarks[i - 1].frameIndex;
+                    }
+                    for (let i = anchor + 1; i < poseLandmarks.length; i++) {
+                        const v = vel(i);
+                        if (v === null || v > SET_POINT_HOLD_MAX_VEL)
+                            break;
+                        holdEnd = poseLandmarks[i].frameIndex;
+                    }
+                }
+                else {
+                    // No genuine pause — continuous shooter. Duration is ~1 frame.
+                    holdStart = setFrame;
+                    holdEnd = setFrame;
+                }
             }
         }
+        const durationFrames = holdEnd - holdStart + 1;
+        // Convert to milliseconds using frame timestamps.
+        let durationMs;
+        const startPose = getPoseAtFrame(poseLandmarks, holdStart);
+        const endPose = getPoseAtFrame(poseLandmarks, holdEnd);
+        if (startPose && endPose && endPose.timestamp > startPose.timestamp) {
+            durationMs = endPose.timestamp - startPose.timestamp;
+        }
+        else if (poseLandmarks.length >= 2) {
+            const fps = 1000 /
+                Math.max(1, (poseLandmarks[1]?.timestamp ?? 33.33) -
+                    (poseLandmarks[0]?.timestamp ?? 0));
+            durationMs = (durationFrames / fps) * 1000;
+        }
         else {
-            // Estimate assuming 30fps
             durationMs = (durationFrames / 30) * 1000;
         }
-        // Ensure positive duration
         durationMs = Math.max(durationMs, (durationFrames / 30) * 1000);
-        // Calculate confidence
         let confidence = 0.8;
         if (startPose && endPose) {
             confidence =
@@ -400,7 +543,7 @@ export class SetPointDurationCalculator {
         const value = {
             value: Math.round(durationMs),
             unit: this.unit,
-            frame: setPointPhase.startFrame,
+            frame: holdStart,
             confidence,
         };
         return { value };

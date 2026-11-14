@@ -52,6 +52,73 @@ export function createBrowserCaptureService(): CaptureService {
   };
 }
 
+/**
+ * File-backed capture: plays a video file through a hidden <video> and
+ * exposes it as a MediaStream via captureStream(), so the whole live path
+ * (frame-capture → worker → coordinator) runs against a recorded clip with
+ * no webcam. Dev/e2e only — lets you validate live shot detection from the
+ * test videos in a browser without a camera. Requires a browser that can
+ * decode the file's codec (e.g. H.264 mp4 needs a Chrome with H.264).
+ */
+export function createFileCaptureService(
+  url: string,
+  opts: { loop?: boolean; fps?: number } = {},
+): CaptureService {
+  return {
+    isAvailable() {
+      return (
+        typeof document !== "undefined" &&
+        typeof (
+          HTMLVideoElement.prototype as unknown as {
+            captureStream?: unknown;
+          }
+        ).captureStream === "function"
+      );
+    },
+
+    async start() {
+      const video = document.createElement("video");
+      video.src = url;
+      video.muted = true;
+      video.playsInline = true;
+      video.loop = opts.loop ?? true;
+      video.crossOrigin = "anonymous";
+
+      await new Promise<void>((resolve, reject) => {
+        video.addEventListener("loadeddata", () => resolve(), { once: true });
+        video.addEventListener(
+          "error",
+          () =>
+            reject(
+              new CameraPermissionError(
+                new Error(
+                  `Cannot decode ${url} (code ${video.error?.code ?? "?"}). ` +
+                    "This browser may lack the video codec (e.g. H.264).",
+                ),
+              ),
+            ),
+          { once: true },
+        );
+      });
+      await video.play();
+
+      const stream = (
+        video as unknown as { captureStream(fps?: number): MediaStream }
+      ).captureStream(opts.fps);
+
+      return {
+        stream,
+        stop() {
+          video.pause();
+          for (const track of stream.getTracks()) track.stop();
+          video.removeAttribute("src");
+          video.load();
+        },
+      };
+    },
+  };
+}
+
 export interface FakeCaptureService extends CaptureService {
   /** Calls received, for assertions. */
   readonly starts: MediaStreamConstraints[];

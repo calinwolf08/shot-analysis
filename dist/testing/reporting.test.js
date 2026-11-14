@@ -16,16 +16,76 @@ import { formatConsoleOutput, formatFailureDetails, saveJsonReport, createTestRe
  */
 function createDefaultKeyframes() {
     return [
-        { keyframeId: "legs_start_bending", labeled: null, detected: null, diff: null, passed: true },
-        { keyframeId: "leg_bend_low_point", labeled: null, detected: null, diff: null, passed: true },
-        { keyframeId: "ball_low_point", labeled: null, detected: null, diff: null, passed: true },
-        { keyframeId: "legs_start_extending", labeled: null, detected: null, diff: null, passed: true },
-        { keyframeId: "ball_starts_upward", labeled: null, detected: null, diff: null, passed: true },
-        { keyframeId: "set_point", labeled: null, detected: null, diff: null, passed: true },
-        { keyframeId: "release", labeled: null, detected: null, diff: null, passed: true },
-        { keyframeId: "arms_fully_extended", labeled: null, detected: null, diff: null, passed: true },
-        { keyframeId: "feet_leave_ground", labeled: null, detected: null, diff: null, passed: true },
-        { keyframeId: "feet_land", labeled: null, detected: null, diff: null, passed: true },
+        {
+            keyframeId: "legs_start_bending",
+            labeled: null,
+            detected: null,
+            diff: null,
+            passed: true,
+        },
+        {
+            keyframeId: "leg_bend_low_point",
+            labeled: null,
+            detected: null,
+            diff: null,
+            passed: true,
+        },
+        {
+            keyframeId: "ball_low_point",
+            labeled: null,
+            detected: null,
+            diff: null,
+            passed: true,
+        },
+        {
+            keyframeId: "legs_start_extending",
+            labeled: null,
+            detected: null,
+            diff: null,
+            passed: true,
+        },
+        {
+            keyframeId: "ball_starts_upward",
+            labeled: null,
+            detected: null,
+            diff: null,
+            passed: true,
+        },
+        {
+            keyframeId: "set_point",
+            labeled: null,
+            detected: null,
+            diff: null,
+            passed: true,
+        },
+        {
+            keyframeId: "release",
+            labeled: null,
+            detected: null,
+            diff: null,
+            passed: true,
+        },
+        {
+            keyframeId: "arms_fully_extended",
+            labeled: null,
+            detected: null,
+            diff: null,
+            passed: true,
+        },
+        {
+            keyframeId: "feet_leave_ground",
+            labeled: null,
+            detected: null,
+            diff: null,
+            passed: true,
+        },
+        {
+            keyframeId: "feet_land",
+            labeled: null,
+            detected: null,
+            diff: null,
+            passed: true,
+        },
     ];
 }
 /**
@@ -312,6 +372,12 @@ describe("saveJsonReport", () => {
     it("returns error on permission issues", () => {
         // Skip this test on systems where we can't create permission issues
         if (process.platform === "win32") {
+            return;
+        }
+        // Root bypasses filesystem permission checks, so a read-only directory is
+        // still writable and this case cannot be exercised. Skip under root (e.g.
+        // some CI containers) rather than fail spuriously.
+        if (process.getuid?.() === 0) {
             return;
         }
         // Create a read-only directory

@@ -8,11 +8,13 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = join(here, "..", "src-tests", "fixtures", "poses");
-// vite preview (SvelteKit) serves .svelte-kit/output/client; the adapter
-// output in build/ is what ships. Cover both so e2e and any static server
-// find the fixtures.
+// Cover every place a server might serve the fixtures from:
+//  - build/           adapter-static output (vite preview)
+//  - build/client/    adapter-node output (node build)
+//  - .svelte-kit/...  vite preview (SvelteKit dev output)
 const dests = [
   join(here, "..", "build", "fixtures", "poses"),
+  join(here, "..", "build", "client", "fixtures", "poses"),
   join(here, "..", ".svelte-kit", "output", "client", "fixtures", "poses"),
 ];
 

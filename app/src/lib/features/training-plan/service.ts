@@ -44,6 +44,8 @@ export interface TrainingPlanService {
   ): Promise<Plan>;
   getPlan(planId: string): Promise<PlanWithItems | null>;
   getActivePlan(playerId: string): Promise<PlanWithItems | null>;
+  /** A single plan item (for plan-bound drill/live/summary screens). */
+  getItem(itemId: string): Promise<PlanItem | null>;
   completeItem(itemId: string): Promise<void>;
   /** The active plan's next pending item (Home "Today" card). */
   nextPendingItem(
@@ -136,6 +138,8 @@ export function createTrainingPlanService(
 
     getActivePlan: async (playerId) =>
       withItems(await plans.getActiveByPlayer(playerId)),
+
+    getItem: (itemId) => plans.getItem(itemId),
 
     completeItem: (itemId) => plans.updateItemStatus(itemId, "done"),
 

@@ -134,6 +134,27 @@ export {
   filterMetricsByConfidence,
 } from "./metrics/types";
 
+// v2 metrics (Sequencing / Structure) — extraction for the validator + app
+export {
+  extractShotMetrics,
+  metricsForShot,
+  computeSequencing,
+  computeStructure,
+} from "./metrics/v2";
+export type {
+  ShotMetricsV2,
+  SequencingMetrics,
+  StructureMetrics,
+  Measurement,
+  ExtractOptions,
+  Thresholds,
+  MetricThreshold,
+} from "./metrics/v2";
+export { deriveThresholds, referenceOnFrame } from "./metrics/v2";
+export type { ReferencePoses, ReferenceSkeleton } from "./metrics/v2";
+export { scoreShot } from "./scoring/v2";
+export type { ShotScore, CategoryScore, MetricScore } from "./scoring/v2";
+
 // Profile exports
 export type {
   MetricFeedback,
@@ -209,3 +230,21 @@ export {
   detectOrientation,
   createPoseShotDetector,
 } from "./detection/pose-shot-detector";
+
+// Keyframe detection (same algorithm the runtime derives phases from and the
+// offline harness scores against labels) — exposed so the validator can show
+// the detected keyframes next to the self-labeled data.
+export {
+  detectKeyframesFromFrames,
+  phasesFromKeyframes,
+  poseLandmarksToFrames,
+} from "./detection/keyframe-phases";
+
+export type { KeyframeId } from "./testing/types";
+
+// Keyframe diagnostics: install a sink to capture the per-keyframe reasoning
+// (method + explanation) the detectors emit, for debugging against labels.
+export {
+  setKeyframeDiagnosticsSink,
+  type KeyframeDiagnostic,
+} from "./keyframe-detector";

@@ -10,6 +10,7 @@ import { createShotRepo } from "../shot-repo";
 
 let services: TestServices;
 let sessionId: string;
+let playerId: string;
 
 beforeEach(async () => {
   services = await createTestServices();
@@ -18,6 +19,7 @@ beforeEach(async () => {
     shootingHand: "right",
     level: "youth",
   });
+  playerId = player.id;
   sessionId = (
     await createSessionRepo(services).create({
       playerId: player.id,
@@ -36,6 +38,8 @@ describe("ShotRepo.saveAnalysis", () => {
     const saved = await repo.saveAnalysis({ sessionId, analysis });
 
     expect(saved.shotIndex).toBe(2);
+    expect(saved.playerId).toBe(playerId); // derived from the session
+    expect(saved.sessionId).toBe(sessionId);
     expect(saved.orientation).toBe("side-right");
     expect(saved.startFrame).toBe(analysis.frameRange.start);
     expect(saved.endFrame).toBe(analysis.frameRange.end);
@@ -111,5 +115,98 @@ describe("ShotRepo.saveAnalysis", () => {
 
     await repo.setExcluded(s0.id, false);
     expect(await repo.listBySession(sessionId)).toHaveLength(2);
+  });
+});
+
+describe("ShotRepo player-rooted (de-sessioned) shots", () => {
+  it("saves a shot with only a playerId (no session)", async () => {
+    const repo = createShotRepo(services);
+    const saved = await repo.saveAnalysis({
+      playerId,
+      analysis: makeShotAnalysis(),
+    });
+    expect(saved.playerId).toBe(playerId);
+    expect(saved.sessionId).toBeNull();
+
+    const loaded = await repo.get(saved.id);
+    expect(loaded?.sessionId).toBeNull();
+    expect(loaded?.playerId).toBe(playerId);
+  });
+
+  it("throws when neither playerId nor sessionId is given", async () => {
+    const repo = createShotRepo(services);
+    await expect(
+      repo.saveAnalysis({ analysis: makeShotAnalysis() }),
+    ).rejects.toThrow();
+  });
+
+  it("persists and reads back a review pose track", async () => {
+    const repo = createShotRepo(services);
+    const reviewPoses = {
+      fps: 30,
+      frames: [
+        { frameIndex: 0, landmarks: [{ x: 0.1, y: 0.2, visibility: 0.9 }] },
+        { frameIndex: 1, landmarks: [{ x: 0.15, y: 0.25, visibility: 0.8 }] },
+      ],
+    };
+    const saved = await repo.saveAnalysis({
+      playerId,
+      analysis: makeShotAnalysis(),
+      reviewPoses,
+    });
+    expect(await repo.getPoses(saved.id)).toEqual(reviewPoses);
+
+    // A shot saved without poses has none.
+    const bare = await repo.saveAnalysis({
+      playerId,
+      analysis: makeShotAnalysis(),
+    });
+    expect(await repo.getPoses(bare.id)).toBeNull();
+  });
+
+  it("listByPlayer returns newest-first and honors since/limit/excluded", async () => {
+    const repo = createShotRepo(services);
+    const a = await repo.saveAnalysis({
+      playerId,
+      analysis: makeShotAnalysis({ shotIndex: 0 }),
+    });
+    services.clock.advance(1000);
+    const b = await repo.saveAnalysis({
+      playerId,
+      analysis: makeShotAnalysis({ shotIndex: 1 }),
+    });
+    services.clock.advance(1000);
+    const c = await repo.saveAnalysis({
+      playerId,
+      analysis: makeShotAnalysis({ shotIndex: 2 }),
+    });
+
+    // Newest first.
+    expect((await repo.listByPlayer(playerId)).map((s) => s.id)).toEqual([
+      c.id,
+      b.id,
+      a.id,
+    ]);
+    // Limit.
+    expect(
+      (await repo.listByPlayer(playerId, { limit: 2 })).map((s) => s.id),
+    ).toEqual([c.id, b.id]);
+    // Since (b and c were saved at/after b's createdAt).
+    expect(
+      (await repo.listByPlayer(playerId, { since: b.createdAt })).map(
+        (s) => s.id,
+      ),
+    ).toEqual([c.id, b.id]);
+    // Excluded filtered out by default, included on request.
+    await repo.setExcluded(c.id, true);
+    expect((await repo.listByPlayer(playerId)).map((s) => s.id)).toEqual([
+      b.id,
+      a.id,
+    ]);
+    expect(
+      (await repo.listByPlayer(playerId, { includeExcluded: true })).map(
+        (s) => s.id,
+      ),
+    ).toEqual([c.id, b.id, a.id]);
   });
 });

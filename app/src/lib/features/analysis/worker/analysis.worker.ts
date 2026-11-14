@@ -23,8 +23,12 @@ if (typeof workerSelf.import !== "function") {
 }
 
 import { createPoseDetector } from "basketball-shot-analysis";
+import type { PoseData } from "basketball-shot-analysis";
 import type { AnalyzeOptions, LandmarkFrame } from "../types";
-import { runReplayAnalysis } from "../replay/replay-pipeline";
+import {
+  landmarkFramesToPoseData,
+  runReplayAnalysis,
+} from "../replay/replay-pipeline";
 import {
   parseToWorker,
   type FramePayload,
@@ -41,6 +45,9 @@ interface WorkerState {
   collected: LandmarkFrame[];
   framesProcessed: number;
   cancelled: boolean;
+  /** Frame dimensions, captured from the incoming RGBA frames. */
+  width: number;
+  height: number;
 }
 
 const state: WorkerState = {
@@ -51,6 +58,8 @@ const state: WorkerState = {
   collected: [],
   framesProcessed: 0,
   cancelled: false,
+  width: 0,
+  height: 0,
 };
 
 /**
@@ -63,7 +72,8 @@ type FromWorkerPost =
       type: "result";
       result: import("basketball-shot-analysis").AnalysisResult;
     }
-  | { type: "landmarks"; frame: LandmarkFrame };
+  | { type: "landmarks"; frame: LandmarkFrame }
+  | { type: "poses"; poseData: PoseData };
 
 function post(message: FromWorkerPost): void {
   (self as unknown as Worker).postMessage(message);
@@ -73,6 +83,10 @@ async function handleFrames(frames: FramePayload[]): Promise<void> {
   if (!state.detector) throw new Error("worker not initialized");
   for (const frame of frames) {
     if (state.cancelled) return;
+    if (state.width === 0) {
+      state.width = frame.width;
+      state.height = frame.height;
+    }
     const pose = await state.detector.detect({
       data: frame.data,
       width: frame.width,
@@ -115,6 +129,21 @@ function handleFinalize(): void {
   post({ type: "result", result });
 }
 
+/**
+ * Returns the collected poses (for server-side analysis) instead of running the
+ * pipeline. Landmark visibility doubles as the persisted confidence (the
+ * server's poseDataToLandmarkFrames uses visibility), and timestamps are
+ * rebased to seconds from the frame index so the payload is self-describing.
+ */
+function handleFinalizePoses(): void {
+  const poseData: PoseData = landmarkFramesToPoseData(
+    state.collected,
+    state.fps,
+    { width: state.width, height: state.height },
+  );
+  post({ type: "poses", poseData });
+}
+
 self.onmessage = async (event: MessageEvent) => {
   try {
     const message = parseToWorker(event.data);
@@ -126,6 +155,8 @@ self.onmessage = async (event: MessageEvent) => {
         state.collected = [];
         state.framesProcessed = 0;
         state.cancelled = false;
+        state.width = 0;
+        state.height = 0;
         state.detector = await createPoseDetector({
           runtime: "browser",
           wasmBasePath: message.assets.wasmBasePath,
@@ -140,6 +171,9 @@ self.onmessage = async (event: MessageEvent) => {
         break;
       case "finalize":
         handleFinalize();
+        break;
+      case "finalizePoses":
+        handleFinalizePoses();
         break;
       case "cancel":
         state.cancelled = true;

@@ -41,6 +41,9 @@ export const toWorkerSchema = z.discriminatedUnion("type", [
     frames: z.array(framePayloadSchema).min(1),
   }),
   z.object({ type: z.literal("finalize") }),
+  // Like finalize, but returns the collected pose frames (for server-side
+  // analysis) instead of running the pipeline in the worker.
+  z.object({ type: z.literal("finalizePoses") }),
   z.object({ type: z.literal("cancel") }),
 ]);
 export type ToWorkerMessage = z.infer<typeof toWorkerSchema>;
@@ -80,11 +83,23 @@ const resultSchema = z.object({
   config: z.unknown(),
 });
 
+/** Pose frames returned for server-side analysis (library PoseData shape). */
+const poseDataSchema = z.object({
+  video: z.string(),
+  fps: z.number(),
+  totalFrames: z.number(),
+  width: z.number(),
+  height: z.number(),
+  extractedAt: z.string(),
+  frames: z.array(z.unknown()),
+});
+
 export const fromWorkerSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("ready") }),
   z.object({ type: z.literal("progress"), progress: progressSchema }),
   z.object({ type: z.literal("landmarks"), frame: landmarkFrameSchema }),
   z.object({ type: z.literal("result"), result: resultSchema }),
+  z.object({ type: z.literal("poses"), poseData: poseDataSchema }),
   z.object({ type: z.literal("error"), message: z.string() }),
 ]);
 export type FromWorkerMessage = z.infer<typeof fromWorkerSchema>;

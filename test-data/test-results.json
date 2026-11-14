@@ -1,9 +1,9 @@
 {
-  "runAt": "2026-07-08T05:13:32.385Z",
+  "runAt": "2026-07-16T01:04:08.338Z",
   "summary": {
-    "total": 8,
-    "passed": 7,
-    "failed": 1
+    "total": 12,
+    "passed": 9,
+    "failed": 3
   },
   "tolerance": {
     "frames": 8,
@@ -72,22 +72,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 44,
-              "detected": 50,
-              "diff": 6,
+              "detected": 45,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 51,
-              "detected": 53,
-              "diff": 2,
+              "detected": 47,
+              "diff": 4,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 52,
-              "detected": 53,
-              "diff": 1,
+              "detected": 49,
+              "diff": 3,
               "passed": true
             },
             {
@@ -165,15 +165,15 @@
             {
               "keyframeId": "set_point",
               "labeled": 337,
-              "detected": 339,
+              "detected": 335,
               "diff": 2,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 343,
-              "detected": 342,
-              "diff": 1,
+              "detected": 336,
+              "diff": 7,
               "passed": true
             },
             {
@@ -352,8 +352,8 @@
             {
               "keyframeId": "set_point",
               "labeled": 850,
-              "detected": 848,
-              "diff": 2,
+              "detected": 853,
+              "diff": 3,
               "passed": true
             },
             {
@@ -451,15 +451,15 @@
             {
               "keyframeId": "set_point",
               "labeled": 96,
-              "detected": 97,
-              "diff": 1,
+              "detected": 99,
+              "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 102,
-              "detected": 98,
-              "diff": 4,
+              "detected": 102,
+              "diff": 0,
               "passed": true
             },
             {
@@ -637,22 +637,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 404,
-              "detected": 409,
-              "diff": 5,
+              "detected": 400,
+              "diff": 4,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 409,
-              "detected": 411,
-              "diff": 2,
+              "detected": 402,
+              "diff": 7,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 411,
-              "detected": 412,
-              "diff": 1,
+              "detected": 408,
+              "diff": 3,
               "passed": true
             },
             {
@@ -736,8 +736,8 @@
             {
               "keyframeId": "set_point",
               "labeled": 23,
-              "detected": 23,
-              "diff": 0,
+              "detected": 24,
+              "diff": 1,
               "passed": true
             },
             {
@@ -829,15 +829,15 @@
             {
               "keyframeId": "set_point",
               "labeled": 131,
-              "detected": 130,
-              "diff": 1,
+              "detected": 133,
+              "diff": 2,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 136,
-              "detected": 133,
-              "diff": 3,
+              "detected": 134,
+              "diff": 2,
               "passed": true
             },
             {
@@ -865,6 +865,111 @@
           "keyframeValidationExcluded": false
         }
       ]
+    },
+    {
+      "video": "20190107_211108.mp4",
+      "status": "pass",
+      "shots": [
+        {
+          "shotNumber": 1,
+          "startFrame": {
+            "detected": 31,
+            "expected": 33,
+            "diff": 2,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 57,
+            "expected": 62,
+            "diff": 5,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "front",
+            "expected": "front",
+            "match": true
+          },
+          "keyframes": [
+            {
+              "keyframeId": "legs_start_bending",
+              "labeled": null,
+              "detected": 31,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "leg_bend_low_point",
+              "labeled": null,
+              "detected": 43,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_low_point",
+              "labeled": null,
+              "detected": 38,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "legs_start_extending",
+              "labeled": null,
+              "detected": 44,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_starts_upward",
+              "labeled": null,
+              "detected": 40,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "set_point",
+              "labeled": null,
+              "detected": 50,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "release",
+              "labeled": null,
+              "detected": 52,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "arms_fully_extended",
+              "labeled": null,
+              "detected": 55,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_leave_ground",
+              "labeled": null,
+              "detected": 45,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_land",
+              "labeled": null,
+              "detected": 57,
+              "diff": null,
+              "passed": true
+            }
+          ],
+          "keyframeValidationExcluded": false
+        }
+      ]
+    },
+    {
+      "video": "20190124_175609.mp4",
+      "status": "fail",
+      "shots": [],
+      "failureReason": "shot count mismatch: detected 2, expected 5"
     },
     {
       "video": "20190804_140617.mp4",
@@ -1021,22 +1126,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 208,
-              "detected": 209,
-              "diff": 1,
+              "detected": 211,
+              "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 213,
-              "detected": 210,
-              "diff": 3,
+              "detected": 212,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 214,
-              "detected": 211,
-              "diff": 3,
+              "detected": 215,
+              "diff": 1,
               "passed": true
             },
             {
@@ -1114,15 +1219,15 @@
             {
               "keyframeId": "set_point",
               "labeled": 848,
-              "detected": 849,
-              "diff": 1,
+              "detected": 848,
+              "diff": 0,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 852,
-              "detected": 850,
-              "diff": 2,
+              "detected": 849,
+              "diff": 3,
               "passed": true
             },
             {
@@ -1399,22 +1504,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 269,
-              "detected": 275,
-              "diff": 6,
+              "detected": 272,
+              "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 276,
-              "detected": 279,
+              "detected": 273,
               "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 277,
-              "detected": 279,
-              "diff": 2,
+              "detected": 276,
+              "diff": 1,
               "passed": true
             },
             {
@@ -1493,14 +1598,14 @@
             {
               "keyframeId": "set_point",
               "labeled": 382,
-              "detected": 386,
-              "diff": 4,
+              "detected": 384,
+              "diff": 2,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 388,
-              "detected": 391,
+              "detected": 385,
               "diff": 3,
               "passed": true
             },
@@ -1587,22 +1692,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 517,
-              "detected": 522,
-              "diff": 5,
+              "detected": 525,
+              "diff": 8,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 526,
-              "detected": 524,
-              "diff": 2,
+              "detected": 527,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 527,
-              "detected": 531,
-              "diff": 4,
+              "detected": 532,
+              "diff": 5,
               "passed": true
             },
             {
@@ -1681,29 +1786,29 @@
             {
               "keyframeId": "set_point",
               "labeled": 634,
-              "detected": 639,
-              "diff": 5,
+              "detected": 635,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 641,
-              "detected": 644,
-              "diff": 3,
+              "detected": 636,
+              "diff": 5,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 642,
-              "detected": 645,
-              "diff": 3,
+              "detected": 642,
+              "diff": 0,
               "passed": true
             },
             {
               "keyframeId": "feet_leave_ground",
               "labeled": 640,
-              "detected": 638,
-              "diff": 2,
+              "detected": 637,
+              "diff": 3,
               "passed": true
             },
             {
@@ -1774,22 +1879,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 762,
-              "detected": 767,
-              "diff": 5,
+              "detected": 763,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 769,
-              "detected": 768,
-              "diff": 1,
+              "detected": 764,
+              "diff": 5,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 770,
-              "detected": 772,
-              "diff": 2,
+              "detected": 765,
+              "diff": 5,
               "passed": true
             },
             {
@@ -1874,8 +1979,8 @@
             {
               "keyframeId": "set_point",
               "labeled": 42,
-              "detected": 48,
-              "diff": 6,
+              "detected": 42,
+              "diff": 0,
               "passed": true
             },
             {
@@ -1967,22 +2072,22 @@
             {
               "keyframeId": "set_point",
               "labeled": 298,
-              "detected": 302,
-              "diff": 4,
+              "detected": 298,
+              "diff": 0,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 303,
-              "detected": 305,
-              "diff": 2,
+              "detected": 302,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 303,
-              "detected": 307,
-              "diff": 4,
+              "detected": 303,
+              "diff": 0,
               "passed": true
             },
             {
@@ -2060,15 +2165,15 @@
             {
               "keyframeId": "set_point",
               "labeled": 564,
-              "detected": 565,
-              "diff": 1,
+              "detected": 566,
+              "diff": 2,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 569,
-              "detected": 566,
-              "diff": 3,
+              "detected": 567,
+              "diff": 2,
               "passed": true
             },
             {
@@ -2090,6 +2195,477 @@
               "labeled": 573,
               "detected": 574,
               "diff": 1,
+              "passed": true
+            }
+          ],
+          "keyframeValidationExcluded": false
+        }
+      ]
+    },
+    {
+      "video": "20200606_111929.mp4",
+      "status": "pass",
+      "shots": [
+        {
+          "shotNumber": 1,
+          "startFrame": {
+            "detected": 107,
+            "expected": 102,
+            "diff": 5,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 124,
+            "expected": 124,
+            "diff": 0,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-right",
+            "expected": "side-right",
+            "match": true
+          },
+          "keyframes": [
+            {
+              "keyframeId": "legs_start_bending",
+              "labeled": null,
+              "detected": 107,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "leg_bend_low_point",
+              "labeled": null,
+              "detected": 108,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_low_point",
+              "labeled": null,
+              "detected": 107,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "legs_start_extending",
+              "labeled": null,
+              "detected": 109,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_starts_upward",
+              "labeled": null,
+              "detected": 108,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "set_point",
+              "labeled": null,
+              "detected": 117,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "release",
+              "labeled": null,
+              "detected": 118,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "arms_fully_extended",
+              "labeled": null,
+              "detected": 119,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_leave_ground",
+              "labeled": null,
+              "detected": 115,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_land",
+              "labeled": null,
+              "detected": 124,
+              "diff": null,
+              "passed": true
+            }
+          ],
+          "keyframeValidationExcluded": false
+        },
+        {
+          "shotNumber": 2,
+          "startFrame": {
+            "detected": 430,
+            "expected": 424,
+            "diff": 6,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 451,
+            "expected": 448,
+            "diff": 3,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-right",
+            "expected": "side-right",
+            "match": true
+          },
+          "keyframes": [
+            {
+              "keyframeId": "legs_start_bending",
+              "labeled": null,
+              "detected": 430,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "leg_bend_low_point",
+              "labeled": null,
+              "detected": 435,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_low_point",
+              "labeled": null,
+              "detected": 430,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "legs_start_extending",
+              "labeled": null,
+              "detected": 436,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_starts_upward",
+              "labeled": null,
+              "detected": 431,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "set_point",
+              "labeled": null,
+              "detected": 439,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "release",
+              "labeled": null,
+              "detected": 440,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "arms_fully_extended",
+              "labeled": null,
+              "detected": 443,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_leave_ground",
+              "labeled": null,
+              "detected": 438,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_land",
+              "labeled": null,
+              "detected": 448,
+              "diff": null,
+              "passed": true
+            }
+          ],
+          "keyframeValidationExcluded": false
+        },
+        {
+          "shotNumber": 3,
+          "startFrame": {
+            "detected": 650,
+            "expected": 645,
+            "diff": 5,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 667,
+            "expected": 668,
+            "diff": 1,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "side-right",
+            "expected": "side-right",
+            "match": true
+          },
+          "keyframes": [
+            {
+              "keyframeId": "legs_start_bending",
+              "labeled": null,
+              "detected": 650,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "leg_bend_low_point",
+              "labeled": null,
+              "detected": 654,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_low_point",
+              "labeled": null,
+              "detected": 650,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "legs_start_extending",
+              "labeled": null,
+              "detected": 656,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_starts_upward",
+              "labeled": null,
+              "detected": 651,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "set_point",
+              "labeled": null,
+              "detected": 661,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "release",
+              "labeled": null,
+              "detected": 662,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "arms_fully_extended",
+              "labeled": null,
+              "detected": 663,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_leave_ground",
+              "labeled": null,
+              "detected": 658,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_land",
+              "labeled": null,
+              "detected": 667,
+              "diff": null,
+              "passed": true
+            }
+          ],
+          "keyframeValidationExcluded": false
+        },
+        {
+          "shotNumber": 4,
+          "startFrame": {
+            "detected": 968,
+            "expected": 964,
+            "diff": 4,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 985,
+            "expected": 987,
+            "diff": 2,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "front-right",
+            "expected": "front-right",
+            "match": true
+          },
+          "keyframes": [
+            {
+              "keyframeId": "legs_start_bending",
+              "labeled": null,
+              "detected": 968,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "leg_bend_low_point",
+              "labeled": null,
+              "detected": 968,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_low_point",
+              "labeled": null,
+              "detected": 968,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "legs_start_extending",
+              "labeled": null,
+              "detected": 971,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_starts_upward",
+              "labeled": null,
+              "detected": 969,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "set_point",
+              "labeled": null,
+              "detected": 976,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "release",
+              "labeled": null,
+              "detected": 979,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "arms_fully_extended",
+              "labeled": null,
+              "detected": 981,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_leave_ground",
+              "labeled": null,
+              "detected": 979,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_land",
+              "labeled": null,
+              "detected": 985,
+              "diff": null,
+              "passed": true
+            }
+          ],
+          "keyframeValidationExcluded": false
+        },
+        {
+          "shotNumber": 5,
+          "startFrame": {
+            "detected": 1291,
+            "expected": 1287,
+            "diff": 4,
+            "pass": true
+          },
+          "endFrame": {
+            "detected": 1311,
+            "expected": 1312,
+            "diff": 1,
+            "pass": true
+          },
+          "orientation": {
+            "detected": "front-right",
+            "expected": "front-right",
+            "match": true
+          },
+          "keyframes": [
+            {
+              "keyframeId": "legs_start_bending",
+              "labeled": null,
+              "detected": 1291,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "leg_bend_low_point",
+              "labeled": null,
+              "detected": 1299,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_low_point",
+              "labeled": null,
+              "detected": 1291,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "legs_start_extending",
+              "labeled": null,
+              "detected": 1300,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "ball_starts_upward",
+              "labeled": null,
+              "detected": 1292,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "set_point",
+              "labeled": null,
+              "detected": 1295,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "release",
+              "labeled": null,
+              "detected": 1301,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "arms_fully_extended",
+              "labeled": null,
+              "detected": 1305,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_leave_ground",
+              "labeled": null,
+              "detected": 1299,
+              "diff": null,
+              "passed": true
+            },
+            {
+              "keyframeId": "feet_land",
+              "labeled": null,
+              "detected": 1309,
+              "diff": null,
               "passed": true
             }
           ],
@@ -2159,8 +2735,8 @@
             {
               "keyframeId": "set_point",
               "labeled": 91,
-              "detected": 92,
-              "diff": 1,
+              "detected": 94,
+              "diff": 3,
               "passed": true
             },
             {
@@ -2258,21 +2834,21 @@
             {
               "keyframeId": "set_point",
               "labeled": 70,
-              "detected": 75,
-              "diff": 5,
+              "detected": 73,
+              "diff": 3,
               "passed": true
             },
             {
               "keyframeId": "release",
               "labeled": 75,
-              "detected": 77,
-              "diff": 2,
+              "detected": 74,
+              "diff": 1,
               "passed": true
             },
             {
               "keyframeId": "arms_fully_extended",
               "labeled": 76,
-              "detected": 78,
+              "detected": 74,
               "diff": 2,
               "passed": true
             },
@@ -2294,6 +2870,12 @@
           "keyframeValidationExcluded": false
         }
       ]
+    },
+    {
+      "video": "zak 1.mp4",
+      "status": "fail",
+      "shots": [],
+      "failureReason": "shot count mismatch: detected 6, expected 9"
     }
   ]
 }

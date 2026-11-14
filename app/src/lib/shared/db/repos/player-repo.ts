@@ -10,9 +10,20 @@ export interface CreatePlayerInput {
 export interface PlayerRepo {
   create(input: CreatePlayerInput): Promise<Player>;
   get(id: string): Promise<Player | null>;
-  /** v1 is a single-player app: the first (only) player, if onboarded. */
+  /**
+   * The current player: scoped to the signed-in user once
+   * setCurrentUser() has been called (unscoped before auth resolves and
+   * in unit tests, matching the pre-auth single-player behavior).
+   */
   getFirst(): Promise<Player | null>;
   update(id: string, patch: Partial<CreatePlayerInput>): Promise<Player | null>;
+  /** Scopes reads/creates to this auth user (null clears the scope). */
+  setCurrentUser(userId: string | null): void;
+  /**
+   * Single-user upgrade path: rows created before auth existed
+   * (user_id NULL) are claimed by the first signed-in user.
+   */
+  claimUnowned(userId: string): Promise<void>;
 }
 
 interface PlayerRow {
@@ -22,6 +33,7 @@ interface PlayerRow {
   level: PlayerLevel;
   created_at: number;
   updated_at: number;
+  user_id: string | null;
 }
 
 function toPlayer(r: PlayerRow): Player {
@@ -37,7 +49,18 @@ function toPlayer(r: PlayerRow): Player {
 
 export function createPlayerRepo(ctx: RepoContext): PlayerRepo {
   const { db, clock, ids } = ctx;
+  let currentUserId: string | null = null;
   return {
+    setCurrentUser(userId) {
+      currentUserId = userId;
+    },
+
+    async claimUnowned(userId) {
+      await db.run("UPDATE players SET user_id = ? WHERE user_id IS NULL", [
+        userId,
+      ]);
+    },
+
     async create(input) {
       const now = clock.now();
       const player: Player = {
@@ -47,8 +70,8 @@ export function createPlayerRepo(ctx: RepoContext): PlayerRepo {
         updatedAt: now,
       };
       await db.run(
-        `INSERT INTO players (id, name, shooting_hand, level, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO players (id, name, shooting_hand, level, created_at, updated_at, user_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           player.id,
           player.name,
@@ -56,6 +79,7 @@ export function createPlayerRepo(ctx: RepoContext): PlayerRepo {
           player.level,
           player.createdAt,
           player.updatedAt,
+          currentUserId,
         ],
       );
       return player;
@@ -70,9 +94,14 @@ export function createPlayerRepo(ctx: RepoContext): PlayerRepo {
     },
 
     async getFirst() {
-      const rows = await db.query<PlayerRow>(
-        "SELECT * FROM players ORDER BY created_at LIMIT 1",
-      );
+      const rows = currentUserId
+        ? await db.query<PlayerRow>(
+            "SELECT * FROM players WHERE user_id = ? ORDER BY created_at LIMIT 1",
+            [currentUserId],
+          )
+        : await db.query<PlayerRow>(
+            "SELECT * FROM players ORDER BY created_at LIMIT 1",
+          );
       return rows[0] ? toPlayer(rows[0]) : null;
     },
 
