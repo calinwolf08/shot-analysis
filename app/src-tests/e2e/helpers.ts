@@ -51,22 +51,10 @@ export async function onboard(
 }
 
 /**
- * Drives the live-practice setup screen to a startable state and begins the
- * loop. The angle-gate "shooting arm toward camera" check can't pass from a
- * replay fixture that isn't the required side, so overrides stand in; the other
- * checks pass from the replayed pose stream.
+ * Waits for the continuous practice loop. The setup screen is gone: the loop
+ * boots straight into practice. In replay there's no camera, so the in-loop
+ * positioning gate is inactive and the replayed pose stream drives shots.
  */
 export async function startLiveLoop(page: Page): Promise<void> {
-  await page.getByTestId("live-setup").waitFor();
-  const start = page.getByTestId("setup-start");
-  // Give the replayed pose stream a moment to satisfy the auto checks.
-  await page.waitForTimeout(1500);
-  if (await start.isDisabled()) {
-    for (const id of ["full-body", "side-view", "lighting", "stability"]) {
-      const override = page.getByTestId(`override-${id}`);
-      if (await override.count()) await override.click();
-    }
-  }
-  await start.click();
-  await page.getByTestId("practice-loop").waitFor();
+  await page.getByTestId("practice-loop").waitFor({ timeout: 30_000 });
 }

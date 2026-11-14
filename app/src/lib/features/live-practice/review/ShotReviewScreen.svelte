@@ -10,9 +10,11 @@
    * every device). A retained on-device clip renders behind this same overlay
    * once per-shot video capture lands.
    */
+  import { onDestroy } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { useAppServices } from "$lib/shared/config/services-context";
+  import { getShotClipStore } from "$lib/shared/media/shot-clip-store";
   import type { ShotRecord, ShotReviewPoses } from "$lib/shared/db/repos";
   import type { StoredShotAnalysis } from "$lib/features/analysis";
   import { scorecardForShot } from "$lib/features/live-practice";
@@ -38,6 +40,7 @@
   let { shotId }: { shotId: string } = $props();
 
   const services = useAppServices();
+  const clipStore = getShotClipStore();
 
   interface ReferencePoses {
     byKeyframe: Record<string, { landmarks: Pt[] }>;
@@ -51,6 +54,11 @@
   let notFound = $state(false);
   let canvas = $state<HTMLCanvasElement | null>(null);
   let hand = $state<Hand>("right");
+
+  // Recorded clip of the actual shot (on-device only; absent on other devices).
+  let clipUrl = $state<string | null>(null);
+  let videoEl = $state<HTMLVideoElement | null>(null);
+  let videoReady = $state(false);
 
   /**
    * Median per-frame body height (normalized) → a CONSTANT zoom scale so the
@@ -136,7 +144,22 @@
     if (player) hand = player.shootingHand;
     bodyHeight = computeBodyHeight(p);
     void loadReferencePoses();
+    void loadClip(id);
   }
+
+  async function loadClip(id: string) {
+    revokeClip();
+    videoReady = false;
+    const blob = await clipStore.get(id).catch(() => null);
+    if (blob) clipUrl = URL.createObjectURL(blob);
+  }
+
+  function revokeClip() {
+    if (clipUrl) URL.revokeObjectURL(clipUrl);
+    clipUrl = null;
+  }
+
+  onDestroy(revokeClip);
 
   async function loadReferencePoses() {
     if (referencePoses) return;
@@ -216,6 +239,41 @@
     if (kf) current = kf.startFrame;
   }
 
+  /**
+   * object-fit:cover mapping matching the clip <video>, so the overlay stays
+   * registered with the footage. Used only when a clip is present; without one
+   * the skeleton uses the zoom-to-fill projection.
+   */
+  function coverProject(
+    w: number,
+    h: number,
+  ): ((l: Pt) => { x: number; y: number }) | null {
+    const vw = videoEl?.videoWidth ?? 0;
+    const vh = videoEl?.videoHeight ?? 0;
+    if (!vw || !vh) return null;
+    const scale = Math.max(w / vw, h / vh);
+    const dw = vw * scale;
+    const dh = vh * scale;
+    const ox = (w - dw) / 2;
+    const oy = (h - dh) / 2;
+    return (l) => ({ x: ox + l.x * dw, y: oy + l.y * dh });
+  }
+
+  // Keep the clip scrubbed in step with the pose: map the frame range across
+  // the whole clip (the clip ~spans the shot, so this is approximate).
+  $effect(() => {
+    const v = videoEl;
+    const c = current;
+    if (!v || !videoReady || !v.duration || !isFinite(v.duration)) return;
+    const span = Math.max(end - start, 1);
+    const frac = Math.min(1, Math.max(0, (c - start) / span));
+    try {
+      v.currentTime = frac * v.duration;
+    } catch {
+      /* seeking not ready */
+    }
+  });
+
   $effect(() => {
     const c = canvas;
     const f = frame;
@@ -237,7 +295,9 @@
     if (!f) return;
 
     const lm = f.landmarks;
-    const project = makeProject(lm, w, h);
+    // With a clip, align the overlay to the footage; otherwise zoom to fill.
+    const cover = clipUrl && videoReady ? coverProject(w, h) : null;
+    const project = cover ?? makeProject(lm, w, h);
 
     // Base skeleton.
     drawSkeleton(ctx, lm, w, h, {
@@ -310,6 +370,18 @@
     <p class="dim" data-testid="shot-review-missing">Shot not found.</p>
   {:else if shot && card}
     <div class="stage">
+      {#if clipUrl}
+        <video
+          bind:this={videoEl}
+          class="clip"
+          src={clipUrl}
+          muted
+          playsinline
+          preload="auto"
+          data-testid="review-video"
+          onloadedmetadata={() => (videoReady = true)}
+        ></video>
+      {/if}
       {#if poses && poses.frames.length > 0}
         <canvas
           bind:this={canvas}
@@ -331,7 +403,7 @@
             </div>
           </div>
         {/if}
-      {:else}
+      {:else if !clipUrl}
         <p class="dim no-poses" data-testid="review-no-poses">
           No pose data stored for this shot.
         </p>
@@ -403,6 +475,14 @@
     overflow: hidden;
     display: grid;
     place-content: center;
+  }
+  .clip {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #000;
   }
   .skeleton {
     position: absolute;

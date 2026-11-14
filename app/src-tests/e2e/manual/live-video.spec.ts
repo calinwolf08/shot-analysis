@@ -74,15 +74,10 @@ test("live lesson tracks pose and streams from a recorded video", async ({
   const query = "?e2e=device&debug=live&liveVideo=/__livevideo";
   await page.goto(`/practice/live${query}`);
 
-  // Real pose from the video drives the setup checks to ready.
-  await expect(page.getByTestId("setup-start")).toBeEnabled({
-    timeout: 120_000,
-  });
-  await page.getByTestId("setup-start").click();
-
-  // Into the loop, with the real worker streaming landmark frames.
+  // Setup-less: the loop boots straight in, with the real worker streaming
+  // landmark frames decoded from the video.
   await expect(page.getByTestId("practice-loop")).toBeVisible({
-    timeout: 30_000,
+    timeout: 120_000,
   });
 
   // Primary proof: the live pose overlay advances → real vision frames are

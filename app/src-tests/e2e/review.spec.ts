@@ -57,18 +57,20 @@ test("clicking a metric seeks the scrubber to its phase", async ({ page }) => {
   await openReview(page);
 
   const scrubber = page.getByTestId("review-scrubber");
-  const max = Number(await scrubber.getAttribute("max"));
+  const metrics = page.locator('[data-testid^="sc-metric-"]');
+  // Two metrics from opposite ends of the scorecard are in different phases,
+  // so clicking each seeks to a different frame — proving the seek works
+  // without depending on scorecard order or seek direction.
+  const first = metrics.first();
+  const last = metrics.last();
 
-  // Move to the end, then click an (earlier-phase) metric row.
-  await setRange(scrubber, max);
-  const before = Number(await scrubber.inputValue());
+  await first.scrollIntoViewIfNeeded();
+  await first.click();
+  const atFirst = Number(await scrubber.inputValue());
 
-  const metric = page.locator('[data-testid^="sc-metric-"]').first();
-  await metric.scrollIntoViewIfNeeded();
-  await metric.click();
+  await last.scrollIntoViewIfNeeded();
+  await last.click();
+  const atLast = Number(await scrubber.inputValue());
 
-  // The scrubber jumped back to the metric's phase start.
-  await expect
-    .poll(async () => Number(await scrubber.inputValue()))
-    .toBeLessThan(before);
+  expect(atFirst).not.toBe(atLast);
 });

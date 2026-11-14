@@ -11,7 +11,6 @@
     LivePracticeStore,
     PracticeScreen,
     requiredOrientation,
-    SetupScreen,
     type LiveRepCoordinator,
     type SideOrientation,
   } from "$lib/features/live-practice";
@@ -21,20 +20,22 @@
   import { createWebAudioFeedbackService } from "$lib/shared/audio";
   import {
     createBrowserCaptureService,
+    type CaptureHandle,
     type CaptureService,
     createFileCaptureService,
   } from "$lib/shared/media/capture";
+  import { getShotClipStore } from "$lib/shared/media/shot-clip-store";
 
   const services = useAppServices();
   const audio = createWebAudioFeedbackService();
+  const clipStore = getShotClipStore();
 
   const replayMode =
     page.url.searchParams.get("e2e") === "replay" ||
     import.meta.env.VITE_ANALYSIS_BACKEND === "replay";
 
   // Dev/e2e only: `?liveVideo=<url>` plays a recorded clip as the "camera"
-  // through the real pipeline (no webcam) so the full live flow can be driven
-  // from a video file. Constant-folds away in production builds.
+  // through the real pipeline (no webcam). Constant-folds away in production.
   const liveVideoUrl =
     import.meta.env.DEV || import.meta.env.VITE_E2E === "1"
       ? page.url.searchParams.get("liveVideo")
@@ -52,7 +53,7 @@
     ((import.meta.env.DEV || import.meta.env.VITE_E2E === "1") &&
       page.url.searchParams.get("debug") === "live");
 
-  let phase = $state<"loading" | "setup" | "running" | "error">("loading");
+  let phase = $state<"loading" | "running" | "error">("loading");
   let session = $state<LiveAnalysisSession | null>(null);
   let store = $state<LivePracticeStore | null>(null);
   let coordinator = $state<LiveRepCoordinator | null>(null);
@@ -62,6 +63,7 @@
   let requiredSide = $state<SideOrientation>("side-left");
   let playerId = "";
   let targets: LiveTargets | null = null;
+  let captureHandle: CaptureHandle | null = null;
 
   $effect(() => {
     void boot();
@@ -78,14 +80,36 @@
     shootingHand = player.shootingHand;
     requiredSide = requiredOrientation(shootingHand);
     targets = await loadLiveTargets();
-    session = services.analysis.createLiveSession({
+
+    const s = services.analysis.createLiveSession({
       shootingHand,
       profile: "pro-form",
     });
-    phase = "setup";
+    session = s;
+    try {
+      await s.start();
+    } catch {
+      handleError(
+        "Unable to start pose detection. Please refresh and try again.",
+      );
+      return;
+    }
+
+    // Open the camera (real webcam, or a file in dev/e2e). Replay has none —
+    // the loop still runs from the replayed pose stream.
+    if (capture) {
+      try {
+        captureHandle = await capture.start();
+        cameraStream = captureHandle.stream;
+      } catch {
+        cameraStream = null; // pose-only fallback
+      }
+    }
+    void engageDeviceLocks();
+    beginLoop();
   }
 
-  async function beginLoop() {
+  function beginLoop() {
     if (!session || !targets) return;
     coordinator = createLiveRepCoordinator(
       { analyze: (frames) => session!.analyzeWindow(frames) },
@@ -114,6 +138,28 @@
     phase = "running";
   }
 
+  async function engageDeviceLocks() {
+    try {
+      await navigator.wakeLock?.request("screen");
+    } catch {
+      /* best effort */
+    }
+    try {
+      await (
+        screen.orientation as unknown as {
+          lock?: (o: string) => Promise<void>;
+        }
+      ).lock?.("portrait");
+    } catch {
+      /* best effort */
+    }
+  }
+
+  function handleError(message: string) {
+    errorMessage = message;
+    phase = "error";
+  }
+
   onDestroy(() => {
     store?.stop();
     void session?.stop();
@@ -122,42 +168,39 @@
     }
   });
 
-  function handleSetupError(message: string) {
-    errorMessage = message;
-    phase = "error";
-  }
-
   function exit() {
     void goto(`/${page.url.search}`);
   }
 </script>
 
 {#if phase === "error"}
-  <main class="error-screen">
+  <main class="center">
     <h2>Something went wrong</h2>
     <p>{errorMessage}</p>
     <button onclick={exit}>Go back</button>
   </main>
-{:else if phase === "setup" && session}
-  <SetupScreen
+{:else if phase === "running" && store}
+  <PracticeScreen
+    {store}
     {session}
-    {capture}
     {audio}
     requiredOrientation={requiredSide}
-    onstart={() => void beginLoop()}
+    {clipStore}
+    stream={cameraStream}
     onexit={exit}
-    onerror={handleSetupError}
-    onstream={(s) => (cameraStream = s)}
   />
-{:else if phase === "running" && store}
-  <PracticeScreen {store} {session} stream={cameraStream} onexit={exit} />
   {#if liveDebug && coordinator}
     <LiveDebugHud {coordinator} />
   {/if}
+{:else}
+  <main class="center" data-testid="practice-loading">
+    <div class="spinner"></div>
+    <p>Starting camera…</p>
+  </main>
 {/if}
 
 <style>
-  .error-screen {
+  .center {
     min-height: 100dvh;
     max-width: 560px;
     margin: 0 auto;
@@ -169,15 +212,15 @@
     gap: var(--sc-space-4);
     text-align: center;
   }
-  .error-screen h2 {
+  .center h2 {
     margin: 0;
     font-size: 20px;
   }
-  .error-screen p {
+  .center p {
     color: var(--sc-text-dim);
     margin: 0;
   }
-  .error-screen button {
+  .center button {
     padding: 10px 24px;
     border-radius: var(--sc-radius);
     background: var(--sc-primary);
@@ -185,5 +228,18 @@
     border: none;
     font-weight: 600;
     cursor: pointer;
+  }
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 3px solid var(--sc-border);
+    border-top-color: var(--sc-primary);
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

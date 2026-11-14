@@ -15,27 +15,51 @@
     createLiveFrameCapture,
     type FrameCaptureHandle,
   } from "$lib/shared/media/frame-capture";
+  import type { AudioFeedbackService } from "$lib/shared/audio";
+  import type { ShotClipStore } from "$lib/shared/media/shot-clip-store";
+  import {
+    createShotClipRecorder,
+    type ShotClipRecorder,
+  } from "$lib/shared/media/shot-clip-recorder";
   import { Button, ScoreRing } from "$lib/shared/ui";
   import {
     drawSkeleton,
     type SkeletonLandmark,
   } from "$lib/shared/ui/pose-skeleton";
   import { ScoreCard } from "$lib/features/scoring";
+  import type { SideOrientation } from "../setup/angle-gate";
   import { createPresenceTracker, type PresenceState } from "./presence";
   import { phraseFor } from "./readback";
+  import {
+    CUE_TEXT,
+    createReadinessGate,
+    type ReadinessCue,
+  } from "./readiness";
   import type { LivePracticeStore } from "./live-practice-store.svelte";
 
   let {
     store,
     session = null,
     stream = null,
+    audio = null,
+    requiredOrientation = null,
+    clipStore = null,
     onexit,
   }: {
     store: LivePracticeStore;
     session?: LiveAnalysisSession | null;
     stream?: MediaStream | null;
+    /** For spoken positioning cues (null in replay/e2e). */
+    audio?: AudioFeedbackService | null;
+    /** Required side-on orientation; enables the in-loop positioning gate. */
+    requiredOrientation?: SideOrientation | null;
+    /** Where per-shot clips are stored (null disables recording). */
+    clipStore?: ShotClipStore | null;
     onexit: () => void;
   } = $props();
+
+  /** The in-loop positioning gate is active only with a real camera. */
+  const gateActive = $derived(!!stream && !!requiredOrientation);
 
   let drawerOpen = $state(false);
   let showBreakdown = $state(false);
@@ -46,12 +70,30 @@
   let presence = $state<PresenceState>("none");
   let latestFrame = $state<LandmarkFrame | null>(null);
 
+  // In-loop positioning gate state (only meaningful when gateActive).
+  let positioned = $state(false);
+  let cue = $state<ReadinessCue>("full-body");
+  let prevPositioned = false;
+  let lastCue: ReadinessCue = null;
+  let lastSpokeAt = 0;
+
+  // Per-shot clip recording.
+  let recorder: ShotClipRecorder | null = null;
+  let savedShots = 0;
+
   $effect(() => {
     if (!session) return;
     const tracker = createPresenceTracker();
+    const gate = gateActive
+      ? createReadinessGate({
+          requiredOrientation: requiredOrientation!,
+          fps: session.fps,
+        })
+      : null;
     const unsubscribe = session.onFrame((frame) => {
       presence = tracker.update(frame);
       latestFrame = frame;
+      if (gate) handleReadiness(gate.update(frame));
     });
     const decay = setInterval(() => (presence = tracker.evaluate()), 400);
     return () => {
@@ -59,6 +101,62 @@
       clearInterval(decay);
     };
   });
+
+  /** Spoken + visual positioning coaching, only between shots. */
+  function handleReadiness(s: {
+    positioned: boolean;
+    cue: ReadinessCue;
+  }): void {
+    positioned = s.positioned;
+    cue = s.cue;
+    const coachable =
+      store.phase !== "analyzing" && !store.feedback && !store.muted;
+    const now = Date.now();
+    if (s.positioned && !prevPositioned) {
+      if (coachable) {
+        audio?.playEarcon("ready");
+        audio?.speak("Ready. Take your shot.");
+      }
+      lastCue = null;
+    } else if (!s.positioned && s.cue) {
+      if (coachable && (s.cue !== lastCue || now - lastSpokeAt > 4000)) {
+        audio?.speak(CUE_TEXT[s.cue]);
+        lastSpokeAt = now;
+        lastCue = s.cue;
+      }
+    }
+    prevPositioned = s.positioned;
+  }
+
+  // Keep a clip rolling while the player is positioned and between shots, so a
+  // detected shot is captured; stop (discard) if they leave the position.
+  $effect(() => {
+    if (!clipStore || !recorder || !gateActive) return;
+    const idle = store.phase !== "analyzing" && !store.feedback;
+    if (positioned && idle && !recorder.recording) recorder.start();
+    else if (!positioned && idle && recorder.recording) recorder.discard();
+  });
+
+  // When a new shot is persisted, take the rolling clip and store it by shotId.
+  $effect(() => {
+    const n = store.shots.length;
+    if (n > savedShots) {
+      const entry = store.shots[n - 1];
+      savedShots = n;
+      if (entry) void saveClip(entry.shotId);
+    }
+  });
+
+  async function saveClip(shotId: string): Promise<void> {
+    if (!clipStore || !recorder || !recorder.recording) return;
+    const blob = await recorder.stopAndTake();
+    if (!blob) return;
+    try {
+      await clipStore.save(shotId, blob);
+    } catch {
+      /* local storage best-effort */
+    }
+  }
 
   const badgeText = $derived(
     presence === "full"
@@ -108,8 +206,12 @@
           frameCapture = createLiveFrameCapture(videoEl, session);
         }
       };
+      if (clipStore && !recorder) recorder = createShotClipRecorder(stream);
     }
-    return () => frameCapture?.stop();
+    return () => {
+      frameCapture?.stop();
+      recorder?.discard();
+    };
   });
 
   const fmt = (n: number | null) => (n === null ? "–" : n.toFixed(1));
@@ -153,10 +255,12 @@
 
   <div
     class="preview"
-    class:full={presence === "full"}
-    class:partial={presence === "partial"}
+    class:full={!gateActive && presence === "full"}
+    class:partial={!gateActive && presence === "partial"}
+    class:ready={gateActive && positioned}
+    class:notready={gateActive && !positioned}
     data-testid="pose-indicator"
-    data-state={presence}
+    data-state={gateActive ? (positioned ? "ready" : "notready") : presence}
   >
     {#if stream}
       <video
@@ -174,7 +278,28 @@
       data-frame={latestFrame?.frameIndex ?? -1}
       aria-hidden="true"
     ></canvas>
-    <div class="pose-badge"><span class="indicator-dot"></span>{badgeText}</div>
+    {#if gateActive}
+      <div
+        class="readiness"
+        class:ok={positioned}
+        data-testid="readiness"
+        data-positioned={positioned}
+      >
+        {#if positioned}
+          <span class="r-text" data-testid="readiness-ready"
+            >Ready — take your shot</span
+          >
+        {:else}
+          <span class="r-text" data-testid="readiness-cue"
+            >{cue ? CUE_TEXT[cue] : "Getting ready…"}</span
+          >
+        {/if}
+      </div>
+    {:else}
+      <div class="pose-badge">
+        <span class="indicator-dot"></span>{badgeText}
+      </div>
+    {/if}
   </div>
 
   <section class="stage">
@@ -297,8 +422,34 @@
   .preview.partial {
     border-color: var(--sc-warn);
   }
-  .preview.full {
+  .preview.full,
+  .preview.ready {
     border-color: var(--sc-success);
+  }
+  .preview.notready {
+    border-color: var(--sc-fail);
+  }
+  .readiness {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 90%;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 68%);
+    border: 1px solid var(--sc-fail);
+    color: #fff;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .readiness.ok {
+    border-color: var(--sc-success);
+    color: #bbf7d0;
+  }
+  .r-text {
+    white-space: normal;
   }
   .preview video {
     width: 100%;

@@ -29,7 +29,6 @@ export {
   isStable,
   meanLuma,
 } from "./setup/checks";
-export { default as SetupScreen } from "./setup/SetupScreen.svelte";
 export { default as LiveDebugHud } from "./loop/LiveDebugHud.svelte";
 
 // Live-first redesign (steps 4–6): the de-sessioned store, swappable analysis
