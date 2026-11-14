@@ -17,6 +17,14 @@ async function setRange(input: Locator, value: number) {
  */
 async function openReview(page: Page) {
   await onboard(page, "?e2e=replay", "Review");
+  // Focus is device-global; reset to "everything" so the overlay isn't
+  // filtered to a selection leaked from another test.
+  await page.getByTestId("focus-row").click();
+  const clear = page.getByTestId("focus-clear");
+  if (await clear.isEnabled()) await clear.click();
+  await page
+    .getByTestId("sheet-backdrop")
+    .click({ position: { x: 10, y: 10 } });
   await page.getByTestId("practice-live").click();
   await startLiveLoop(page);
   await expect(page.getByTestId("rep-feedback")).toBeVisible({

@@ -26,7 +26,7 @@
     drawSkeleton,
     type SkeletonLandmark,
   } from "$lib/shared/ui/pose-skeleton";
-  import { ScoreCard } from "$lib/features/scoring";
+  import { FocusSheet, ScoreCard, focusSummary } from "$lib/features/scoring";
   import type { SideOrientation } from "../setup/angle-gate";
   import { createPresenceTracker, type PresenceState } from "./presence";
   import { phraseFor } from "./readback";
@@ -44,6 +44,7 @@
     audio = null,
     requiredOrientation = null,
     clipStore = null,
+    onfocuschange = null,
     onexit,
   }: {
     store: LivePracticeStore;
@@ -55,8 +56,17 @@
     requiredOrientation?: SideOrientation | null;
     /** Where per-shot clips are stored (null disables recording). */
     clipStore?: ShotClipStore | null;
+    /** Persist a focus change made from the in-loop picker. */
+    onfocuschange?: ((ids: string[]) => void) | null;
     onexit: () => void;
   } = $props();
+
+  let focusOpen = $state(false);
+
+  function changeFocus(ids: string[]) {
+    store.setFocusAreas(ids);
+    onfocuschange?.(ids);
+  }
 
   /** The in-loop positioning gate is active only with a real camera. */
   const gateActive = $derived(!!stream && !!requiredOrientation);
@@ -219,7 +229,13 @@
 
 <main class="loop" data-testid="practice-loop">
   <header>
-    <span class="focus dim">Free shooting</span>
+    <button
+      class="focus-chip"
+      data-testid="focus-chip"
+      onclick={() => (focusOpen = true)}
+    >
+      🎯 {focusSummary(store.focusAreas)}
+    </button>
     <div class="controls">
       <button
         class="ctl"
@@ -392,6 +408,12 @@
       {/if}
     </section>
   {/if}
+
+  <FocusSheet
+    bind:open={focusOpen}
+    selected={store.focusAreas}
+    onchange={changeFocus}
+  />
 </main>
 
 <style>
@@ -492,10 +514,18 @@
   .preview.full .indicator-dot {
     background: var(--sc-success);
   }
-  .focus {
+  .focus-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--sc-border);
+    background: var(--sc-card);
     color: var(--sc-primary);
     font-size: 13px;
     font-weight: 600;
+    cursor: pointer;
   }
   .dim {
     color: var(--sc-text-dim);

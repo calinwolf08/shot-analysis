@@ -21,6 +21,8 @@
   import {
     ScoreCard,
     loadLiveTargets,
+    metricMatchesAreas,
+    normalizeAreas,
     type MetricDeviation,
     type ShotScorecard,
   } from "$lib/features/scoring";
@@ -54,6 +56,9 @@
   let notFound = $state(false);
   let canvas = $state<HTMLCanvasElement | null>(null);
   let hand = $state<Hand>("right");
+
+  // Coaching focus (from settings): emphasize these areas in the overlay.
+  let focusAreas = $state<string[]>([]);
 
   // Recorded clip of the actual shot (on-device only; absent on other devices).
   let clipUrl = $state<string | null>(null);
@@ -107,11 +112,21 @@
     poses?.frames.find((f) => f.frameIndex === current) ?? null,
   );
 
-  /** Off-target scored metrics in the current phase, worst first. */
+  /**
+   * Off-target scored metrics in the current phase, worst first. When a focus
+   * is set, the overlay emphasizes only those areas (the full scorecard below
+   * still shows everything).
+   */
   const phaseIssues = $derived<MetricDeviation[]>(
     card && currentPhase
       ? card.all
-          .filter((m) => m.phase === currentPhase && m.scored && !m.inBand)
+          .filter(
+            (m) =>
+              m.phase === currentPhase &&
+              m.scored &&
+              !m.inBand &&
+              (focusAreas.length === 0 || metricMatchesAreas(m.id, focusAreas)),
+          )
           .slice()
           .sort((a, b) => b.score - a.score)
       : [],
@@ -142,6 +157,9 @@
     card = scorecardForShot(s.analysis, targets);
     current = s.analysis.frameRange.start;
     if (player) hand = player.shootingHand;
+    focusAreas = normalizeAreas(
+      await services.repos.settings.get("liveFocusAreas"),
+    );
     bodyHeight = computeBodyHeight(p);
     void loadReferencePoses();
     void loadClip(id);

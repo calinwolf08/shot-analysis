@@ -14,7 +14,11 @@
     type LiveRepCoordinator,
     type SideOrientation,
   } from "$lib/features/live-practice";
-  import { loadLiveTargets, type LiveTargets } from "$lib/features/scoring";
+  import {
+    loadLiveTargets,
+    normalizeAreas,
+    type LiveTargets,
+  } from "$lib/features/scoring";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { createApiClient } from "$lib/shared/api/client";
   import { createWebAudioFeedbackService } from "$lib/shared/audio";
@@ -64,6 +68,12 @@
   let playerId = "";
   let targets: LiveTargets | null = null;
   let captureHandle: CaptureHandle | null = null;
+  let focusAreas: string[] = [];
+
+  function persistFocus(ids: string[]) {
+    focusAreas = ids;
+    void services.repos.settings.set("liveFocusAreas", ids);
+  }
 
   $effect(() => {
     void boot();
@@ -80,6 +90,9 @@
     shootingHand = player.shootingHand;
     requiredSide = requiredOrientation(shootingHand);
     targets = await loadLiveTargets();
+    focusAreas = normalizeAreas(
+      await services.repos.settings.get("liveFocusAreas"),
+    );
 
     const s = services.analysis.createLiveSession({
       shootingHand,
@@ -133,6 +146,7 @@
       opts: { shootingHand, profile: "pro-form" },
       fps: session.fps,
       feedbackMs,
+      focusAreas,
     });
     store.start();
     phase = "running";
@@ -187,6 +201,7 @@
     requiredOrientation={requiredSide}
     {clipStore}
     stream={cameraStream}
+    onfocuschange={persistFocus}
     onexit={exit}
   />
   {#if liveDebug && coordinator}

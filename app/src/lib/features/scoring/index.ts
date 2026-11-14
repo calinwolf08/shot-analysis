@@ -44,3 +44,12 @@ export {
 } from "./deviation";
 export { loadLiveTargets, resetLiveTargetsCache } from "./live-targets";
 export { default as ScoreCard } from "./ScoreCard.svelte";
+export { default as FocusSheet } from "./FocusSheet.svelte";
+export {
+  FOCUS_AREAS,
+  focusSummary,
+  metricMatchesAreas,
+  normalizeAreas,
+  selectFocusWorst,
+  type FocusArea,
+} from "./focus";

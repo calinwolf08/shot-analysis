@@ -17,7 +17,11 @@
 import type { AnalyzeOptions } from "$lib/features/analysis";
 import { landmarkFramesToPoseData } from "$lib/features/analysis/replay/replay-pipeline";
 import type { AudioFeedbackService } from "$lib/shared/audio";
-import type { MetricDeviation, ShotScorecard } from "$lib/features/scoring";
+import {
+  selectFocusWorst,
+  type MetricDeviation,
+  type ShotScorecard,
+} from "$lib/features/scoring";
 import type {
   CoordinatorEvents,
   LiveRepCoordinator,
@@ -69,6 +73,8 @@ export interface LivePracticeStoreDeps {
   feedbackMs?: number;
   /** Max worst metrics to read aloud (default 5). */
   maxWorstSpoken?: number;
+  /** Live focus-area ids; [] = coach on everything (the default). */
+  focusAreas?: string[];
 }
 
 export class LivePracticeStore {
@@ -79,6 +85,8 @@ export class LivePracticeStore {
   noShotFlash = $state(false);
   muted = $state(false);
   error = $state<string | null>(null);
+  /** Coaching focus (ids); [] = everything. Changeable mid-session. */
+  focusAreas = $state<string[]>([]);
 
   private started = false;
   private unsubscribes: (() => void)[] = [];
@@ -91,6 +99,12 @@ export class LivePracticeStore {
     this.feedbackMs = deps.feedbackMs ?? 4000;
     this.maxWorstSpoken = deps.maxWorstSpoken ?? 5;
     this.muted = deps.audio.isMuted();
+    this.focusAreas = deps.focusAreas ?? [];
+  }
+
+  /** Change the coaching focus (applies to the next scored shot). */
+  setFocusAreas(ids: string[]): void {
+    this.focusAreas = ids;
   }
 
   /** Mean overall score across included shots (lower is better), or null. */
@@ -157,11 +171,22 @@ export class LivePracticeStore {
         return;
       }
       const first = processed[0]!;
+      // Focus steers coaching only: when areas are selected, surface the worst
+      // WITHIN them (even if not globally worst); the overall score is untouched.
+      const focused =
+        this.focusAreas.length > 0
+          ? (selectFocusWorst(
+              first.scorecard.all,
+              this.focusAreas,
+              this.maxWorstSpoken,
+            ) ?? [])
+          : first.worst;
+
       const entry: ShotEntry = {
         index: this.shots.length + 1,
         shotId: first.shot.id,
         overall: first.scorecard.overall,
-        worst: first.worst,
+        worst: focused,
         scorecard: first.scorecard,
         excluded: false,
       };
@@ -171,10 +196,13 @@ export class LivePracticeStore {
         first.shot.endFrame !== null && first.shot.startFrame !== null
           ? first.shot.endFrame - first.shot.startFrame + 1
           : undefined;
-      const spoken = buildWorstReadback(first.worst, {
+      let spoken = buildWorstReadback(focused, {
         max: this.maxWorstSpoken,
         ...(durationFrames !== undefined ? { durationFrames } : {}),
       });
+      // With a focus set and nothing off-target in it, acknowledge rather than
+      // fall silent (silence would read as "no feedback").
+      if (!spoken && this.focusAreas.length > 0) spoken = "Focus on target";
       // onAnalyzing already cancelled prior speech; read, then signal ready.
       if (spoken) audio.speak(spoken);
       audio.playEarcon("ready");
