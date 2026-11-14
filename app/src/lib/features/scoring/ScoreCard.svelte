@@ -17,7 +17,13 @@
   let {
     card,
     highlightPhase = null,
-  }: { card: ShotScorecard; highlightPhase?: string | null } = $props();
+    onmetric = null,
+  }: {
+    card: ShotScorecard;
+    highlightPhase?: string | null;
+    /** When set, metric rows + top-issue chips become clickable (e.g. seek). */
+    onmetric?: ((m: MetricDeviation) => void) | null;
+  } = $props();
 
   const GREEN = "#34d399";
   const AMBER = "#fbbf24";
@@ -62,37 +68,65 @@
       <span class="worst-label">Top issues</span>
       <div class="chips">
         {#each card.worst as m (m.id)}
-          <span class="chip" style="border-color:{scoreColor(m)}">
-            {m.label}
-            {#if m.direction}<em>{m.direction} by {m.magnitude}</em>{/if}
-          </span>
+          {#if onmetric}
+            <button
+              class="chip clickable"
+              type="button"
+              style="border-color:{scoreColor(m)}"
+              onclick={() => onmetric(m)}
+            >
+              {m.label}
+              {#if m.direction}<em>{m.direction} by {m.magnitude}</em>{/if}
+            </button>
+          {:else}
+            <span class="chip" style="border-color:{scoreColor(m)}">
+              {m.label}
+              {#if m.direction}<em>{m.direction} by {m.magnitude}</em>{/if}
+            </span>
+          {/if}
         {/each}
       </div>
     </div>
   {/if}
 
-  {#snippet metricRow(m: MetricDeviation)}
-    <div
-      class="metric"
-      class:reported={!m.scored}
-      data-testid="sc-metric-{m.id}"
-    >
-      <span class="dot" style="background:{scoreColor(m)}"></span>
-      <span class="label">{m.label}{m.scored ? "" : " (info)"}</span>
-      <span class="value">{m.value.toFixed(2)}</span>
-      {#if m.scored}
-        <span class="score" style="color:{scoreColor(m)}"
-          >{m.score.toFixed(1)}</span
-        >
+  {#snippet metricInner(m: MetricDeviation)}
+    <span class="dot" style="background:{scoreColor(m)}"></span>
+    <span class="label">{m.label}{m.scored ? "" : " (info)"}</span>
+    <span class="value">{m.value.toFixed(2)}</span>
+    {#if m.scored}
+      <span class="score" style="color:{scoreColor(m)}"
+        >{m.score.toFixed(1)}</span
+      >
+    {/if}
+    <span class="band">
+      {#if m.inBand}
+        on target
+      {:else if m.direction}
+        {m.direction} by {m.magnitude}
       {/if}
-      <span class="band">
-        {#if m.inBand}
-          on target
-        {:else if m.direction}
-          {m.direction} by {m.magnitude}
-        {/if}
-      </span>
-    </div>
+    </span>
+  {/snippet}
+
+  {#snippet metricRow(m: MetricDeviation)}
+    {#if onmetric}
+      <button
+        class="metric clickable"
+        class:reported={!m.scored}
+        type="button"
+        onclick={() => onmetric(m)}
+        data-testid="sc-metric-{m.id}"
+      >
+        {@render metricInner(m)}
+      </button>
+    {:else}
+      <div
+        class="metric"
+        class:reported={!m.scored}
+        data-testid="sc-metric-{m.id}"
+      >
+        {@render metricInner(m)}
+      </div>
+    {/if}
   {/snippet}
 
   {#each card.sections as section (section.section)}
@@ -226,6 +260,29 @@
     gap: 8px;
     font-size: 0.8rem;
     padding: 2px 0;
+  }
+  .metric.clickable {
+    width: 100%;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 2px 4px;
+  }
+  .metric.clickable:hover {
+    background: rgba(148, 163, 184, 0.14);
+  }
+  .chip.clickable {
+    cursor: pointer;
+    color: inherit;
+    font-family: inherit;
+  }
+  .chip.clickable:hover {
+    background: #1f2937;
   }
   .metric.reported .label,
   .metric.reported .value {
