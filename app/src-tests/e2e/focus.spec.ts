@@ -17,7 +17,9 @@ async function clearFocus(page: Page) {
 
 function dismissSheet(page: Page) {
   // The sheet covers the backdrop's center; click its exposed top edge.
-  return page.getByTestId("sheet-backdrop").click({ position: { x: 10, y: 10 } });
+  return page
+    .getByTestId("sheet-backdrop")
+    .click({ position: { x: 10, y: 10 } });
 }
 
 test("focus picker on the Practice tab persists the selection", async ({
