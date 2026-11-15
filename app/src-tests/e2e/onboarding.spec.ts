@@ -1,11 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { signUp } from "./helpers";
 
 test("fresh app onboards, persists the player, and stays onboarded", async ({
   page,
 }) => {
-  await page.goto("/");
-  // Fresh profile → redirected to onboarding.
-  await page.waitForURL("**/onboarding");
+  // Fresh profile: create an account, then the guard lands on onboarding.
+  await signUp(page, "", "jordan");
   await expect(page.getByTestId("onboarding-slide-0")).toBeVisible();
 
   // Three intro slides.
@@ -28,20 +28,16 @@ test("fresh app onboards, persists the player, and stays onboarded", async ({
   await expect(page.getByTestId("onboarding-camera")).toBeVisible();
   await page.getByTestId("onboarding-finish").click();
 
-  // Lands on Home.
-  await page.waitForURL(/\/$/);
-  await expect(
-    page.getByRole("heading", { name: "ShotCoach" }).first(),
-  ).toBeVisible();
-  await expect(page.getByText("Let's get to work, Jordan.")).toBeVisible();
+  // Lands on the Practice tab (the live-first entry).
+  await page.waitForURL("**/practice**");
+  await expect(page.getByTestId("tab-practice")).toBeVisible();
+  await expect(page.getByTestId("practice-live")).toBeVisible();
 
-  // Reload → still Home (persisted onboarding).
+  // Reload → still onboarded (persisted), back on Practice.
   await page.reload();
   await page.waitForSelector('[data-testid="db-ready"]', { state: "attached" });
   await expect(page).not.toHaveURL(/onboarding/);
-  await expect(
-    page.getByRole("heading", { name: "ShotCoach" }).first(),
-  ).toBeVisible();
+  await expect(page.getByTestId("practice-live")).toBeVisible();
 
   // Handedness visible in Profile.
   await page.getByTestId("tab-profile").click();

@@ -7,5 +7,5 @@ export { default as ProgressBar } from "./ProgressBar.svelte";
 export { default as EmptyState } from "./EmptyState.svelte";
 export { default as Sheet } from "./Sheet.svelte";
 export { default as Toast } from "./Toast.svelte";
-export { toasts, type ToastMessage } from "./toast.svelte";
+export { toasts, type ToastMessage } from "./toastStore.svelte";
 export { scoreBand, BAND_COLORS, type ScoreBand } from "./score-band";

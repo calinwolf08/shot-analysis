@@ -14,18 +14,33 @@ describe("createFakeAudio", () => {
     expect(audio.spoken).toEqual(["Nice shot"]);
   });
 
+  it("records earcons and cancels (interruptions)", () => {
+    const audio = createFakeAudio();
+    audio.playEarcon("analyzing");
+    audio.speak("set point low by 2");
+    audio.cancel();
+    audio.playEarcon("ready");
+    expect(audio.earcons).toEqual(["analyzing", "ready"]);
+    expect(audio.spoken).toEqual(["set point low by 2"]);
+    expect(audio.cancels).toBe(1);
+  });
+
   it("mute suppresses everything until unmuted", () => {
     const audio = createFakeAudio();
     audio.setMuted(true);
     expect(audio.isMuted()).toBe(true);
     audio.beep("score");
     audio.speak("ignored");
+    audio.playEarcon("analyzing");
     expect(audio.beeps).toEqual([]);
     expect(audio.spoken).toEqual([]);
+    expect(audio.earcons).toEqual([]);
 
     audio.setMuted(false);
     audio.beep("score");
+    audio.playEarcon("ready");
     expect(audio.beeps).toEqual(["score"]);
+    expect(audio.earcons).toEqual(["ready"]);
   });
 });
 

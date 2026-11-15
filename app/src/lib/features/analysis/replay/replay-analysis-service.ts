@@ -78,6 +78,12 @@ export function createReplayAnalysisService(
       });
     },
 
+    async extractPoses(input: AnalysisInput, _opts: AnalyzeOptions) {
+      // A replay fixture already *is* recorded pose data.
+      if (!isFixtureRef(input)) throw new FixtureNotSupportedError();
+      return loadPoseData(input.fixtureId);
+    },
+
     createLiveSession(opts: AnalyzeOptions): LiveAnalysisSession {
       const fixtureId = options.liveFixtureId;
       if (!fixtureId) {
@@ -113,6 +119,9 @@ function createReplayLiveSession(
   let fps = 30;
 
   return {
+    get fps() {
+      return fps;
+    },
     onFrame(cb) {
       subscribers.add(cb);
       return () => subscribers.delete(cb);

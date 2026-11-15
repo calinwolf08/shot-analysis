@@ -10,6 +10,8 @@ export const SETTINGS = {
   voiceFeedback: { schema: z.boolean(), default: true },
   activeBenchmarkId: { schema: z.string().nullable(), default: null },
   keepRepClips: { schema: z.boolean(), default: false },
+  /** Live-lesson focus-area ids; [] = coach on everything. */
+  liveFocusAreas: { schema: z.array(z.string()), default: [] as string[] },
 } as const;
 
 export type SettingKey = keyof typeof SETTINGS;

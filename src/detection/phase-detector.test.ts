@@ -95,6 +95,11 @@ interface FrameConfig {
   indexFingerY?: [number, number];
   // Index finger X positions (for hand separation)
   indexFingerX?: [number, number];
+  // Wrist X positions [leftX, rightX] (for horizontal set-point detection).
+  // Defaults to [0.4, 0.6] (no horizontal motion) when omitted.
+  wristX?: [number, number];
+  // Nose X (facing hint; basket side). Defaults to 0.5 (frontal) when omitted.
+  noseX?: number;
 }
 
 /**
@@ -105,14 +110,21 @@ function createFrameSequence(configs: FrameConfig[]): PoseLandmarks[] {
     const landmarks = createDefaultLandmarks();
 
     // Set wrist positions
+    const [leftWristX, rightWristX] = config.wristX ?? [0.4, 0.6];
     landmarks[LANDMARK_INDEX.LEFT_WRIST] = createLandmark(
-      0.4,
+      leftWristX,
       config.wristY[0],
     );
     landmarks[LANDMARK_INDEX.RIGHT_WRIST] = createLandmark(
-      0.6,
+      rightWristX,
       config.wristY[1],
     );
+
+    // Facing hint (nose relative to ears). Ears stay at the default
+    // 0.45/0.55; move the nose to signal which way the shooter faces.
+    if (config.noseX !== undefined) {
+      landmarks[LANDMARK_INDEX.NOSE] = createLandmark(config.noseX, 0.15);
+    }
 
     // Set hip positions if specified
     if (config.hipY !== undefined) {
@@ -691,6 +703,144 @@ describe("PhaseDetector", () => {
       // Quick release set point may be only 1-2 frames
       const duration = setPoint!.endFrame - setPoint!.startFrame + 1;
       expect(duration).toBeGreaterThanOrEqual(1);
+    });
+
+    it("side-on shot: set point is the horizontal turning point, before the wrist-height peak", () => {
+      // Shooter faces +x (basket right; nose right of the ears). The wrist
+      // rises up-and-BACK (X decreasing) to the set point, then extends
+      // toward the basket (X increasing) up to full extension = the wrist
+      // Y peak. So the set point (min X, frame 8) precedes the Y peak
+      // (frame 12) — the old "set point = Y peak" would land at extension.
+      const configs: FrameConfig[] = [
+        {
+          wristY: [0.55, 0.55],
+          wristX: [0.5, 0.5],
+          hipY: 0.5,
+          kneeAngle: 172,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.55, 0.55],
+          wristX: [0.5, 0.5],
+          hipY: 0.5,
+          kneeAngle: 172,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.55, 0.55],
+          wristX: [0.5, 0.5],
+          hipY: 0.51,
+          kneeAngle: 168,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.5, 0.5],
+          wristX: [0.48, 0.48],
+          hipY: 0.53,
+          kneeAngle: 150,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.44, 0.44],
+          wristX: [0.45, 0.45],
+          hipY: 0.54,
+          kneeAngle: 148,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.38, 0.38],
+          wristX: [0.42, 0.42],
+          hipY: 0.52,
+          kneeAngle: 155,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.32, 0.32],
+          wristX: [0.39, 0.39],
+          hipY: 0.5,
+          kneeAngle: 162,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.27, 0.27],
+          wristX: [0.37, 0.37],
+          hipY: 0.49,
+          kneeAngle: 168,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.23, 0.23],
+          wristX: [0.35, 0.35],
+          hipY: 0.48,
+          kneeAngle: 172,
+          noseX: 0.62,
+        }, // set point (min X)
+        {
+          wristY: [0.19, 0.19],
+          wristX: [0.42, 0.42],
+          hipY: 0.47,
+          kneeAngle: 176,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.15, 0.15],
+          wristX: [0.5, 0.5],
+          hipY: 0.47,
+          kneeAngle: 178,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.12, 0.12],
+          wristX: [0.58, 0.58],
+          hipY: 0.47,
+          kneeAngle: 180,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.1, 0.1],
+          wristX: [0.62, 0.62],
+          hipY: 0.47,
+          kneeAngle: 180,
+          noseX: 0.62,
+        }, // wrist Y peak (extension)
+        {
+          wristY: [0.14, 0.14],
+          wristX: [0.63, 0.63],
+          hipY: 0.48,
+          kneeAngle: 180,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.22, 0.22],
+          wristX: [0.63, 0.63],
+          hipY: 0.49,
+          kneeAngle: 178,
+          noseX: 0.62,
+        },
+        {
+          wristY: [0.32, 0.32],
+          wristX: [0.62, 0.62],
+          hipY: 0.5,
+          kneeAngle: 175,
+          noseX: 0.62,
+        },
+      ];
+      const sequence = createFrameSequence(configs);
+      const detector = createPhaseDetector();
+      const result = detector.detectPhases(sequence, 0, sequence.length - 1);
+
+      const setPoint = result.phases[ShotPhase.SetPoint];
+      expect(setPoint).toBeDefined();
+      // Lands at the horizontal turning point (~frame 8), not the Y peak (12).
+      expect(setPoint!.startFrame).toBeGreaterThanOrEqual(6);
+      expect(setPoint!.startFrame).toBeLessThanOrEqual(10);
+
+      // Rise ends before the set point; release runs after it.
+      const rise = result.phases[ShotPhase.Rise];
+      const release = result.phases[ShotPhase.Release];
+      if (rise) expect(rise.endFrame).toBeLessThan(setPoint!.startFrame);
+      if (release)
+        expect(release.startFrame).toBeGreaterThan(setPoint!.endFrame);
     });
   });
 

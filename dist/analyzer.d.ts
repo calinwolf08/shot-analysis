@@ -59,12 +59,13 @@ import type { AnalysisConfig, ValidatedAnalysisConfig } from "./config";
 import type { FormProfile, ProfileComparison } from "./profiles/types";
 import type { PoseDetector } from "./pose/detector";
 import { type PoseDetectorConfig } from "./pose/factory";
+import type { PoseLandmarks as PosePoseLandmarks } from "./pose/types";
 import { ShotDetector, type ShotDetectorConfig } from "./detection/integrated-shot-detector";
 import { MetricOrchestrator } from "./metrics";
 import { type ProfileRegistry } from "./profiles/registry";
 import type { FrameProvider, VideoFrame } from "./providers/types";
 import type { PoseLandmarks as MetricsPoseLandmarks, ShotPhase } from "./types";
-import type { AnalysisResult, MetricValue } from "./metrics/types";
+import type { AnalysisResult, VideoMetadata, MetricValue } from "./metrics/types";
 /**
  * Error thrown when analyzer methods are called before initialization.
  */
@@ -273,6 +274,35 @@ export declare class ShotAnalyzer {
      * ```
      */
     analyzeVideo(frameProvider: FrameProvider): Promise<AnalysisResult>;
+    /**
+     * Runs analysis on an already-extracted pose sequence, skipping MediaPipe
+     * pose detection entirely. This is the fast path for the validator/harness:
+     * given a `poses.json`-style frame list, it runs shot detection, phase
+     * detection and metric extraction and returns the same `AnalysisResult` as
+     * {@link analyzeVideo}.
+     *
+     * Does **not** require {@link initialize} — no pose model is loaded, since
+     * the poses are supplied. Frame ordering is by array position (dense pose
+     * data, one entry per frame, as `poses.json` provides); each frame's own
+     * `frameIndex`/`timestamp` is used for metric timing when present.
+     *
+     * @param frames - Pre-extracted poses (e.g. `poses.json` `frames`)
+     * @param videoMetadata - Video dimensions/fps/frame count for the clip
+     * @returns Analysis result with per-shot phases and metrics
+     */
+    analyzePoses(frames: ReadonlyArray<{
+        landmarks?: PosePoseLandmarks["landmarks"] | null;
+        poseConfidence?: number;
+        frameIndex?: number;
+        timestamp?: number;
+    } | null>, videoMetadata: VideoMetadata): AnalysisResult;
+    /**
+     * Shared post-extraction pipeline: shot boundary + phase detection, then
+     * metric extraction and orientation per shot. Used by both
+     * {@link analyzeVideo} (poses from MediaPipe) and {@link analyzePoses}
+     * (poses supplied directly).
+     */
+    private analyzePoseSequence;
     /**
      * Processes a single video frame for live/incremental analysis.
      *

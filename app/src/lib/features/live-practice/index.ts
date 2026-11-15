@@ -16,6 +16,7 @@ export {
   noPose,
   shotArc,
   stillPose,
+  wristRise,
   type StreamCursor,
 } from "./coordinator/synthetic-streams";
 export {
@@ -28,14 +29,44 @@ export {
   isStable,
   meanLuma,
 } from "./setup/checks";
-export { default as SetupScreen } from "./setup/SetupScreen.svelte";
+export { default as LiveDebugHud } from "./loop/LiveDebugHud.svelte";
+
+// Live-first redesign (steps 4–6): the de-sessioned store, swappable analysis
+// pipeline, voice readback, and angle gate.
 export {
-  LiveSessionStore,
-  type LiveSessionStoreDeps,
+  LivePracticeStore,
+  type LivePracticeStoreDeps,
   type LoopPhase,
-  type RepEntry,
-  type RepFeedback,
-} from "./loop/live-session-store.svelte";
-export { default as PracticeLoopScreen } from "./loop/PracticeLoopScreen.svelte";
-export { compareHalves, type HalvesComparison } from "./summary/summary-logic";
-export { default as SummaryScreen } from "./summary/SummaryScreen.svelte";
+  type ShotEntry,
+  type ShotFeedback,
+} from "./loop/live-practice-store.svelte";
+export { buildWorstReadback, phraseFor } from "./loop/readback";
+export {
+  evaluateAngleGate,
+  requiredOrientation,
+  type AngleGateResult,
+  type SideOrientation,
+} from "./setup/angle-gate";
+export {
+  analyzeAndScore,
+  scorecardForShot,
+  createRepoShotStore,
+  createLiveShotPipeline,
+  createLocalPipeline,
+  createServerPipeline,
+  resolvePipelineLocation,
+  type ScoredShot,
+  type ShotStore,
+  type LiveShotPipeline,
+  type PipelineLocation,
+  type ProcessInput,
+  type ProcessedShot,
+} from "./pipeline";
+export { default as PracticeScreen } from "./loop/PracticeScreen.svelte";
+export { default as ShotReviewScreen } from "./review/ShotReviewScreen.svelte";
+export {
+  createPresenceTracker,
+  type PresenceState,
+  type PresenceTracker,
+  type PresenceTrackerOptions,
+} from "./loop/presence";

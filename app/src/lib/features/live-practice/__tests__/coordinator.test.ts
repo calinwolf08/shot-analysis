@@ -18,6 +18,7 @@ import {
   noPose,
   shotArc,
   stillPose,
+  wristRise,
 } from "../coordinator/synthetic-streams";
 
 const oneShot = { shots: [{}] } as unknown as AnalysisResult;
@@ -377,4 +378,72 @@ describe("real fixture segment through the replay pipeline", () => {
     const shot = results[0]!.analysis.shots[0]!;
     expect(Object.keys(shot.metrics).length).toBeGreaterThan(0);
   }, 30_000);
+});
+
+describe("debug diagnostics", () => {
+  it("emits per-frame debug events (only) to subscribers", () => {
+    const coordinator = createLiveRepCoordinator(
+      { analyze: async () => noShots },
+      { shootingHand: "right" },
+    );
+    coordinator.start();
+    const cursor = makeCursor();
+
+    // Nothing subscribed yet — frames flow without debug events.
+    feed(coordinator, stillPose(cursor, 200));
+
+    const events: unknown[] = [];
+    coordinator.on("debug", (d) => events.push(d));
+    const frames = stillPose(cursor, 1000);
+    feed(coordinator, frames);
+
+    expect(events).toHaveLength(frames.length);
+    const last = events.at(-1) as {
+      state: string;
+      posePresent: boolean;
+      smoothedVelocity: number;
+      riseVelocity: number;
+      settledForMs: number | null;
+      bufferFrames: number;
+      bufferSpanMs: number;
+    };
+    expect(last.state).toBe("READY"); // still pose for >readyPoseMs
+    expect(last.posePresent).toBe(true);
+    expect(Math.abs(last.smoothedVelocity)).toBeLessThan(0.01);
+    expect(last.riseVelocity).toBe(DEFAULT_LIVE_REP_CONFIG.riseVelocity);
+    expect(last.settledForMs).toBeNull(); // only meaningful while ACTIVE
+    expect(last.bufferFrames).toBeGreaterThan(0);
+    expect(last.bufferSpanMs).toBeGreaterThan(0);
+  });
+
+  it("reports a nearTrigger when the wrist rises below the rep threshold", () => {
+    const { coordinator, events } = harness(async () => oneShot);
+    const near: { peakVelocity: number; riseVelocity: number }[] = [];
+    coordinator.on("nearTrigger", (e) => near.push(e));
+
+    const cursor = makeCursor();
+    feed(coordinator, stillPose(cursor, 1000)); // reach READY
+    // ~70% of the default 0.35 units/s trigger: close, but no rep.
+    feed(coordinator, wristRise(cursor, 0.25, 800));
+    feed(coordinator, stillPose(cursor, 600)); // motion fades → report
+
+    expect(events.repStarted).toHaveLength(0);
+    expect(near).toHaveLength(1);
+    expect(near[0]!.peakVelocity).toBeGreaterThanOrEqual(0.35 * 0.6);
+    expect(near[0]!.peakVelocity).toBeLessThan(0.35);
+    expect(near[0]!.riseVelocity).toBe(DEFAULT_LIVE_REP_CONFIG.riseVelocity);
+  });
+
+  it("does not report a nearTrigger for a real rep trigger", async () => {
+    const { coordinator, events } = harness(async () => oneShot);
+    const near: unknown[] = [];
+    coordinator.on("nearTrigger", (e) => near.push(e));
+
+    const cursor = makeCursor();
+    feed(coordinator, stillPose(cursor, 1000));
+    await feedRealtime(coordinator, shotArc(cursor));
+
+    expect(events.repStarted).toHaveLength(1);
+    expect(near).toHaveLength(0);
+  });
 });

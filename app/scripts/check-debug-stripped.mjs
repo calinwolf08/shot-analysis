@@ -12,6 +12,7 @@ const MARKERS = [
   "Debug: replay analysis",
   "debug-analyze-run",
   "debug-drill-list",
+  "live-debug-hud",
 ];
 
 const here = dirname(fileURLToPath(import.meta.url));

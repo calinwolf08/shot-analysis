@@ -11,6 +11,7 @@
  * @see Task 9.2 - Detection Execution & Comparison
  */
 import type { PoseLandmarks } from "../pose/types";
+import { detectKeyframesFromFrames } from "../detection/keyframe-phases";
 import type { PoseData, LabelData, LabeledShot, Orientation, Frame, KeyframeId, KeyframeComparisonResult } from "./types";
 /**
  * A detected shot from the algorithm.
@@ -181,6 +182,7 @@ export declare function runDetection(poseData: PoseData): DetectionResult;
  * @returns Map of keyframe IDs to detected frame numbers (or null if not detected)
  */
 export declare function detectKeyframesForShot(poseData: PoseData, startFrame: number, endFrame: number): Map<KeyframeId, number | null>;
+export { detectKeyframesFromFrames };
 /**
  * Compares all keyframes for a labeled shot.
  *

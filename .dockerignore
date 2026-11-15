@@ -1,0 +1,24 @@
+# Keep the build context lean + reproducible (deps are installed fresh in the
+# image, build artifacts are regenerated).
+.git
+.github
+**/node_modules
+ios
+android
+test-data
+**/src-tests
+**/.svelte-kit
+app/build
+coverage
+test-results
+playwright-report
+**/*.sqlite
+data
+app/data
+*.log
+.env
+.env.*
+app/.env
+app/.env.*
+docs
+*.md

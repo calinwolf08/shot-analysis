@@ -143,15 +143,6 @@ export function createAssessmentService(
             totalShotsDetected: totalShots,
           });
 
-          const video = await repos.video.create({
-            playerId: player.id,
-            source: "upload",
-            ...(item.durationMs !== undefined
-              ? { durationMs: item.durationMs }
-              : {}),
-            ...(item.fps !== undefined ? { fps: item.fps } : {}),
-          });
-
           const result = await deps.analysis.analyzeVideoFile(
             item.input,
             {
@@ -168,6 +159,21 @@ export function createAssessmentService(
                 totalShotsDetected: totalShots + p.shotsDetected,
               }),
           );
+
+          // Created after analysis so the record carries the measured
+          // fps/duration/dimensions — review UIs map shot frame indexes
+          // back to video time through this fps.
+          const meta = result.videoMetadata;
+          const durationMs = item.durationMs ?? meta.duration;
+          const fps = item.fps ?? meta.fps;
+          const video = await repos.video.create({
+            playerId: player.id,
+            source: "upload",
+            ...(durationMs !== undefined ? { durationMs } : {}),
+            ...(fps !== undefined ? { fps } : {}),
+            ...(meta.width ? { width: meta.width } : {}),
+            ...(meta.height ? { height: meta.height } : {}),
+          });
 
           for (const analysis of result.shots) {
             throwIfAborted(opts.signal, session.id);

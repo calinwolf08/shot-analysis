@@ -37,7 +37,6 @@ import {
   type ScoringService,
 } from "$lib/features/scoring";
 import type { DatabaseAdapter } from "../db";
-import { createDatabase, migrate } from "../db";
 import type { RepoContext } from "../db/repo-base";
 import {
   createPlayerRepo,
@@ -57,7 +56,16 @@ import {
 } from "../db/repos";
 import type { Clock, IdGenerator } from "../utils";
 import { systemClock, uuidIdGenerator } from "../utils";
-import { getPlatform } from "./platform";
+import { createApiClient } from "../api/client";
+import { createRemoteRepos } from "../api/remote-repos";
+import {
+  createRemoteBenchmarks,
+  createRemoteDiagnosis,
+  createRemoteDrills,
+  createRemoteProgress,
+  createRemoteTrainingPlan,
+} from "../api/remote-services";
+import { createServerAssessmentService } from "$lib/features/assessment/services/server-assessment-service";
 
 export interface AppRepos {
   player: PlayerRepo;
@@ -164,24 +172,65 @@ export function selectAnalysisService(): AnalysisService {
   return createWorkerAnalysisService();
 }
 
-/** Production composition: platform DB, migrations + benchmark seed applied. */
+/**
+ * The client no longer owns a database — all user data lives on the server.
+ * This stub satisfies the {@link DatabaseAdapter} shape for the few call sites
+ * that still reference `services.db` (e.g. `flushDb`, which becomes a no-op
+ * because there is nothing to persist locally). Any actual query/run is a bug.
+ */
+function createNoClientDb(): DatabaseAdapter {
+  const fail = (): never => {
+    throw new Error(
+      "No client database: user data lives on the server — use the API/remote repos",
+    );
+  };
+  return {
+    run: async () => fail(),
+    query: async () => fail(),
+    transaction: async () => fail(),
+    close: async () => {},
+    // No `flush` → flushDb() is a no-op.
+  };
+}
+
+/**
+ * Production composition (client): a remote data layer over the SvelteKit API.
+ * The on-device database is gone — repos and read-model services call the
+ * server (user-scoped by the bearer token), scoring runs over the remote repos,
+ * and analysis is performed server-side (client extracts poses only). See
+ * docs/server-migration-plan.md Phases 5–7.
+ */
 export async function createAppServices(): Promise<AppServices> {
-  const db = await createDatabase(getPlatform());
-  await migrate(db);
+  const api = createApiClient();
   const ctx: RepoContext = {
-    db,
+    db: createNoClientDb(),
     clock: systemClock,
     ids: uuidIdGenerator,
   };
-  const repos = createRepos(ctx);
+  const repos = createRemoteRepos(api);
   const analysis = selectAnalysisService();
-  const domain = createDomainServices(ctx, repos, analysis);
-  await domain.benchmarks.seed();
-  await domain.drills.seed();
+
+  const benchmarks = createRemoteBenchmarks(api);
+  const scoring = createScoringService(ctx, {
+    shotRepo: repos.shot,
+    scoreRepo: repos.score,
+  });
+  const diagnosis = createRemoteDiagnosis(api);
+  const drills = createRemoteDrills(api);
+  const trainingPlan = createRemoteTrainingPlan(api);
+  const progress = createRemoteProgress(api);
+  const assessment = createServerAssessmentService({ analysis, repos, api });
+
   return {
     ...ctx,
     repos,
     analysis,
-    ...domain,
+    benchmarks,
+    scoring,
+    diagnosis,
+    assessment,
+    drills,
+    trainingPlan,
+    progress,
   };
 }

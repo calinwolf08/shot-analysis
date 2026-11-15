@@ -89,6 +89,89 @@ async function listValidations(): Promise<string[]> {
   return files.filter((f) => f.endsWith(".json"));
 }
 
+const VIDEO_EXT_RE = /\.(mp4|mov|webm)$/i;
+
+/**
+ * Lists test-data cases from the contents of each folder. A case is any
+ * subfolder of test-data/ that holds a `poses.json` and/or a video file; the
+ * validator loads whichever of poses.json / labels.json / video are present.
+ * Videos live inside the case folder (kept local, not committed — see
+ * .gitignore), so adding a case is just dropping files in a new folder.
+ */
+async function listTestCases(): Promise<
+  { name: string; poses: boolean; labels: boolean; video: string | null }[]
+> {
+  let entries: string[];
+  try {
+    entries = await fs.readdir(TEST_DATA_DIR);
+  } catch {
+    return [];
+  }
+  const cases: {
+    name: string;
+    poses: boolean;
+    labels: boolean;
+    video: string | null;
+  }[] = [];
+  for (const name of entries.sort()) {
+    const dir = path.join(TEST_DATA_DIR, name);
+    let files: string[];
+    try {
+      const stat = await fs.stat(dir);
+      if (!stat.isDirectory()) continue;
+      files = await fs.readdir(dir);
+    } catch {
+      continue;
+    }
+    const poses = files.includes("poses.json");
+    const labels = files.includes("labels.json");
+    const video = files.find((f) => VIDEO_EXT_RE.test(f)) ?? null;
+    // Surface only folders the validator can actually work with.
+    if (!poses && !video) continue;
+    cases.push({ name, poses, labels, video });
+  }
+  return cases;
+}
+
+const CONTENT_TYPES: Record<string, string> = {
+  ".json": "application/json",
+  ".mp4": "video/mp4",
+  ".mov": "video/quicktime",
+  ".webm": "video/webm",
+};
+
+/**
+ * Serves a single file from a test-data case folder (poses.json, labels.json,
+ * or the video). Rejects anything with path traversal or a disallowed name.
+ */
+async function serveTestDataFile(
+  res: http.ServerResponse,
+  caseName: string,
+  fileName: string,
+): Promise<void> {
+  const safeCase = path.basename(caseName);
+  const safeFile = path.basename(fileName);
+  const allowed =
+    safeFile === "poses.json" ||
+    safeFile === "labels.json" ||
+    VIDEO_EXT_RE.test(safeFile);
+  if (!allowed || safeCase !== caseName || safeFile !== fileName) {
+    sendError(res, "Not found", 404);
+    return;
+  }
+  const filePath = path.join(TEST_DATA_DIR, safeCase, safeFile);
+  try {
+    const content = await fs.readFile(filePath);
+    const type =
+      CONTENT_TYPES[path.extname(safeFile).toLowerCase()] ??
+      "application/octet-stream";
+    res.writeHead(200, { "Content-Type": type });
+    res.end(content);
+  } catch {
+    sendError(res, "Not found", 404);
+  }
+}
+
 async function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -200,6 +283,48 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/validations") {
       const files = await listValidations();
       sendJson(res, { files });
+      return;
+    }
+
+    // List loadable test cases (folders with poses.json + labels.json)
+    if (req.method === "GET" && url.pathname === "/api/test-cases") {
+      const cases = await listTestCases();
+      sendJson(res, { cases });
+      return;
+    }
+
+    // Serve placeholder reference assets: /reference/<file>.json
+    if (req.method === "GET" && url.pathname.startsWith("/reference/")) {
+      const file = path.basename(url.pathname.slice("/reference/".length));
+      if (/^[a-zA-Z0-9_-]+\.json$/.test(file)) {
+        try {
+          const content = await fs.readFile(
+            path.join(process.cwd(), "reference", file),
+            "utf-8",
+          );
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(content);
+        } catch {
+          sendError(res, "Not found", 404);
+        }
+        return;
+      }
+      sendError(res, "Not found", 404);
+      return;
+    }
+
+    // Serve a file from a test-data case: /test-data/<name>/<file>
+    if (req.method === "GET" && url.pathname.startsWith("/test-data/")) {
+      const parts = url.pathname.slice("/test-data/".length).split("/");
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        await serveTestDataFile(
+          res,
+          decodeURIComponent(parts[0]),
+          decodeURIComponent(parts[1]),
+        );
+        return;
+      }
+      sendError(res, "Not found", 404);
       return;
     }
 

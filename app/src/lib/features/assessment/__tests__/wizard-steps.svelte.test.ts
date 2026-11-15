@@ -46,11 +46,20 @@ describe("AnalyzeStep", () => {
     await userEvent.click(screen.getByTestId("assess-cancel"));
     expect(oncancel).toHaveBeenCalledOnce();
   });
+
+  it("shows the activity spinner even before progress events arrive", () => {
+    render(AnalyzeStep, { progress: null, oncancel: () => undefined });
+    expect(screen.getByTestId("assess-spinner")).toBeTruthy();
+    expect(screen.getByTestId("assess-analyze-phase").textContent).toContain(
+      "Preparing…",
+    );
+  });
 });
 
 function makeShotRecord(index: number, excluded = false): ShotRecord {
   return {
     id: `shot-${index}`,
+    playerId: "player",
     sessionId: "sess",
     videoId: null,
     shotIndex: index,
@@ -102,6 +111,26 @@ describe("ReviewStep", () => {
 
     await userEvent.click(screen.getByTestId("assess-finish-review"));
     expect(onfinish).toHaveBeenCalledOnce();
+  });
+
+  it("shows start/end thumbnails and time ranges when frame info exists", () => {
+    const shots = [makeShotRecord(0)];
+    const px =
+      "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+    render(ReviewStep, {
+      shots,
+      frameInfo: {
+        "shot-0": { startSec: 1.5, endSec: 3.2, startThumb: px, endThumb: px },
+      },
+      isExcluded: () => false,
+      ontoggle: () => undefined,
+      onfinish: () => undefined,
+    });
+    expect(screen.getByTestId("review-thumb-start-0")).toBeTruthy();
+    expect(screen.getByTestId("review-thumb-end-0")).toBeTruthy();
+    expect(screen.getByTestId("review-shot-0").textContent).toContain(
+      "0:01.5–0:03.2",
+    );
   });
 
   it("disables finish when everything is excluded", () => {

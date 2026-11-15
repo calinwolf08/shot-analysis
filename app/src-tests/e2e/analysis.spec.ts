@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("replay analysis backend produces the expected shot count in-browser", async ({
   page,

@@ -27,6 +27,12 @@
 </script>
 
 <section class="analyze" data-testid="assess-analyze">
+  <span
+    class="spinner"
+    role="status"
+    aria-label="Analysis in progress"
+    data-testid="assess-spinner"
+  ></span>
   <h2>Analyzing</h2>
   {#if progress}
     <p class="video" data-testid="assess-analyze-video">
@@ -59,6 +65,25 @@
   }
   h2 {
     margin: 0;
+  }
+  .spinner {
+    width: 36px;
+    height: 36px;
+    margin: 0 auto;
+    border-radius: 50%;
+    border: 4px solid var(--sc-border);
+    border-top-color: var(--sc-primary);
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner {
+      animation: spin 2.5s steps(8) infinite;
+    }
   }
   .video,
   .phase {

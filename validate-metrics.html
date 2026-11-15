@@ -403,6 +403,242 @@
         margin-left: 6px;
       }
 
+      /* Sidebar Keyframes/Metrics view toggle */
+      .view-toggle {
+        display: inline-flex;
+        gap: 4px;
+        background: #1a1a1a;
+        border-radius: 8px;
+        padding: 4px;
+        margin-bottom: 15px;
+      }
+
+      .view-toggle-btn {
+        padding: 6px 18px;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        color: #9ca3af;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+      }
+
+      .view-toggle-btn.active {
+        background: #2563eb;
+        color: #fff;
+      }
+
+      .view-toggle-btn:hover:not(.active) {
+        background: #374151;
+        color: #e0e0e0;
+      }
+
+      /* Keyframe comparison table (algorithm vs labeled) */
+      .kf-compare {
+        display: grid;
+        grid-template-columns: 1fr auto auto auto;
+        gap: 4px 10px;
+        align-items: center;
+        margin-bottom: 15px;
+        font-size: 0.85rem;
+      }
+
+      .kf-compare .kf-head {
+        color: #6b7280;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid #374151;
+      }
+
+      .kf-compare .kf-name {
+        color: #60a5fa;
+        font-weight: 500;
+      }
+
+      .kf-compare .kf-frame {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        cursor: pointer;
+        color: #e0e0e0;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      .kf-compare .kf-frame:hover {
+        background: #374151;
+      }
+
+      .kf-compare .kf-frame.missing {
+        color: #6b7280;
+        cursor: default;
+      }
+
+      .kf-compare .kf-frame.missing:hover {
+        background: transparent;
+      }
+
+      .kf-compare .kf-diff {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+      }
+
+      .kf-compare .kf-diff.ok {
+        color: #34d399;
+      }
+
+      .kf-compare .kf-diff.bad {
+        color: #f87171;
+      }
+
+      .kf-compare .kf-diff.none {
+        color: #6b7280;
+        font-weight: 400;
+      }
+
+      /* Keyframe diagnostics (algorithm reasoning) */
+      .kf-diag {
+        margin-bottom: 15px;
+        background: #1a1a1a;
+        border-radius: 6px;
+        padding: 8px 12px;
+      }
+
+      .kf-diag summary {
+        cursor: pointer;
+        color: #9ca3af;
+        font-size: 0.82rem;
+      }
+
+      .kf-diag-row {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #2a2a2a;
+      }
+
+      .kf-diag-name {
+        color: #60a5fa;
+        font-weight: 600;
+        font-size: 0.82rem;
+      }
+
+      .kf-diag-method {
+        color: #34d399;
+        font-size: 0.72rem;
+        margin-left: 6px;
+      }
+
+      .kf-diag-detail {
+        color: #9ca3af;
+        font-size: 0.78rem;
+        margin-top: 2px;
+        line-height: 1.4;
+      }
+
+      /* Labeled keyframe chips shown under the video */
+      .label-kf-list {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+
+      .label-kf-chip {
+        padding: 4px 10px;
+        background: #1a1a1a;
+        border: 1px solid #374151;
+        border-radius: 16px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .label-kf-chip:hover {
+        border-color: #2563eb;
+        background: #1e3a5f;
+      }
+
+      .label-kf-chip .lk-name {
+        color: #9ca3af;
+      }
+
+      .label-kf-chip .lk-frame {
+        color: #fff;
+        font-weight: 600;
+        margin-left: 6px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Per-keyframe editor (selected shot). */
+      .kfe {
+        margin-top: 8px;
+        border-top: 1px solid #374151;
+        padding-top: 8px;
+      }
+      .kfe-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 0.78rem;
+        color: #9ca3af;
+        margin-bottom: 6px;
+      }
+      .kfe-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .kfe-row {
+        display: grid;
+        grid-template-columns: 1fr auto auto auto;
+        align-items: center;
+        gap: 8px;
+      }
+      .kfe-name {
+        color: #d1d5db;
+        font-size: 0.82rem;
+      }
+      .kfe-val {
+        min-width: 34px;
+        text-align: right;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: #fff;
+        cursor: pointer;
+      }
+      .kfe-val.unset {
+        color: #6b7280;
+        cursor: default;
+        font-weight: 400;
+      }
+      .kfe-btn {
+        padding: 2px 8px;
+        background: #1a1a1a;
+        border: 1px solid #374151;
+        border-radius: 6px;
+        color: #d1d5db;
+        font-size: 0.78rem;
+        cursor: pointer;
+      }
+      .kfe-btn:hover:not(:disabled) {
+        border-color: #2563eb;
+        background: #1e3a5f;
+      }
+      .kfe-btn:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .kfe-clear {
+        padding: 2px 7px;
+      }
+      .kfe-seed {
+        color: #93c5fd;
+      }
+
       .metric-card {
         background: #1a1a1a;
         border-radius: 8px;
@@ -938,6 +1174,17 @@
       <div class="analysis-section">
         <div class="analysis-form">
           <div class="form-group">
+            <label>Test Case (poses + labels)</label>
+            <div style="display: flex; gap: 10px; align-items: center">
+              <select id="testCaseSelect" style="min-width: 220px">
+                <option value="">Loading…</option>
+              </select>
+              <span id="testCaseHint" style="color: #9ca3af; font-size: 0.9rem"
+                >Pick a case to auto-load its poses + labels</span
+              >
+            </div>
+          </div>
+          <div class="form-group">
             <label>Video File</label>
             <div style="display: flex; gap: 10px; align-items: center">
               <button
@@ -957,6 +1204,52 @@
                 id="selectedFileName"
                 style="color: #9ca3af; font-size: 0.9rem"
                 >No file selected</span
+              >
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Pose Data (JSON)</label>
+            <div style="display: flex; gap: 10px; align-items: center">
+              <button
+                id="loadPosesBtn"
+                class="secondary"
+                style="white-space: nowrap"
+                title="Run the algorithm on a poses.json instead of re-analyzing the video"
+              >
+                Load Poses
+              </button>
+              <input
+                type="file"
+                id="posesFileInput"
+                accept="application/json,.json"
+                style="display: none"
+              />
+              <span id="posesFileName" style="color: #9ca3af; font-size: 0.9rem"
+                >No poses loaded</span
+              >
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Labeled Data (JSON)</label>
+            <div style="display: flex; gap: 10px; align-items: center">
+              <button
+                id="loadLabelsBtn"
+                class="secondary"
+                style="white-space: nowrap"
+                title="Load labels.json to compare labeled keyframes against the algorithm"
+              >
+                Load Labels
+              </button>
+              <input
+                type="file"
+                id="labelsFileInput"
+                accept="application/json,.json"
+                style="display: none"
+              />
+              <span
+                id="labelsFileName"
+                style="color: #9ca3af; font-size: 0.9rem"
+                >No labels loaded</span
               >
             </div>
           </div>
@@ -1025,6 +1318,18 @@
         <div class="video-section">
           <div class="video-container">
             <video id="video"></video>
+            <canvas
+              id="poseCanvas"
+              style="
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+                pointer-events: none;
+                display: none;
+              "
+            ></canvas>
             <div class="video-placeholder" id="videoPlaceholder">
               <p>Select a video file and click "Analyze Video"</p>
               <p style="font-size: 0.85rem; color: #6b7280">
@@ -1106,6 +1411,23 @@
               />
               <button id="frameJumpBtn" class="secondary" disabled>Go</button>
             </div>
+            <label
+              class="control-group"
+              id="overlayToggleWrap"
+              title="Draw the detected pose skeleton on top of the video"
+              style="
+                margin-left: 10px;
+                display: none;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+                font-size: 13px;
+                color: #d1d5db;
+              "
+            >
+              <input type="checkbox" id="overlayToggle" checked />
+              Pose overlay
+            </label>
           </div>
 
           <div class="keyboard-hint">
@@ -1120,7 +1442,9 @@
             <div class="shot-labeling-header">
               <span class="shot-labeling-title">Shot Labels</span>
               <div class="shot-labeling-actions">
-                <button id="addShotBtn" class="secondary" disabled>+ Add Shot</button>
+                <button id="addShotBtn" class="secondary" disabled>
+                  + Add Shot
+                </button>
                 <button id="removeShotBtn" class="danger" disabled>
                   Remove Shot
                 </button>
@@ -1162,6 +1486,18 @@
           <div id="metricsContent" class="hidden">
             <div class="shot-tabs" id="shotTabs"></div>
             <div class="shot-info" id="shotInfo"></div>
+            <div class="view-toggle" id="viewToggle">
+              <button
+                id="viewKeyframesBtn"
+                class="view-toggle-btn active"
+                type="button"
+              >
+                Keyframes
+              </button>
+              <button id="viewMetricsBtn" class="view-toggle-btn" type="button">
+                Metrics
+              </button>
+            </div>
             <div id="phasesSection"></div>
             <div id="metricsList"></div>
           </div>
@@ -1238,8 +1574,17 @@
         totalFrames: 0,
         validations: {},
         analyzer: null,
-        // Pose data for export - populated during analysis
+        // Pose data for export - populated during analysis OR loaded from a
+        // poses.json file (the fast path that skips MediaPipe re-analysis).
         poseData: null,
+        // Virtual playhead used when no video is loaded (poses-only mode), so
+        // frame chips still drive the on-canvas pose skeleton.
+        currentFrameNo: 0,
+        // Sidebar view: 'keyframes' or 'metrics' (looked at separately).
+        sidebarView: "keyframes",
+        // When a video AND poses are both loaded, draw the pose skeleton over
+        // the video. Toggled by the "Pose overlay" checkbox.
+        overlayPoses: true,
       };
 
       // Shot labeling state
@@ -1256,9 +1601,23 @@
       const $ = (id) => document.getElementById(id);
 
       const elements = {
+        testCaseSelect: $("testCaseSelect"),
+        testCaseHint: $("testCaseHint"),
         selectVideoBtn: $("selectVideoBtn"),
         videoFileInput: $("videoFileInput"),
         selectedFileName: $("selectedFileName"),
+        loadPosesBtn: $("loadPosesBtn"),
+        posesFileInput: $("posesFileInput"),
+        posesFileName: $("posesFileName"),
+        loadLabelsBtn: $("loadLabelsBtn"),
+        labelsFileInput: $("labelsFileInput"),
+        labelsFileName: $("labelsFileName"),
+        poseCanvas: $("poseCanvas"),
+        overlayToggle: $("overlayToggle"),
+        overlayToggleWrap: $("overlayToggleWrap"),
+        viewToggle: $("viewToggle"),
+        viewKeyframesBtn: $("viewKeyframesBtn"),
+        viewMetricsBtn: $("viewMetricsBtn"),
         shootingHand: $("shootingHand"),
         profile: $("profile"),
         analyzeBtn: $("analyzeBtn"),
@@ -1375,117 +1734,148 @@
       // =========================================================================
       // Video Loading & Playback
       // =========================================================================
+      // Resolves true once the video's metadata has loaded (videoLoaded set),
+      // false if the file is rejected or fails to decode. Returning a boolean
+      // rather than rejecting keeps the fire-and-forget callers (file picker,
+      // test-case dropdown) free of unhandled-rejection warnings.
       function loadVideoIntoPlayer(file) {
-        // Validate file input
-        if (!file) {
-          showToast("No file provided", "error");
-          return;
-        }
-
-        // Validate file is a video
-        if (!file.type.startsWith("video/")) {
-          showToast("Invalid file type. Please select a video file.", "error");
-          return;
-        }
-
-        // Clean up previous video URL to prevent memory leaks
-        if (appState.videoBlobUrl) {
-          URL.revokeObjectURL(appState.videoBlobUrl);
-        }
-
-        // Reset video-related state when loading new video
-        appState.videoLoaded = false;
-        appState.totalFrames = 0;
-        appState.fps = 30; // Default FPS (HTML5 video doesn't expose native FPS)
-        appState.poseData = null;
-        appState.analysisData = null;
-
-        // Reset labeling state for new video
-        labelingState.shots = [];
-        labelingState.selectedShotIndex = null;
-        renderShotList();
-        updateRemoveButtonState();
-        showValidationErrors([]);
-
-        // Hide analysis UI (will be shown again after analysis)
-        elements.metricsContent.classList.add("hidden");
-        elements.noDataMessage.classList.remove("hidden");
-        elements.toolbar.classList.add("hidden");
-
-        // Create blob URL from the selected file
-        const blobUrl = URL.createObjectURL(file);
-        appState.videoBlobUrl = blobUrl;
-        appState.videoFile = file;
-
-        // Set video source
-        elements.video.src = blobUrl;
-
-        // Handle loadedmetadata event to extract duration and calculate frames
-        elements.video.onloadedmetadata = () => {
-          const duration = elements.video.duration;
-
-          // Handle very short videos (< 1 second) - still valid, just few frames
-          if (duration <= 0) {
-            showToast("Video has invalid duration", "error");
-            resetVideoState();
+        return new Promise((resolve) => {
+          // Validate file input
+          if (!file) {
+            showToast("No file provided", "error");
+            resolve(false);
             return;
           }
 
-          // Calculate total frames (duration * fps)
-          appState.totalFrames = Math.floor(duration * appState.fps);
-
-          // Update timeline
-          elements.timeline.max = duration;
-          elements.timeline.disabled = false;
-
-          // Hide placeholders, show video
-          elements.videoPlaceholder.classList.add("hidden");
-          elements.loadingPlaceholder.classList.add("hidden");
-
-          // Mark video as loaded
-          appState.videoLoaded = true;
-
-          // Enable navigation controls
-          enableControls();
-
-          // Enable Add Shot button now that video is loaded
-          updateAddShotButtonState();
-
-          // Enable Export Poses button now that video is loaded
-          updateExportPosesButtonState();
-
-          // Show video toolbar (Export Poses, Export Labels)
-          elements.videoToolbar.classList.remove("hidden");
-
-          // Update frame display to show initial frame info
-          updateFrameDisplay();
-        };
-
-        // Handle video load errors (invalid/corrupted files)
-        elements.video.onerror = (e) => {
-          const error = elements.video.error;
-          let errorMessage = "Failed to load video";
-
-          if (error) {
-            switch (error.code) {
-              case MediaError.MEDIA_ERR_ABORTED:
-                errorMessage = "Video loading was aborted";
-                break;
-              case MediaError.MEDIA_ERR_NETWORK:
-                errorMessage = "Network error while loading video";
-                break;
-              case MediaError.MEDIA_ERR_DECODE:
-                errorMessage = "Video file is corrupted or uses an unsupported format";
-                break;
-              case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                errorMessage = "Video format is not supported by your browser";
-                break;
-            }
+          // Validate file is a video
+          if (!file.type.startsWith("video/")) {
+            showToast(
+              "Invalid file type. Please select a video file.",
+              "error",
+            );
+            resolve(false);
+            return;
           }
 
-          showToast(errorMessage, "error");
-          resetVideoState();
-        };
+          // Clean up previous video URL to prevent memory leaks
+          if (appState.videoBlobUrl) {
+            URL.revokeObjectURL(appState.videoBlobUrl);
+          }
+
+          // Reset video-related state when loading new video
+          appState.videoLoaded = false;
+
+          // Preserve any separately-loaded poses/labels/analysis so the user can
+          // load video + poses + labels in any order. Only wipe analysis state
+          // for the classic "load a fresh video, then Analyze Video" flow.
+          if (!appState.poseData) {
+            appState.totalFrames = 0;
+            appState.fps = 30; // Default FPS (HTML5 video doesn't expose native FPS)
+            appState.analysisData = null;
+
+            // Reset labeling state for new video
+            labelingState.shots = [];
+            labelingState.selectedShotIndex = null;
+            renderShotList();
+            updateRemoveButtonState();
+            showValidationErrors([]);
+
+            // Hide analysis UI (will be shown again after analysis)
+            elements.metricsContent.classList.add("hidden");
+            elements.noDataMessage.classList.remove("hidden");
+            elements.toolbar.classList.add("hidden");
+          }
+
+          // Create blob URL from the selected file
+          const blobUrl = URL.createObjectURL(file);
+          appState.videoBlobUrl = blobUrl;
+          appState.videoFile = file;
+
+          // Set video source
+          elements.video.src = blobUrl;
+
+          // Handle loadedmetadata event to extract duration and calculate frames
+          elements.video.onloadedmetadata = () => {
+            const duration = elements.video.duration;
+
+            // Handle very short videos (< 1 second) - still valid, just few frames
+            if (duration <= 0) {
+              showToast("Video has invalid duration", "error");
+              resetVideoState();
+              resolve(false);
+              return;
+            }
+
+            // Calculate total frames (duration * fps). When poses are already
+            // loaded, keep their authoritative fps/frame count so labeled and
+            // algorithm frame numbers map to the correct video time.
+            if (!appState.poseData) {
+              appState.totalFrames = Math.floor(duration * appState.fps);
+            }
+
+            // Update timeline
+            elements.timeline.max = duration;
+            elements.timeline.disabled = false;
+
+            // Hide placeholders; the real video is shown. The pose canvas is
+            // shown/hidden by updatePoseOverlayVisibility below (it overlays the
+            // video when poses are also loaded and the toggle is on).
+            elements.videoPlaceholder.classList.add("hidden");
+            elements.loadingPlaceholder.classList.add("hidden");
+
+            // Mark video as loaded
+            appState.videoLoaded = true;
+
+            // Overlay the pose skeleton if poses are already loaded.
+            updatePoseOverlayVisibility();
+
+            // Enable navigation controls
+            enableControls();
+
+            // Enable Add Shot button now that video is loaded
+            updateAddShotButtonState();
+
+            // Enable Export Poses button now that video is loaded
+            updateExportPosesButtonState();
+
+            // Show video toolbar (Export Poses, Export Labels)
+            elements.videoToolbar.classList.remove("hidden");
+
+            // Update frame display to show initial frame info
+            updateFrameDisplay();
+
+            resolve(true);
+          };
+
+          // Handle video load errors (invalid/corrupted files)
+          elements.video.onerror = (e) => {
+            const error = elements.video.error;
+            let errorMessage = "Failed to load video";
+
+            if (error) {
+              switch (error.code) {
+                case MediaError.MEDIA_ERR_ABORTED:
+                  errorMessage = "Video loading was aborted";
+                  break;
+                case MediaError.MEDIA_ERR_NETWORK:
+                  errorMessage = "Network error while loading video";
+                  break;
+                case MediaError.MEDIA_ERR_DECODE:
+                  errorMessage =
+                    "Video file is corrupted or uses an unsupported format";
+                  break;
+                case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                  errorMessage =
+                    "Video format is not supported by your browser";
+                  break;
+              }
+            }
+
+            showToast(errorMessage, "error");
+            resetVideoState();
+            resolve(false);
+          };
+        });
       }
 
       // Reset video state when loading fails
@@ -1549,10 +1939,10 @@
       }
 
       function stepFrame(delta) {
-        if (!appState.videoLoaded) return;
+        if (!isScrubbable()) return;
 
         // Pause if playing
-        if (!elements.video.paused) {
+        if (appState.videoLoaded && !elements.video.paused) {
           elements.video.pause();
           elements.playPauseBtn.textContent = "Play";
         }
@@ -1574,7 +1964,7 @@
       }
 
       function seekToFrame(frame) {
-        if (!appState.videoLoaded) return;
+        if (!isScrubbable()) return;
 
         // Clamp frame to valid range
         const clampedFrame = Math.max(
@@ -1582,16 +1972,23 @@
           Math.min(appState.totalFrames - 1, frame),
         );
 
-        // Calculate the exact time for this frame
-        // Adding a small offset (half frame duration) helps with precision
-        // by targeting the middle of the frame interval
-        const frameTime = clampedFrame / appState.fps;
-        elements.video.currentTime = frameTime;
+        appState.currentFrameNo = clampedFrame;
 
-        // Pause if playing
-        if (!elements.video.paused) {
-          elements.video.pause();
-          elements.playPauseBtn.textContent = "Play";
+        if (appState.videoLoaded) {
+          // Seek the real video (targets the middle of the frame interval). The
+          // pose overlay redraws on the video's 'seeked' event.
+          elements.video.currentTime = clampedFrame / appState.fps;
+          if (!elements.video.paused) {
+            elements.video.pause();
+            elements.playPauseBtn.textContent = "Play";
+          }
+        } else {
+          // No video: render the skeleton for this frame on the canvas and
+          // keep the frame-based timeline in sync.
+          drawPoseSkeleton(clampedFrame);
+          if (!elements.timeline.matches(":active")) {
+            elements.timeline.value = clampedFrame;
+          }
         }
 
         updateFrameDisplay();
@@ -1599,7 +1996,10 @@
       }
 
       function getCurrentFrame() {
-        return Math.floor(elements.video.currentTime * appState.fps);
+        if (appState.videoLoaded) {
+          return Math.floor(elements.video.currentTime * appState.fps);
+        }
+        return appState.currentFrameNo || 0;
       }
 
       function updateVideoState() {
@@ -1616,8 +2016,13 @@
 
       function updateFrameDisplay() {
         const frame = getCurrentFrame();
-        const time = elements.video.currentTime || 0;
-        const totalTime = elements.video.duration || 0;
+        const fps = appState.fps || 30;
+        const time = appState.videoLoaded
+          ? elements.video.currentTime || 0
+          : frame / fps;
+        const totalTime = appState.videoLoaded
+          ? elements.video.duration || 0
+          : appState.totalFrames / fps;
 
         // Update VideoState
         updateVideoState();
@@ -1655,182 +2060,75 @@
         updateProgress("Initializing analyzer...", 5);
 
         try {
-          // Access the ShotAnalysis library from the browser bundle
-          const {
-            createShotAnalyzer,
-            createConfig,
-            createVideoElementProvider,
-          } = window.ShotAnalysis;
-
-          // Create config
-          updateProgress("Creating configuration...", 10);
-          const config = createConfig({
-            shootingHand,
-            profile,
-          });
-
-          // Create analyzer
-          updateProgress("Loading MediaPipe pose model...", 15);
-          const analyzer = await createShotAnalyzer(config);
-          appState.analyzer = analyzer;
-
-          // Create video element provider from the file
-          updateProgress("Loading video file...", 25);
-          const frameProvider = await createVideoElementProvider(file);
-          const metadata = frameProvider.getMetadata();
-          appState.fps = frameProvider.getFps();
-
-          console.log("[DEBUG] Video metadata:", metadata);
-          console.log("[DEBUG] FPS:", frameProvider.getFps());
-          console.log("[DEBUG] Total frames:", frameProvider.getTotalFrames());
-
-          // Debug: test single frame extraction and pose detection
-          updateProgress("Testing frame extraction...", 28);
-          const testFrame = await frameProvider.getNextFrame();
-          if (testFrame) {
-            console.log("[DEBUG] Test frame extracted:", {
-              width: testFrame.width,
-              height: testFrame.height,
-              timestamp: testFrame.timestamp,
-              frameIndex: testFrame.frameIndex,
-              hasCanvas: !!testFrame.canvas,
-              dataLength: testFrame.data?.length,
-            });
-
-            // Try to detect pose on this single frame
-            try {
-              // We need to access the detector directly - let's use a workaround
-              // by processing just a few frames manually
-              console.log("[DEBUG] Testing pose detection on first frame...");
-            } catch (e) {
-              console.error("[DEBUG] Pose detection test failed:", e);
+          // Ensure the video is loaded into the player. The file picker loads
+          // it on selection, but guard in case that hasn't completed yet — we
+          // need it for pose extraction and for scrubbing the results.
+          if (!appState.videoLoaded || appState.videoFile !== file) {
+            updateProgress("Loading video player...", 8);
+            const ok = await loadVideoIntoPlayer(file);
+            if (!ok) {
+              elements.progressSection.classList.add("hidden");
+              elements.videoPlaceholder.classList.remove("hidden");
+              return;
             }
-          } else {
-            console.error("[DEBUG] Failed to extract test frame!");
           }
 
-          // Reset provider for full analysis
-          await frameProvider.reset();
+          // Extract poses ONCE with MediaPipe and cache them on appState. Both
+          // the keyframe view and Export Poses reuse this, so neither triggers
+          // a second detection pass. runPoseDetection drives its own progress.
+          appState.poseData = await runPoseDetection();
+          appState.fps = appState.poseData.fps || appState.fps;
+          updateExportPosesButtonState();
 
-          updateProgress("Running pose detection...", 30);
-
-          // Run analysis with debug logging - track frame processing
-          console.log("[DEBUG] Starting full analysis...");
-          let frameCount = 0;
-          const startTime = Date.now();
-          const result = await analyzer.analyzeVideo(frameProvider);
-          const elapsed = Date.now() - startTime;
-
-          console.log("[DEBUG] Analysis complete in", elapsed, "ms");
-          console.log(
-            "[DEBUG] Video metadata from result:",
-            result.videoMetadata,
+          // Run the same detection the app and harness use, directly on the
+          // extracted poses — no second MediaPipe pass, and identical results
+          // to the Load Poses path.
+          updateProgress("Detecting shots and metrics...", 96);
+          const { ShotAnalyzer, createConfig } = window.ShotAnalysis;
+          const analyzer = new ShotAnalyzer(
+            createConfig({ shootingHand, profile }),
           );
-          console.log(
-            "[DEBUG] Frames processed:",
-            result.videoMetadata?.totalFrames,
+          const videoMetadata = {
+            width: appState.poseData.width,
+            height: appState.poseData.height,
+            fps: appState.poseData.fps,
+            totalFrames: appState.poseData.totalFrames,
+          };
+          const result = analyzer.analyzePoses(
+            appState.poseData.frames,
+            videoMetadata,
           );
+
           console.log(
-            "[DEBUG] Number of shots detected:",
+            "[DEBUG] Shots detected:",
             result.shots?.length || 0,
+            result,
           );
-          if (result.shots?.length === 0) {
-            console.log("[DEBUG] No shots - this could mean:");
-            console.log("[DEBUG]   1. No poses were detected in frames");
-            console.log(
-              "[DEBUG]   2. Poses detected but no shooting motion found",
-            );
-            console.log("[DEBUG]   3. Video too short or wrong content");
-          }
-          console.log("[DEBUG] Full result:", result);
-
-          updateProgress("Processing results...", 95);
 
           if (!result.shots || result.shots.length === 0) {
-            console.warn(
-              "[DEBUG] No shots detected - check console for details",
-            );
             showToast("No shots detected in video", "error");
             elements.progressSection.classList.add("hidden");
             elements.videoPlaceholder.classList.remove("hidden");
             return;
           }
 
-          // Convert to validation export format
-          const exportData = {
-            version: "1.0",
-            exportedAt: new Date().toISOString(),
-            video: {
-              filename: file.name,
-              width: result.videoMetadata.width,
-              height: result.videoMetadata.height,
-              fps: result.videoMetadata.fps,
-              totalFrames: result.videoMetadata.totalFrames,
-              duration: result.videoMetadata.duration,
-            },
-            config: {
-              shootingHand,
-              profile,
-            },
-            shots: result.shots.map((shot) => ({
-              shotIndex: shot.shotIndex,
-              frameRange: {
-                start: shot.frameRange.start,
-                end: shot.frameRange.end,
-              },
-              phases: convertPhasesToExport(shot.phases),
-              metrics: convertMetricsToExport(shot.metrics),
-              overallConfidence: shot.overallConfidence,
-              orientation: shot.orientation || "unknown",
-            })),
-          };
-
-          // Build pose data from analysis result (if available)
-          // The poseHistory contains frame-level pose data from the analysis
-          if (result.poseHistory && Array.isArray(result.poseHistory)) {
-            appState.poseData = {
-              video: file.name,
-              fps: result.videoMetadata.fps,
-              totalFrames: result.videoMetadata.totalFrames,
-              width: result.videoMetadata.width,
-              height: result.videoMetadata.height,
-              extractedAt: new Date().toISOString(),
-              frames: result.poseHistory.map((frame) => ({
-                frameIndex: frame.frameIndex,
-                timestamp: frame.timestamp,
-                poseConfidence: frame.confidence || 0,
-                landmarks: frame.landmarks || [],
-              })),
-            };
-            console.log(
-              "[DEBUG] Pose data captured:",
-              appState.poseData.frames.length,
-              "frames",
-            );
-          } else {
-            // No raw pose data available - set to null
-            console.log("[DEBUG] No raw pose history available in result");
-            appState.poseData = null;
-          }
-          updateExportPosesButtonState();
-
-          // Load video for playback FIRST (this resets UI state)
-          updateProgress("Loading video player...", 98);
-          loadVideoIntoPlayer(file);
-
-          // Load the analysis data AFTER video (this shows the metrics UI)
+          const exportData = buildExportData(result, file.name, {
+            shootingHand,
+            profile,
+          });
           loadAnalysisData(exportData);
+
+          // Enable scrubbing. The video is loaded, so setupPosePlayback keeps
+          // the real video as the frame source (it only switches to the pose
+          // canvas when no video is present).
+          setupPosePlayback();
+          seekToFrame(result.shots[0]?.frameRange?.start ?? 0);
 
           elements.progressSection.classList.add("hidden");
           showToast(
             `Detected ${result.shots.length} shot(s) for validation`,
             "success",
           );
-
-          // Cleanup
-          frameProvider.dispose();
-          await analyzer.dispose();
-          appState.analyzer = null;
         } catch (err) {
           console.error("Analysis error:", err);
           showToast("Error: " + err.message, "error");
@@ -1903,6 +2201,396 @@
       }
 
       // =========================================================================
+      // Load Poses / Labels (fast path: run algorithm on pre-extracted poses)
+      // =========================================================================
+
+      // True when we can scrub frames: either a video is loaded (real frames)
+      // or pose data is loaded (skeleton frames on the canvas).
+      function isScrubbable() {
+        return (
+          appState.videoLoaded ||
+          !!(appState.poseData && appState.poseData.frames?.length)
+        );
+      }
+
+      function buildExportData(result, videoName, config) {
+        return {
+          version: "1.0",
+          exportedAt: new Date().toISOString(),
+          video: {
+            filename: videoName,
+            width: result.videoMetadata.width,
+            height: result.videoMetadata.height,
+            fps: result.videoMetadata.fps,
+            totalFrames: result.videoMetadata.totalFrames,
+          },
+          config,
+          shots: result.shots.map((shot) => ({
+            shotIndex: shot.shotIndex,
+            frameRange: {
+              start: shot.frameRange.start,
+              end: shot.frameRange.end,
+            },
+            phases: convertPhasesToExport(shot.phases),
+            metrics: convertMetricsToExport(shot.metrics),
+            overallConfidence: shot.overallConfidence,
+            orientation: shot.orientation || "unknown",
+          })),
+        };
+      }
+
+      async function loadPosesFromFile(file) {
+        if (!file) return;
+        try {
+          const parsed = JSON.parse(await file.text());
+          if (!parsed.frames || !Array.isArray(parsed.frames)) {
+            showToast("Invalid poses file (no frames array)", "error");
+            return;
+          }
+
+          appState.poseData = parsed;
+          appState.fps = parsed.fps || 30;
+          appState.totalFrames = parsed.totalFrames || parsed.frames.length;
+          appState.currentFrameNo = 0;
+          elements.posesFileName.textContent = `${parsed.video || file.name} (${parsed.frames.length} frames)`;
+
+          // Run the algorithm directly on the poses — no MediaPipe, no video
+          // decode. Same detection the app and harness use.
+          const shootingHand = elements.shootingHand.value;
+          const profile = elements.profile.value;
+          const { ShotAnalyzer, createConfig } = window.ShotAnalysis;
+          const analyzer = new ShotAnalyzer(
+            createConfig({ shootingHand, profile }),
+          );
+          const videoMetadata = {
+            width: parsed.width || 1920,
+            height: parsed.height || 1080,
+            fps: appState.fps,
+            totalFrames: appState.totalFrames,
+          };
+          const result = analyzer.analyzePoses(parsed.frames, videoMetadata);
+
+          const exportData = buildExportData(
+            result,
+            parsed.video || file.name,
+            { shootingHand, profile },
+          );
+          loadAnalysisData(exportData);
+
+          // Enable scrubbing (video if present, otherwise the skeleton canvas).
+          setupPosePlayback();
+          updateExportPosesButtonState();
+
+          const firstStart = result.shots?.[0]?.frameRange?.start ?? 0;
+          seekToFrame(firstStart);
+
+          if (!result.shots || result.shots.length === 0) {
+            showToast("Analysis ran but detected no shots", "info");
+          } else {
+            showToast(
+              `Analyzed ${result.shots.length} shot(s) from poses`,
+              "success",
+            );
+          }
+        } catch (err) {
+          console.error("Load poses error:", err);
+          showToast("Failed to load poses: " + err.message, "error");
+        }
+      }
+
+      async function loadLabelsFromFile(file) {
+        if (!file) return;
+        try {
+          const parsed = JSON.parse(await file.text());
+          if (!parsed.shots || !Array.isArray(parsed.shots)) {
+            showToast("Invalid labels file (no shots array)", "error");
+            return;
+          }
+
+          // Map labeled shots into the labeling panel, carrying every keyframe
+          // through so we can show labeled-vs-algorithm comparisons.
+          labelingState.shots = parsed.shots.map((s, i) => {
+            const keyframes = {};
+            KEYFRAME_ORDER.forEach((id) => {
+              if (typeof s[id] === "number") keyframes[id] = s[id];
+            });
+            // Carry the optional range ends for set point / release.
+            Object.values(RANGE_END_KEYFRAME).forEach((endId) => {
+              if (typeof s[endId] === "number") keyframes[endId] = s[endId];
+            });
+            return {
+              shotNumber: s.shotNumber ?? i + 1,
+              startFrame: s.startFrame ?? null,
+              endFrame: s.endFrame ?? null,
+              cameraOrientation: s.cameraOrientation || "front",
+              keyframes,
+            };
+          });
+          labelingState.selectedShotIndex = null;
+          elements.labelsFileName.textContent = `${parsed.video || file.name} (${labelingState.shots.length} shots)`;
+
+          renderShotList();
+          updateRemoveButtonState();
+          // Refresh the sidebar so keyframe comparisons pick up the labels.
+          if (appState.analysisData) renderCurrentShot();
+          showToast(
+            `Loaded ${labelingState.shots.length} labeled shot(s)`,
+            "success",
+          );
+        } catch (err) {
+          console.error("Load labels error:", err);
+          showToast("Failed to load labels: " + err.message, "error");
+        }
+      }
+
+      // Enables playback controls and, when no real video is loaded, shows the
+      // pose skeleton canvas as the frame view.
+      function setupPosePlayback() {
+        enableControls();
+        updateAddShotButtonState();
+        elements.videoToolbar.classList.remove("hidden");
+
+        if (!appState.videoLoaded) {
+          elements.videoPlaceholder.classList.add("hidden");
+          elements.loadingPlaceholder.classList.add("hidden");
+          const w = appState.poseData?.width || 1280;
+          const h = appState.poseData?.height || 720;
+          elements.poseCanvas.width = w;
+          elements.poseCanvas.height = h;
+          elements.poseCanvas.style.display = "block";
+          // In poses-only mode the timeline is measured in frames.
+          elements.timeline.min = 0;
+          elements.timeline.max = Math.max(0, appState.totalFrames - 1);
+          elements.timeline.step = 1;
+          elements.timeline.value = 0;
+          elements.timeline.disabled = false;
+        }
+        if (elements.statVideo) {
+          elements.statVideo.textContent =
+            appState.poseData?.video || "poses loaded";
+        }
+        // If a video is also loaded, overlay the skeleton on it.
+        updatePoseOverlayVisibility();
+        updateFrameDisplay();
+      }
+
+      // MediaPipe BlazePose skeleton connections (subset covering limbs/torso).
+      const POSE_CONNECTIONS = [
+        [11, 12],
+        [11, 13],
+        [13, 15],
+        [12, 14],
+        [14, 16],
+        [11, 23],
+        [12, 24],
+        [23, 24],
+        [23, 25],
+        [25, 27],
+        [27, 29],
+        [29, 31],
+        [27, 31],
+        [24, 26],
+        [26, 28],
+        [28, 30],
+        [30, 32],
+        [28, 32],
+        [0, 11],
+        [0, 12],
+      ];
+
+      // Draws the pose skeleton for a frame onto the overlay canvas. Used when
+      // no video is loaded so frame chips still show the corresponding pose.
+      function posesAvailable() {
+        return !!(
+          appState.poseData &&
+          appState.poseData.frames &&
+          appState.poseData.frames.length
+        );
+      }
+
+      function drawPoseSkeleton(frameNo) {
+        const canvas = elements.poseCanvas;
+        if (!canvas) return;
+        // Overlay mode = a real video is playing underneath. Only draw when the
+        // overlay is enabled and we actually have poses.
+        const overlayMode = appState.videoLoaded;
+        if (overlayMode && (!appState.overlayPoses || !posesAvailable()))
+          return;
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const frame = appState.poseData?.frames?.[frameNo];
+        const lm = frame && frame.landmarks;
+        if (!lm || lm.length === 0) {
+          // In overlay mode keep the video unobscured when a frame has no pose.
+          if (!overlayMode) {
+            ctx.fillStyle = "#6b7280";
+            ctx.font = "20px sans-serif";
+            ctx.fillText(`Frame ${frameNo}: no pose`, 20, 40);
+          }
+          return;
+        }
+
+        const W = canvas.width;
+        const H = canvas.height;
+        const pt = (i) =>
+          lm[i] && { x: lm[i].x * W, y: lm[i].y * H, v: lm[i].visibility };
+
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#34d399";
+        for (const [a, b] of POSE_CONNECTIONS) {
+          const pa = pt(a);
+          const pb = pt(b);
+          if (!pa || !pb || pa.v < 0.3 || pb.v < 0.3) continue;
+          ctx.beginPath();
+          ctx.moveTo(pa.x, pa.y);
+          ctx.lineTo(pb.x, pb.y);
+          ctx.stroke();
+        }
+        ctx.fillStyle = "#60a5fa";
+        for (let i = 0; i < lm.length; i++) {
+          const p = pt(i);
+          if (!p || p.v < 0.3) continue;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // Pro-skeleton overlay: when scrubbed onto a detected keyframe and the
+        // reference poses are loaded, draw the pro's stance-aligned skeleton as
+        // a dashed ghost so the user can compare their shape to the target.
+        const kfId =
+          appState.currentKeyframes && appState.currentKeyframes[frameNo];
+        const refPose =
+          kfId &&
+          appState.referencePoses &&
+          appState.referencePoses.byKeyframe &&
+          appState.referencePoses.byKeyframe[kfId];
+        if (
+          refPose &&
+          window.ShotAnalysis &&
+          typeof ShotAnalysis.referenceOnFrame === "function"
+        ) {
+          const proLm = ShotAnalysis.referenceOnFrame(refPose, frame);
+          if (proLm) {
+            const ppt = (i) =>
+              proLm[i] && { x: proLm[i].x * W, y: proLm[i].y * H };
+            ctx.save();
+            ctx.setLineDash([6, 5]);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "rgba(251, 191, 36, 0.85)"; // amber = pro target
+            for (const [a, b] of POSE_CONNECTIONS) {
+              const pa = ppt(a);
+              const pb = ppt(b);
+              if (!pa || !pb) continue;
+              ctx.beginPath();
+              ctx.moveTo(pa.x, pa.y);
+              ctx.lineTo(pb.x, pb.y);
+              ctx.stroke();
+            }
+            ctx.restore();
+            ctx.fillStyle = "rgba(251, 191, 36, 0.95)";
+            ctx.font = "14px sans-serif";
+            ctx.fillText(`pro target: ${kfId}`, 12, H - 14);
+          }
+        }
+
+        if (!overlayMode) {
+          ctx.fillStyle = "#e5e7eb";
+          ctx.font = "18px sans-serif";
+          ctx.fillText(`Frame ${frameNo}`, 12, 26);
+        }
+      }
+
+      // ---- Pose overlay on video -------------------------------------------
+      // While a video plays we can't rely on frame-stepping, so redraw the
+      // skeleton on an animation loop that follows the video's current time.
+      let overlayRafId = null;
+      function overlayTick() {
+        overlayRafId = null;
+        if (
+          appState.videoLoaded &&
+          appState.overlayPoses &&
+          posesAvailable() &&
+          !elements.video.paused
+        ) {
+          drawPoseSkeleton(getCurrentFrame());
+          overlayRafId = requestAnimationFrame(overlayTick);
+        }
+      }
+      function startOverlayLoop() {
+        if (overlayRafId == null)
+          overlayRafId = requestAnimationFrame(overlayTick);
+      }
+
+      // Shows/hides the overlay toggle and canvas based on what's loaded, and
+      // (re)draws the current frame. Safe to call any time state changes.
+      function updatePoseOverlayVisibility() {
+        const canOverlay = appState.videoLoaded && posesAvailable();
+        elements.overlayToggleWrap.style.display = canOverlay ? "flex" : "none";
+
+        // Poses-only mode manages the canvas itself (setupPosePlayback); only
+        // touch the canvas here when a video is loaded.
+        if (!appState.videoLoaded) return;
+
+        if (canOverlay && appState.overlayPoses) {
+          const w =
+            appState.poseData.width || elements.video.videoWidth || 1280;
+          const h =
+            appState.poseData.height || elements.video.videoHeight || 720;
+          if (elements.poseCanvas.width !== w) elements.poseCanvas.width = w;
+          if (elements.poseCanvas.height !== h) elements.poseCanvas.height = h;
+          elements.poseCanvas.style.display = "block";
+          drawPoseSkeleton(getCurrentFrame());
+          if (!elements.video.paused) startOverlayLoop();
+        } else {
+          elements.poseCanvas.style.display = "none";
+          const ctx = elements.poseCanvas.getContext("2d");
+          ctx &&
+            ctx.clearRect(
+              0,
+              0,
+              elements.poseCanvas.width,
+              elements.poseCanvas.height,
+            );
+        }
+      }
+
+      // Finds the labeled shot whose frame range best overlaps a detected
+      // shot's range, so keyframe comparisons line up the right pair.
+      function matchLabeledShot(start, end) {
+        let best = null;
+        let bestOverlap = 0;
+        for (const s of labelingState.shots) {
+          if (!s.keyframes || s.startFrame == null || s.endFrame == null)
+            continue;
+          const overlap =
+            Math.min(end, s.endFrame) - Math.max(start, s.startFrame);
+          if (overlap > bestOverlap) {
+            bestOverlap = overlap;
+            best = s;
+          }
+        }
+        return best;
+      }
+
+      // =========================================================================
+      // Sidebar view toggle (Keyframes vs Metrics)
+      // =========================================================================
+      function setSidebarView(view) {
+        appState.sidebarView = view;
+        const kf = view === "keyframes";
+        elements.viewKeyframesBtn.classList.toggle("active", kf);
+        elements.viewMetricsBtn.classList.toggle("active", !kf);
+        applySidebarView();
+      }
+
+      function applySidebarView() {
+        const kf = appState.sidebarView === "keyframes";
+        elements.phasesSection.style.display = kf ? "" : "none";
+        elements.metricsList.style.display = kf ? "none" : "";
+      }
+
+      // =========================================================================
       // Rendering
       // =========================================================================
       function renderShotTabs() {
@@ -1927,7 +2615,7 @@
 
         // Jump to start of shot
         const shot = appState.analysisData?.shots?.[index];
-        if (shot && appState.videoLoaded) {
+        if (shot && isScrubbable()) {
           seekToFrame(shot.frameRange.start);
         }
       }
@@ -1945,7 +2633,11 @@
         const orientation = shot.orientation || "unknown";
 
         // Format orientation for display (e.g., "front-left" -> "Front Left")
-        const formatOrientation = (o) => o.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        const formatOrientation = (o) =>
+          o
+            .split("-")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
 
         elements.shotInfo.innerHTML = `
         <span class="label">Start:</span> <span class="value">${shot.frameRange.start}</span>
@@ -1966,6 +2658,9 @@
         renderMetrics(shot);
 
         elements.metricsCount.textContent = `${Object.keys(shot.metrics || {}).length} metrics`;
+
+        // Respect the current Keyframes/Metrics view selection.
+        applySidebarView();
       }
 
       function renderPhases(shot) {
@@ -2003,7 +2698,178 @@
         });
 
         html += "</div>";
+        html += renderKeyframes(shot);
         elements.phasesSection.innerHTML = html;
+      }
+
+      // Keyframe order + display names, mirroring the labeled corpus so the
+      // detected frames line up visually with the Shot Labels panel.
+      const KEYFRAME_ORDER = [
+        "legs_start_bending",
+        "leg_bend_low_point",
+        "ball_low_point",
+        "legs_start_extending",
+        "ball_starts_upward",
+        "set_point",
+        "legs_fully_extended",
+        "release",
+        "arms_fully_extended",
+        "feet_leave_ground",
+        "feet_land",
+      ];
+      const KEYFRAME_NAMES = {
+        legs_start_bending: "Legs bend start",
+        leg_bend_low_point: "Leg low point",
+        ball_low_point: "Ball low point",
+        legs_start_extending: "Legs extend",
+        ball_starts_upward: "Ball up",
+        set_point: "Set point",
+        legs_fully_extended: "Legs full ext",
+        release: "Release",
+        arms_fully_extended: "Arms extended",
+        feet_leave_ground: "Feet leave",
+        feet_land: "Feet land",
+      };
+
+      // Keyframes that are durations (ranges), not instants: the primary field
+      // is the range START, the mapped field is the END. The validator lets you
+      // label both; other keyframes are single frames.
+      const RANGE_END_KEYFRAME = {
+        set_point: "set_point_end",
+        release: "release_end",
+      };
+
+      // Runs the keyframe algorithm on the captured pose frames for this shot
+      // and renders each detected keyframe as a seekable chip. This is the
+      // same detection the runtime derives phases from, so the chips are the
+      // frames to compare against the labels while tuning.
+      function renderKeyframes(shot) {
+        const frames = appState.poseData && appState.poseData.frames;
+        if (
+          !frames ||
+          !frames.length ||
+          !window.ShotAnalysis ||
+          typeof ShotAnalysis.detectKeyframesFromFrames !== "function"
+        ) {
+          return "";
+        }
+
+        let detected;
+        const diagnostics = [];
+        try {
+          // Capture the algorithm's own reasoning for each keyframe.
+          if (typeof ShotAnalysis.setKeyframeDiagnosticsSink === "function") {
+            ShotAnalysis.setKeyframeDiagnosticsSink((d) => diagnostics.push(d));
+          }
+          detected = ShotAnalysis.detectKeyframesFromFrames(
+            frames,
+            shot.frameRange.start,
+            shot.frameRange.end,
+          );
+          // Cache frame -> keyframe id so the pro-skeleton overlay knows which
+          // reference pose to draw when scrubbed onto a keyframe.
+          const frameToKf = {};
+          KEYFRAME_ORDER.forEach((id) => {
+            const f = detected.get ? detected.get(id) : detected[id];
+            if (typeof f === "number") frameToKf[f] = id;
+          });
+          appState.currentKeyframes = frameToKf;
+        } catch (err) {
+          console.warn("[keyframes] detection failed", err);
+          return "";
+        } finally {
+          if (typeof ShotAnalysis.setKeyframeDiagnosticsSink === "function") {
+            ShotAnalysis.setKeyframeDiagnosticsSink(null);
+          }
+        }
+        if (diagnostics.length) {
+          console.log(
+            `[keyframes] shot ${shot.shotIndex} (frames ${shot.frameRange.start}-${shot.frameRange.end}):`,
+          );
+          diagnostics.forEach((d) =>
+            console.log(
+              `  [${d.keyframe}] @${d.frame} (${d.method}) — ${d.detail}`,
+            ),
+          );
+        }
+
+        // Pair with the labeled shot (if labels are loaded) for a per-keyframe
+        // algorithm-vs-labeled comparison with frame diffs.
+        const labeled = matchLabeledShot(
+          shot.frameRange.start,
+          shot.frameRange.end,
+        );
+        const labeledKf = labeled?.keyframes || {};
+        const hasLabels = Object.keys(labeledKf).length > 0;
+
+        const cell = (frame) =>
+          frame == null
+            ? '<span class="kf-frame missing">—</span>'
+            : `<span class="kf-frame" onclick="seekToFrame(${frame})">${frame}</span>`;
+
+        let html =
+          '<div class="section-header">Keyframes: Algorithm vs Labeled</div>';
+        html += '<div class="kf-compare">';
+        html +=
+          '<div class="kf-head">Keyframe</div><div class="kf-head" style="text-align:right">Algo</div>' +
+          '<div class="kf-head" style="text-align:right">Labeled</div><div class="kf-head" style="text-align:right">Δ</div>';
+
+        KEYFRAME_ORDER.forEach((id) => {
+          const algo = detected.get ? detected.get(id) : detected[id];
+          const lab = typeof labeledKf[id] === "number" ? labeledKf[id] : null;
+          const name = KEYFRAME_NAMES[id] || id;
+
+          let diffHtml = '<span class="kf-diff none">—</span>';
+          if (algo != null && lab != null) {
+            const d = algo - lab;
+            const cls = Math.abs(d) <= 3 ? "ok" : "bad";
+            diffHtml = `<span class="kf-diff ${cls}">${d > 0 ? "+" + d : d}</span>`;
+          }
+
+          // Show the labeled range (start–end) for set point / release when an
+          // end was labeled; a plain frame otherwise.
+          const endId = RANGE_END_KEYFRAME[id];
+          const labEnd =
+            endId && typeof labeledKf[endId] === "number"
+              ? labeledKf[endId]
+              : null;
+          const labCell =
+            lab != null && labEnd != null
+              ? `<span class="kf-frame" onclick="seekToFrame(${lab})">${lab}–${labEnd}</span>`
+              : cell(lab);
+
+          html += `<div class="kf-name">${name}</div>${cell(algo)}${hasLabels ? labCell : '<span class="kf-frame missing">n/a</span>'}${diffHtml}`;
+        });
+        html += "</div>";
+
+        if (hasLabels) {
+          // Summary: mean absolute error over keyframes both sides detected.
+          let sum = 0;
+          let n = 0;
+          KEYFRAME_ORDER.forEach((id) => {
+            const algo = detected.get ? detected.get(id) : detected[id];
+            const lab =
+              typeof labeledKf[id] === "number" ? labeledKf[id] : null;
+            if (algo != null && lab != null) {
+              sum += Math.abs(algo - lab);
+              n++;
+            }
+          });
+          if (n > 0) {
+            html += `<div style="font-size:0.8rem;color:#9ca3af;margin-bottom:15px">MAE ${(sum / n).toFixed(1)} frames over ${n} keyframes (±3 = ok)</div>`;
+          }
+        }
+
+        // How/why each keyframe was chosen (algorithm diagnostics).
+        if (diagnostics.length) {
+          html +=
+            '<details class="kf-diag"><summary>Why these frames? (algorithm reasoning)</summary>';
+          diagnostics.forEach((d) => {
+            html += `<div class="kf-diag-row"><span class="kf-diag-name">${d.keyframe} @${d.frame}</span> <span class="kf-diag-method">${d.method}</span><div class="kf-diag-detail">${d.detail}</div></div>`;
+          });
+          html += "</details>";
+        }
+        return html;
       }
 
       function renderMetrics(shot) {
@@ -2079,7 +2945,100 @@
           elements.metricsList.appendChild(section);
         }
 
+        renderV2Metrics(shot);
+
         highlightCurrentFrame();
+      }
+
+      // Memoized v2 extraction, keyed by the loaded poses + shooting hand.
+      let _v2Cache = { poseData: null, hand: null, metrics: null };
+      function getV2Metrics() {
+        const pd = appState.poseData;
+        const hand = elements.shootingHand.value;
+        if (
+          !pd ||
+          !window.ShotAnalysis ||
+          typeof ShotAnalysis.extractShotMetrics !== "function"
+        ) {
+          return null;
+        }
+        if (_v2Cache.poseData === pd && _v2Cache.hand === hand)
+          return _v2Cache.metrics;
+        let metrics = null;
+        try {
+          metrics = ShotAnalysis.extractShotMetrics(pd, { shootingHand: hand });
+        } catch (err) {
+          console.warn("[v2] extractShotMetrics failed", err);
+        }
+        _v2Cache = { poseData: pd, hand, metrics };
+        return metrics;
+      }
+
+      // Sequencing (signed gaps) + Structure (per-phase) metrics from the v2
+      // pipeline — the numbers that feed the new Sequencing/Structure scoring.
+      // Unmeasurable values show as n/a so nothing is silently guessed.
+      function renderV2Metrics(shot) {
+        const all = getV2Metrics();
+        if (!all || !all.length) return;
+        const m =
+          all.find((x) => x.shot.startFrame === shot.frameRange.start) ||
+          all.find(
+            (x) => Math.abs(x.shot.startFrame - shot.frameRange.start) <= 3,
+          );
+        if (!m) return;
+
+        const rowCss =
+          "display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 6px;border-bottom:1px solid #22304a;font-size:0.82rem";
+        const na = '<span style="color:#6b7280">n/a</span>';
+        const frameBtn = (meas) =>
+          meas.reliable && meas.frames && meas.frames.length
+            ? `<button class="metric-frame-btn" onclick="seekToFrame(${meas.frames[meas.frames.length - 1]})">f${meas.frames[meas.frames.length - 1]}</button>`
+            : "";
+
+        let html = "";
+
+        // Sequencing gaps — green if in order (>=0), red if order violated (<0).
+        html +=
+          '<div class="category-section"><div class="category-header">Sequencing (v2)</div>';
+        for (const g of m.sequencing.gaps) {
+          const rel = g.gap.reliable;
+          const color = !rel
+            ? "#6b7280"
+            : g.gap.value < 0
+              ? "#f87171"
+              : "#34d399";
+          const val = rel
+            ? `${g.gap.value >= 0 ? "+" : ""}${g.gap.value.toFixed(3)}`
+            : "n/a";
+          html += `<div style="${rowCss}"><span>${g.from} → ${g.to}</span><span style="color:${color};font-variant-numeric:tabular-nums">${val}</span></div>`;
+        }
+        html += `<div style="${rowCss};color:#9ca3af"><span>coverage</span><span>${(m.sequencing.coverage * 100).toFixed(0)}%</span></div>`;
+        html += "</div>";
+
+        // Structure — one section per phase.
+        const phaseNames = {
+          gather: "Gather",
+          load: "Load",
+          rise: "Rise",
+          setPoint: "Set Point",
+          release: "Release",
+          followThrough: "Follow-through",
+        };
+        for (const [phase, metrics] of Object.entries(m.structure || {})) {
+          if (!metrics) continue;
+          html += `<div class="category-section"><div class="category-header">${phaseNames[phase] || phase} (v2)</div>`;
+          for (const [key, meas] of Object.entries(metrics)) {
+            const val = meas.reliable
+              ? `<span style="font-variant-numeric:tabular-nums">${meas.value.toFixed(3)}</span>`
+              : na;
+            html += `<div style="${rowCss}"><span>${key}</span><span style="display:flex;gap:6px;align-items:center">${val}${frameBtn(meas)}</span></div>`;
+          }
+          html += "</div>";
+        }
+
+        const container = document.createElement("div");
+        container.innerHTML = html;
+        elements.metricsList.appendChild(container);
       }
 
       function createMetricCard(metricName, metric, validation) {
@@ -2205,7 +3164,7 @@
       }
 
       function highlightCurrentFrame() {
-        if (!appState.videoLoaded) return;
+        if (!isScrubbable()) return;
         const currentFrame = getCurrentFrame();
 
         // Highlight metric cards
@@ -2383,18 +3342,29 @@
           appState.analysisData?.video?.filename ||
           appState.videoFile?.name ||
           "unknown";
-        const labeling = getLabelingData();
-
+        // Read from labelingState directly (getLabelingData() strips keyframes).
         return {
           video: videoName,
           labeledBy: "human",
           labeledAt: new Date().toISOString(),
-          shots: labeling.shots.map((shot) => ({
-            shotNumber: shot.shotNumber,
-            startFrame: shot.startFrame,
-            endFrame: shot.endFrame,
-            cameraOrientation: shot.cameraOrientation || "front",
-          })),
+          shots: labelingState.shots.map((shot) => {
+            const out = {
+              shotNumber: shot.shotNumber,
+              startFrame: shot.startFrame,
+              endFrame: shot.endFrame,
+              cameraOrientation: shot.cameraOrientation || "front",
+            };
+            // Write every labeled keyframe (single frames) and the optional
+            // set-point / release range ends. Unlabeled keyframes are omitted.
+            const kf = shot.keyframes || {};
+            KEYFRAME_ORDER.forEach((id) => {
+              if (typeof kf[id] === "number") out[id] = kf[id];
+            });
+            Object.values(RANGE_END_KEYFRAME).forEach((endId) => {
+              if (typeof kf[endId] === "number") out[endId] = kf[endId];
+            });
+            return out;
+          }),
         };
       }
 
@@ -2484,9 +3454,7 @@
             // Update progress every 10 frames or 100ms
             const now = Date.now();
             if (frameCount % 10 === 0 || now - lastProgressUpdate >= 100) {
-              const percent = Math.round(
-                10 + (frameCount / totalFrames) * 85,
-              );
+              const percent = Math.round(10 + (frameCount / totalFrames) * 85);
               updateProgress(
                 `Detecting poses: ${frameCount} / ${totalFrames} (${Math.round((frameCount / totalFrames) * 100)}%)`,
                 percent,
@@ -2921,6 +3889,110 @@
       /**
        * Renders the shot list in the UI
        */
+      // Builds the per-keyframe editor for the selected shot: each keyframe the
+      // algorithm identifies gets a "Set" (to the current frame) + clear
+      // control; set point and release additionally get a range END row.
+      function renderKeyframeEditor(shot, index) {
+        const kf = shot.keyframes || {};
+        const row = (id, labelText) => {
+          const v = typeof kf[id] === "number" ? kf[id] : null;
+          const valHtml =
+            v == null
+              ? '<span class="kfe-val unset">—</span>'
+              : `<span class="kfe-val" onclick="event.stopPropagation();seekToFrame(${v})">${v}</span>`;
+          return `<div class="kfe-row">
+              <span class="kfe-name">${labelText}</span>
+              ${valHtml}
+              <button type="button" class="kfe-btn" onclick="event.stopPropagation();vkfSet(${index},'${id}')">Set</button>
+              <button type="button" class="kfe-btn kfe-clear" title="Clear" onclick="event.stopPropagation();vkfClear(${index},'${id}')" ${v == null ? "disabled" : ""}>×</button>
+            </div>`;
+        };
+        const rows = [];
+        KEYFRAME_ORDER.forEach((id) => {
+          const name = KEYFRAME_NAMES[id] || id;
+          if (RANGE_END_KEYFRAME[id]) {
+            rows.push(row(id, `${name} (start)`));
+            rows.push(row(RANGE_END_KEYFRAME[id], `${name} (end)`));
+          } else {
+            rows.push(row(id, name));
+          }
+        });
+        return `
+          <div class="kfe" onclick="event.stopPropagation()">
+            <div class="kfe-head">
+              <span>Keyframes — "Set" captures the current frame</span>
+              <button type="button" class="kfe-btn kfe-seed" onclick="event.stopPropagation();vkfSeed(${index})">Seed from algorithm</button>
+            </div>
+            <div class="kfe-grid">${rows.join("")}</div>
+          </div>`;
+      }
+
+      // Set a keyframe (or range end) on a shot to the current scrubbed frame.
+      window.vkfSet = function (index, id) {
+        const shot = labelingState.shots[index];
+        if (!shot) return;
+        if (!isScrubbable()) {
+          showToast("Load a video or poses first", "error");
+          return;
+        }
+        shot.keyframes = shot.keyframes || {};
+        shot.keyframes[id] = getCurrentFrame();
+        renderShotList();
+      };
+
+      window.vkfClear = function (index, id) {
+        const shot = labelingState.shots[index];
+        if (!shot || !shot.keyframes) return;
+        delete shot.keyframes[id];
+        renderShotList();
+      };
+
+      // Seed the shot's keyframes from the algorithm's detection over its
+      // labeled frame range, as a starting point to hand-adjust. release_end is
+      // seeded from arms_fully_extended (the algorithm's release-range end);
+      // set_point_end has no algorithm equivalent and is labeled by hand.
+      window.vkfSeed = function (index) {
+        const shot = labelingState.shots[index];
+        if (!shot) return;
+        const frames = appState.poseData && appState.poseData.frames;
+        if (
+          !frames ||
+          !window.ShotAnalysis ||
+          typeof ShotAnalysis.detectKeyframesFromFrames !== "function"
+        ) {
+          showToast("Load poses first to seed from the algorithm", "error");
+          return;
+        }
+        if (shot.startFrame == null || shot.endFrame == null) {
+          showToast("Set the shot start and end first", "error");
+          return;
+        }
+        let detected;
+        try {
+          detected = ShotAnalysis.detectKeyframesFromFrames(
+            frames,
+            shot.startFrame,
+            shot.endFrame,
+          );
+        } catch (err) {
+          showToast(`Seed failed: ${err.message}`, "error");
+          return;
+        }
+        const get = (id) => (detected.get ? detected.get(id) : detected[id]);
+        shot.keyframes = shot.keyframes || {};
+        KEYFRAME_ORDER.forEach((id) => {
+          const f = get(id);
+          if (typeof f === "number") shot.keyframes[id] = f;
+        });
+        const relEnd = get("arms_fully_extended");
+        if (typeof relEnd === "number") shot.keyframes.release_end = relEnd;
+        renderShotList();
+        showToast(
+          `Seeded shot ${shot.shotNumber} keyframes from the algorithm`,
+          "success",
+        );
+      };
+
       function renderShotList() {
         if (labelingState.shots.length === 0) {
           elements.shotLabelingEmpty.classList.remove("hidden");
@@ -2960,6 +4032,24 @@
           // Get current orientation value
           const orientation = shot.cameraOrientation || "front";
 
+          // Keyframes: an editable editor for the selected shot (label every
+          // keyframe the algorithm identifies, incl. set-point/release ranges);
+          // compact read-only chips for the rest.
+          let keyframesHtml = "";
+          if (index === labelingState.selectedShotIndex) {
+            keyframesHtml = renderKeyframeEditor(shot, index);
+          } else if (shot.keyframes && Object.keys(shot.keyframes).length > 0) {
+            const chips = KEYFRAME_ORDER.filter(
+              (id) => typeof shot.keyframes[id] === "number",
+            )
+              .map((id) => {
+                const f = shot.keyframes[id];
+                return `<span class="label-kf-chip" onclick="event.stopPropagation();seekToFrame(${f})"><span class="lk-name">${KEYFRAME_NAMES[id] || id}</span><span class="lk-frame">${f}</span></span>`;
+              })
+              .join("");
+            keyframesHtml = `<div class="label-kf-list">${chips}</div>`;
+          }
+
           entry.innerHTML = `
           <div class="shot-entry-header">
             <span class="shot-entry-number">Shot ${shot.shotNumber}</span>
@@ -2969,6 +4059,7 @@
             <span><span class="frame-label">Start:</span> <span class="frame-value ${startClass}">${startFrameStr}</span></span>
             <span><span class="frame-label">End:</span> <span class="frame-value ${endClass}">${endFrameStr}</span></span>
           </div>
+          ${keyframesHtml}
           <div class="shot-entry-orientation">
             <span class="frame-label">Camera:</span>
             <select class="shot-orientation-select" data-shot-index="${index}">
@@ -2992,7 +4083,9 @@
           };
 
           // Handle orientation change
-          const orientationSelect = entry.querySelector(".shot-orientation-select");
+          const orientationSelect = entry.querySelector(
+            ".shot-orientation-select",
+          );
           orientationSelect.onchange = (e) => {
             e.stopPropagation();
             updateShotOrientation(index, e.target.value);
@@ -3014,7 +4107,7 @@
        * Updates the Add Shot button state based on video loaded state
        */
       function updateAddShotButtonState() {
-        elements.addShotBtn.disabled = !appState.videoLoaded;
+        elements.addShotBtn.disabled = !isScrubbable();
       }
 
       /**
@@ -3087,6 +4180,155 @@
 
       elements.analyzeBtn.onclick = runAnalysis;
 
+      // Load Poses / Labels (fast path)
+      elements.loadPosesBtn.onclick = () => elements.posesFileInput.click();
+      elements.posesFileInput.onchange = () => {
+        const file = elements.posesFileInput.files[0];
+        if (file) loadPosesFromFile(file);
+        elements.posesFileInput.value = "";
+      };
+      elements.loadLabelsBtn.onclick = () => elements.labelsFileInput.click();
+      elements.labelsFileInput.onchange = () => {
+        const file = elements.labelsFileInput.files[0];
+        if (file) loadLabelsFromFile(file);
+        elements.labelsFileInput.value = "";
+      };
+
+      // Test-case dropdown: one pick loads poses + labels (+ video if present).
+      // loadPosesFromFile/loadLabelsFromFile read `.text()` and `.name`, so a
+      // fetched JSON string wrapped as `{ text, name }` reuses them as-is.
+      async function populateTestCases() {
+        try {
+          const res = await fetch("/api/test-cases");
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const { cases } = await res.json();
+          const sel = elements.testCaseSelect;
+          sel.innerHTML = "";
+          const first = document.createElement("option");
+          first.value = "";
+          first.textContent = cases.length
+            ? "Select a test case…"
+            : "No test cases found";
+          sel.appendChild(first);
+          for (const c of cases) {
+            const opt = document.createElement("option");
+            opt.value = c.name;
+            opt.dataset.video = c.video || "";
+            opt.dataset.poses = c.poses ? "1" : "";
+            opt.dataset.labels = c.labels ? "1" : "";
+            // Tag which artifacts the folder has, so it's clear at a glance.
+            const tags = [
+              c.poses && "poses",
+              c.labels && "labels",
+              c.video && "video",
+            ].filter(Boolean);
+            opt.textContent = tags.length
+              ? `${c.name} (${tags.join(", ")})`
+              : c.name;
+            sel.appendChild(opt);
+          }
+        } catch (err) {
+          // Served from file:// or without the dev server — hide the control.
+          console.warn("[test-cases] unavailable:", err.message);
+          const group = elements.testCaseSelect.closest(".form-group");
+          if (group) group.style.display = "none";
+        }
+      }
+
+      async function loadTestCase(name, opts) {
+        const { videoFile, hasPoses, hasLabels } = opts;
+        elements.testCaseHint.textContent = `Loading ${name}…`;
+        try {
+          // Video first (if any) so poses-only playback knows a video exists;
+          // loadVideoIntoPlayer preserves already-loaded poses. Videos live
+          // inside the case folder now (local-only; may be absent on a clone).
+          if (videoFile) {
+            try {
+              const vRes = await fetch(
+                `/test-data/${encodeURIComponent(name)}/${encodeURIComponent(videoFile)}`,
+              );
+              if (vRes.ok) {
+                const blob = await vRes.blob();
+                const file = new File([blob], videoFile, {
+                  type: blob.type || "video/mp4",
+                });
+                elements.selectedFileName.textContent = videoFile;
+                loadVideoIntoPlayer(file);
+              }
+            } catch (e) {
+              console.warn("[test-case] video load failed:", e.message);
+            }
+          }
+
+          // Poses and labels are each optional — load whatever the folder has.
+          const loaded = [];
+          if (hasPoses) {
+            const posesRes = await fetch(
+              `/test-data/${encodeURIComponent(name)}/poses.json`,
+            );
+            if (posesRes.ok) {
+              const posesText = await posesRes.text();
+              await loadPosesFromFile({
+                text: async () => posesText,
+                name: `${name}/poses.json`,
+              });
+              loaded.push("poses");
+            }
+          }
+          if (hasLabels) {
+            const labelsRes = await fetch(
+              `/test-data/${encodeURIComponent(name)}/labels.json`,
+            );
+            if (labelsRes.ok) {
+              const labelsText = await labelsRes.text();
+              await loadLabelsFromFile({
+                text: async () => labelsText,
+                name: `${name}/labels.json`,
+              });
+              loaded.push("labels");
+            }
+          }
+          if (videoFile) loaded.push("video");
+          elements.testCaseHint.textContent = loaded.length
+            ? `Loaded ${name} (${loaded.join(", ")})`
+            : `Loaded ${name}`;
+        } catch (err) {
+          console.error("Load test case error:", err);
+          showToast(`Failed to load ${name}: ${err.message}`, "error");
+          elements.testCaseHint.textContent = "Load failed";
+        }
+      }
+
+      elements.testCaseSelect.onchange = () => {
+        const sel = elements.testCaseSelect;
+        const name = sel.value;
+        if (!name) return;
+        const opt = sel.options[sel.selectedIndex];
+        loadTestCase(name, {
+          videoFile: opt?.dataset.video || null,
+          hasPoses: opt?.dataset.poses === "1",
+          hasLabels: opt?.dataset.labels === "1",
+        });
+      };
+
+      populateTestCases();
+
+      // Load the (placeholder) pro reference skeletons for the you-vs-pro
+      // overlay. Missing file is fine — the overlay just won't draw.
+      async function loadReferencePoses() {
+        try {
+          const res = await fetch("/reference/reference-poses.json");
+          if (res.ok) appState.referencePoses = await res.json();
+        } catch (err) {
+          console.warn("[reference] not available:", err.message);
+        }
+      }
+      loadReferencePoses();
+
+      // Sidebar Keyframes/Metrics view toggle
+      elements.viewKeyframesBtn.onclick = () => setSidebarView("keyframes");
+      elements.viewMetricsBtn.onclick = () => setSidebarView("metrics");
+
       elements.saveProgressBtn.onclick = saveProgress;
       elements.loadProgressBtn.onclick = () => elements.progressInput.click();
       elements.progressInput.onchange = (e) => {
@@ -3126,9 +4368,14 @@
       };
 
       elements.timeline.oninput = () => {
-        elements.video.currentTime = parseFloat(elements.timeline.value);
-        updateFrameDisplay();
-        highlightCurrentFrame();
+        if (appState.videoLoaded) {
+          elements.video.currentTime = parseFloat(elements.timeline.value);
+          updateFrameDisplay();
+          highlightCurrentFrame();
+        } else {
+          // Poses-only: the timeline is in frames.
+          seekToFrame(Math.round(parseFloat(elements.timeline.value)));
+        }
       };
 
       elements.video.ontimeupdate = () => {
@@ -3139,10 +4386,27 @@
         highlightCurrentFrame();
       };
 
-      elements.video.onplay = () =>
-        (elements.playPauseBtn.textContent = "Pause");
-      elements.video.onpause = () =>
-        (elements.playPauseBtn.textContent = "Play");
+      elements.video.onplay = () => {
+        elements.playPauseBtn.textContent = "Pause";
+        startOverlayLoop();
+      };
+      elements.video.onpause = () => {
+        elements.playPauseBtn.textContent = "Play";
+        // Loop stops itself on pause; draw the final resting frame.
+        if (appState.overlayPoses && posesAvailable())
+          drawPoseSkeleton(getCurrentFrame());
+      };
+      // Redraw the overlay after a scrub/seek settles on the target frame.
+      elements.video.onseeked = () => {
+        if (appState.videoLoaded && appState.overlayPoses && posesAvailable())
+          drawPoseSkeleton(getCurrentFrame());
+      };
+
+      // Pose-overlay visibility toggle (only shown when video + poses coexist).
+      elements.overlayToggle.onchange = () => {
+        appState.overlayPoses = elements.overlayToggle.checked;
+        updatePoseOverlayVisibility();
+      };
 
       // Keyboard shortcuts
       document.onkeydown = (e) => {
@@ -3156,11 +4420,11 @@
             break;
           case "ArrowLeft":
             e.preventDefault();
-            if (appState.videoLoaded) stepFrame(e.shiftKey ? -10 : -1);
+            if (isScrubbable()) stepFrame(e.shiftKey ? -10 : -1);
             break;
           case "ArrowRight":
             e.preventDefault();
-            if (appState.videoLoaded) stepFrame(e.shiftKey ? 10 : 1);
+            if (isScrubbable()) stepFrame(e.shiftKey ? 10 : 1);
             break;
           case "s":
           case "S":
