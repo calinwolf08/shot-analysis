@@ -1,16 +1,19 @@
 name: Build & push web image
 
-# Builds the SvelteKit (adapter-node) web app + API into a Docker image and
-# pushes it to Docker Hub, so Coolify can deploy/redeploy it. Pulls/redeploys
-# are handled on the Coolify side (no deploy webhook here).
+# Builds the SvelteKit (adapter-node) web app + API image on a GitHub runner and
+# pushes it to the GitHub Container Registry (ghcr.io). Auth uses the built-in
+# GITHUB_TOKEN — NO Docker Hub (or any other) registry credentials are needed.
+# Coolify then just pulls and runs the image.
 #
-# Required repo secrets (Settings → Secrets and variables → Actions):
-#   DOCKERHUB_USERNAME  — your Docker Hub username (also the image namespace)
-#   DOCKERHUB_TOKEN     — a Docker Hub access token with read/write
+# Published image: ghcr.io/<owner>/shot-analysis
+#   tags: latest (on master), <branch>, sha-<short commit>
+# Point your Coolify "Docker Image" resource at
+#   ghcr.io/<owner>/shot-analysis:latest
 #
-# Published image: docker.io/<DOCKERHUB_USERNAME>/shotcoach
-#   tags: latest, sha-<short commit>
-# Point Coolify at <DOCKERHUB_USERNAME>/shotcoach:latest.
+# Optional auto-deploy: set two repo secrets and Coolify redeploys on each push —
+#   COOLIFY_WEBHOOK  — the deploy webhook URL from the Coolify resource
+#   COOLIFY_TOKEN    — a Coolify API token
+# Without them, the deploy step is skipped and you redeploy manually in Coolify.
 
 on:
   push:
@@ -26,29 +29,42 @@ concurrency:
   group: docker-image-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    env:
+      COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Compute lowercase image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Image metadata (tags + labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/shotcoach
+          images: ${{ steps.image.outputs.name }}
           tags: |
-            type=raw,value=latest
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
             type=sha,format=short
 
       - name: Build and push
@@ -62,3 +78,10 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Trigger Coolify deploy
+        if: ${{ env.COOLIFY_WEBHOOK != '' }}
+        run: |
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
+            "${COOLIFY_WEBHOOK}"

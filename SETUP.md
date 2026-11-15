@@ -120,18 +120,27 @@ npm run start --workspace shotcoach
 Full hosting guidance (reverse proxy, persistent volume, checklist) is in
 [`docs/hosting-and-deployment.md`](docs/hosting-and-deployment.md).
 
-### Docker image (CI) → Coolify
+### Docker image (CI → GHCR) → Coolify
 
 A GitHub Action (`.github/workflows/docker-image.yml`) builds the web app + API
-into a Docker image and pushes it to Docker Hub on every push to `master` (and
-on manual dispatch). The image is `docker.io/<DOCKERHUB_USERNAME>/shotcoach`
-(tags `latest` and `sha-<commit>`).
+into a Docker image and pushes it to the **GitHub Container Registry (GHCR)** on
+every push to `master` (and on manual dispatch). It authenticates with the
+built-in `GITHUB_TOKEN`, so **no registry credentials (Docker Hub or otherwise)
+are required**. The image is:
 
-**One-time GitHub setup** — add two repo secrets (Settings → Secrets and
-variables → Actions):
+```
+ghcr.io/<owner>/shot-analysis       tags: latest, <branch>, sha-<commit>
+```
 
-- `DOCKERHUB_USERNAME` — your Docker Hub username (also the image namespace).
-- `DOCKERHUB_TOKEN` — a Docker Hub access token with read/write.
+All app secrets are read at **runtime** (set them in Coolify, below) — nothing
+secret is baked into the image, so there are no build-time variables to set.
+
+**Optional auto-deploy** — add two repo secrets (Settings → Secrets and
+variables → Actions) and Coolify redeploys on every push; omit them and you
+redeploy manually in Coolify:
+
+- `COOLIFY_WEBHOOK` — the deploy webhook URL from the Coolify resource.
+- `COOLIFY_TOKEN` — a Coolify API token.
 
 **Build the image locally** (optional, to test before pushing):
 
@@ -149,8 +158,10 @@ docker run --rm -p 3000:3000 \
 
 **Deploy on Coolify:**
 
-1. New Resource → **Docker Image**, image `<DOCKERHUB_USERNAME>/shotcoach:latest`
-   (add a registry credential if the Docker Hub repo is private).
+1. New Resource → **Docker Image**, image `ghcr.io/<owner>/shot-analysis:latest`.
+   If the GHCR package is private (it is, for a private repo), add a GHCR
+   **registry credential** in Coolify once — a GitHub token with `read:packages`
+   (the same one you reuse for your other projects).
 2. **Port:** the container listens on **3000**.
 3. **Persistent storage:** mount a volume at `/data` (SQLite lives here).
 4. **Environment variables:**
@@ -159,12 +170,13 @@ docker run --rm -p 3000:3000 \
    - `ORIGIN` — your public HTTPS URL, e.g. `https://app.example.com`
    - `AUTH_TRUSTED_ORIGINS` — `https://app.example.com,capacitor://localhost,http://localhost`
    - (optional) `PORT` (3000), `BODY_SIZE_LIMIT` (64M) — image defaults are fine.
-5. Set the domain + TLS in Coolify and deploy. Health check: `GET /api/health`.
+5. Set the domain + TLS in Coolify and deploy. The live camera needs **HTTPS**.
+   Health check: `GET /api/health`.
 
-To ship a new build: push to `master` (the Action rebuilds `:latest`), then
-**Redeploy** in Coolify (or enable its registry polling / webhook). The same
-`<DOCKERHUB_USERNAME>/shotcoach` image is also the API the mobile build points
-at via `VITE_API_URL` (§5).
+To ship a new build: push to `master` (the Action rebuilds `:latest` and, if the
+`COOLIFY_WEBHOOK` secret is set, pings Coolify to redeploy). Otherwise click
+**Redeploy** in Coolify. The same `ghcr.io/<owner>/shot-analysis` image is also
+the API the mobile build points at via `VITE_API_URL` (§5).
 
 ---
 
