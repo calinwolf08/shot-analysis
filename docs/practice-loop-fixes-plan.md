@@ -262,3 +262,271 @@ Run on iPhone Safari, Android Chrome, and the native iOS/Android builds:
   in the cloud container.
 - Deleting the non-side shots is irreversible. The migration logs counts and runs
   once.
+
+---
+
+# Part B — Metrics overhaul + Curry model viewer
+
+Phases 9–15 follow Part A (phases 0–8). They depend on Phase 0's harness and
+Phase 6's review framing (reused by the viewer). The 30 fps change (B-2.4)
+builds on Phase 2's backpressure and lite-model fallback.
+
+## B-1. Investigation findings
+
+| Area | Today | Gap vs. request |
+|---|---|---|
+| Targets source | `src/testing/build-live-targets.ts` runs v2 metrics over the 7 labeled `stephen-curry-1` shots using **detected** keyframes and writes `app/static/reference/live-targets.json` (88 ids). | There is no way to see what was measured on Curry. Some values look suspect: for example, set-point elbow angle ≈ 144° suggests the detected set point may sit late. |
+| Curry video | `Stephen Curry 1.mov` (1920×1080, 30 fps, 925 frames) is **gitignored / local only**. `poses.json` + `labels.json` are committed. | The viewer must load the video from local disk. NBA footage can't ship. |
+| Normalization | Distances are ÷ `bodyScaleY` = nose-to-ankle **vertical span of the same frame**. | That span shrinks as the player crouches, which inflates load/rise distances. Some anatomy also leaks through (head height vs. leg length). |
+| Sequencing | 7 signed gaps between consecutive events, as a **fraction of the whole shot**. | The request is **per-phase %** of specific event pairs. Several events don't exist yet (ball drop start, hip drop start/low, ball rise end, elbow bend start, spine straightened). |
+| Timing resolution | Curry shots are ~18 frames at 30 fps (rise ≈ 4 frames, so 25 % per frame). Live runs at **15 fps**. | Per-phase % is meaningless at frame granularity. It needs 30 fps plus sub-frame interpolation. |
+| Structure | Posture = joint x-offset from feet center (head/shoulders/hips/knees/ankles). Also wrist cock, wrist height/dist, elbow angle (set point only), elbow "flare", guide-hand timing, elbow height vs head, wrist snap, elbow extension. | **Missing:** spine angle, head/neck vs spine, knee angle (depth), hip angle, hip-over-knee, knee-over-ankle, elbow angle in load/rise, elbow travel direction in release, guide-hand position, knee/spine change in release. `*.ankles` is ≈ 0 by construction. |
+| Score scale | `score = clamp(1 + normDev, 1, 10)`, lower is better, 1 = on target. | The request is **0 = perfect, 10+ = way off** (display capped at 10). |
+| Labels | Ids like `load.knees_delta`, `seq.ball_rise__leg_low`. | The request is plain-language wording plus coaching cues. |
+| Debug routes | `/__debug/{analyze,drills,replay,scorecard}` exist. `/__debug` has no index. | Add an index page and a temporary Profile link. |
+
+## B-2. Locked decisions (from the interview)
+
+### B-2.1 Phases (4 scored groups)
+**Load → Rise → Set Point → Release.** Gather and Follow-Through are dropped as
+groups. Wrist snap moves into Release. Each phase window is a fixed denominator
+for timing:
+
+| Phase | Window |
+|---|---|
+| Load | first of (ball starts dropping, hips start dropping) → last of (ball lowest, hips lowest) |
+| Rise | end of Load → set point (ball highest before the arm extends) |
+| Set Point | snapshot at the set-point frame |
+| Release | set point → shooting arm fully extended (wrist snap looks ~0.3 s past this) |
+
+**Timing metric** = signed `(t_B − t_A) ÷ phase duration`. A negative value
+means the order is wrong. This one number captures **both order and the % gap**.
+
+### B-2.2 Normalization
+- **Angles in degrees** wherever possible (inherently anatomy-free).
+- Distances are ÷ the player's **own segment length**, taken as the median over
+  the shot's frames for: thigh (hip→knee), shin (knee→ankle), torso (shoulder
+  mid→hip mid), forearm (elbow→wrist), and leg (thigh + shin).
+- Side-on, the **near-side** joints are used (shooting side toward camera; the
+  pose is mirrored for left-handers). Far-side joints are used only for the guide
+  hand.
+- "Toward the hoop" is positive for every horizontal offset.
+
+### B-2.3 Metric catalog (scored)
+
+Notation: **S** = structure, **T** = timing (% of phase, signed). All angles use
+near-side landmarks. Spine = hip-mid→shoulder-mid vs. vertical (+ = leaning
+toward the hoop). Head/neck = ear→shoulder line vs. the spine line. Knee angle =
+hip-knee-ankle (180 = straight). Hip angle = shoulder-hip-knee.
+
+**Load**
+| id | Type | Measures | Unit |
+|---|---|---|---|
+| `load.spine_angle` | S | Spine lean at deepest load | ° |
+| `load.head_vs_spine` | S | Head/neck angle at deepest load | ° |
+| `load.knee_depth` | S | Minimum knee angle | ° |
+| `load.hip_over_knee` | S | Hip x relative to knee x at deepest load (− = sitting back) | % thigh |
+| `load.knee_over_ankle` | S | Knee x relative to ankle x at deepest load (+ = forward) | % shin |
+| `load.ball_drop` | S | Wrist height relative to hip height at ball lowest (− = below hip) | % torso |
+| `load.elbow_angle` | S | Elbow angle at ball lowest | ° |
+| `load.elbow_change` | S | Elbow angle change across load | ° |
+| `load.ball_close` | S | Wrist distance from hip at ball lowest *(extra)* | % torso |
+| `load.t_drop_start` | T | Ball starts dropping vs hips start dropping | % load |
+| `load.t_drop_end` | T | Ball lowest vs hips lowest | % load |
+| `load.t_elbow_bend` | T | Elbow starts bending vs ball starts dropping | % load |
+
+**Rise**
+| id | Type | Measures | Unit |
+|---|---|---|---|
+| `rise.t_start` | T | Ball starts rising vs knees start straightening | % rise |
+| `rise.t_end` | T | Ball reaches set point vs knees fully straight | % rise |
+| `rise.elbow_change_1` / `_2` | S | Elbow angle change over 0–50 % / 50–100 % of rise | ° |
+| `rise.wrist_hinge_change_1` / `_2` | S | Wrist hinge change over 0–50 % / 50–100 % of rise | ° |
+| `rise.spine_change` | S | Spine angle change over rise | ° |
+| `rise.t_spine_vs_knees` | T | Spine finishes straightening vs knees finish | % rise |
+| `rise.head_vs_spine_change` | S | Head/neck angle change over rise | ° |
+
+**Set Point** (snapshot)
+| id | Measures | Unit |
+|---|---|---|
+| `setPoint.wrist_vs_head` | Shooting wrist height relative to head (ear) height | % torso |
+| `setPoint.elbow_angle` | Elbow angle | ° |
+| `setPoint.spine_angle` | Spine lean | ° |
+| `setPoint.knee_angle` | Knee bend | ° |
+| `setPoint.hip_angle` | Hip bend | ° |
+| `setPoint.hip_over_knee` | Hip x relative to knee x | % thigh |
+| `setPoint.knee_over_ankle` | Knee x relative to ankle x | % shin |
+| `setPoint.head_vs_spine` | Head/neck angle | ° |
+
+**Release**
+| id | Type | Measures | Unit |
+|---|---|---|---|
+| `release.elbow_path` | S | Elbow travel direction from set point to extension (0 = straight up, + = toward the hoop) | ° |
+| `release.wrist_vs_head_end` | S | Shooting wrist height relative to head at arm extension | % torso |
+| `release.guide_hand_end` | S | Guide wrist offset from shooting wrist at extension (dx, dy). **Unmeasured when far-side visibility < 0.5** | % forearm |
+| `release.knee_change` | S | Knee extension change across release | ° |
+| `release.spine_change` | S | Spine angle change across release | ° |
+| `release.wrist_snap` | S | Max wrist flexion within 0.3 s after extension (unreliable when finger visibility is low) | ° |
+| `release.forward_drift` | S | Hip + head travel toward the hoop from load end to release end *(extra)* | % leg |
+| `release.t_legs_vs_arm` | T | Legs fully straight vs arm fully extended | % release |
+
+**Kept as unscored "Details"** (viewer + shot-review Details section; not in the
+score or the voice readback): wrist path straightness (rise), elbow height vs
+head (release), guide-hand separation timing, jump timing (release vs feet
+leaving the ground), follow-through elbow extension.
+**Removed:** gather posture/ball height, elbow flare, `*.ankles`, and the old
+per-joint `_start/_end/_delta` posture offsets.
+
+**New events** (sub-frame timestamps, see B-2.4): ball drop start, hip drop
+start, hip lowest, ball lowest, ball rise start, set point, knees start
+straightening, knees fully straight, elbow bend start, spine straightened, arm
+fully extended. The existing keyframe detector supplies the ones it has. The
+rest are new detectors over smoothed joint signals.
+
+### B-2.4 Timing resolution
+- Live tracking goes to **30 fps**, using Part A's backpressure + lite fallback.
+  If the device can't sustain it, the effective fps is recorded per shot and
+  timing metrics are flagged *low resolution* when the phase is under 6 frames.
+- **Sub-frame event times:** each signal is smoothed (Savitzky–Golay, window 5),
+  and events are found by interpolating the threshold or extremum crossing
+  between frames (parabolic fit for minima/maxima). Unit tests use synthetic
+  signals with known sub-frame events.
+- Recommendation (doc only): record future reference clips at 60 fps.
+
+### B-2.5 Scoring scale
+- Within Curry's band `[passMin, passMax]`, the score is **0**.
+- Outside the band, the score is `(distance beyond the band edge) ÷ rampSd`, so
+  +1 per Curry SD. It is continuous with 1 decimal and the display is capped at
+  **"10+"**. The stored value is uncapped.
+- Phase score = mean of its measured metrics. Overall = mean of the 4 phases.
+  Coverage gating is unchanged.
+- Score color bands: 0–1 green, 1–3 yellow, 3–6 orange, 6+ red. The legend sits
+  on the scorecard.
+
+### B-2.6 Wording (both styles)
+Each metric entry in `live-targets.json` gains `label`, `unitLabel`, and per
+direction `{ phrase, cue }`. All are hand-editable.
+- **Scorecard (measurement):** "Knee bend — too shallow by 12° (target 95–110°)" ·
+  timing: "Ball started rising 15 % of the rise *after* your legs (target: 5–20 % before)".
+- **Voice (coaching cue, terse):** "Bend your knees more" / "Start the ball up
+  sooner". This uses the 5 worst, with focus areas respected.
+- Default phrases and cues are authored for every metric/direction in the
+  targets builder and preserved across rebuilds (hand edits win).
+
+### B-2.7 Curry model viewer (dev only) — `/__debug/reference`
+- **Video:** in dev, served from `test-data/stephen-curry-1/` through a dev-only
+  Vite middleware. Otherwise a file picker loads it locally. Without it the
+  viewer is skeleton-only. The video is never bundled or committed.
+- **Overlay:** the Phase 6 renderer (true aspect, static fit). The measured
+  geometry for the selected metric is drawn: angle arcs, the spine line,
+  hip→knee and knee→ankle offsets, the wrist-vs-head bar, and phase/event
+  markers on the scrubber with sub-frame ticks.
+- **Per-shot metric table:** rows = metrics (grouped by phase, plain-language
+  label), columns = the 7 Curry shots, plus mean, band, SD. Outliers > 2 SD and
+  unmeasured cells are flagged. Clicking a cell seeks that shot to the metric's
+  frame and draws its geometry.
+- **Compare:** pick one of *my* shots and play it side-by-side with a chosen
+  Curry shot, **phase-time-aligned** (each phase stretched to the same duration).
+  Both skeletons are drawn with the same renderer, and the metric table shows my
+  value next to the band.
+- **`/__debug` index:** links to every debug route (analyze, drills, replay,
+  scorecard, reference). A temporary "Debug tools" button on the Profile page
+  (dev/E2E builds only, marked `TEMP` in code).
+
+### B-2.8 Existing shots
+The metric schema bumps to `schemaVersion: 2`. On read, shots with v1 metrics
+are **recomputed from their stored review pose track** (2D + visibility is
+enough for every new metric) and the result is persisted back. Shots without a
+pose track show "Re-analysis unavailable" and are excluded from Insights trends.
+
+## B-3. Phased implementation (Part B)
+
+**Phase 9 — Debug index + Curry viewer shell**
+- `/__debug/+page.svelte` index, the Profile TEMP button, and the
+  `/__debug/reference` route.
+- Dev middleware for the local video, plus the file-picker fallback. Load
+  `poses.json`, `labels.json` and `live-targets.json`.
+- Current (v1) metrics in the per-shot table, so you can **audit today's
+  targets before anything changes.**
+
+**Phase 10 — Signals, events, sub-frame timing**
+- `src/metrics/v3/signals.ts`: smoothed per-frame signals (spine angle,
+  head-vs-spine, knee/hip/elbow angles, wrist hinge, wrist/hip heights, segment
+  lengths).
+- `events.ts`: the new event detectors with sub-frame interpolation, plus phase
+  windows per B-2.1.
+- The viewer shows the detected events vs. the human labels on the scrubber
+  (read-only, for sanity checking).
+
+**Phase 11 — Metric catalog v3**
+- `src/metrics/v3/{load,rise,setPoint,release}.ts` per B-2.3, with segment-length
+  normalization, near-side selection, and reliability flags (guide hand, wrist
+  snap, low-resolution timing).
+- Details (unscored) block. Flatten to ids. `schemaVersion: 2`.
+- Old v2 module kept until Phase 14 removes its callers.
+
+**Phase 12 — Targets v2 + scoring scale + wording**
+- `targets:build` emits the v3 ids with band/SD, plus default
+  `label`/`phrase`/`cue`, merged with existing hand edits.
+- `scoreDeviation` rewritten to the 0–10+ scale (B-2.5). The 4-phase grouping
+  replaces Structure/Sequencing sections. Within a phase, the Position and
+  Timing sub-lists remain.
+- Readback uses `cue`. The scorecard uses `phrase` + target text + score chip +
+  legend.
+
+**Phase 13 — Viewer: geometry overlays + compare**
+- Per-metric geometry drawing, cell-click seek, outlier flags.
+- Side-by-side phase-aligned compare with my shots.
+
+**Phase 14 — Pipeline integration + migration**
+- The live pipeline, server endpoint and replay pipeline compute v3. Live
+  capture at 30 fps.
+- Read-time recompute of v1 shots from the stored pose track, then persist.
+  Insights use v3 ids. Old focus-area ids are mapped to the new phase-based
+  areas.
+- Remove the v2 live path. The hidden assessment path keeps v2 untouched.
+
+**Phase 15 — Docs**
+- Update `docs/metrics-by-phase.md` with the v3 catalog (definition, formula,
+  unit, landmarks, reliability rule per metric) and `docs/live-redesign-plan.md`
+  with the scale and phases.
+
+## B-4. Validation plan (Part B)
+
+The same conventions as §5 apply: real UI interactions, screenshots at DPR 2,
+and `toHaveScreenshot` for stable states. The Curry video isn't in CI, so the
+viewer e2e runs **skeleton-only**. Video-backed checks are on the manual
+checklist.
+
+| Phase | Unit / integration (vitest) | E2E (real UI) | Screenshots |
+|---|---|---|---|
+| 9 | Debug index lists every `__debug` route (glob test, so new routes can't be forgotten). | Profile → tap "Debug tools" → index → tap "Reference" → the table renders 7 shot columns, scrub a shot. The button is absent from a production build (`check:stripped` extended). | Index, viewer (skeleton-only). |
+| 10 | Synthetic signals with known sub-frame events: recovered within ±0.15 frame. Smoothing doesn't shift extrema. Phase windows from event sets, including missing-event fallbacks. **Curry agreement:** detected events vs. `labels.json` across the 7 shots within ±1 frame for ≥ 80 % of events (the report is printed). | Viewer: event markers render. Toggling "labels" shows the human markers, and disagreements are highlighted. | Scrubber with detected + labeled markers. |
+| 11 | Each metric has a hand-computed fixture (a synthetic skeleton with known angles/lengths), so exact values are known. **Anatomy invariance:** scaling limbs ±20 % or the whole body ×0.5/×2 leaves every metric unchanged (±1 %). **Mirroring:** a left-hand mirrored pose gives the same values. Unmeasured rules (guide hand hidden, low fps). Golden snapshot over the 3 replay fixtures + Curry. | — | — |
+| 12 | Scale: in band = 0, 1 SD beyond = 1.0, display caps at "10+", uncapped stored. Phase/overall means. Builder merge keeps hand-edited phrases. Every v3 id has a label, phrase and cue (a lint test). Curry's own shots score ≤ 1 on average (sanity). | Replay a shot → the scorecard shows 4 phases, the "10+" cap, the legend, and plain wording. The audio log contains a cue string (not an id). Focus sheet → choose "Rise" → the readback only includes rise cues. | Scorecard (live feedback + shot review), legend. |
+| 13 | Phase-time alignment maps phase boundaries 1:1. | Viewer: click a cell (e.g. Load · knee depth · shot 3) → the scrubber seeks to that frame and the angle arc is drawn (canvas probe hook). Compare: pick my replayed shot → both stages play and the phase labels match at each boundary. | Geometry overlay per metric family (angle, offset, height bar), compare view. |
+| 14 | Recompute-from-pose-track equals direct v3 analysis on the same frames (±1 %). Migration is idempotent. 30 fps capture timestamps are monotonic. | Seed a v1 shot → open Shots → the review shows the v3 scorecard, and the row is persisted as schema 2 (API probe). Full live replay flow end-to-end with v3. Insights tab renders the new phase ids. | Insights with v3 issues. |
+| 15 | `npm run verify` + the full Playwright suite (prod + dev). | — | — |
+
+**Manual (needs the local Curry video + a real device):**
+1. Dev server → `/__debug/reference` loads the `.mov` automatically. The
+   skeleton sits on Curry with no aspect distortion.
+2. For each phase, click 2–3 metric cells. The drawn angle or offset visually
+   matches the footage, and the target band looks plausible. Correct
+   `live-targets.json` by hand where needed.
+3. Compare one of your real shots with Curry. The phases line up and the
+   differences you see match the scored metrics.
+4. On the phone, live 30 fps holds (HUD), or the lite fallback engages and
+   timing metrics show "low resolution" when appropriate.
+
+## B-5. Risks
+- **7 Curry shots is a thin baseline.** Bands from min/max of 7 values are
+  tight, so expect many non-zero scores at first. The viewer is the tool to widen
+  them by hand.
+- **Far-side landmarks** (guide hand, far ear) are unreliable side-on.
+  Reliability flags keep them out of scores rather than guessing.
+- **Wrist hinge and wrist snap rely on finger landmarks**, which are noisy at
+  256 px. Phase 2's capture `maxEdge` may need raising to 384 for these. This is
+  measured in Phase 11 against Curry.
+- **Sub-frame interpolation can't invent information.** At 15 fps (if 30 isn't
+  sustained), timing remains approximate and is labeled as such.
