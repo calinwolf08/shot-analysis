@@ -11,8 +11,10 @@ import type {
   AnalyzeOptions,
   LandmarkFrame,
   LiveAnalysisSession,
+  LiveSessionStats,
   ProgressCallback,
 } from "../types";
+import { createLatencyTracker } from "../services/latency";
 import { isFixtureRef } from "../types";
 import { poseDataToLandmarkFrames, runReplayAnalysis } from "./replay-pipeline";
 import { scriptFrames, type ScriptSegment } from "./positioning-script";
@@ -132,6 +134,8 @@ function createReplayLiveSession(
   let cancel: (() => void) | null = null;
   let stopped = false;
   let fps = 30;
+  const latency = createLatencyTracker(30);
+  let delivered = 0;
 
   return {
     get fps() {
@@ -164,6 +168,8 @@ function createReplayLiveSession(
         const stamped = { ...frame, captureTs: performance.now() };
         const deliver = () => {
           if (stopped) return;
+          latency.add(performance.now() - stamped.captureTs);
+          delivered += 1;
           for (const cb of subscribers) cb(stamped);
         };
         if (deps.latencyMs > 0) setTimeout(deliver, deps.latencyMs);
@@ -199,6 +205,17 @@ function createReplayLiveSession(
 
     async analyzeWindow(frames) {
       return runReplayAnalysis(frames, deps.opts, { fps });
+    },
+
+    stats(): LiveSessionStats {
+      return {
+        model: null, // replay has no pose model
+        p50LatencyMs: latency.p50(),
+        framesDelivered: delivered,
+        framesSkipped: 0,
+        maxInFlight: 0,
+        fallbacks: 0,
+      };
     },
 
     async stop() {

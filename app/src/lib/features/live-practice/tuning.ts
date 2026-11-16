@@ -36,9 +36,21 @@ export interface ReadinessTuning {
   readonly minOrientationAgreement: number;
 }
 
+export interface LatencyTuning {
+  /** "auto": full model, falling back to lite when too slow. */
+  readonly model: "auto" | "full" | "lite";
+  /** Switch to lite when the median capture→pose latency exceeds this. */
+  readonly liteFallbackP50Ms: number;
+  /** Latency samples per decision window. */
+  readonly windowFrames: number;
+  /** First samples ignored (model warm-up). */
+  readonly warmupFrames: number;
+}
+
 export interface LiveTuning {
   readonly cues: CueTuning;
   readonly readiness: ReadinessTuning;
+  readonly latency: LatencyTuning;
 }
 
 export const DEFAULT_LIVE_TUNING: LiveTuning = {
@@ -55,6 +67,12 @@ export const DEFAULT_LIVE_TUNING: LiveTuning = {
     maxSideSeparation: 0.5,
     orientationWindow: 30,
     minOrientationAgreement: 0.6,
+  },
+  latency: {
+    model: "auto",
+    liteFallbackP50Ms: 150,
+    windowFrames: 30,
+    warmupFrames: 15,
   },
 };
 
@@ -77,7 +95,15 @@ const FIELD_SCHEMAS = {
     orientationWindow: z.number().int().min(3).max(300),
     minOrientationAgreement: frac,
   },
+  latency: {
+    model: z.enum(["auto", "full", "lite"]),
+    liteFallbackP50Ms: ms,
+    windowFrames: z.number().int().min(3).max(300),
+    warmupFrames: z.number().int().min(0).max(1000),
+  },
 } as const;
+
+const SECTIONS = ["cues", "readiness", "latency"] as const;
 
 export interface TuningResult {
   readonly tuning: LiveTuning;
@@ -92,17 +118,18 @@ export interface TuningResult {
  */
 export function mergeTuning(raw: unknown): TuningResult {
   const warnings: string[] = [];
-  const out = {
+  const out: Record<(typeof SECTIONS)[number], Record<string, unknown>> = {
     cues: { ...DEFAULT_LIVE_TUNING.cues },
     readiness: { ...DEFAULT_LIVE_TUNING.readiness },
-  } as { cues: Record<string, number>; readiness: Record<string, number> };
+    latency: { ...DEFAULT_LIVE_TUNING.latency },
+  };
 
   if (raw === null || typeof raw !== "object") {
     if (raw !== undefined) warnings.push("tuning file is not an object");
     return { tuning: out as unknown as LiveTuning, warnings };
   }
 
-  for (const section of ["cues", "readiness"] as const) {
+  for (const section of SECTIONS) {
     const given = (raw as Record<string, unknown>)[section];
     if (given === undefined) continue;
     if (given === null || typeof given !== "object") {
@@ -118,7 +145,7 @@ export function mergeTuning(raw: unknown): TuningResult {
         continue;
       }
       const parsed = schema.safeParse(value);
-      if (parsed.success) out[section][key] = parsed.data as number;
+      if (parsed.success) out[section][key] = parsed.data;
       else
         warnings.push(
           `${section}.${key}: invalid value ${JSON.stringify(value)}`,

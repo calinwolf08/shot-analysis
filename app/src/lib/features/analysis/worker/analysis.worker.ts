@@ -87,6 +87,9 @@ async function handleFrames(frames: FramePayload[]): Promise<void> {
       state.width = frame.width;
       state.height = frame.height;
     }
+    if (debugDetectDelayMs > 0) {
+      await new Promise((r) => setTimeout(r, debugDetectDelayMs));
+    }
     const pose = await state.detector.detect({
       data: frame.data,
       width: frame.width,
@@ -98,6 +101,7 @@ async function handleFrames(frames: FramePayload[]): Promise<void> {
       frameIndex: frame.frameIndex,
       timestamp: frame.timestamp,
       poseConfidence: pose?.poseConfidence ?? 0,
+      ...(frame.captureTs !== undefined ? { captureTs: frame.captureTs } : {}),
       landmarks: pose ? pose.landmarks : null,
     };
     state.framesProcessed += 1;
@@ -144,9 +148,52 @@ function handleFinalizePoses(): void {
   post({ type: "poses", poseData });
 }
 
-self.onmessage = async (event: MessageEvent) => {
+async function createDetector(
+  wasmBasePath: string,
+  modelPath: string,
+): Promise<PoseDetector> {
+  return createPoseDetector({
+    runtime: "browser",
+    wasmBasePath,
+    modelPath,
+    runningMode: "VIDEO",
+  });
+}
+
+let wasmBasePath = "";
+let debugDetectDelayMs = 0;
+
+/**
+ * Messages are handled strictly in order: handlers are async (detection
+ * awaits), and without a queue a "setModel" could close the detector while a
+ * frame is mid-detection. "cancel" is the exception — it must take effect
+ * immediately, between frames of a batch already being processed.
+ */
+let queue: Promise<void> = Promise.resolve();
+
+self.onmessage = (event: MessageEvent) => {
+  let message: ReturnType<typeof parseToWorker>;
   try {
-    const message = parseToWorker(event.data);
+    message = parseToWorker(event.data);
+  } catch (err) {
+    post({
+      type: "error",
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+  if (message.type === "cancel") {
+    state.cancelled = true;
+    state.collected = [];
+    return;
+  }
+  queue = queue.then(() => handle(message));
+};
+
+async function handle(
+  message: ReturnType<typeof parseToWorker>,
+): Promise<void> {
+  try {
     switch (message.type) {
       case "init": {
         state.mode = message.mode;
@@ -157,12 +204,20 @@ self.onmessage = async (event: MessageEvent) => {
         state.cancelled = false;
         state.width = 0;
         state.height = 0;
-        state.detector = await createPoseDetector({
-          runtime: "browser",
-          wasmBasePath: message.assets.wasmBasePath,
-          modelPath: message.assets.modelPath,
-          runningMode: "VIDEO",
-        });
+        wasmBasePath = message.assets.wasmBasePath;
+        debugDetectDelayMs = message.debugDetectDelayMs ?? 0;
+        state.detector = await createDetector(
+          wasmBasePath,
+          message.assets.modelPath,
+        );
+        post({ type: "ready" });
+        break;
+      }
+      case "setModel": {
+        const old = state.detector;
+        state.detector = null;
+        await old?.close();
+        state.detector = await createDetector(wasmBasePath, message.modelPath);
         post({ type: "ready" });
         break;
       }
@@ -176,8 +231,7 @@ self.onmessage = async (event: MessageEvent) => {
         handleFinalizePoses();
         break;
       case "cancel":
-        state.cancelled = true;
-        state.collected = [];
+        // Handled synchronously in onmessage.
         break;
     }
   } catch (err) {
@@ -186,4 +240,4 @@ self.onmessage = async (event: MessageEvent) => {
       message: err instanceof Error ? err.message : String(err),
     });
   }
-};
+}

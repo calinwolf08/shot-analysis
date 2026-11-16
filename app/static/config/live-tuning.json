@@ -15,5 +15,12 @@
     "maxSideSeparation": 0.5,
     "orientationWindow": 30,
     "minOrientationAgreement": 0.6
+  },
+  "latency": {
+    "$comment": "Pose-detection latency (capture \u2192 skeleton). model: 'auto' starts on the full model and switches to the faster 'lite' model once if the median latency over windowFrames (after warmupFrames) exceeds liteFallbackP50Ms. Force a model with 'full' or 'lite'.",
+    "model": "auto",
+    "liteFallbackP50Ms": 150,
+    "windowFrames": 30,
+    "warmupFrames": 15
   }
 }

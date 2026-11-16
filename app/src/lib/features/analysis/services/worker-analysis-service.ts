@@ -17,8 +17,15 @@ import type {
   AnalyzeOptions,
   LandmarkFrame,
   LiveAnalysisSession,
+  LiveSessionOptions,
+  LiveSessionStats,
   ProgressCallback,
 } from "../types";
+import {
+  createLatencyTracker,
+  shouldFallBackToLite,
+  type PoseModel,
+} from "./latency";
 import { isFixtureRef } from "../types";
 import { runReplayAnalysis } from "../replay/replay-pipeline";
 import {
@@ -40,7 +47,10 @@ export interface WorkerLike {
 
 export interface WorkerAssets {
   wasmBasePath: string;
+  /** Full pose model (default for video analysis and live). */
   modelPath: string;
+  /** Lite pose model (live fallback when the full model is too slow). */
+  liteModelPath?: string;
 }
 
 export interface WorkerAnalysisServiceDeps {
@@ -54,6 +64,16 @@ export interface WorkerAnalysisServiceDeps {
 const DEFAULT_ASSETS: WorkerAssets = {
   wasmBasePath: "/mediapipe/wasm",
   modelPath: "/mediapipe/pose_landmarker_full.task",
+  liteModelPath: "/mediapipe/pose_landmarker_lite.task",
+};
+
+/** Live latency defaults (overridable from the tuning file). */
+export const DEFAULT_LIVE_SESSION_OPTIONS: Required<LiveSessionOptions> = {
+  model: "auto",
+  liteFallbackP50Ms: 150,
+  windowFrames: 30,
+  warmupFrames: 15,
+  debugDetectDelayMs: 0,
 };
 
 function defaultMakeWorker(): WorkerLike {
@@ -318,10 +338,57 @@ export function createWorkerAnalysisService(
         onProgress,
       ),
 
-    createLiveSession(opts: AnalyzeOptions): LiveAnalysisSession {
+    createLiveSession(
+      opts: AnalyzeOptions,
+      liveOpts: LiveSessionOptions = {},
+    ): LiveAnalysisSession {
+      const live = { ...DEFAULT_LIVE_SESSION_OPTIONS, ...liveOpts };
       const subscribers = new Set<(frame: LandmarkFrame) => void>();
       let handle: WorkerHandle | null = null;
       const fps = 15;
+      const liteModelPath =
+        assets.liteModelPath ?? DEFAULT_ASSETS.liteModelPath!;
+
+      // Backpressure: at most ONE frame in the worker at a time. Without it,
+      // capture kept posting 15 fps while a slow phone needed >66 ms per
+      // frame, the worker queue grew without bound, and the skeleton (and the
+      // positioning cues) lagged further and further behind the player.
+      let inFlight = 0;
+      let sentAt = 0;
+      let maxInFlight = 0;
+      /** A frame that never comes back (worker error) must not wedge capture. */
+      const STALL_MS = 2000;
+      const busy = (): boolean => {
+        if (swapping) return true;
+        if (inFlight > 0 && performance.now() - sentAt > STALL_MS) {
+          inFlight = 0;
+        }
+        return inFlight > 0;
+      };
+      let swapping = false;
+      let model: PoseModel = live.model === "lite" ? "lite" : "full";
+      const latency = createLatencyTracker(live.windowFrames);
+      let delivered = 0;
+      let skipped = 0;
+      let fallbacks = 0;
+
+      async function fallBackToLite(): Promise<void> {
+        if (!handle) return;
+        swapping = true;
+        model = "lite";
+        fallbacks += 1;
+        console.info(
+          `[live] pose latency p50 ${Math.round(latency.p50() ?? 0)} ms > ${live.liteFallbackP50Ms} ms — switching to the lite model`,
+        );
+        const ready = handle.waitReady();
+        handle.send({ type: "setModel", modelPath: liteModelPath });
+        try {
+          await ready;
+        } finally {
+          latency.reset();
+          swapping = false;
+        }
+      }
 
       return {
         fps,
@@ -333,7 +400,23 @@ export function createWorkerAnalysisService(
         async start() {
           handle = wrapWorker(makeWorker());
           handle.onLandmarks((frame) => {
+            inFlight = Math.max(0, inFlight - 1);
+            delivered += 1;
+            if (frame.captureTs !== undefined) {
+              latency.add(performance.now() - frame.captureTs);
+            }
             for (const cb of subscribers) cb(frame);
+            if (
+              !swapping &&
+              shouldFallBackToLite(model, latency, {
+                policy: live.model,
+                liteFallbackP50Ms: live.liteFallbackP50Ms,
+                warmupFrames: live.warmupFrames,
+                windowFrames: live.windowFrames,
+              })
+            ) {
+              void fallBackToLite();
+            }
           });
           const ready = handle.waitReady();
           handle.send({
@@ -341,15 +424,53 @@ export function createWorkerAnalysisService(
             opts: { shootingHand: opts.shootingHand, profile: opts.profile },
             mode: "live",
             fps,
-            assets,
+            assets: {
+              wasmBasePath: assets.wasmBasePath,
+              modelPath: model === "lite" ? liteModelPath : assets.modelPath,
+            },
+            ...(live.debugDetectDelayMs > 0
+              ? { debugDetectDelayMs: live.debugDetectDelayMs }
+              : {}),
           });
           await ready;
         },
 
+        // Called once per capture tick; a busy answer is a skipped tick.
+        isBusy() {
+          const b = busy();
+          if (b) skipped += 1;
+          return b;
+        },
+
         pushFrame(frame: FramePayload) {
-          handle?.send({ type: "frames", frames: [frame] }, [
-            frame.data.buffer as ArrayBuffer,
-          ]);
+          if (!handle) return;
+          if (busy()) {
+            skipped += 1;
+            return;
+          }
+          inFlight += 1;
+          sentAt = performance.now();
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          handle.send(
+            {
+              type: "frames",
+              frames: [
+                { ...frame, captureTs: frame.captureTs ?? performance.now() },
+              ],
+            },
+            [frame.data.buffer as ArrayBuffer],
+          );
+        },
+
+        stats(): LiveSessionStats {
+          return {
+            model,
+            p50LatencyMs: latency.p50(),
+            framesDelivered: delivered,
+            framesSkipped: skipped,
+            maxInFlight,
+            fallbacks,
+          };
         },
 
         async analyzeWindow(frames) {
@@ -360,6 +481,7 @@ export function createWorkerAnalysisService(
         async stop() {
           handle?.terminate();
           handle = null;
+          inFlight = 0;
         },
       } as LiveAnalysisSession & { pushFrame(frame: FramePayload): void };
     },

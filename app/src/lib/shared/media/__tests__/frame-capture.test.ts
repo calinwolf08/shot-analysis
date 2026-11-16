@@ -150,3 +150,29 @@ describe("createLiveFrameCapture", () => {
     expect(frames.length).toBeGreaterThan(0);
   });
 });
+
+describe("frame capture backpressure", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("skips ticks (no grab) while the session is busy", () => {
+    const frames: FrameData[] = [];
+    let busy = false;
+    const session = {
+      pushFrame: (f: FrameData) => frames.push(f),
+      isBusy: () => busy,
+    };
+    const handle = createLiveFrameCapture(makeVideo(), session, { fps: 10 });
+    expect(frames).toHaveLength(1); // immediate first grab
+    busy = true;
+    vi.advanceTimersByTime(500);
+    expect(frames).toHaveLength(1);
+    busy = false;
+    vi.advanceTimersByTime(200);
+    expect(frames.length).toBe(3);
+    // Frame indexes stay contiguous over skipped ticks (only grabbed frames count).
+    expect(frames.map((f) => f.frameIndex)).toEqual([0, 1, 2]);
+    expect(frames.every((f) => typeof f.captureTs === "number")).toBe(true);
+    handle?.stop();
+  });
+});

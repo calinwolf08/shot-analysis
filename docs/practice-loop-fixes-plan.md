@@ -147,7 +147,7 @@ State machine in `LivePracticeStore`:
 
 ## 4. Phased implementation
 
-> **Status:** Phases 0 and 1 are implemented (see "Implementation notes" below).
+> **Status:** Phases 0, 1 and 2 are implemented (see "Implementation notes" below).
 
 ### Implementation notes (Phases 0–1)
 - **Required side corrected.** Pose data shows "side-left" means the player's
@@ -173,6 +173,32 @@ State machine in `LivePracticeStore`:
   pixel-stable. Specs assert test ids and states instead.
 - **Speech-duration simulation** in the audio probe moves to Phase 4, which
   introduces promise-based `speak()`.
+
+### Implementation notes (Phase 2)
+- **Root cause confirmed.** With detection slowed to 150 ms per frame (a slow
+  phone; capture runs every 66 ms), the old unthrottled path reached a
+  **9.9 s** median capture→pose delay within about 20 s. With backpressure the
+  same run stays flat at **~175 ms**, and capture ticks are skipped rather than
+  queued.
+- **Backpressure** lives in the live session (`isBusy`, at most one frame in
+  flight, 2 s stall guard). Capture skips the tick, with no grab or downsample,
+  while busy.
+- **The worker handles messages strictly in order**, so a model swap can't close
+  the detector mid-frame. `cancel` is still immediate.
+- **Lite fallback:** under `latency.model: "auto"`, the session switches once to
+  `pose_landmarker_lite.task` (now committed and staged by
+  `scripts/fetch-mediapipe-assets.ts`). It switches when the median latency
+  over `windowFrames`, measured after `warmupFrames`, exceeds
+  `liteFallbackP50Ms`. All of these are in the tuning file, and `"full"` or
+  `"lite"` pins the model.
+- **HUD** (`?debug=live`) shows the median pose latency, the model, the skipped
+  ticks, and a "pose model → lite" log line.
+- **E2E now runs the real MediaPipe worker** on the fake camera (no replay).
+  CDP CPU throttling doesn't reach workers, so a slow phone is imitated with the
+  dev/E2E-only `?detectDelayMs=` (extra time per detection inside the worker;
+  stripped from production, enforced by `check:stripped`).
+- **The overlay needed no change:** with one frame in flight, landmarks arrive in
+  order.
 
 Each phase ends with its own validation (see §5) and lands as its own commit(s).
 

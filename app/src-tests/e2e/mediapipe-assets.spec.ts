@@ -13,6 +13,7 @@ const ASSETS = [
   "/mediapipe/wasm/vision_wasm_nosimd_internal.js",
   "/mediapipe/wasm/vision_wasm_nosimd_internal.wasm",
   "/mediapipe/pose_landmarker_full.task",
+  "/mediapipe/pose_landmarker_lite.task",
 ];
 
 for (const path of ASSETS) {

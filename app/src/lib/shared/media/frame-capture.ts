@@ -14,6 +14,8 @@ export interface FrameData {
   height: number;
   frameIndex: number;
   timestamp: number;
+  /** performance.now() when the frame was grabbed (for latency). */
+  captureTs: number;
 }
 
 export interface FrameCaptureHandle {
@@ -36,6 +38,11 @@ export interface FrameCaptureOptions {
    * backwards, confusing the timestamp-driven coordinator across the handoff.
    */
   startTime?: number;
+  /**
+   * Backpressure: when this returns true the tick is skipped (no grab, no
+   * downsample), so frames never queue up behind a slow pose detector.
+   */
+  shouldSkip?: () => boolean;
 }
 
 /**
@@ -67,6 +74,7 @@ export function startFrameCapture(
   // the capture loop just hands it the video element each tick.
   function captureFrame(): void {
     if (!running) return;
+    if (options.shouldSkip?.()) return;
 
     // Wait for video to have valid dimensions.
     const vw = video.videoWidth;
@@ -77,8 +85,9 @@ export function startFrameCapture(
     }
 
     try {
+      const captureTs = performance.now();
       const imageData = downsampleToImageData(video, vw, vh, maxEdge);
-      const timestamp = performance.now() - startTime;
+      const timestamp = captureTs - startTime;
 
       onFrame({
         data: imageData.data,
@@ -86,6 +95,7 @@ export function startFrameCapture(
         height: imageData.height,
         frameIndex,
         timestamp,
+        captureTs,
       });
 
       frameIndex += 1;
@@ -123,7 +133,7 @@ export function startFrameCapture(
  */
 export function createLiveFrameCapture(
   video: HTMLVideoElement,
-  session: { pushFrame?(frame: FrameData): void },
+  session: { pushFrame?(frame: FrameData): void; isBusy?(): boolean },
   options?: FrameCaptureOptions,
 ): FrameCaptureHandle | null {
   if (!session.pushFrame) {
@@ -132,5 +142,9 @@ export function createLiveFrameCapture(
   }
 
   const pushFrame = session.pushFrame.bind(session);
-  return startFrameCapture(video, pushFrame, options);
+  const isBusy = session.isBusy?.bind(session);
+  return startFrameCapture(video, pushFrame, {
+    ...options,
+    ...(isBusy ? { shouldSkip: isBusy } : {}),
+  });
 }

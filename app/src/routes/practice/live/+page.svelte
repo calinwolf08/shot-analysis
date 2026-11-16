@@ -117,10 +117,18 @@
       await services.repos.settings.get("liveFocusAreas"),
     );
 
-    const s = services.analysis.createLiveSession({
-      shootingHand,
-      profile: "pro-form",
-    });
+    // Dev/E2E only: `?detectDelayMs=` slows each detection in the worker to
+    // imitate a slow phone. Constant-folds away in production.
+    const detectDelay = devSurfaces
+      ? Number(page.url.searchParams.get("detectDelayMs") ?? 0) || 0
+      : 0;
+    const s = services.analysis.createLiveSession(
+      { shootingHand, profile: "pro-form" },
+      {
+        ...tuning.latency,
+        ...(detectDelay > 0 ? { debugDetectDelayMs: detectDelay } : {}),
+      },
+    );
     session = s;
     try {
       await s.start();
@@ -230,7 +238,7 @@
     onexit={exit}
   />
   {#if liveDebug && coordinator}
-    <LiveDebugHud {coordinator} />
+    <LiveDebugHud {coordinator} {session} />
   {/if}
 {:else}
   <main class="center" data-testid="practice-loading">
