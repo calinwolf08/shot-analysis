@@ -13,6 +13,7 @@ const MARKERS = [
   "debug-analyze-run",
   "debug-drill-list",
   "live-debug-hud",
+  "__scAudioLog",
 ];
 
 const here = dirname(fileURLToPath(import.meta.url));

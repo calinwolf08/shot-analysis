@@ -160,6 +160,58 @@ describe("ReplayAnalysisService.createLiveSession", () => {
     expect(result.shots).toHaveLength(1);
   }, 30_000);
 
+  it("plays a positioning script first, then the fixture, monotonically", async () => {
+    const immediate = (cb: () => void) => {
+      cb();
+      return () => undefined;
+    };
+    const live = createReplayAnalysisService({
+      loadFixture,
+      liveFixtureId: "20201212_134104",
+      schedule: immediate,
+      liveScript: [
+        { kind: "facing", seconds: 1 },
+        { kind: "none", seconds: 0.5 },
+      ],
+    }).createLiveSession(opts);
+    const got: { i: number; t: number; posed: boolean; cap?: number }[] = [];
+    live.onFrame((f) =>
+      got.push({
+        i: f.frameIndex,
+        t: f.timestamp,
+        posed: f.landmarks !== null,
+        ...(f.captureTs !== undefined ? { cap: f.captureTs } : {}),
+      }),
+    );
+    await live.start();
+    await live.stop();
+
+    // 30 fps fixture: 30 facing frames, 15 no-pose frames, then the fixture.
+    expect(got.slice(0, 30).every((g) => g.posed)).toBe(true);
+    expect(got.slice(30, 45).every((g) => !g.posed)).toBe(true);
+    expect(got.length).toBeGreaterThan(45 + 100);
+    for (let k = 1; k < got.length; k++) {
+      expect(got[k]!.i).toBeGreaterThan(got[k - 1]!.i);
+      expect(got[k]!.t).toBeGreaterThan(got[k - 1]!.t);
+    }
+    expect(got.every((g) => typeof g.cap === "number")).toBe(true);
+  }, 30_000);
+
+  it("delays delivery by liveLatencyMs", async () => {
+    const live = createReplayAnalysisService({
+      loadFixture,
+      liveFixtureId: "20201212_134104",
+      liveLatencyMs: 80,
+    }).createLiveSession(opts);
+    const lags: number[] = [];
+    live.onFrame((f) => lags.push(performance.now() - f.captureTs!));
+    await live.start();
+    await new Promise((r) => setTimeout(r, 400));
+    await live.stop();
+    expect(lags.length).toBeGreaterThan(2);
+    expect(Math.min(...lags)).toBeGreaterThanOrEqual(75);
+  });
+
   it("requires liveFixtureId", () => {
     const svc = createReplayAnalysisService({ loadFixture });
     expect(() => svc.createLiveSession(opts)).toThrow(/liveFixtureId/);

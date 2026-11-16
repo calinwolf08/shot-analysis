@@ -44,6 +44,12 @@ export interface LandmarkFrame {
   /** Milliseconds since session start. */
   timestamp: number;
   poseConfidence: number;
+  /**
+   * performance.now() when the source image was captured (before pose
+   * detection). Lets the loop measure end-to-end latency; absent on sources
+   * that don't stamp it.
+   */
+  captureTs?: number;
   landmarks:
     | readonly {
         x: number;

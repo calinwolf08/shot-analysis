@@ -58,3 +58,11 @@ export async function onboard(
 export async function startLiveLoop(page: Page): Promise<void> {
   await page.getByTestId("practice-loop").waitFor({ timeout: 30_000 });
 }
+
+/**
+ * Where review screenshots go: test-results/screens/<group>/<name>.png
+ * (Playwright clears test-results/ at the start of each run).
+ */
+export function screenPath(group: string, name: string): string {
+  return `test-results/screens/${group}/${name}.png`;
+}

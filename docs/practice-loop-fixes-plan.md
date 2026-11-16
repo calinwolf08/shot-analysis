@@ -147,6 +147,33 @@ State machine in `LivePracticeStore`:
 
 ## 4. Phased implementation
 
+> **Status:** Phases 0 and 1 are implemented (see "Implementation notes" below).
+
+### Implementation notes (Phases 0–1)
+- **Required side corrected.** Pose data shows "side-left" means the player's
+  LEFT side is nearest the camera. Curry (right-handed, labeled side-left) was
+  filmed from his guide-hand side, and the app required right-handers to stand
+  side-left (guide arm toward the camera) while the voice said "shooting arm
+  toward the camera". With the user's decision, `requiredOrientation` is now
+  **side-right for right-handers** (shooting arm nearest). Side-on 2D metrics
+  are mirror images, so Curry's targets still apply.
+- **Body-in-frame check uses the side actually nearest the camera** (not the
+  required side), so showing the wrong side gives "turn around", not "step back".
+- **Orientation** separation is divided by torso height (independent of distance
+  from the camera). On labeled fixture shots it never confuses which side faces
+  the camera. One labeled side-left shot is quite angled (0.59) and reads as
+  "front".
+- **Tuning** is edited in `app/static/config/live-tuning.json` and picked up on
+  page reload (fetched `no-store`). E2E overrides it by intercepting that
+  request, so the planned `?tuning=` param was not needed.
+- **One Playwright project, `mobile-fakecam`** (iPhone 14 viewport on Chromium +
+  fake camera), runs `*.mobile.spec.ts`. Review screenshots go to
+  `app/test-results/screens/<phase>/`. `toHaveScreenshot` baselines were not
+  added: the live preview (fake camera pattern) and skeleton sway are not
+  pixel-stable. Specs assert test ids and states instead.
+- **Speech-duration simulation** in the audio probe moves to Phase 4, which
+  introduces promise-based `speak()`.
+
 Each phase ends with its own validation (see §5) and lands as its own commit(s).
 
 **Phase 0 — Test harness groundwork**

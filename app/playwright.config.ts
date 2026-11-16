@@ -31,7 +31,31 @@ export default defineConfig({
       // Full suite against the PRODUCTION build (adapter-node), the artifact
       // we ship.
       name: "chromium",
+      testIgnore: ["**/*.mobile.spec.ts"],
       use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:4173" },
+    },
+    {
+      // Phone-sized Chromium with a FAKE CAMERA (Chromium's synthetic test
+      // pattern via getUserMedia). Pose data still comes from replay
+      // (`?e2e=replay&fakecam=1`), so the camera-only paths — positioning
+      // gate, spoken cues, clip recording — run deterministically without
+      // footage. Specs: *.mobile.spec.ts. Screenshots for review go to
+      // test-results/screens/.
+      name: "mobile-fakecam",
+      testMatch: ["**/*.mobile.spec.ts"],
+      use: {
+        ...devices["iPhone 14"],
+        browserName: "chromium",
+        baseURL: "http://localhost:4173",
+        permissions: ["camera"],
+        launchOptions: {
+          ...(executablePath ? { executablePath } : {}),
+          args: [
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream",
+          ],
+        },
+      },
     },
     {
       // Tier B — parity smoke against the DEV server (vite dev), the thing you

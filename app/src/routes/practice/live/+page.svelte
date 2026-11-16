@@ -15,6 +15,12 @@
     type SideOrientation,
   } from "$lib/features/live-practice";
   import {
+    DEFAULT_LIVE_TUNING,
+    loadLiveTuning,
+    type LiveTuning,
+  } from "$lib/features/live-practice/tuning";
+  import { withAudioProbe } from "$lib/shared/audio/audio-probe";
+  import {
     loadLiveTargets,
     normalizeAreas,
     type LiveTargets,
@@ -31,7 +37,12 @@
   import { getShotClipStore } from "$lib/shared/media/shot-clip-store";
 
   const services = useAppServices();
-  const audio = createWebAudioFeedbackService();
+  // Dev/E2E: mirror everything audible into window.__scAudioLog so specs can
+  // assert what the player hears. Constant-folds away in production.
+  const devSurfaces = import.meta.env.DEV || import.meta.env.VITE_E2E === "1";
+  const audio = devSurfaces
+    ? withAudioProbe(createWebAudioFeedbackService())
+    : createWebAudioFeedbackService();
   const clipStore = getShotClipStore();
 
   const replayMode =
@@ -45,8 +56,16 @@
       ? page.url.searchParams.get("liveVideo")
       : null;
 
+  // Dev/e2e only: `?fakecam=1` opens a real getUserMedia stream (Chromium's
+  // fake device in e2e) alongside the REPLAYED pose stream, so the camera-only
+  // paths (positioning gate, clip recording) run deterministically.
+  const fakeCam =
+    replayMode && devSurfaces && page.url.searchParams.get("fakecam") === "1";
+
   const capture: CaptureService | null = replayMode
-    ? null
+    ? fakeCam
+      ? createBrowserCaptureService()
+      : null
     : liveVideoUrl
       ? createFileCaptureService(liveVideoUrl)
       : createBrowserCaptureService();
@@ -69,6 +88,7 @@
   let targets: LiveTargets | null = null;
   let captureHandle: CaptureHandle | null = null;
   let focusAreas: string[] = [];
+  let tuning = $state<LiveTuning>(DEFAULT_LIVE_TUNING);
 
   function persistFocus(ids: string[]) {
     focusAreas = ids;
@@ -90,6 +110,9 @@
     shootingHand = player.shootingHand;
     requiredSide = requiredOrientation(shootingHand);
     targets = await loadLiveTargets();
+    const loaded = await loadLiveTuning();
+    tuning = loaded.tuning;
+    for (const w of loaded.warnings) console.warn("[live-tuning]", w);
     focusAreas = normalizeAreas(
       await services.repos.settings.get("liveFocusAreas"),
     );
@@ -202,6 +225,8 @@
     {clipStore}
     stream={cameraStream}
     onfocuschange={persistFocus}
+    {tuning}
+    debug={liveDebug}
     onexit={exit}
   />
   {#if liveDebug && coordinator}

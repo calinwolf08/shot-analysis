@@ -2,27 +2,27 @@ import { describe, expect, it } from "vitest";
 import { evaluateAngleGate, requiredOrientation } from "../angle-gate";
 
 describe("requiredOrientation", () => {
-  it("is side-left for right-handed (matches the Curry baseline), side-right for left", () => {
-    expect(requiredOrientation("right")).toBe("side-left");
-    expect(requiredOrientation("left")).toBe("side-right");
+  it("puts the shooting arm nearest the camera: side-right for right-handed, side-left for left", () => {
+    expect(requiredOrientation("right")).toBe("side-right");
+    expect(requiredOrientation("left")).toBe("side-left");
   });
 });
 
 describe("evaluateAngleGate", () => {
   it("passes when the detected orientation matches the required side", () => {
-    const r = evaluateAngleGate("side-left", "right");
+    const r = evaluateAngleGate("side-right", "right");
     expect(r.ok).toBe(true);
     expect(r.reason).toBeNull();
-    expect(r.required).toBe("side-left");
+    expect(r.required).toBe("side-right");
   });
 
   it("mirrors for left-handed shooters", () => {
-    expect(evaluateAngleGate("side-right", "left").ok).toBe(true);
-    expect(evaluateAngleGate("side-left", "left").ok).toBe(false);
+    expect(evaluateAngleGate("side-left", "left").ok).toBe(true);
+    expect(evaluateAngleGate("side-right", "left").ok).toBe(false);
   });
 
   it("asks the user to turn around when side-on but on the wrong side", () => {
-    const r = evaluateAngleGate("side-right", "right");
+    const r = evaluateAngleGate("side-left", "right");
     expect(r.ok).toBe(false);
     expect(r.reason).toMatch(/turn around/i);
   });

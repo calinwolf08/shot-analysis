@@ -1,45 +1,59 @@
 /**
- * In-lesson positioning gate (live redesign — setup-less flow). Replaces the
- * separate setup screen: the player starts the lesson and the loop itself tells
- * them when they're positioned to shoot, re-checking between shots. Drives the
- * spoken positioning cues (the player can't see the screen while shooting).
+ * In-lesson positioning gate (live redesign — setup-less flow). The loop tells
+ * the player when they're positioned to shoot and re-checks between shots.
+ * Drives the spoken positioning cues (the player can't see the screen while
+ * shooting); WHEN a cue is spoken is decided by ./cue-pacer.
  *
- * Only the position-relevant checks live here — full body in frame + the
- * shooting-arm-toward-camera orientation. Lighting/stability were one-time setup
- * concerns and are dropped from the per-shot gate.
+ * Two checks, both side-aware (see ../setup/live-orientation):
+ *  - whole body in frame, judged on the side nearest the camera only (the far
+ *    side is occluded side-on — requiring it made the gate impossible to pass);
+ *  - side-on with the shooting arm nearest the camera.
  */
-import { detectOrientation } from "basketball-shot-analysis";
 import type { LandmarkFrame } from "$lib/features/analysis";
-import { landmarkFramesToPoseData } from "$lib/features/analysis/replay/replay-pipeline";
 import type { SideOrientation } from "../setup/angle-gate";
+import { createSustainedCheck } from "../setup/checks";
 import {
-  CHECK_DEFAULTS,
-  createSustainedCheck,
-  isFullBodyVisible,
-} from "../setup/checks";
+  detectLiveOrientation,
+  isNearSideBodyVisible,
+  type FrameOrientation,
+} from "../setup/live-orientation";
+import { DEFAULT_LIVE_TUNING, type ReadinessTuning } from "../tuning";
 
 /** Which correction to voice, or null when the player is positioned. */
-export type ReadinessCue = "full-body" | "orientation" | null;
+export type ReadinessCue = "full-body" | "side-on" | "turn-around" | null;
 
 /** Spoken/shown text for each cue. */
-export const CUE_TEXT: Record<"full-body" | "orientation", string> = {
+export const CUE_TEXT: Record<Exclude<ReadinessCue, null>, string> = {
   "full-body": "Step back so your whole body is in frame",
-  orientation: "Turn side-on — shooting arm toward the camera",
+  "side-on": "Turn side-on, shooting arm toward the camera",
+  "turn-around": "Turn around, shooting arm toward the camera",
 };
 
-/** Pure: resolve full-body before orientation (can't judge angle if cut off). */
+/** Spoken once when the player becomes positioned. */
+export const READY_TEXT = "Ready. Take your shot.";
+
+/** Pure: resolve full-body first (can't judge angle if cut off). */
 export function selectReadinessCue(
   fullBodyOk: boolean,
+  detected: FrameOrientation,
   orientationOk: boolean,
 ): ReadinessCue {
   if (!fullBodyOk) return "full-body";
-  if (!orientationOk) return "orientation";
-  return null;
+  if (orientationOk) return null;
+  // Side-on but the wrong side faces the camera → turn around; otherwise
+  // (facing the camera, angled, or unreadable) → turn side-on.
+  if (detected === "side-left" || detected === "side-right")
+    return "turn-around";
+  return "side-on";
 }
 
 export interface ReadinessState {
   readonly positioned: boolean;
   readonly cue: ReadinessCue;
+  readonly fullBodyOk: boolean;
+  readonly detected: FrameOrientation;
+  /** Fraction of recent frames reading as the required side. */
+  readonly agreement: number;
 }
 
 export interface ReadinessGate {
@@ -49,38 +63,41 @@ export interface ReadinessGate {
 
 export function createReadinessGate(opts: {
   requiredOrientation: SideOrientation;
-  fps: number;
-  fullBodySustainMs?: number;
+  tuning?: ReadinessTuning;
 }): ReadinessGate {
-  const sustain = createSustainedCheck(
-    opts.fullBodySustainMs ?? CHECK_DEFAULTS.fullBodySustainMs,
-  );
+  const t = opts.tuning ?? DEFAULT_LIVE_TUNING.readiness;
+  const sustain = createSustainedCheck(t.fullBodyHoldMs);
   let recent: LandmarkFrame[] = [];
-  let orientationOk = false;
 
   return {
     update(frame) {
       const fullBodyOk = sustain.update(
-        isFullBodyVisible(frame),
+        // Judge the side actually facing the camera (see isNearSideBodyVisible).
+        isNearSideBodyVisible(frame, "auto", t),
         frame.timestamp,
       );
       recent.push(frame);
-      if (recent.length > CHECK_DEFAULTS.sideViewWindow) {
-        recent = recent.slice(-CHECK_DEFAULTS.sideViewWindow);
+      if (recent.length > t.orientationWindow) {
+        recent = recent.slice(-t.orientationWindow);
       }
-      if (recent.length >= 3) {
-        const detected = detectOrientation(
-          landmarkFramesToPoseData(recent, opts.fps),
-        );
-        orientationOk = detected === opts.requiredOrientation;
-      }
-      const cue = selectReadinessCue(fullBodyOk, orientationOk);
-      return { positioned: cue === null, cue };
+      const o = detectLiveOrientation(recent, {
+        maxSideSeparation: t.maxSideSeparation,
+        required: opts.requiredOrientation,
+      });
+      const orientationOk =
+        recent.length >= 3 && o.requiredAgreement >= t.minOrientationAgreement;
+      const cue = selectReadinessCue(fullBodyOk, o.orientation, orientationOk);
+      return {
+        positioned: cue === null,
+        cue,
+        fullBodyOk,
+        detected: o.orientation,
+        agreement: o.requiredAgreement,
+      };
     },
     reset() {
       sustain.reset();
       recent = [];
-      orientationOk = false;
     },
   };
 }

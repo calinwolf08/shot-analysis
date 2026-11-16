@@ -32,9 +32,17 @@
   import { phraseFor } from "./readback";
   import {
     CUE_TEXT,
+    READY_TEXT,
     createReadinessGate,
     type ReadinessCue,
+    type ReadinessState,
   } from "./readiness";
+  import {
+    createCuePacer,
+    type CuePacer,
+    type PacerSnapshot,
+  } from "./cue-pacer";
+  import { DEFAULT_LIVE_TUNING, type LiveTuning } from "../tuning";
   import type { LivePracticeStore } from "./live-practice-store.svelte";
 
   let {
@@ -45,6 +53,8 @@
     requiredOrientation = null,
     clipStore = null,
     onfocuschange = null,
+    tuning = DEFAULT_LIVE_TUNING,
+    debug = false,
     onexit,
   }: {
     store: LivePracticeStore;
@@ -58,6 +68,10 @@
     clipStore?: ShotClipStore | null;
     /** Persist a focus change made from the in-loop picker. */
     onfocuschange?: ((ids: string[]) => void) | null;
+    /** Cue pacing + readiness thresholds (static/config/live-tuning.json). */
+    tuning?: LiveTuning;
+    /** Show the readiness/cue debug panel (dev/E2E only). */
+    debug?: boolean;
     onexit: () => void;
   } = $props();
 
@@ -83,9 +97,11 @@
   // In-loop positioning gate state (only meaningful when gateActive).
   let positioned = $state(false);
   let cue = $state<ReadinessCue>("full-body");
-  let prevPositioned = false;
-  let lastCue: ReadinessCue = null;
-  let lastSpokeAt = 0;
+  let readiness = $state<ReadinessState | null>(null);
+  let pacerSnap = $state<PacerSnapshot | null>(null);
+  // Wall-clock pacing: what matters is how long the PLAYER has had to react.
+  // (Re)created with the gate, from the tuning in effect for this session.
+  let pacer: CuePacer | null = null;
 
   // Per-shot clip recording.
   let recorder: ShotClipRecorder | null = null;
@@ -97,9 +113,10 @@
     const gate = gateActive
       ? createReadinessGate({
           requiredOrientation: requiredOrientation!,
-          fps: session.fps,
+          tuning: tuning.readiness,
         })
       : null;
+    pacer = gate ? createCuePacer(tuning.cues) : null;
     const unsubscribe = session.onFrame((frame) => {
       presence = tracker.update(frame);
       latestFrame = frame;
@@ -112,30 +129,25 @@
     };
   });
 
-  /** Spoken + visual positioning coaching, only between shots. */
-  function handleReadiness(s: {
-    positioned: boolean;
-    cue: ReadinessCue;
-  }): void {
+  /**
+   * Spoken + visual positioning coaching, only between shots. The visual
+   * banner follows the gate live; speech is paced (hold → cooldown → repeat
+   * limit) so the player has time to move before hearing the next cue.
+   */
+  function handleReadiness(s: ReadinessState): void {
     positioned = s.positioned;
     cue = s.cue;
+    if (debug) readiness = s;
     const coachable =
       store.phase !== "analyzing" && !store.feedback && !store.muted;
-    const now = Date.now();
-    if (s.positioned && !prevPositioned) {
-      if (coachable) {
-        audio?.playEarcon("ready");
-        audio?.speak("Ready. Take your shot.");
-      }
-      lastCue = null;
-    } else if (!s.positioned && s.cue) {
-      if (coachable && (s.cue !== lastCue || now - lastSpokeAt > 4000)) {
-        audio?.speak(CUE_TEXT[s.cue]);
-        lastSpokeAt = now;
-        lastCue = s.cue;
-      }
+    const out = pacer?.update(s.cue, coachable) ?? null;
+    if (out?.kind === "ready") {
+      audio?.playEarcon("ready");
+      audio?.speak(READY_TEXT);
+    } else if (out?.kind === "cue") {
+      audio?.speak(CUE_TEXT[out.cue as keyof typeof CUE_TEXT]);
     }
-    prevPositioned = s.positioned;
+    if (debug && pacer) pacerSnap = pacer.snapshot();
   }
 
   // Keep a clip rolling while the player is positioned and between shots, so a
@@ -311,6 +323,26 @@
           >
         {/if}
       </div>
+      {#if debug && readiness}
+        <dl class="ready-debug" data-testid="readiness-debug">
+          <dt>body</dt>
+          <dd data-testid="rd-body">{readiness.fullBodyOk ? "ok" : "no"}</dd>
+          <dt>side</dt>
+          <dd data-testid="rd-side">
+            {readiness.detected} ({Math.round(readiness.agreement * 100)}% req)
+          </dd>
+          <dt>cue</dt>
+          <dd data-testid="rd-cue">{readiness.cue ?? "ready"}</dd>
+          {#if pacerSnap}
+            <dt>held</dt>
+            <dd>{(pacerSnap.heldMs / 1000).toFixed(1)}s</dd>
+            <dt>cooldown</dt>
+            <dd>{(pacerSnap.cooldownLeftMs / 1000).toFixed(1)}s</dd>
+            <dt>last said</dt>
+            <dd>{pacerSnap.lastSpoken ?? "–"}</dd>
+          {/if}
+        </dl>
+      {/if}
     {:else}
       <div class="pose-badge">
         <span class="indicator-dot"></span>{badgeText}
@@ -469,6 +501,28 @@
   .readiness.ok {
     border-color: var(--sc-success);
     color: #bbf7d0;
+  }
+  .ready-debug {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    margin: 0;
+    padding: 6px 8px;
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 0 8px;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 70%);
+    color: #e5e7eb;
+    font:
+      11px/1.4 ui-monospace,
+      monospace;
+  }
+  .ready-debug dt {
+    color: #9ca3af;
+  }
+  .ready-debug dd {
+    margin: 0;
   }
   .r-text {
     white-space: normal;
