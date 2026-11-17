@@ -99,6 +99,12 @@ export interface RepRecord {
 export interface ReviewPoseFrame {
   /** Analysis-aligned frame index (matches keyframes + metric frame refs). */
   readonly frameIndex: number;
+  /**
+   * When the frame was captured (ms, the live pose-frame clock — the same
+   * clock the shot's video clip start is recorded on). Lets review seek the
+   * video exactly. Absent on older shots.
+   */
+  readonly t?: number;
   readonly landmarks: {
     readonly x: number;
     readonly y: number;

@@ -147,7 +147,7 @@ State machine in `LivePracticeStore`:
 
 ## 4. Phased implementation
 
-> **Status:** Phases 0–6 are implemented (see "Implementation notes" below).
+> **Status:** Phases 0–7 are implemented (Phase 8: native validation + docs remains) (see "Implementation notes" below).
 
 ### Implementation notes (Phases 0–1)
 - **Required side corrected.** Pose data shows "side-left" means the player's
@@ -324,6 +324,55 @@ State machine in `LivePracticeStore`:
 
   A re-saved copy without a size shows the approximate tag with a portrait
   estimate.
+
+### Implementation notes (Phase 7)
+- **Recorder** (`shared/media/shot-clip-recorder.ts`): two staggered
+  MediaRecorders ("ping-pong"), each restarting every 10 s, offset by 5 s.
+  On a shot, the shortest segment that started before rep start minus the
+  1.5 s pre-roll is kept, and the other is dropped. Clips never exceed 10 s.
+- **Compression:** bitrate-capped (`videoBitsPerSecond` 0.9 Mbps), so about
+  0.1 MB per second. The e2e clip was ~460 KB.
+
+  Deviation from the plan: no canvas downscale. Bitrate alone bounds size,
+  and canvas `captureStream` adds per-frame CPU and is unreliable on iOS
+  WKWebView. Codec is VP9 → VP8 → WebM → MP4 (iOS).
+- **Exact sync:** each segment records its start on `performance.now()`.
+  Each stored pose frame now keeps its real capture time (`ReviewPoseFrame.t`;
+  the analysis view rebases times, so it's read from PoseData). The clip
+  stores `startFrameTs` on the pose-frame clock, and review seeks to
+  `(t − startFrameTs)/1000`. Older clips fall back to spreading the shot
+  across the clip. Play/pause lets the video drive the scrubber.
+- **Storage:** IndexedDB (web) or `@capacitor/filesystem` files plus a JSON
+  index in `Directory.Data/clips` (native), behind one `ShotClipStore`
+  interface with `cap`/`setCap`. "Not a shot?" only excludes shots (there is
+  no delete), so old clips leave through the cap.
+- **Retention is per device**, not a server setting: Profile → "Keep video for
+  the last" No video / 5 / 10 / 20 (default) / 50, stored in localStorage.
+  Lowering it prunes at once, and 0 records nothing. The clips live only on
+  that device, and server settings are currently **global across all users**
+  (see below), which surfaced as cross-test interference.
+- **Bug fixed — duplicate shots:** a rep window that ran to its max duration
+  (the player kept moving) could contain two detected shots, and the
+  pipeline stored both. One real shot showed up twice in Shots and Insights,
+  and the clip went to the wrong copy. `analyzeAndScore(…, focusIndex)` now
+  keeps only the shot nearest the rep trigger, on device and on the server.
+- **Bug fixed — flicker:** positioning flickers as the shooting motion starts,
+  which discarded the rolling clip. Clips now discard only after 3 s out of
+  position.
+- **Not validated here:** native iOS/Android (MediaRecorder in WKWebView,
+  Filesystem writes). Phase 8, on a device.
+
+### Findings for later (not fixed in Phases 0–7)
+- **Server settings are global, not per user** (`settings` table has no
+  `user_id`). Live focus areas, voice feedback and similar settings are shared
+  by every account on a server. Fix: a migration adding `user_id` and
+  scoping the settings repo. Video retention avoided it by being per device.
+- **Frame spacing vs. assumed fps:** since Phase 2's backpressure skips camera
+  ticks, live frames can be unevenly spaced. The analysis still assumes a
+  fixed 15 fps (time = index / fps). Fraction-of-shot timing metrics are mostly
+  unaffected, but durations in seconds can be off on slow phones. Part B
+  (30 fps + sub-frame timing) should use the real per-frame timestamps,
+  which the pose track now carries.
 
 Each phase ends with its own validation (see §5) and lands as its own commit(s).
 

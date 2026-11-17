@@ -139,3 +139,49 @@ describe("orientation gate", () => {
     expect(v2.reliability.sideView).toBe(true);
   });
 });
+
+describe("one shot per rep (focusIndex)", () => {
+  // Labeled: side-right [84-111], front [245-270], front-right [392-418].
+  const multi = JSON.parse(
+    readFileSync(
+      join(
+        process.cwd(),
+        "src-tests",
+        "fixtures",
+        "poses",
+        "20190103_180930.json",
+      ),
+      "utf8",
+    ),
+  ) as PoseData;
+
+  it("without a focus, every detected shot is considered", () => {
+    const { shots, rejected } = analyzeAndScore(multi, opts, targets);
+    expect(shots.length + rejected.length).toBe(3);
+  });
+
+  it("keeps only the shot at the rep trigger", () => {
+    const { shots, rejected } = analyzeAndScore(
+      multi,
+      opts,
+      targets,
+      undefined,
+      95,
+    );
+    expect(shots).toHaveLength(1);
+    expect(rejected).toEqual([]);
+    expect(shots[0]!.analysis.orientation).toBe("side-right");
+  });
+
+  it("gates the focused shot alone (a front-on rep isn't replaced by another)", () => {
+    const { shots, rejected } = analyzeAndScore(
+      multi,
+      opts,
+      targets,
+      undefined,
+      255,
+    );
+    expect(shots).toEqual([]);
+    expect(rejected).toHaveLength(1);
+  });
+});

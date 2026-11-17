@@ -80,10 +80,16 @@ export interface ScoredShot {
  */
 function filteredReviewFrames(pose: PoseData): ReviewPoseFrame[] {
   const out: ReviewPoseFrame[] = [];
-  for (const f of poseDataToLandmarkFrames(pose)) {
+  const frames = poseDataToLandmarkFrames(pose);
+  for (let i = 0; i < frames.length; i++) {
+    const f = frames[i]!;
     if (!f.landmarks || f.landmarks.length === 0) continue;
+    // PoseData keeps each frame's real capture time (seconds); the analysis
+    // view above rebases to frameIndex/fps, so read the original here.
+    const t = pose.frames[i]?.timestamp;
     out.push({
       frameIndex: out.length,
+      ...(typeof t === "number" ? { t: t * 1000 } : {}),
       landmarks: f.landmarks.map((l) => ({
         x: l.x,
         y: l.y,
@@ -112,6 +118,15 @@ export function analyzeAndScore(
   gate: { maxSideSeparation: number } = {
     maxSideSeparation: DEFAULT_LIVE_TUNING.readiness.maxSideSeparation,
   },
+  /**
+   * Live rep windows: the posed-frame index where the rep was triggered. A
+   * window can contain more than one detected shot (the player kept moving,
+   * so the rep ran to its max duration and swallowed the next shot); only the
+   * shot nearest the trigger is the rep — the others are not stored, so one
+   * rep never becomes several (duplicate) shots. Omit to keep every shot
+   * (e.g. a whole uploaded video).
+   */
+  focusIndex?: number,
 ): AnalyzeAndScoreResult {
   const frames = poseDataToLandmarkFrames(pose);
   const allowed = allowedOrientations(opts.shootingHand);
@@ -126,7 +141,11 @@ export function analyzeAndScore(
   });
   const allFrames = filteredReviewFrames(pose);
   const rejected: RejectedShot[] = [];
-  const kept = result.shots.filter((a) => {
+  const candidates =
+    focusIndex === undefined
+      ? result.shots
+      : nearestShot(result.shots, focusIndex);
+  const kept = candidates.filter((a) => {
     const o = a.orientation ?? "unknown";
     if (allowed.includes(o)) return true;
     rejected.push({ reason: "orientation", orientation: o, allowed });
@@ -153,6 +172,24 @@ export function analyzeAndScore(
     return { analysis, scorecard, worst: scorecard.worst, reviewPoses };
   });
   return { shots, rejected };
+}
+
+/** The shot whose frame range is nearest `index` (inside = distance 0). */
+function nearestShot<T extends { frameRange: { start: number; end: number } }>(
+  shots: readonly T[],
+  index: number,
+): T[] {
+  let best: T | null = null;
+  let bestDist = Infinity;
+  for (const s of shots) {
+    const { start, end } = s.frameRange;
+    const d = index < start ? start - index : index > end ? index - end : 0;
+    if (d < bestDist) {
+      bestDist = d;
+      best = s;
+    }
+  }
+  return best ? [best] : [];
 }
 
 /**

@@ -68,6 +68,7 @@ export const reviewPosesSchema = z.object({
   frames: z.array(
     z.object({
       frameIndex: z.number().int().nonnegative(),
+      t: z.number().optional(),
       landmarks: z.array(
         z.object({ x: z.number(), y: z.number(), visibility: z.number() }),
       ),
@@ -125,6 +126,8 @@ export const setSettingBody = z.object({ value: z.unknown() });
 export const analyzeLiveShotBody = z.object({
   playerId: z.string().min(1),
   poseData: z.unknown(),
+  /** Posed-frame index of the rep trigger (one shot per rep). */
+  focusIndex: z.number().int().nonnegative().optional(),
 });
 export const analyzeSessionBody = z.object({
   playerId: z.string().min(1),

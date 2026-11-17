@@ -68,6 +68,12 @@ export interface ShotEntry {
   worst: readonly MetricDeviation[];
   scorecard: ShotScorecard;
   excluded: boolean;
+  /**
+   * When the rep started (pose-frame clock, ms) and the offset from that clock
+   * to performance.now() — lets the clip recorder pick and align the video.
+   * Absent for shots loaded from history.
+   */
+  capture?: { repStartTs: number; frameToWall: number };
 }
 
 export interface ShotFeedback {
@@ -221,10 +227,16 @@ export class LivePracticeStore {
         this.deps.fps,
         this.deps.frameSize?.() ?? {},
       );
+      // The rep's trigger, as an index into the posed frames the analysis
+      // sees (frames with no pose are dropped there).
+      const focusIndex = event.window.frames.filter(
+        (f) => f.landmarks !== null && f.timestamp < event.window.startedAt,
+      ).length;
       result = await pipeline.process({
         playerId: this.deps.playerId,
         poseData,
         opts: this.deps.opts,
+        focusIndex,
       });
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
@@ -256,6 +268,7 @@ export class LivePracticeStore {
           ) ?? [])
         : first.worst;
 
+    const last = event.window.frames.at(-1);
     const entry: ShotEntry = {
       index: this.shots.length + 1,
       shotId: first.shot.id,
@@ -263,6 +276,11 @@ export class LivePracticeStore {
       worst: focused,
       scorecard: first.scorecard,
       excluded: false,
+      capture: {
+        repStartTs: event.window.startedAt,
+        frameToWall:
+          last?.captureTs !== undefined ? last.captureTs - last.timestamp : 0,
+      },
     };
     this.shots = [...this.shots, entry];
 

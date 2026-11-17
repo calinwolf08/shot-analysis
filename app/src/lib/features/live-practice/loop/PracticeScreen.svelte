@@ -6,7 +6,7 @@
    * demand), and a running history. No "End / summary" — you practice until you
    * leave, and every shot is already persisted.
    */
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import type {
     LandmarkFrame,
     LiveAnalysisSession,
@@ -107,8 +107,11 @@
   let pacer: CuePacer | null = null;
 
   // Per-shot clip recording.
-  let recorder: ShotClipRecorder | null = null;
-  let savedShots = 0;
+  let recorder = $state.raw<ShotClipRecorder | null>(null);
+  // Shots already in the store at mount (today's history) have no clip to take.
+  let savedShots = untrack(() => store.shots.length);
+  /** Pre-roll kept before the rep start (matches the coordinator's window). */
+  const CLIP_PRE_ROLL_MS = 1500;
 
   $effect(() => {
     if (!session) return;
@@ -164,12 +167,28 @@
   });
 
   // Keep a clip rolling while the player is positioned and between shots, so a
-  // detected shot is captured; stop (discard) if they leave the position.
+  // detected shot is captured. Positioning flickers as the shooting motion
+  // starts, so only discard after the player has really left (segments are
+  // capped at 10 s, so rolling a little longer costs nothing).
+  const CLIP_DISCARD_AFTER_MS = 3000;
+  let discardTimer: ReturnType<typeof setTimeout> | null = null;
   $effect(() => {
     if (!clipStore || !recorder || !gateActive) return;
-    const idle = store.phase !== "analyzing" && store.cycle === "tracking";
-    if (positioned && idle && !recorder.recording) recorder.start();
-    else if (!positioned && idle && recorder.recording) recorder.discard();
+    const idle =
+      store.running &&
+      store.phase !== "analyzing" &&
+      store.cycle === "tracking";
+    if (positioned) {
+      if (discardTimer) clearTimeout(discardTimer);
+      discardTimer = null;
+      if (idle && !recorder.recording) recorder.start();
+    } else if (idle && recorder.recording && !discardTimer) {
+      const r = recorder;
+      discardTimer = setTimeout(() => {
+        discardTimer = null;
+        if (!positioned && store.cycle === "tracking") r.discard();
+      }, CLIP_DISCARD_AFTER_MS);
+    }
   });
 
   // When a new shot is persisted, take the rolling clip and store it by shotId.
@@ -178,16 +197,28 @@
     if (n > savedShots) {
       const entry = store.shots[n - 1];
       savedShots = n;
-      if (entry) void saveClip(entry.shotId);
+      if (entry) void saveClip(entry);
     }
   });
 
-  async function saveClip(shotId: string): Promise<void> {
+  /**
+   * Keeps the segment covering this shot (from its pre-roll) and stores it
+   * with its start on the pose-frame clock, so review seeks frame-exactly.
+   */
+  async function saveClip(entry: (typeof store.shots)[number]): Promise<void> {
     if (!clipStore || !recorder || !recorder.recording) return;
-    const blob = await recorder.stopAndTake();
-    if (!blob) return;
+    const cap = entry.capture;
+    const fromWall = cap
+      ? cap.repStartTs + cap.frameToWall - CLIP_PRE_ROLL_MS
+      : Number.NEGATIVE_INFINITY;
+    const take = await recorder.takeCovering(fromWall);
+    if (!take) return;
     try {
-      await clipStore.save(shotId, blob);
+      await clipStore.save(entry.shotId, {
+        blob: take.blob,
+        mime: take.mime,
+        startFrameTs: cap ? take.startTs - cap.frameToWall : null,
+      });
     } catch {
       /* local storage best-effort */
     }
@@ -241,10 +272,14 @@
           frameCapture = createLiveFrameCapture(videoEl, session);
         }
       };
-      if (clipStore && !recorder) recorder = createShotClipRecorder(stream);
+      // Cap 0 ("keep video for 0 shots") = don't record at all.
+      if (clipStore && clipStore.cap > 0 && !recorder) {
+        recorder = createShotClipRecorder(stream);
+      }
     }
     return () => {
       frameCapture?.stop();
+      if (discardTimer) clearTimeout(discardTimer);
       recorder?.discard();
     };
   });

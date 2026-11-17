@@ -47,6 +47,7 @@
     createFileCaptureService,
   } from "$lib/shared/media/capture";
   import { getShotClipStore } from "$lib/shared/media/shot-clip-store";
+  import { getVideoRetention } from "$lib/shared/media/video-retention";
   import { audioUnlockState } from "$lib/shared/audio/unlock-state";
 
   const services = useAppServices();
@@ -62,6 +63,7 @@
           : {},
       )
     : createWebAudioFeedbackService();
+  // Retention is applied once the setting loads (see boot).
   const clipStore = getShotClipStore();
 
   const replayMode =
@@ -142,6 +144,7 @@
       await services.repos.settings.get("liveFocusAreas"),
     );
     initialShots = await loadTodaysShots(player.id, targets);
+    await clipStore.setCap(getVideoRetention()).catch(() => undefined);
     if (destroyed) return;
 
     // Dev/E2E only: `?detectDelayMs=` slows each detection in the worker to

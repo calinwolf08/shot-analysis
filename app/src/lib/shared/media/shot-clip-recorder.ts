@@ -1,98 +1,215 @@
 /**
- * Thin MediaRecorder wrapper for capturing a short clip of a single shot from
- * the live camera stream. The loop starts it when the player is positioned and
- * takes the clip when a shot is scored, so each clip spans roughly "ready →
- * shot", which is exactly what the review screen wants to play back.
+ * Per-shot clip recording from the live camera stream (on-device only).
  *
- * Returns null when MediaRecorder isn't available (SSR, replay/e2e, some
- * webviews) so callers never branch on platform — recording is simply skipped.
+ * Two staggered MediaRecorders ("ping-pong" segments) run while the player is
+ * positioned. Each restarts after `segmentMs`, offset by half a segment, so at
+ * any moment one of them has been recording for at least `segmentMs / 2`.
+ * When a shot is captured, the shortest segment that started before the shot
+ * (minus pre-roll) is kept and the other is discarded, so a clip covers the
+ * shot but never grows past `segmentMs`, however long the player stands there.
+ *
+ * Every segment records its start time on the `performance.now()` clock (the
+ * same clock as live pose frames), so review can seek the video to any pose
+ * frame exactly instead of guessing.
+ *
+ * Size is bounded by the bitrate (`videoBitsPerSecond`, default 0.9 Mbps):
+ * ~0.1 MB per second of clip, ≤ ~1.1 MB for a full 10 s segment.
+ *
+ * Returns null when MediaRecorder isn't available (SSR, some webviews) so
+ * callers never branch on platform — recording is simply skipped.
  */
+
+export interface ClipTake {
+  readonly blob: Blob;
+  readonly mime: string;
+  /** performance.now() when this clip's first frame was recorded. */
+  readonly startTs: number;
+}
+
 export interface ShotClipRecorder {
   readonly recording: boolean;
-  /** Begin (or continue) recording. Idempotent while already recording. */
+  /** Begin rolling segments (idempotent while recording). */
   start(): void;
-  /** Stop and resolve the recorded clip, or null if nothing was captured. */
-  stopAndTake(): Promise<Blob | null>;
-  /** Stop and discard (e.g. the player walked out of frame). */
+  /**
+   * Stop and keep the clip that best covers `fromTs` onward (the shortest
+   * segment that started at or before it; else the oldest). Null if nothing
+   * was recorded.
+   */
+  takeCovering(fromTs: number): Promise<ClipTake | null>;
+  /** Stop and drop everything (e.g. the player walked out of position). */
   discard(): void;
 }
 
-const PREFERRED_MIME = [
+/** The slice of MediaRecorder used here (injectable for tests). */
+export interface RecorderLike {
+  readonly state: "inactive" | "recording" | "paused";
+  ondataavailable: ((e: { data: Blob }) => void) | null;
+  onstop: (() => void) | null;
+  start(timesliceMs?: number): void;
+  stop(): void;
+}
+
+export interface ShotClipRecorderOptions {
+  segmentMs?: number;
+  videoBitsPerSecond?: number;
+  now?: () => number;
+  /** Rotation check interval (ms). */
+  tickMs?: number;
+  makeRecorder?: (
+    stream: MediaStream,
+    mime: string,
+    bps: number,
+  ) => RecorderLike;
+}
+
+export const PREFERRED_MIME = [
   "video/webm;codecs=vp9",
   "video/webm;codecs=vp8",
   "video/webm",
-  "video/mp4",
+  "video/mp4", // iOS Safari / WKWebView
 ];
 
-export function createShotClipRecorder(
-  stream: MediaStream,
-): ShotClipRecorder | null {
-  if (typeof MediaRecorder === "undefined") return null;
-  if (stream.getVideoTracks().length === 0) return null;
+export const DEFAULT_SEGMENT_MS = 10_000;
+export const DEFAULT_VIDEO_BPS = 900_000;
 
-  const mime =
+function pickMime(): string {
+  if (typeof MediaRecorder === "undefined") return "";
+  return (
     PREFERRED_MIME.find((m) => {
       try {
         return MediaRecorder.isTypeSupported(m);
       } catch {
         return false;
       }
-    }) ?? "";
+    }) ?? ""
+  );
+}
 
-  let rec: MediaRecorder | null = null;
-  let chunks: Blob[] = [];
+function defaultMakeRecorder(
+  stream: MediaStream,
+  mime: string,
+  bps: number,
+): RecorderLike {
+  const opts: MediaRecorderOptions = { videoBitsPerSecond: bps };
+  if (mime) opts.mimeType = mime;
+  return new MediaRecorder(stream, opts) as unknown as RecorderLike;
+}
 
-  function take(): Blob | null {
-    if (chunks.length === 0) return null;
-    return new Blob(chunks, { type: mime || "video/webm" });
+interface Slot {
+  rec: RecorderLike;
+  chunks: Blob[];
+  startTs: number;
+}
+
+export function createShotClipRecorder(
+  stream: MediaStream,
+  opts: ShotClipRecorderOptions = {},
+): ShotClipRecorder | null {
+  const custom = !!opts.makeRecorder;
+  if (!custom && typeof MediaRecorder === "undefined") return null;
+  if (!custom && stream.getVideoTracks().length === 0) return null;
+
+  const segmentMs = opts.segmentMs ?? DEFAULT_SEGMENT_MS;
+  const bps = opts.videoBitsPerSecond ?? DEFAULT_VIDEO_BPS;
+  const now = opts.now ?? (() => performance.now());
+  const make = opts.makeRecorder ?? defaultMakeRecorder;
+  const mime = custom ? "video/webm" : pickMime();
+
+  let slots: Slot[] = [];
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let active = false;
+
+  function open(): Slot | null {
+    try {
+      const rec = make(stream, mime, bps);
+      const slot: Slot = { rec, chunks: [], startTs: now() };
+      rec.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) slot.chunks.push(e.data);
+      };
+      rec.start();
+      return slot;
+    } catch {
+      return null;
+    }
+  }
+
+  function close(slot: Slot): void {
+    slot.rec.ondataavailable = null;
+    slot.rec.onstop = null;
+    try {
+      if (slot.rec.state !== "inactive") slot.rec.stop();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** Keep two staggered segments rolling. */
+  function tick(): void {
+    if (!active) return;
+    const t = now();
+    slots = slots.map((s) => {
+      if (t - s.startTs < segmentMs) return s;
+      close(s);
+      return open() ?? s;
+    });
+    if (slots.length === 1 && t - slots[0]!.startTs >= segmentMs / 2) {
+      const second = open();
+      if (second) slots.push(second);
+    }
+  }
+
+  function stopAll(): void {
+    active = false;
+    if (timer) clearInterval(timer);
+    timer = null;
   }
 
   return {
     get recording() {
-      return rec?.state === "recording";
+      return active;
     },
+
     start() {
-      if (rec && rec.state === "recording") return;
-      chunks = [];
-      try {
-        rec = mime
-          ? new MediaRecorder(stream, { mimeType: mime })
-          : new MediaRecorder(stream);
-      } catch {
-        rec = null;
-        return;
-      }
-      rec.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunks.push(e.data);
-      };
-      rec.start();
+      if (active) return;
+      const first = open();
+      if (!first) return;
+      slots = [first];
+      active = true;
+      timer = setInterval(tick, opts.tickMs ?? 250);
     },
-    stopAndTake() {
-      return new Promise((resolve) => {
-        const r = rec;
-        if (!r || r.state === "inactive") {
-          resolve(take());
-          return;
-        }
-        r.onstop = () => {
-          const blob = take();
-          chunks = [];
-          resolve(blob);
-        };
+
+    async takeCovering(fromTs) {
+      if (!active) return null;
+      stopAll();
+      const covering = slots.filter((s) => s.startTs <= fromTs);
+      const keep =
+        covering.length > 0
+          ? covering.reduce((a, b) => (b.startTs > a.startTs ? b : a))
+          : slots.reduce((a, b) => (b.startTs < a.startTs ? b : a));
+      for (const s of slots) if (s !== keep) close(s);
+      slots = [];
+      const blob = await new Promise<Blob | null>((resolve) => {
+        const finish = () =>
+          resolve(
+            keep.chunks.length > 0
+              ? new Blob(keep.chunks, { type: mime || "video/webm" })
+              : null,
+          );
+        if (keep.rec.state === "inactive") return finish();
+        keep.rec.onstop = finish;
         try {
-          r.stop();
+          keep.rec.stop();
         } catch {
-          resolve(take());
+          finish();
         }
       });
+      return blob ? { blob, mime: blob.type, startTs: keep.startTs } : null;
     },
+
     discard() {
-      try {
-        if (rec && rec.state !== "inactive") rec.stop();
-      } catch {
-        /* ignore */
-      }
-      chunks = [];
+      stopAll();
+      for (const s of slots) close(s);
+      slots = [];
     },
   };
 }

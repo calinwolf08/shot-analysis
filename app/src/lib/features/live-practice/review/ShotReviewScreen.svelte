@@ -70,6 +70,10 @@
 
   // Recorded clip of the actual shot (on-device only; absent on other devices).
   let clipUrl = $state<string | null>(null);
+  /** The clip's first frame on the pose-frame clock (null: older clip). */
+  let clipStartFrameTs = $state<number | null>(null);
+  /** Video is playing and driving the scrubber. */
+  let playing = $state(false);
   let videoEl = $state<HTMLVideoElement | null>(null);
   let videoReady = $state(false);
   let videoSize = $state<{ width: number; height: number } | null>(null);
@@ -193,8 +197,11 @@
   async function loadClip(id: string) {
     revokeClip();
     videoReady = false;
-    const blob = await clipStore.get(id).catch(() => null);
-    if (blob) clipUrl = URL.createObjectURL(blob);
+    const clip = await clipStore.get(id).catch(() => null);
+    if (clip) {
+      clipStartFrameTs = clip.startFrameTs;
+      clipUrl = URL.createObjectURL(clip.blob);
+    }
   }
 
   function revokeClip() {
@@ -224,20 +231,89 @@
     if (kf) current = kf.startFrame;
   }
 
-  // Keep the clip scrubbed in step with the pose: map the frame range across
-  // the whole clip (the clip ~spans the shot, so this is approximate).
+  /**
+   * Video time (s) for a pose frame. Exact when the clip's start and the
+   * frame's capture time are both known (same clock); older clips fall back
+   * to spreading the shot across the clip.
+   */
+  function videoTimeFor(frameIndex: number): number | null {
+    const f = poses?.frames.find((p) => p.frameIndex === frameIndex);
+    if (clipStartFrameTs !== null && typeof f?.t === "number") {
+      return Math.max(0, (f.t - clipStartFrameTs) / 1000);
+    }
+    const v = videoEl;
+    if (!v || !v.duration || !isFinite(v.duration)) return null;
+    const span = Math.max(end - start, 1);
+    return Math.min(1, Math.max(0, (frameIndex - start) / span)) * v.duration;
+  }
+
+  /** The pose frame shown at a video time (inverse of videoTimeFor). */
+  function frameAtTime(seconds: number): number {
+    if (!poses) return start;
+    let best = start;
+    let bestErr = Infinity;
+    for (const f of poses.frames) {
+      const vt = videoTimeFor(f.frameIndex);
+      if (vt === null) continue;
+      const err = Math.abs(vt - seconds);
+      if (err < bestErr) {
+        bestErr = err;
+        best = f.frameIndex;
+      }
+    }
+    return best;
+  }
+
+  const exactSync = $derived(
+    clipStartFrameTs !== null &&
+      !!poses?.frames.some((f) => typeof f.t === "number"),
+  );
+
+  // Scrubbing seeks the clip to the shown pose frame (unless the video is
+  // playing — then the video drives the scrubber).
   $effect(() => {
     const v = videoEl;
     const c = current;
-    if (!v || !videoReady || !v.duration || !isFinite(v.duration)) return;
-    const span = Math.max(end - start, 1);
-    const frac = Math.min(1, Math.max(0, (c - start) / span));
+    if (!v || !videoReady || playing) return;
+    const t = videoTimeFor(c);
+    if (t === null) return;
     try {
-      v.currentTime = frac * v.duration;
+      v.currentTime = t;
     } catch {
       /* seeking not ready */
     }
   });
+
+  async function togglePlay() {
+    const v = videoEl;
+    if (!v) return;
+    if (playing) {
+      v.pause();
+      playing = false;
+      return;
+    }
+    if (current >= end) current = start;
+    const t = videoTimeFor(current);
+    if (t !== null) v.currentTime = t;
+    playing = true;
+    try {
+      await v.play();
+    } catch {
+      playing = false;
+      return;
+    }
+    const tick = () => {
+      if (!playing || !videoEl) return;
+      current = frameAtTime(videoEl.currentTime);
+      if (videoEl.ended || current >= end) {
+        videoEl.pause();
+        playing = false;
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
 
   $effect(() => {
     const c = canvas;
@@ -356,6 +432,8 @@
           playsinline
           preload="auto"
           data-testid="review-video"
+          data-start-frame-ts={clipStartFrameTs ?? ""}
+          data-exact-sync={exactSync}
           style={videoBox
             ? `left:${videoBox.left}px;top:${videoBox.top}px;width:${videoBox.width}px;height:${videoBox.height}px`
             : ""}
@@ -382,6 +460,7 @@
               })
             : ""}
           data-approximate={framing?.approximate ?? false}
+          data-frame-t={frame?.t ?? ""}
         ></canvas>
         {#if framing?.approximate}
           <span class="approx" data-testid="review-approx-framing"
@@ -417,10 +496,27 @@
             ></span>
           {/each}
         </div>
+        {#if clipUrl}
+          <button
+            class="play"
+            data-testid="review-play"
+            aria-label={playing ? "Pause video" : "Play video"}
+            disabled={!videoReady}
+            onclick={() => void togglePlay()}
+          >
+            {playing ? "⏸" : "▶"}
+          </button>
+        {/if}
         <input
           type="range"
           min={start}
           max={end}
+          oninput={() => {
+            if (playing) {
+              videoEl?.pause();
+              playing = false;
+            }
+          }}
           bind:value={current}
           data-testid="review-scrubber"
           aria-label="Scrub shot"
@@ -477,6 +573,16 @@
     position: absolute;
     object-fit: fill;
     background: #000;
+  }
+  .play {
+    width: 40px;
+    height: 32px;
+    margin-right: 8px;
+    border: 1px solid var(--sc-border);
+    border-radius: 8px;
+    background: var(--sc-card);
+    color: var(--sc-text);
+    cursor: pointer;
   }
   .approx {
     position: absolute;

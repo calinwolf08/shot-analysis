@@ -28,6 +28,8 @@ export interface ProcessInput {
   readonly poseData: PoseData;
   /** Analysis options for the player (shooting hand + profile). */
   readonly opts: AnalyzeOptions;
+  /** Posed-frame index of the rep trigger (keeps only that rep's shot). */
+  readonly focusIndex?: number;
 }
 
 export interface ProcessedShot {
@@ -58,11 +60,13 @@ export function createLocalPipeline(deps: {
 }): LiveShotPipeline {
   return {
     location: "device",
-    async process({ playerId, poseData, opts }) {
+    async process({ playerId, poseData, opts, focusIndex }) {
       const { shots: scored, rejected } = analyzeAndScore(
         poseData,
         opts,
         deps.targets,
+        undefined,
+        focusIndex,
       );
       const out: ProcessedShot[] = [];
       for (const s of scored) {
@@ -84,10 +88,14 @@ export function createServerPipeline(deps: {
 }): LiveShotPipeline {
   return {
     location: "server",
-    async process({ playerId, poseData }) {
+    async process({ playerId, poseData, focusIndex }) {
       const res = await deps.api.send<ProcessResult>(
         "/api/analysis/live-shot",
-        { playerId, poseData },
+        {
+          playerId,
+          poseData,
+          ...(focusIndex !== undefined ? { focusIndex } : {}),
+        },
       );
       return { shots: res.shots, rejected: res.rejected ?? [] };
     },
