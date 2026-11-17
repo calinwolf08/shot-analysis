@@ -19,7 +19,10 @@
     loadLiveTuning,
     type LiveTuning,
   } from "$lib/features/live-practice/tuning";
-  import { withAudioProbe } from "$lib/shared/audio/audio-probe";
+  import {
+    simulatedSpeechMs,
+    withAudioProbe,
+  } from "$lib/shared/audio/audio-probe";
   import {
     loadLiveTargets,
     normalizeAreas,
@@ -40,8 +43,14 @@
   // Dev/E2E: mirror everything audible into window.__scAudioLog so specs can
   // assert what the player hears. Constant-folds away in production.
   const devSurfaces = import.meta.env.DEV || import.meta.env.VITE_E2E === "1";
+  // E2E builds also simulate speech durations (headless has no voices).
   const audio = devSurfaces
-    ? withAudioProbe(createWebAudioFeedbackService())
+    ? withAudioProbe(
+        createWebAudioFeedbackService(),
+        import.meta.env.VITE_E2E === "1"
+          ? { simulateSpeech: simulatedSpeechMs }
+          : {},
+      )
     : createWebAudioFeedbackService();
   const clipStore = getShotClipStore();
 
@@ -69,7 +78,6 @@
     : liveVideoUrl
       ? createFileCaptureService(liveVideoUrl)
       : createBrowserCaptureService();
-  const feedbackMs = replayMode ? 1500 : 4000;
 
   const liveDebug =
     import.meta.env.VITE_LIVE_DEBUG === "1" ||
@@ -176,7 +184,6 @@
       playerId,
       opts: { shootingHand, profile: "pro-form" },
       fps: session.fps,
-      feedbackMs,
       focusAreas,
     });
     store.start();

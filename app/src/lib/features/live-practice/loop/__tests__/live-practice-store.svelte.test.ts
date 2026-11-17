@@ -13,7 +13,11 @@ import type {
   LiveRepCoordinator,
 } from "../../coordinator/coordinator";
 import {
+  ANALYZING_TEXT,
+  CAPTURED_TEXT,
   LivePracticeStore,
+  NOT_SCORED_TEXT,
+  ON_TARGET_TEXT,
   WRONG_ANGLE_TEXT,
 } from "../live-practice-store.svelte";
 import type { RejectedShot } from "../../pipeline";
@@ -133,11 +137,14 @@ function fakeStore() {
 
 const opts: AnalyzeOptions = { shootingHand: "right", profile: "pro-form" };
 
-function makeStore(results: Outcome[]) {
+function makeStore(
+  results: Outcome[],
+  audioOpts: { holdSpeech?: boolean } = {},
+) {
   const { coordinator, emit } = fakeCoordinator();
   const pipeline = fakePipeline(results);
   const { store: shotStore, excluded } = fakeStore();
-  const audio = createFakeAudio();
+  const audio = createFakeAudio(audioOpts);
   const store = new LivePracticeStore({
     coordinator,
     pipeline,
@@ -146,7 +153,6 @@ function makeStore(results: Outcome[]) {
     playerId: "p1",
     opts,
     fps: 30,
-    feedbackMs: 60,
   });
   store.start();
   return { store, emit, audio, pipeline, shotStore, excluded, coordinator };
@@ -161,48 +167,63 @@ function repEvent(): CoordinatorEvents["repResult"] {
   };
 }
 
-describe("LivePracticeStore", () => {
-  it("brackets a shot with earcons and reads the worst metrics", async () => {
-    const { store, emit, audio } = makeStore([
+describe("LivePracticeStore — per-shot cycle", () => {
+  it("captured → analyzing → readback → ready, strictly in order", async () => {
+    const { store, emit, audio, coordinator } = makeStore([
       [processed("s1", 3.4, ["Elbow flare", "Set point"])],
     ]);
-
-    emit("repAnalyzing", { frameCount: 10, trigger: "settled" });
-    expect(audio.earcons).toEqual(["analyzing"]);
-    expect(audio.cancels).toBe(1); // interrupts any prior readback
-
     emit("repResult", repEvent());
-    await vi.waitFor(() => expect(store.shots).toHaveLength(1));
+    await vi.waitFor(() => expect(store.cycle).toBe("tracking"));
 
-    expect(audio.earcons).toEqual(["analyzing", "ready"]);
-    expect(audio.spoken[0]).toContain("Elbow flare high by 6");
+    expect(audio.sequence).toEqual([
+      "earcon:captured",
+      `speak:${CAPTURED_TEXT}`,
+      `speak:${ANALYZING_TEXT}`,
+      "speak:Elbow flare high by 6, Set point high by 6",
+      "earcon:ready",
+    ]);
+    expect(store.shots).toHaveLength(1);
     expect(store.feedback?.overall).toBe(3.4);
-    expect(store.feedback?.worst).toHaveLength(2);
     expect(store.average).toBe(3.4);
-    expect(store.shots[0]!.shotId).toBe("s1");
+    // Tracking resumed exactly once, at the end.
+    expect(coordinator.dismissFeedback).toHaveBeenCalledTimes(1);
   });
 
-  it("stays silent (no readback) when nothing is off-target", async () => {
+  it("holds shot detection until the readback has FINISHED", async () => {
+    const { store, emit, audio, coordinator } = makeStore(
+      [[processed("s1", 2, ["Set point"])]],
+      { holdSpeech: true },
+    );
+    emit("repResult", repEvent());
+    await vi.waitFor(() => expect(store.cycle).toBe("captured"));
+    expect(coordinator.dismissFeedback).not.toHaveBeenCalled();
+
+    const next = async () => {
+      await vi.waitFor(() => expect(audio.speaking).toBe(1));
+      audio.releaseSpeech();
+    };
+    await next(); // "Shot captured" done
+    await vi.waitFor(() => expect(store.cycle).toBe("analyzing"));
+    await vi.waitFor(() => expect(audio.speaking).toBe(1));
+    expect(coordinator.dismissFeedback).not.toHaveBeenCalled();
+    audio.releaseSpeech(); // "Analyzing" done
+    await vi.waitFor(() => expect(store.cycle).toBe("readback"));
+    expect(store.feedback).not.toBeNull();
+    expect(coordinator.dismissFeedback).not.toHaveBeenCalled();
+
+    await next(); // readback done
+    await vi.waitFor(() => expect(store.cycle).toBe("tracking"));
+    expect(coordinator.dismissFeedback).toHaveBeenCalledTimes(1);
+    // The card stays up until the next shot.
+    expect(store.feedback?.index).toBe(1);
+  });
+
+  it("says 'On target' instead of falling silent", async () => {
     const { store, emit, audio } = makeStore([[processed("s1", 1, [])]]);
     emit("repResult", repEvent());
-    await vi.waitFor(() => expect(store.shots).toHaveLength(1));
-    expect(audio.spoken).toEqual([]); // no worst metrics → nothing spoken
-    expect(audio.earcons).toContain("ready");
-  });
-
-  it("treats an empty pipeline result as a miss", async () => {
-    const { store, emit, audio } = makeStore([[]]);
-    emit("repResult", repEvent());
-    await vi.waitFor(() => expect(store.noShotFlash).toBe(true));
-    expect(store.shots).toHaveLength(0);
-    expect(audio.earcons).toContain("ready");
-  });
-
-  it("releases the coordinator when the pipeline finds nothing", async () => {
-    const { store, emit, coordinator } = makeStore([[]]);
-    emit("repResult", repEvent());
-    await vi.waitFor(() => expect(store.noShotFlash).toBe(true));
-    expect(coordinator.dismissFeedback).toHaveBeenCalled();
+    await vi.waitFor(() => expect(store.cycle).toBe("tracking"));
+    expect(audio.spoken.at(-1)).toBe(ON_TARGET_TEXT);
+    expect(audio.earcons.at(-1)).toBe("ready");
   });
 
   it("announces a wrong-angle shot, stores nothing, resumes tracking", async () => {
@@ -219,12 +240,86 @@ describe("LivePracticeStore", () => {
       },
     ]);
     emit("repResult", repEvent());
-    await vi.waitFor(() => expect(store.wrongAngleFlash).toBe(true));
+    await vi.waitFor(() => expect(store.cycle).toBe("tracking"));
+    expect(store.wrongAngleFlash).toBe(true);
     expect(store.shots).toHaveLength(0);
-    expect(audio.spoken).toEqual([WRONG_ANGLE_TEXT]);
-    expect(audio.earcons).toContain("ready");
-    expect(store.noShotFlash).toBe(false);
+    expect(audio.sequence.slice(-2)).toEqual([
+      `speak:${WRONG_ANGLE_TEXT}`,
+      "earcon:ready",
+    ]);
+    expect(coordinator.dismissFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it("an empty pipeline result is reported and releases tracking", async () => {
+    const { store, emit, audio, coordinator } = makeStore([[]]);
+    emit("repResult", repEvent());
+    await vi.waitFor(() => expect(store.cycle).toBe("tracking"));
+    expect(store.noShotFlash).toBe(true);
+    expect(audio.spoken).toContain(NOT_SCORED_TEXT);
     expect(coordinator.dismissFeedback).toHaveBeenCalled();
+  });
+
+  it("a pipeline error still ends the cycle and resumes tracking", async () => {
+    const { store, emit, pipeline, coordinator } = makeStore([[]]);
+    (pipeline.process as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("boom"),
+    );
+    emit("repResult", repEvent());
+    await vi.waitFor(() => expect(store.cycle).toBe("tracking"));
+    expect(store.error).toBe("boom");
+    expect(coordinator.dismissFeedback).toHaveBeenCalled();
+  });
+
+  it("a non-shot motion only flashes (nothing was announced)", () => {
+    const { store, emit, audio } = makeStore([[]]);
+    emit("repAnalyzing", { frameCount: 10, trigger: "settled" });
+    expect(audio.cancels).toBe(1); // cuts any positioning cue
+    emit("noShot", {
+      window: { frames: [], startedAt: 0, endedAt: 1, trigger: "settled" },
+      reason: "no-shot-detected",
+    });
+    expect(store.noShotFlash).toBe(true);
+    expect(audio.sequence).toEqual([]);
+  });
+
+  it("pausing mid-cycle abandons it without resuming tracking", async () => {
+    const { store, emit, audio, coordinator } = makeStore(
+      [[processed("s1", 2, ["Set point"])]],
+      { holdSpeech: true },
+    );
+    emit("repResult", repEvent());
+    await vi.waitFor(() => expect(store.cycle).toBe("captured"));
+    store.pause();
+    audio.releaseSpeech();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(store.cycle).toBe("tracking");
+    expect(store.phase).toBe("paused");
+    expect(coordinator.stop).toHaveBeenCalled();
+    expect(coordinator.dismissFeedback).not.toHaveBeenCalled();
+    expect(audio.earcons).not.toContain("ready");
+  });
+
+  it("'Not a shot?' excludes, re-averages, and cuts its readback short", async () => {
+    const { store, emit, audio, excluded } = makeStore(
+      [[processed("s1", 4, ["Elbow flare"])]],
+      { holdSpeech: true },
+    );
+    emit("repResult", repEvent());
+    const next = async () => {
+      await vi.waitFor(() => expect(audio.speaking).toBe(1));
+      audio.releaseSpeech();
+    };
+    await next(); // "Shot captured"
+    await next(); // "Analyzing"
+    await vi.waitFor(() => expect(store.cycle).toBe("readback"));
+
+    await store.excludeShot(1);
+    expect(excluded).toEqual(["s1"]);
+    expect(store.shots[0]!.excluded).toBe(true);
+    expect(store.shotCount).toBe(0);
+    expect(store.average).toBeNull();
+    expect(store.feedback).toBeNull();
+    await vi.waitFor(() => expect(store.cycle).toBe("tracking"));
   });
 
   it("forwards arming to the coordinator", () => {
@@ -233,37 +328,11 @@ describe("LivePracticeStore", () => {
     expect(coordinator.setArmed).toHaveBeenCalledWith(false);
   });
 
-  it("flashes and signals ready on a no-shot", () => {
-    const { store, emit, audio } = makeStore([[]]);
-    emit("noShot", {
-      window: { frames: [], startedAt: 0, endedAt: 1, trigger: "settled" },
-      reason: "no-shot-detected",
-    });
-    expect(store.noShotFlash).toBe(true);
-    expect(audio.earcons).toEqual(["ready"]);
-  });
-
-  it("excludes a shot and re-averages", async () => {
-    const { store, emit, excluded } = makeStore([
-      [processed("s1", 4, ["Elbow flare"])],
-    ]);
-    emit("repResult", repEvent());
-    await vi.waitFor(() => expect(store.shots).toHaveLength(1));
-
-    await store.excludeShot(1);
-    expect(excluded).toEqual(["s1"]);
-    expect(store.shots[0]!.excluded).toBe(true);
-    expect(store.shotCount).toBe(0);
-    expect(store.average).toBeNull();
-  });
-
-  it("pause cancels speech + stops the coordinator; resume restarts", () => {
-    const { store, audio, coordinator } = makeStore([[]]);
-    const cancelsBefore = audio.cancels;
+  it("pause stops the coordinator; resume restarts", () => {
+    const { store, coordinator } = makeStore([[]]);
     store.pause();
     expect(store.phase).toBe("paused");
     expect(coordinator.stop).toHaveBeenCalled();
-    expect(audio.cancels).toBe(cancelsBefore + 1);
     store.resume();
     expect(store.phase).toBe("ready");
     expect(coordinator.start).toHaveBeenCalledTimes(2); // start() + resume()

@@ -138,14 +138,18 @@
     positioned = s.positioned;
     cue = s.cue;
     if (debug) readiness = s;
+    // Only coach between shots (never over the shot announcements).
     const coachable =
-      store.phase !== "analyzing" && !store.feedback && !store.muted;
+      store.cycle === "tracking" &&
+      store.phase !== "analyzing" &&
+      store.phase !== "paused" &&
+      !store.muted;
     const out = pacer?.update(s.cue, coachable) ?? null;
     if (out?.kind === "ready") {
-      audio?.playEarcon("ready");
-      audio?.speak(READY_TEXT);
+      // Tone first, then the words (sequenced, never overlapping).
+      void audio?.playEarcon("ready").then(() => audio?.speak(READY_TEXT));
     } else if (out?.kind === "cue") {
-      audio?.speak(CUE_TEXT[out.cue as keyof typeof CUE_TEXT]);
+      void audio?.speak(CUE_TEXT[out.cue as keyof typeof CUE_TEXT]);
     }
     if (debug && pacer) pacerSnap = pacer.snapshot();
   }
@@ -159,7 +163,7 @@
   // detected shot is captured; stop (discard) if they leave the position.
   $effect(() => {
     if (!clipStore || !recorder || !gateActive) return;
-    const idle = store.phase !== "analyzing" && !store.feedback;
+    const idle = store.phase !== "analyzing" && store.cycle === "tracking";
     if (positioned && idle && !recorder.recording) recorder.start();
     else if (!positioned && idle && recorder.recording) recorder.discard();
   });
@@ -242,6 +246,37 @@
   });
 
   const fmt = (n: number | null) => (n === null ? "–" : n.toFixed(1));
+
+  /**
+   * One glanceable line mirroring what the player hears — for a spotter
+   * watching the screen with the sound off.
+   */
+  const status = $derived.by(
+    (): {
+      state:
+        | "paused"
+        | "captured"
+        | "analyzing"
+        | "readback"
+        | "ready"
+        | "notready";
+      text: string;
+    } => {
+      if (store.phase === "paused") return { state: "paused", text: "Paused" };
+      if (store.cycle === "captured")
+        return { state: "captured", text: "Shot captured" };
+      if (store.cycle === "analyzing" || store.phase === "analyzing")
+        return { state: "analyzing", text: "Analyzing…" };
+      if (store.cycle === "readback")
+        return {
+          state: "readback",
+          text: `Shot ${store.feedback?.index ?? ""} · ${fmt(store.feedback?.overall ?? null)}`,
+        };
+      if (gateActive && !positioned)
+        return { state: "notready", text: "Get in position" };
+      return { state: "ready", text: "Ready — take your shot" };
+    },
+  );
 </script>
 
 <main class="loop" data-testid="practice-loop">
@@ -356,6 +391,25 @@
   </div>
 
   <section class="stage">
+    <div
+      class="status"
+      data-testid="status-strip"
+      data-state={status.state}
+      role="status"
+      aria-live="polite"
+    >
+      {#if status.state === "analyzing"}<span class="pulse"></span>{/if}
+      {status.text}
+    </div>
+    {#if store.wrongAngleFlash}
+      <p class="no-shot" data-testid="practice-wrong-angle">
+        Wrong angle — shot not counted
+      </p>
+    {:else if store.noShotFlash}
+      <p class="no-shot" data-testid="practice-no-shot">
+        No shot detected — keep going
+      </p>
+    {/if}
     {#if store.feedback}
       {@const fb = store.feedback}
       <div class="feedback" data-testid="rep-feedback">
@@ -396,23 +450,6 @@
           {/if}
         {/if}
       </div>
-    {:else if store.phase === "analyzing"}
-      <div class="analyzing" data-testid="practice-analyzing">
-        <span class="pulse"></span>Analyzing…
-      </div>
-    {:else if store.phase === "paused"}
-      <p class="banner dim" data-testid="practice-paused">Paused</p>
-    {:else}
-      <p class="banner" data-testid="practice-idle">Take your shot</p>
-      {#if store.wrongAngleFlash}
-        <p class="no-shot" data-testid="practice-wrong-angle">
-          Wrong angle — shot not counted
-        </p>
-      {:else if store.noShotFlash}
-        <p class="no-shot" data-testid="practice-no-shot">
-          No shot detected — keep going
-        </p>
-      {/if}
     {/if}
   </section>
 
@@ -610,25 +647,46 @@
   .stage {
     flex: 1;
     display: grid;
-    place-content: center;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
     text-align: center;
     gap: var(--sc-space-3);
   }
-  .banner {
-    font-size: 28px;
-    font-weight: 700;
-    margin: 0;
+  .status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sc-space-3);
+    padding: 14px 18px;
+    border-radius: var(--sc-radius);
+    font-size: 26px;
+    font-weight: 800;
+    color: #0b1220;
+    background: var(--sc-success);
+    /* Full width + instant color: state changes must read at a glance. */
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .status[data-state="notready"] {
+    background: var(--sc-card-raised);
+    color: var(--sc-text-dim);
+  }
+  .status[data-state="captured"] {
+    background: #60a5fa;
+  }
+  .status[data-state="analyzing"] {
+    background: #fbbf24;
+  }
+  .status[data-state="readback"] {
+    background: #c4b5fd;
+  }
+  .status[data-state="paused"] {
+    background: var(--sc-card-raised);
+    color: var(--sc-text-dim);
   }
   .no-shot {
     color: var(--sc-warn);
     margin: 0;
-  }
-  .analyzing {
-    display: flex;
-    align-items: center;
-    gap: var(--sc-space-3);
-    font-size: 22px;
-    font-weight: 600;
   }
   .pulse {
     width: 14px;

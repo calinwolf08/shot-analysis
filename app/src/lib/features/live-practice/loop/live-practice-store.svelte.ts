@@ -5,9 +5,18 @@
  * Binds the LiveRepCoordinator to the swappable analysis pipeline (on-device by
  * default, server when configured — see ./pipeline). There is no "session": the
  * user practices continuously and every shot is persisted rooted on the player.
- * Each shot is bracketed by audio: an "analyzing" earcon when the shot is
- * recognized (which also interrupts any prior readback), the 5-worst terse
- * readback, then a "ready" earcon for the next shot.
+ * Each shot runs one strictly ordered, audio-first cycle (the player mostly
+ * listens; the screen mirrors it for a spotter):
+ *
+ *   captured  — "captured" earcon + "Shot captured"
+ *   analyzing — "Analyzing" (the pipeline scores in parallel)
+ *   readback  — the worst metrics (or "On target"), shown on the card
+ *   tracking  — "ready" earcon, then shot detection resumes
+ *
+ * Each step waits for the previous sound to FINISH, and the coordinator stays
+ * in FEEDBACK (no new shot can start) until the ready earcon — so a new shot
+ * is never picked up mid-feedback. There is no fixed pause: tracking resumes
+ * as soon as the readback has been heard.
  *
  * The scorecard is produced by the pipeline and shown/stored as measurements
  * (recomputed on read elsewhere); this store only orchestrates the live loop.
@@ -32,6 +41,15 @@ import { buildWorstReadback } from "./readback";
 
 /** Spoken when a detected shot is rejected for the camera angle. */
 export const WRONG_ANGLE_TEXT = "Wrong angle, shot not counted";
+export const CAPTURED_TEXT = "Shot captured";
+export const ANALYZING_TEXT = "Analyzing";
+/** Spoken when nothing (in focus) is off target. */
+export const ON_TARGET_TEXT = "On target";
+/** Spoken when the pipeline couldn't score a captured shot. */
+export const NOT_SCORED_TEXT = "Shot not scored";
+
+/** Where the per-shot announcement cycle is (drives the status strip). */
+export type ShotCycle = "tracking" | "captured" | "analyzing" | "readback";
 
 export type LoopPhase =
   | "idle"
@@ -72,8 +90,6 @@ export interface LivePracticeStoreDeps {
   /** Frame rate of the rep windows, to reconstruct PoseData. */
   fps: number;
   dims?: { width?: number; height?: number };
-  /** Feedback card auto-dismiss (wall-clock ms). */
-  feedbackMs?: number;
   /** Max worst metrics to read aloud (default 5). */
   maxWorstSpoken?: number;
   /** Live focus-area ids; [] = coach on everything (the default). */
@@ -82,8 +98,11 @@ export interface LivePracticeStoreDeps {
 
 export class LivePracticeStore {
   phase = $state<LoopPhase>("idle");
+  /** Per-shot announcement cycle; "tracking" between shots. */
+  cycle = $state<ShotCycle>("tracking");
   /** The continuous shot history (most recent last). */
   shots = $state<ShotEntry[]>([]);
+  /** The latest shot's feedback; stays up until the next shot. */
   feedback = $state<ShotFeedback | null>(null);
   noShotFlash = $state(false);
   /** A detected shot was rejected for the camera angle (brief flash). */
@@ -95,13 +114,12 @@ export class LivePracticeStore {
 
   private started = false;
   private unsubscribes: (() => void)[] = [];
-  private dismissTimer: ReturnType<typeof setTimeout> | null = null;
   private flashTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly feedbackMs: number;
   private readonly maxWorstSpoken: number;
+  /** Bumped by pause/stop so an in-flight cycle stops where it is. */
+  private generation = 0;
 
   constructor(private readonly deps: LivePracticeStoreDeps) {
-    this.feedbackMs = deps.feedbackMs ?? 4000;
     this.maxWorstSpoken = deps.maxWorstSpoken ?? 5;
     this.muted = deps.audio.isMuted();
     this.focusAreas = deps.focusAreas ?? [];
@@ -133,7 +151,7 @@ export class LivePracticeStore {
     return this.shots.filter((s) => !s.excluded).length;
   }
 
-  /** Begins the loop. Caller gates this behind the angle check. */
+  /** Begins the loop. */
   start(): void {
     if (this.started) return;
     this.started = true;
@@ -145,7 +163,7 @@ export class LivePracticeStore {
       }),
       coordinator.on("repAnalyzing", () => this.onAnalyzing()),
       coordinator.on("repResult", (event) => {
-        void this.handleRepResult(event);
+        void this.runShotCycle(event);
       }),
       coordinator.on("noShot", () => this.onNoShot()),
     ];
@@ -153,119 +171,149 @@ export class LivePracticeStore {
     this.phase = "ready";
   }
 
-  /** Shot recognized → interrupt any prior readback and signal "analyzing". */
+  /** A rep ended and is being checked: cut off any positioning cue. */
   private onAnalyzing(): void {
     this.deps.audio.cancel();
-    this.deps.audio.playEarcon("analyzing");
   }
 
+  /** The motion wasn't a shot (nothing was announced): just a quiet flash. */
   private onNoShot(): void {
     this.flashNoShot();
-    this.deps.audio.playEarcon("ready");
   }
 
-  private async handleRepResult(
+  private isStale(gen: number): boolean {
+    return gen !== this.generation || !this.started;
+  }
+
+  /**
+   * One shot, start to finish. The coordinator is in FEEDBACK for the whole
+   * cycle, so no new shot can begin until `finishCycle` releases it.
+   */
+  private async runShotCycle(
     event: CoordinatorEvents["repResult"],
   ): Promise<void> {
+    const gen = this.generation;
     const { pipeline, audio } = this.deps;
+    this.cycle = "captured";
+    this.feedback = null;
+    this.error = null;
+
+    // Announce while the pipeline scores in parallel.
+    const announce = (async () => {
+      await audio.playEarcon("captured");
+      await audio.speak(CAPTURED_TEXT);
+      if (this.isStale(gen)) return;
+      this.cycle = "analyzing";
+      await audio.speak(ANALYZING_TEXT);
+    })();
+
+    let result: Awaited<ReturnType<LiveShotPipeline["process"]>> | null = null;
     try {
       const poseData = landmarkFramesToPoseData(
         event.window.frames,
         this.deps.fps,
         this.deps.dims ?? {},
       );
-      const { shots: processed, rejected } = await pipeline.process({
+      result = await pipeline.process({
         playerId: this.deps.playerId,
         poseData,
         opts: this.deps.opts,
       });
-      if (processed.length === 0) {
-        // The coordinator's own window analysis saw a shot (it's in FEEDBACK);
-        // release it back to tracking since nothing will be shown.
-        this.deps.coordinator.dismissFeedback();
-        if (rejected.length > 0) this.onWrongAngle();
-        else this.onNoShot();
-        return;
-      }
-      const first = processed[0]!;
-      // Focus steers coaching only: when areas are selected, surface the worst
-      // WITHIN them (even if not globally worst); the overall score is untouched.
-      const focused =
-        this.focusAreas.length > 0
-          ? (selectFocusWorst(
-              first.scorecard.all,
-              this.focusAreas,
-              this.maxWorstSpoken,
-            ) ?? [])
-          : first.worst;
-
-      const entry: ShotEntry = {
-        index: this.shots.length + 1,
-        shotId: first.shot.id,
-        overall: first.scorecard.overall,
-        worst: focused,
-        scorecard: first.scorecard,
-        excluded: false,
-      };
-      this.shots = [...this.shots, entry];
-
-      const durationFrames =
-        first.shot.endFrame !== null && first.shot.startFrame !== null
-          ? first.shot.endFrame - first.shot.startFrame + 1
-          : undefined;
-      let spoken = buildWorstReadback(focused, {
-        max: this.maxWorstSpoken,
-        ...(durationFrames !== undefined ? { durationFrames } : {}),
-      });
-      // With a focus set and nothing off-target in it, acknowledge rather than
-      // fall silent (silence would read as "no feedback").
-      if (!spoken && this.focusAreas.length > 0) spoken = "Focus on target";
-      // onAnalyzing already cancelled prior speech; read, then signal ready.
-      if (spoken) audio.speak(spoken);
-      audio.playEarcon("ready");
-
-      this.feedback = {
-        index: entry.index,
-        overall: entry.overall,
-        worst: entry.worst,
-        spoken,
-      };
-      this.dismissTimer = setTimeout(
-        () => this.dismissFeedback(),
-        this.feedbackMs,
-      );
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
-      this.deps.audio.playEarcon("ready");
-      this.dismissFeedback();
     }
-  }
+    await announce;
+    if (this.isStale(gen)) return;
 
-  /** Detected, but from an angle live practice doesn't accept: not stored. */
-  private onWrongAngle(): void {
-    this.wrongAngleFlash = true;
-    if (this.flashTimer) clearTimeout(this.flashTimer);
-    this.flashTimer = setTimeout(() => (this.wrongAngleFlash = false), 2500);
-    this.deps.audio.speak(WRONG_ANGLE_TEXT);
-    this.deps.audio.playEarcon("ready");
-  }
-
-  private flashNoShot(): void {
-    this.noShotFlash = true;
-    if (this.flashTimer) clearTimeout(this.flashTimer);
-    this.flashTimer = setTimeout(() => (this.noShotFlash = false), 1500);
-  }
-
-  dismissFeedback(): void {
-    if (this.dismissTimer) {
-      clearTimeout(this.dismissTimer);
-      this.dismissTimer = null;
+    if (!result || result.shots.length === 0) {
+      if (result && result.rejected.length > 0) {
+        this.flash("wrong-angle");
+        await audio.speak(WRONG_ANGLE_TEXT);
+      } else {
+        this.flash("no-shot");
+        await audio.speak(NOT_SCORED_TEXT);
+      }
+      await this.finishCycle(gen);
+      return;
     }
-    this.feedback = null;
+
+    const first = result.shots[0]!;
+    // Focus steers coaching only: when areas are selected, surface the worst
+    // WITHIN them (even if not globally worst); the overall score is untouched.
+    const focused =
+      this.focusAreas.length > 0
+        ? (selectFocusWorst(
+            first.scorecard.all,
+            this.focusAreas,
+            this.maxWorstSpoken,
+          ) ?? [])
+        : first.worst;
+
+    const entry: ShotEntry = {
+      index: this.shots.length + 1,
+      shotId: first.shot.id,
+      overall: first.scorecard.overall,
+      worst: focused,
+      scorecard: first.scorecard,
+      excluded: false,
+    };
+    this.shots = [...this.shots, entry];
+
+    const durationFrames =
+      first.shot.endFrame !== null && first.shot.startFrame !== null
+        ? first.shot.endFrame - first.shot.startFrame + 1
+        : undefined;
+    let spoken = buildWorstReadback(focused, {
+      max: this.maxWorstSpoken,
+      ...(durationFrames !== undefined ? { durationFrames } : {}),
+    });
+    // Audio-first: never fall silent after "Analyzing".
+    if (!spoken) {
+      spoken = this.focusAreas.length > 0 ? "Focus on target" : ON_TARGET_TEXT;
+    }
+    this.feedback = {
+      index: entry.index,
+      overall: entry.overall,
+      worst: entry.worst,
+      spoken,
+    };
+    this.cycle = "readback";
+    await audio.speak(spoken);
+    await this.finishCycle(gen);
+  }
+
+  /** Ready earcon, then resume shot detection. */
+  private async finishCycle(gen: number): Promise<void> {
+    if (this.isStale(gen)) return;
+    await this.deps.audio.playEarcon("ready");
+    if (this.isStale(gen)) return;
+    this.cycle = "tracking";
     this.deps.coordinator.dismissFeedback();
   }
 
-  /** "Not a shot?" — excludes the shot and re-averages. */
+  private flash(kind: "wrong-angle" | "no-shot"): void {
+    this.wrongAngleFlash = kind === "wrong-angle";
+    this.noShotFlash = kind === "no-shot";
+    if (this.flashTimer) clearTimeout(this.flashTimer);
+    this.flashTimer = setTimeout(
+      () => {
+        this.wrongAngleFlash = false;
+        this.noShotFlash = false;
+      },
+      kind === "wrong-angle" ? 2500 : 1500,
+    );
+  }
+
+  private flashNoShot(): void {
+    this.flash("no-shot");
+  }
+
+  /** Hides the feedback card (tracking is unaffected). */
+  clearFeedback(): void {
+    this.feedback = null;
+  }
+
+  /** "Not a shot?" — excludes the shot, re-averages, cuts its readback. */
   async excludeShot(index: number): Promise<void> {
     const entry = this.shots.find((s) => s.index === index);
     if (!entry || entry.excluded) return;
@@ -273,13 +321,24 @@ export class LivePracticeStore {
     this.shots = this.shots.map((s) =>
       s.index === index ? { ...s, excluded: true } : s,
     );
-    if (this.feedback?.index === index) this.dismissFeedback();
+    if (this.feedback?.index === index) {
+      // Ends the readback early; the cycle continues to "ready".
+      if (this.cycle === "readback") this.deps.audio.cancel();
+      this.clearFeedback();
+    }
+  }
+
+  /** Abandon any in-flight cycle (pause/stop). */
+  private abortCycle(): void {
+    this.generation += 1;
+    this.cycle = "tracking";
+    this.deps.audio.cancel();
   }
 
   pause(): void {
     if (this.phase === "paused") return;
-    this.dismissFeedback();
-    this.deps.audio.cancel();
+    this.abortCycle();
+    this.clearFeedback();
     this.deps.coordinator.stop();
     this.phase = "paused";
   }
@@ -298,8 +357,8 @@ export class LivePracticeStore {
 
   /** Tears down subscriptions + the coordinator (leaving the screen). */
   stop(): void {
-    this.dismissFeedback();
-    this.deps.audio.cancel();
+    this.abortCycle();
+    this.clearFeedback();
     this.deps.coordinator.stop();
     for (const unsubscribe of this.unsubscribes) unsubscribe();
     this.unsubscribes = [];

@@ -147,7 +147,7 @@ State machine in `LivePracticeStore`:
 
 ## 4. Phased implementation
 
-> **Status:** Phases 0–3 are implemented (see "Implementation notes" below).
+> **Status:** Phases 0–4 are implemented (see "Implementation notes" below).
 
 ### Implementation notes (Phases 0–1)
 - **Required side corrected.** Pose data shows "side-left" means the player's
@@ -229,6 +229,36 @@ State machine in `LivePracticeStore`:
   Part B.
 - **E2E result** (mixed-angle fixture, right-handed): 2 side-right shots stored,
   5 wrong-angle shots announced and not stored.
+
+### Implementation notes (Phase 4)
+- **`speak()` / `playEarcon()` return Promises** that resolve when the sound
+  finishes. Speech resolves on end, error or `cancel()`, with a safety timeout
+  of 2 s + 90 ms per character. Muted or unsupported audio resolves at once.
+- **Per-shot cycle** (`LivePracticeStore.cycle`): "captured" tone → "Shot
+  captured" → "Analyzing" (the pipeline scores in parallel) → the worst
+  metrics, or "On target" (never silence after "Analyzing") → "ready" tone →
+  tracking resumes. The coordinator stays in FEEDBACK for the whole cycle, so no
+  new shot can start until the ready tone. There is no fixed pause, per the
+  decision. The feedback card stays up until the next shot.
+- **The announcement starts when a shot is confirmed**, not when any motion
+  ends. A motion that isn't a shot only flashes "No shot detected", so false
+  "Shot captured" lines are avoided.
+- **Wrong angle** → "Wrong angle, shot not counted" → ready tone. An empty or
+  failed pipeline result → "Shot not scored" → ready tone. Pause/stop abandon
+  the cycle (generation counter). "Not a shot?" cuts the readback short.
+- **Positioning cues are only coached while tracking**, and "Ready" plays tone
+  then words, never overlapping.
+- **Earcons are louder** (gain 0.35, triangle wave) and distinct: rising
+  two-note = captured, bright double-tap = ready.
+- **Status strip** (`status-strip`, `data-state`) mirrors every step for a
+  spotter: Shot captured / Analyzing… / Shot N · score / Ready / Get in
+  position / Paused.
+- **The audio probe simulates speech** in E2E builds (~60 ms per character),
+  logging `speak` and `speak-end`, so order and overlap are asserted
+  deterministically.
+- **Known layout limit:** on a phone the big feedback card sits below the
+  preview, off screen. The strip shows the score. Phase 5 (Practice tab)
+  revisits the layout.
 
 Each phase ends with its own validation (see §5) and lands as its own commit(s).
 
