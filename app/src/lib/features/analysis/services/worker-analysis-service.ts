@@ -370,6 +370,7 @@ export function createWorkerAnalysisService(
       const latency = createLatencyTracker(live.windowFrames);
       let delivered = 0;
       let skipped = 0;
+      let lastSize: { width: number; height: number } | null = null;
       let fallbacks = 0;
 
       async function fallBackToLite(): Promise<void> {
@@ -450,6 +451,7 @@ export function createWorkerAnalysisService(
           }
           inFlight += 1;
           sentAt = performance.now();
+          lastSize = { width: frame.width, height: frame.height };
           maxInFlight = Math.max(maxInFlight, inFlight);
           handle.send(
             {
@@ -460,6 +462,10 @@ export function createWorkerAnalysisService(
             },
             [frame.data.buffer as ArrayBuffer],
           );
+        },
+
+        frameSize() {
+          return lastSize;
         },
 
         stats(): LiveSessionStats {

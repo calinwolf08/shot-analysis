@@ -38,6 +38,14 @@
     type Hand,
     type Pt,
   } from "./joint-map";
+  import {
+    MIN_VIS,
+    computeShotFraming,
+    projectWith,
+    sourceRect,
+    type Framing,
+  } from "./framing";
+  import { phraseFor } from "../loop/readback";
 
   let { shotId }: { shotId: string } = $props();
 
@@ -64,17 +72,35 @@
   let clipUrl = $state<string | null>(null);
   let videoEl = $state<HTMLVideoElement | null>(null);
   let videoReady = $state(false);
+  let videoSize = $state<{ width: number; height: number } | null>(null);
+
+  // Stage size (CSS px), measured from the layout.
+  let stageW = $state(0);
+  let stageH = $state(0);
 
   /**
-   * Median per-frame body height (normalized) → a CONSTANT zoom scale so the
-   * figure fills the view without rescaling frame to frame. Each frame is then
-   * centered on its own bbox, so the pose stays large and centered while
-   * following the motion.
+   * One fixed transform for the whole shot (see ./framing): true proportions,
+   * zoomed so the highest and lowest points of the movement are just inside.
+   * The source size comes from the clip when there is one, else from the
+   * stored pose track, else it's estimated (older shots).
    */
-  let bodyHeight = $state<number | null>(null);
-
-  const MIN_VIS = 0.3;
-  const FILL = 0.82; // figure fills ~82% of the stage height
+  const framing = $derived.by((): Framing | null => {
+    if (!poses || poses.frames.length === 0 || stageW <= 0 || stageH <= 0) {
+      return null;
+    }
+    const source =
+      clipUrl && videoReady && videoSize
+        ? videoSize
+        : poses.width && poses.height
+          ? { width: poses.width, height: poses.height }
+          : null;
+    return computeShotFraming(
+      poses.frames,
+      { width: stageW, height: stageH },
+      source,
+    );
+  });
+  const videoBox = $derived(framing ? sourceRect(framing) : null);
 
   const analysis = $derived(
     shot ? (shot.analysis as StoredShotAnalysis) : null,
@@ -160,7 +186,6 @@
     focusAreas = normalizeAreas(
       await services.repos.settings.get("liveFocusAreas"),
     );
-    bodyHeight = computeBodyHeight(p);
     void loadReferencePoses();
     void loadClip(id);
   }
@@ -190,91 +215,13 @@
     }
   }
 
-  /** Visible-landmark bounding box of one frame (normalized), or null. */
-  function frameBounds(
-    landmarks: { x: number; y: number; visibility: number }[],
-  ) {
-    let minX = 1,
-      minY = 1,
-      maxX = 0,
-      maxY = 0,
-      seen = false;
-    for (const l of landmarks) {
-      if (l.visibility < MIN_VIS) continue;
-      seen = true;
-      if (l.x < minX) minX = l.x;
-      if (l.y < minY) minY = l.y;
-      if (l.x > maxX) maxX = l.x;
-      if (l.y > maxY) maxY = l.y;
-    }
-    return seen ? { minX, minY, maxX, maxY } : null;
-  }
-
-  /** Median per-frame vertical extent → a stable scale that doesn't breathe. */
-  function computeBodyHeight(p: ShotReviewPoses | null): number | null {
-    if (!p || p.frames.length === 0) return null;
-    const heights: number[] = [];
-    for (const f of p.frames) {
-      const b = frameBounds(f.landmarks);
-      if (b) heights.push(b.maxY - b.minY);
-    }
-    if (heights.length === 0) return null;
-    heights.sort((a, b) => a - b);
-    return heights[Math.floor(heights.length / 2)]!;
-  }
-
-  /**
-   * Zoom-to-fill projection: a CONSTANT scale (from the median body height) so
-   * the figure fills ~FILL of the stage, centered on the CURRENT frame's bbox
-   * so it stays big and centered as the player moves through the shot.
-   */
-  function makeProject(
-    frameLandmarks: { x: number; y: number; visibility: number }[],
-    w: number,
-    h: number,
-  ): (l: Pt) => { x: number; y: number } {
-    const bh = bodyHeight;
-    const b = frameBounds(frameLandmarks);
-    if (!bh || bh < 0.02 || !b) return (l) => ({ x: l.x * w, y: l.y * h });
-    // px scale that makes a median-height figure fill FILL·h; capped so a
-    // near-degenerate frame can't blow up.
-    const scale = Math.min((FILL * h) / (bh * h), 6);
-    const cx = ((b.minX + b.maxX) / 2) * w;
-    const cy = ((b.minY + b.maxY) / 2) * h;
-    return (l) => ({
-      x: (l.x * w - cx) * scale + w / 2,
-      y: (l.y * h - cy) * scale + h / 2,
-    });
-  }
-
   function markerLeft(startFrame: number): number {
     const span = Math.max(end - start, 1);
     return ((startFrame - start) / span) * 100;
   }
-
   function seekToPhase(phase: string) {
     const kf = phaseStarts.find((p) => p.phase === phase);
     if (kf) current = kf.startFrame;
-  }
-
-  /**
-   * object-fit:cover mapping matching the clip <video>, so the overlay stays
-   * registered with the footage. Used only when a clip is present; without one
-   * the skeleton uses the zoom-to-fill projection.
-   */
-  function coverProject(
-    w: number,
-    h: number,
-  ): ((l: Pt) => { x: number; y: number }) | null {
-    const vw = videoEl?.videoWidth ?? 0;
-    const vh = videoEl?.videoHeight ?? 0;
-    if (!vw || !vh) return null;
-    const scale = Math.max(w / vw, h / vh);
-    const dw = vw * scale;
-    const dh = vh * scale;
-    const ox = (w - dw) / 2;
-    const oy = (h - dh) / 2;
-    return (l) => ({ x: ox + l.x * dw, y: oy + l.y * dh });
   }
 
   // Keep the clip scrubbed in step with the pose: map the frame range across
@@ -298,24 +245,31 @@
     if (!c) return;
     const ctx = c.getContext("2d");
     if (!ctx) return;
-    // Measure the real displayed size (the canvas fills the stage via CSS) and
-    // back it with a DPR-scaled bitmap so the pose is crisp, not a stretched
-    // 300×150 default.
-    const rect = c.getBoundingClientRect();
-    const w = rect.width || 300;
-    const h = rect.height || 400;
+    // Back the canvas with a DPR-scaled bitmap of the stage size so the pose
+    // is crisp, not a stretched 300×150 default.
+    const fr = framing;
+    const w = stageW || 300;
+    const h = stageH || 400;
     const dpr =
       typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
     c.width = Math.round(w * dpr);
     c.height = Math.round(h * dpr);
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, w, h);
-    if (!f) return;
+    if (!f || !fr) return;
 
     const lm = f.landmarks;
-    // With a clip, align the overlay to the footage; otherwise zoom to fill.
-    const cover = clipUrl && videoReady ? coverProject(w, h) : null;
-    const project = cover ?? makeProject(lm, w, h);
+    const project = projectWith(fr);
+    // Test/debug hook: where this frame's visible joints landed on the stage.
+    const pts = lm.filter((l) => l.visibility >= MIN_VIS).map(project);
+    if (pts.length > 0) {
+      c.dataset.frameBox = JSON.stringify({
+        top: Math.min(...pts.map((q) => q.y)),
+        bottom: Math.max(...pts.map((q) => q.y)),
+        left: Math.min(...pts.map((q) => q.x)),
+        right: Math.max(...pts.map((q) => q.x)),
+      });
+    }
 
     // Base skeleton.
     drawSkeleton(ctx, lm, w, h, {
@@ -387,7 +341,12 @@
   {#if notFound}
     <p class="dim" data-testid="shot-review-missing">Shot not found.</p>
   {:else if shot && card}
-    <div class="stage">
+    <div
+      class="stage"
+      bind:clientWidth={stageW}
+      bind:clientHeight={stageH}
+      data-testid="review-stage"
+    >
       {#if clipUrl}
         <video
           bind:this={videoEl}
@@ -397,7 +356,16 @@
           playsinline
           preload="auto"
           data-testid="review-video"
-          onloadedmetadata={() => (videoReady = true)}
+          style={videoBox
+            ? `left:${videoBox.left}px;top:${videoBox.top}px;width:${videoBox.width}px;height:${videoBox.height}px`
+            : ""}
+          onloadedmetadata={(e) => {
+            const v = e.currentTarget;
+            if (v.videoWidth && v.videoHeight) {
+              videoSize = { width: v.videoWidth, height: v.videoHeight };
+            }
+            videoReady = true;
+          }}
         ></video>
       {/if}
       {#if poses && poses.frames.length > 0}
@@ -405,21 +373,20 @@
           bind:this={canvas}
           class="skeleton"
           data-testid="review-skeleton"
+          data-framing={framing
+            ? JSON.stringify({
+                scale: framing.scale,
+                offsetX: framing.offsetX,
+                offsetY: framing.offsetY,
+                aspect: framing.aspect,
+              })
+            : ""}
+          data-approximate={framing?.approximate ?? false}
         ></canvas>
-        {#if phaseIssues.length > 0}
-          <div class="phase-overlay" data-testid="review-phase-metrics">
-            <span class="po-head">
-              {currentPhase} · off target
-            </span>
-            <div class="po-chips">
-              {#each phaseIssues.slice(0, 4) as m (m.id)}
-                <span class="po-chip" class:bad={m.score > 4}>
-                  {m.label}{#if m.direction}
-                    <em>{m.direction} by {m.magnitude}</em>{/if}
-                </span>
-              {/each}
-            </div>
-          </div>
+        {#if framing?.approximate}
+          <span class="approx" data-testid="review-approx-framing"
+            >Approximate framing (older shot)</span
+          >
         {/if}
       {:else if !clipUrl}
         <p class="dim no-poses" data-testid="review-no-poses">
@@ -427,6 +394,17 @@
         </p>
       {/if}
     </div>
+    <!-- Below the stage (not over it) so the chips never hide the feet. -->
+    {#if poses && poses.frames.length > 0 && phaseIssues.length > 0}
+      <div class="phase-overlay" data-testid="review-phase-metrics">
+        <span class="po-head">{currentPhase} · off target</span>
+        <div class="po-chips">
+          {#each phaseIssues.slice(0, 4) as m (m.id)}
+            <span class="po-chip" class:bad={m.score > 4}>{phraseFor(m)}</span>
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     {#if poses && poses.frames.length > 0}
       <div class="scrubber">
@@ -494,13 +472,21 @@
     display: grid;
     place-content: center;
   }
+  /* Positioned + sized by the shot framing (same transform as the pose). */
   .clip {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    object-fit: fill;
     background: #000;
+  }
+  .approx {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 60%);
+    color: #cbd5e1;
+    font-size: 10px;
   }
   .skeleton {
     position: absolute;
@@ -513,12 +499,7 @@
     text-align: center;
   }
   .phase-overlay {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: 8px 10px;
-    background: linear-gradient(transparent, rgb(0 0 0 / 70%));
+    padding: 6px 2px 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -547,10 +528,6 @@
     background: rgb(248 113 113 / 18%);
     border-color: rgb(248 113 113 / 70%);
     color: #fecaca;
-  }
-  .po-chip em {
-    font-style: normal;
-    opacity: 0.85;
   }
   .scrubber {
     display: flex;

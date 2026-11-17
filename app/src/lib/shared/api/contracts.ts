@@ -61,6 +61,10 @@ export const shotAnalysisSchema = z
   .passthrough();
 export const reviewPosesSchema = z.object({
   fps: z.number(),
+  // Source frame size (pixels) — the aspect ratio the review needs to draw
+  // the pose undistorted. Absent on shots saved before it was recorded.
+  width: z.number().positive().optional(),
+  height: z.number().positive().optional(),
   frames: z.array(
     z.object({
       frameIndex: z.number().int().nonnegative(),

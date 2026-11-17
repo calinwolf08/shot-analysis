@@ -137,8 +137,14 @@ export function analyzeAndScore(
     const scorecard = analysis.v2Metrics
       ? scoreShotDeviation(analysis.v2Metrics, targets)
       : scoreDeviation([], targets);
+    // Real dims only (1×1 is the "unknown" placeholder from PoseData).
+    const dims =
+      pose.width > 1 && pose.height > 1
+        ? { width: pose.width, height: pose.height }
+        : {};
     const reviewPoses: ShotReviewPoses = {
       fps: pose.fps,
+      ...dims,
       frames: allFrames.slice(
         analysis.frameRange.start,
         analysis.frameRange.end + 1,

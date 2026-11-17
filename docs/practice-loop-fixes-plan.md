@@ -147,7 +147,7 @@ State machine in `LivePracticeStore`:
 
 ## 4. Phased implementation
 
-> **Status:** Phases 0–5 are implemented (see "Implementation notes" below).
+> **Status:** Phases 0–6 are implemented (see "Implementation notes" below).
 
 ### Implementation notes (Phases 0–1)
 - **Required side corrected.** Pose data shows "side-left" means the player's
@@ -293,6 +293,37 @@ State machine in `LivePracticeStore`:
   - Switching to Shots ends the camera tracks. Back on Practice the camera is
     live again, with no second tap and the counter continued.
   - `/practice/live` redirects, and axe passes on the new screen.
+
+### Implementation notes (Phase 6)
+- **Cause:** landmarks are normalized 0..1 on each axis. The review drew
+  them at x·stageW and y·stageH (a 3:4 stage for a 9:16 camera), which
+  stretched the body, so leaning read as rotation. It also re-centered and
+  re-zoomed each frame, which clipped the release reach and the dip.
+- **`review/framing.ts`:** one fixed transform per shot, with a uniform scale
+  using the true source aspect. The zoom makes the union of every frame's
+  visible joints fill the stage with a 6% margin, so the highest and lowest
+  points are just visible. The same transform positions the video
+  (`sourceRect`), so footage and skeleton stay registered.
+- **The source size is now stored** with each shot's review poses: the
+  session's `frameSize()` feeds the store, then PoseData, then
+  `reviewPoses.width/height`. It is JSON in `shot_poses`, so no migration was
+  needed. A clip's own `videoWidth/Height` wins when present.
+- **Older shots without a size:** the aspect is estimated from the skeleton
+  (limb lengths stay constant only at the true aspect), using clearly
+  tracked joints (≥ 0.8), then snapped to 9:16, 3:4, 4:3 or 16:9. On labeled
+  clips it always gets portrait vs landscape right, though 9:16 vs 3:4 can
+  miss. Such shots show an "Approximate framing" tag.
+- **Also fixed:** the phase chips moved below the stage so they no longer
+  hide the feet, and their text now reads "Elbow angle low by 91" instead of
+  "Elbow anglelow by 91.096".
+- **E2E** scrubs every frame of a recorded shot and checks that:
+  - the transform is identical across frames;
+  - every frame's joints are inside the stage;
+  - the movement's extremes are within 8% of the edges;
+  - the stored 9:16 aspect is used exactly.
+
+  A re-saved copy without a size shows the approximate tag with a portrait
+  estimate.
 
 Each phase ends with its own validation (see §5) and lands as its own commit(s).
 

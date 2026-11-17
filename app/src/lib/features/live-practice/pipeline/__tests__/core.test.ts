@@ -73,6 +73,16 @@ describe("analyzeAndScore (isomorphic core)", () => {
     expect(reviewPoses.frames[0]!.frameIndex).toBe(analysis.frameRange.start);
     expect(reviewPoses.frames.at(-1)!.frameIndex).toBe(analysis.frameRange.end);
     expect(reviewPoses.fps).toBe(pose.fps);
+    // The source size travels with the poses so the review can draw them
+    // undistorted (the fixture is portrait 1080×1920).
+    expect(reviewPoses.width).toBe(1080);
+    expect(reviewPoses.height).toBe(1920);
+  });
+
+  it("omits the size when the pose data doesn't know it (1×1 placeholder)", () => {
+    const unknown: PoseData = { ...pose, width: 1, height: 1 };
+    const { shots } = analyzeAndScore(unknown, opts, targets);
+    expect(shots[0]!.reviewPoses.width).toBeUndefined();
   });
 
   it("returns no shots (not an error) for a window too short to detect one", () => {

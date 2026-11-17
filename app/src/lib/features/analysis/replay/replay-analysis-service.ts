@@ -134,6 +134,7 @@ function createReplayLiveSession(
   let cancel: (() => void) | null = null;
   let stopped = false;
   let fps = 30;
+  let size: { width: number; height: number } | null = null;
   const latency = createLatencyTracker(30);
   let delivered = 0;
 
@@ -149,6 +150,9 @@ function createReplayLiveSession(
     async start() {
       const pose = await deps.loadPoseData();
       fps = pose.fps;
+      if (pose.width > 1 && pose.height > 1) {
+        size = { width: pose.width, height: pose.height };
+      }
       const frames = poseDataToLandmarkFrames(pose);
       const intervalMs = 1000 / (pose.fps * deps.speed);
       const spanFrames = frames.length;
@@ -205,6 +209,10 @@ function createReplayLiveSession(
 
     async analyzeWindow(frames) {
       return runReplayAnalysis(frames, deps.opts, { fps });
+    },
+
+    frameSize() {
+      return size;
     },
 
     stats(): LiveSessionStats {

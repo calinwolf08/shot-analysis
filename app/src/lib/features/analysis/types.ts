@@ -97,6 +97,12 @@ export interface LiveAnalysisSession {
   isBusy?(): boolean;
   /** Live latency/model diagnostics (debug HUD + e2e). */
   stats?(): LiveSessionStats;
+  /**
+   * Pixel size of the frames the landmarks were detected on (aspect ratio is
+   * what matters), or null before the first frame. Stored with each shot so
+   * the review can draw the pose undistorted.
+   */
+  frameSize?(): { width: number; height: number } | null;
   start(): Promise<void>;
   stop(): Promise<void>;
 }

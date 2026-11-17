@@ -81,3 +81,27 @@ export async function apiGet<T>(page: Page, path: string): Promise<T> {
     return res.json();
   }, path) as Promise<T>;
 }
+
+/** POST JSON to an app API route as the signed-in user. */
+export async function apiPost<T>(
+  page: Page,
+  path: string,
+  body: unknown,
+): Promise<T> {
+  return page.evaluate(
+    async ({ p, b }) => {
+      const token = localStorage.getItem("shotcoach.bearer_token");
+      const res = await fetch(p, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(b),
+      });
+      if (!res.ok) throw new Error(`${p} → HTTP ${res.status}`);
+      return res.json();
+    },
+    { p: path, b: body },
+  ) as Promise<T>;
+}

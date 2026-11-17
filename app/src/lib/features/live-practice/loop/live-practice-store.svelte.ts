@@ -89,7 +89,8 @@ export interface LivePracticeStoreDeps {
   opts: AnalyzeOptions;
   /** Frame rate of the rep windows, to reconstruct PoseData. */
   fps: number;
-  dims?: { width?: number; height?: number };
+  /** Pixel size of the pose frames (stored with each shot for review). */
+  frameSize?: () => { width: number; height: number } | null;
   /** Max worst metrics to read aloud (default 5). */
   maxWorstSpoken?: number;
   /** Live focus-area ids; [] = coach on everything (the default). */
@@ -218,7 +219,7 @@ export class LivePracticeStore {
       const poseData = landmarkFramesToPoseData(
         event.window.frames,
         this.deps.fps,
-        this.deps.dims ?? {},
+        this.deps.frameSize?.() ?? {},
       );
       result = await pipeline.process({
         playerId: this.deps.playerId,

@@ -209,6 +209,7 @@
       playerId,
       opts: { shootingHand, profile: "pro-form" },
       fps: session.fps,
+      frameSize: () => session?.frameSize?.() ?? null,
       focusAreas,
       initialShots,
     });
