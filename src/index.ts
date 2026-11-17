@@ -248,3 +248,23 @@ export {
   categoryLabel,
 } from "./metrics/v2";
 export type { FlatMetric } from "./metrics/v2";
+
+// v3 (in progress): aspect-correct signals + sub-frame events / phase windows.
+export {
+  computeSignals,
+  detectEvents,
+  phaseWindows,
+  frameAt,
+  timeAt,
+  LABEL_FOR_EVENT,
+  EVENT_PAD_BEFORE,
+  EVENT_PAD_AFTER,
+  isClippedStartLabel,
+} from "./metrics/v3";
+export type {
+  ShotSignals,
+  SignalFrame,
+  ShotEvents,
+  EventId,
+  PhaseWindows,
+} from "./metrics/v3";

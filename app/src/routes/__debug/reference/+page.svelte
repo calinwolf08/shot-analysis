@@ -41,6 +41,20 @@
   let shotIdx = $state(0);
   let frame = $state(0);
   let selected = $state<{ id: string; shot: number } | null>(null);
+  let showLabels = $state(true);
+
+  /** Percent position of a frame on the scrubber track. */
+  const markerPct = (f: number) => ((f - lo) / Math.max(1, hi - lo)) * 100;
+  const EVENT_NAMES: Record<string, string> = {
+    hipDropStart: "Hips start dropping",
+    ballLowest: "Ball lowest",
+    ballRiseStart: "Ball starts rising",
+    hipLowest: "Hips lowest",
+    kneesStartStraightening: "Knees start straightening",
+    setPoint: "Set point",
+    kneesStraight: "Knees straight",
+    armExtended: "Arm extended",
+  };
 
   let videoUrl = $state<string | null>(null);
   let localVideo = false;
@@ -246,6 +260,28 @@
           <canvas bind:this={canvas} data-testid="ref-skeleton"></canvas>
         </div>
         <div class="side">
+          <div class="track" data-testid="ref-markers">
+            {#if shot}
+              {#each shot.events as e (e.event)}
+                {#if e.detected !== null}
+                  <span
+                    class="mk det"
+                    style="left:{markerPct(e.detected)}%"
+                    title="detected: {EVENT_NAMES[e.event]}"
+                    data-testid="mk-det-{e.event}"
+                  ></span>
+                {/if}
+                {#if showLabels && e.labeled !== null}
+                  <span
+                    class="mk lab"
+                    style="left:{markerPct(e.labeled)}%"
+                    title="labeled: {e.labelKey}"
+                    data-testid="mk-lab-{e.event}"
+                  ></span>
+                {/if}
+              {/each}
+            {/if}
+          </div>
           <input
             type="range"
             min={lo}
@@ -254,6 +290,16 @@
             data-testid="ref-scrubber"
             aria-label="Scrub reference shot"
           />
+          <label class="toggle">
+            <input
+              type="checkbox"
+              bind:checked={showLabels}
+              data-testid="ref-show-labels"
+            />
+            Show human labels
+            <span class="key det"></span> detected (v3)
+            <span class="key lab"></span> labeled
+          </label>
           <p class="meta" data-testid="ref-frame">
             frame {frame} · {(frame / fps).toFixed(2)} s
             {#if shot && (frame < shot.startFrame || frame > shot.endFrame)}
@@ -272,6 +318,38 @@
                 data-testid="ref-video-pick"
               />
             </label>
+          {/if}
+          {#if shot}
+            <table class="events" data-testid="ref-events">
+              <thead>
+                <tr
+                  ><th>Event</th><th>Labeled</th><th>Detected</th><th>Δ</th></tr
+                >
+              </thead>
+              <tbody>
+                {#each shot.events as e (e.event)}
+                  {@const d =
+                    e.labeled !== null && e.detected !== null && !e.clipped
+                      ? e.detected - e.labeled
+                      : null}
+                  <tr
+                    class:warn={d !== null && Math.abs(d) > 1}
+                    class:bad={d !== null && Math.abs(d) > 2}
+                    data-testid="ev-{e.event}"
+                    onclick={() => {
+                      if (e.detected !== null) frame = Math.round(e.detected);
+                    }}
+                  >
+                    <th>{EVENT_NAMES[e.event]}</th>
+                    <td>{e.labeled ?? "—"}{e.clipped ? " (clipped)" : ""}</td>
+                    <td>{e.detected === null ? "—" : e.detected.toFixed(1)}</td>
+                    <td
+                      >{d === null ? "" : (d > 0 ? "+" : "") + d.toFixed(1)}</td
+                    >
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
           {/if}
           {#if selectedRow && selected}
             {@const c = selectedRow.cells[selected.shot]}
@@ -417,6 +495,60 @@
   .meta {
     margin: 0;
     font-size: 13px;
+  }
+  .track {
+    position: relative;
+    height: 16px;
+  }
+  .mk {
+    position: absolute;
+    width: 3px;
+    margin-left: -1px;
+    border-radius: 2px;
+  }
+  .mk.det {
+    top: 0;
+    height: 8px;
+    background: var(--sc-primary);
+  }
+  .mk.lab {
+    top: 8px;
+    height: 8px;
+    background: #e5e7eb;
+  }
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--sc-text-dim);
+  }
+  .key {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+  .key.det {
+    background: var(--sc-primary);
+  }
+  .key.lab {
+    background: #e5e7eb;
+  }
+  .events {
+    font-size: 12px;
+  }
+  .events th:first-child {
+    text-align: left;
+  }
+  .events tbody tr {
+    cursor: pointer;
+  }
+  .events tr.warn td {
+    color: var(--sc-warn);
+  }
+  .events tr.bad td {
+    color: var(--sc-fail);
   }
   .pick {
     font-size: 13px;

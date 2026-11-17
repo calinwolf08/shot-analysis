@@ -700,6 +700,65 @@ pose track show "Re-analysis unavailable" and are excluded from Insights trends.
     resolution problem B-2.4 addresses.
   - Ankle rows are 0 by construction (already excluded from scoring).
 
+## B-2.10 Implementation notes (Phase 10)
+- **`src/metrics/v3/signals.ts`:** per-frame signals for the shooting wrist
+  height, near hip height, near knee angle, near hip angle, shooting elbow
+  angle and spine lean, plus median segment lengths.
+  - **Angles use true proportions:** x is scaled by the frame aspect. The v2
+    angles were computed on per-axis-normalized coordinates, which distorts
+    every non-axis-aligned angle, and differently on a landscape reference
+    than on a portrait phone. **Correction to the Phase 9 note:** Curry's
+    135–152° "set-point elbow" was this distortion, not a late set point. With
+    true proportions his elbow at the labeled set point is ~30–40°.
+  - **Real timestamps** are used, not index ÷ fps. Gaps of up to 3 frames are
+    bridged, then smoothed with a 5-point Savitzky–Golay filter.
+- **`src/metrics/v3/events.ts`:** sub-frame events.
+  - Turning points (ball lowest, hips lowest, deepest knee, most-bent elbow)
+    are refined with a parabola.
+  - Onsets (hips/ball drop, ball rise, knees start straightening, set point,
+    elbow bend) are where the speed toward the coming turning point first
+    reaches 20% of its peak (10% for ball rise), interpolated.
+  - Completions (knees straight 80%, arm extended 90%) are interpolated
+    threshold crossings.
+- **Definitions that came out of matching the labels:**
+  - **Set point** is the *start of the elbow's extension* after its most-bent
+    point (the labels mark the end of the hold, not the minimum).
+  - **Knees start straightening** is the onset of knee extension.
+  - The shot is anchored on the hand's *first* arrival at its peak (release),
+    because a held follow-through peaks later.
+  - Legs are searched in a window anchored on the ball events, so the landing
+    dip can't pose as the load.
+- **`phaseWindows`** builds the Load / Rise / Release windows per B-2.1.
+- **Agreement with the human labels** (`npx tsx src/testing/eval-events-v3.ts`,
+  34 side-on shots). "Old" is the current keyframe detector, which was built
+  to match these same labels, so it is a tuned baseline rather than an
+  independent one. Start labels placed on a window's first frame are clipped
+  and excluded.
+
+```
+label                    n   v3 ±1  ±2   med  bias miss | old ±1  ±2   med  bias miss
+ball_low_point           19    37%  63%  1.75 -1.50   0 |   53%  63%  1.00  0.21   0
+ball_starts_upward       23    61%  78%  0.95 -0.08   0 |   74%  87%  1.00 -0.30   0
+leg_bend_low_point       23    48%  74%  1.03 -1.12   0 |   83%  83%  0.00 -0.52   0
+legs_start_extending     23    52%  65%  0.96 -2.40   0 |   83%  83%  0.00 -0.65   0
+set_point                23    65%  91%  0.69 -1.26   0 |   70%  87%  0.00  0.17   0
+arms_fully_extended      23    70%  87%  0.56 -1.75   0 |   65%  74%  1.00  0.52   0
+legs_fully_extended       7    29%  43%  2.48 -3.69   0 |  100% 100%  0.00  0.00   0
+ALL 141: within ±1 — v3 55% · old 73%; within ±2 — v3 75% · old 81%
+```
+
+  The ±1-frame ≥ 80% target from B-4 is **not met overall**. The events the
+  timing metrics depend on most do match well within 2 frames: set point 91%
+  (old 87%), arm extension 87% (old 74%) and ball rise 78%. Low points
+  (ball/hips) sit on flat stretches where the "lowest frame" is ambiguous to
+  a person too, and they are weakest. Some Curry shots barely bend the knees,
+  which leaves the knee events noisy. `v3.test.ts` guards today's levels as
+  floors.
+- **Viewer:** each Curry shot shows a detected-vs-labeled event table (Δ in
+  frames, amber over 1, red over 2, clipped labels marked), plus
+  detected/labeled markers on the scrubber with a labels toggle. Clicking an
+  event seeks to it.
+
 ## B-3. Phased implementation (Part B)
 
 **Phase 9 — Debug index + Curry viewer shell**

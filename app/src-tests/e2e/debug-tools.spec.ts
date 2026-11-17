@@ -66,6 +66,29 @@ test("Profile → Debug tools → Curry viewer: table, cell seek, shot tabs", as
   await page.getByTestId("ref-shot-1").click();
   await expect(page.getByTestId("ref-frame")).toContainText("frame 35");
 
+  // Phase 10: v3 events vs the human labels for the selected shot.
+  const events = page.getByTestId("ref-events");
+  await expect(events.locator("tbody tr")).toHaveCount(8);
+  await expect(page.getByTestId("mk-det-setPoint")).toBeVisible();
+  await expect(page.getByTestId("mk-lab-setPoint")).toBeVisible();
+  // Hiding labels leaves only the detected markers.
+  await page.getByTestId("ref-show-labels").uncheck();
+  await expect(page.getByTestId("mk-lab-setPoint")).toHaveCount(0);
+  await expect(page.getByTestId("mk-det-setPoint")).toBeVisible();
+  await page.getByTestId("ref-show-labels").check();
+  // Clicking an event row seeks to its detected frame.
+  const detected = Number(
+    await page.getByTestId("ev-setPoint").locator("td").nth(1).textContent(),
+  );
+  await page.getByTestId("ev-setPoint").click();
+  await expect(page.getByTestId("ref-scrubber")).toHaveValue(
+    String(Math.round(detected)),
+  );
+  await page.screenshot({
+    path: screenPath("phase10", "events-vs-labels"),
+    fullPage: false,
+  });
+
   // No local video in CI: skeleton-only, with the file picker offered.
   await expect(page.getByTestId("ref-video-pick")).toBeVisible();
 });

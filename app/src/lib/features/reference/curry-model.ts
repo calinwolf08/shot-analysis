@@ -9,11 +9,20 @@
  * Pure; the caller supplies the parsed poses/labels JSON.
  */
 import {
+  EVENT_PAD_AFTER,
+  EVENT_PAD_BEFORE,
+  LABEL_FOR_EVENT,
+  computeSignals,
+  detectEvents,
   detectKeyframesFromFrames,
   flattenMetrics,
+  frameAt,
+  isClippedStartLabel,
   keyframeFramesFromPoseData,
   metricsForShot,
+  type EventId,
   type PoseData,
+  type SignalFrame,
 } from "basketball-shot-analysis";
 
 export interface ReferenceLabels {
@@ -43,6 +52,48 @@ export interface ReferenceShot {
   readonly keyframes: Readonly<Record<string, number | null>>;
   /** Reliable, finite metric values by id; absent = unmeasured. */
   readonly metrics: ReadonlyMap<string, ReferenceMetricValue>;
+  /** v3 sub-frame events vs the human labels, one row per labeled event. */
+  readonly events: readonly EventComparison[];
+}
+
+export interface EventComparison {
+  readonly event: EventId;
+  readonly labelKey: string;
+  /** Human-labeled frame (null = not labeled). */
+  readonly labeled: number | null;
+  /** v3 detection as a fractional source frame (null = not detected). */
+  readonly detected: number | null;
+  /** Labeled on the window's first frame → clipped, not comparable. */
+  readonly clipped: boolean;
+}
+
+/** v3 events for one labeled window, compared with its labels. */
+export function compareEvents(
+  poses: PoseData,
+  lab: ReferenceLabels["shots"][number],
+  shootingHand: "left" | "right",
+): EventComparison[] {
+  const lo = Math.max(0, lab.startFrame - EVENT_PAD_BEFORE);
+  const hi = Math.min(poses.frames.length - 1, lab.endFrame + EVENT_PAD_AFTER);
+  const sig = computeSignals(
+    poses.frames.slice(lo, hi + 1) as unknown as SignalFrame[],
+    { aspect: poses.width / poses.height, shootingHand },
+  );
+  const ev = detectEvents(sig);
+  return LABEL_FOR_EVENT.map(([event, labelKey]) => {
+    const raw = lab[labelKey];
+    const labeled = typeof raw === "number" ? raw : null;
+    const at = ev[event];
+    return {
+      event,
+      labelKey,
+      labeled,
+      detected: at === null ? null : frameAt(sig, at),
+      clipped:
+        labeled !== null &&
+        isClippedStartLabel(labelKey, labeled, lab.startFrame),
+    };
+  });
 }
 
 export function computeReferenceShots(
@@ -89,6 +140,7 @@ export function computeReferenceShots(
       orientation,
       keyframes: Object.fromEntries(kf),
       metrics,
+      events: compareEvents(poses, lab, shootingHand),
     };
   });
 }

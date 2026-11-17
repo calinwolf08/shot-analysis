@@ -57,6 +57,33 @@ describe("computeReferenceShots (Curry)", () => {
   });
 });
 
+describe("v3 events vs labels (Curry)", () => {
+  it("compares every mapped event on every shot", () => {
+    for (const s of shots) {
+      expect(s.events).toHaveLength(8);
+      expect(
+        s.events.find((e) => e.event === "setPoint")!.detected,
+      ).not.toBeNull();
+    }
+  });
+
+  it("detects Curry's set point within 2 frames of the label on most shots", () => {
+    const close = shots.filter((s) => {
+      const e = s.events.find((x) => x.event === "setPoint")!;
+      return e.labeled !== null && Math.abs(e.detected! - e.labeled) <= 2;
+    });
+    expect(close.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("marks start labels placed on the window's first frame as clipped", () => {
+    const e = shots[0]!.events.find(
+      (x) => x.labelKey === "legs_start_bending",
+    )!;
+    expect(e.labeled).toBe(shots[0]!.startFrame);
+    expect(e.clipped).toBe(true);
+  });
+});
+
 describe("buildMetricTable", () => {
   const table = buildMetricTable(shots, targets.metrics);
 
