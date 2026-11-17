@@ -14,6 +14,9 @@ const MARKERS = [
   "debug-drill-list",
   "live-debug-hud",
   "__scAudioLog",
+  "debug-tools-link",
+  "reference-viewer",
+  "debug-index",
   '"detectDelayMs"', // ?detectDelayMs= slow-phone knob (live page)
 ];
 

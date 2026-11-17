@@ -141,6 +141,16 @@
   </Card>
 </section>
 
+<!-- TEMP: quick access to the debug tools while metrics are being audited.
+     Dev/E2E builds only (constant-folded away in production). -->
+{#if import.meta.env.DEV || import.meta.env.VITE_E2E === "1"}
+  <section class="block">
+    <a class="debug-link" href="/__debug" data-testid="debug-tools-link"
+      >Debug tools →</a
+    >
+  </section>
+{/if}
+
 <section class="block">
   <h2>Account</h2>
   <Card testid="account-card">
@@ -305,5 +315,9 @@
     display: block;
     color: var(--sc-text-dim);
     font-size: 12px;
+  }
+  .debug-link {
+    color: var(--sc-primary);
+    font-weight: 600;
   }
 </style>

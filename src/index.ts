@@ -218,6 +218,7 @@ export {
 export {
   extractShotMetrics,
   metricsForShot,
+  keyframeFramesFromPoseData,
   computeSequencing,
   computeStructure,
 } from "./metrics/v2";

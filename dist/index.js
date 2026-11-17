@@ -44,7 +44,7 @@ export { poseDataSchema, frameSchema } from "./testing/types";
 // locally-hosted assets)
 export { createPoseDetector, } from "./pose/factory";
 // v2 metrics (Sequencing / Structure overhaul) — extraction + measurement types
-export { extractShotMetrics, metricsForShot, computeSequencing, computeStructure, } from "./metrics/v2";
+export { extractShotMetrics, metricsForShot, keyframeFramesFromPoseData, computeSequencing, computeStructure, } from "./metrics/v2";
 export { detectKeyframesFromFrames, poseLandmarksToFrames, } from "./detection/keyframe-phases";
 export { deriveThresholds } from "./metrics/v2";
 export { scoreShot } from "./scoring/v2";

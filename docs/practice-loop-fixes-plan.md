@@ -666,6 +666,40 @@ are **recomputed from their stored review pose track** (2D + visibility is
 enough for every new metric) and the result is persisted back. Shots without a
 pose track show "Re-analysis unavailable" and are excluded from Insights trends.
 
+## B-2.9 Implementation notes (Phase 9)
+- **`/__debug` index** (`routes/__debug/debug-routes.ts`): a unit test checks
+  the list against the route folders, so a new tool can't be left off.
+  A **TEMP "Debug tools →" link** sits in Profile (dev/E2E builds only).
+  `check:stripped` asserts that it, the index, and the viewer markup are
+  absent from production.
+- **Curry model viewer** (`/__debug/reference`):
+  `features/reference/curry-model.ts` measures the 7 labeled Curry shots
+  exactly like `targets:build`. A unit test proves parity: the mean, min,
+  max and n of every target are reproduced to 1e-9. The library now exports
+  `keyframeFramesFromPoseData` for this.
+  - The table groups rows by phase, then sequencing, with one column per
+    shot plus mean, band and SD. Cells more than 2 SD out are flagged,
+    unmeasured cells show "—", and unscored rows are faded.
+  - Clicking a cell selects that shot and seeks to the frame where it was
+    measured.
+  - The stage reuses the Phase 6 framing (true 16:9 aspect, whole-shot fit).
+- **Data:** in dev, a serve-only middleware reads it from
+  `test-data/stephen-curry-1/` (poses, labels, `manifest.json`, and the
+  local-only video with Range support). The e2e build gets poses and labels
+  copied in, with `manifest.json` set to `{video:false}`. There is no video in
+  CI, so the viewer is skeleton-only with a file picker.
+- **What the table already shows** (input for Phases 10–12):
+  - `setPoint.elbow_angle` is 135–152° on every shot. A true set point is a
+    bent elbow (~90°), and shot 4's skeleton at the measured frame has the arm
+    nearly extended. So the **detected set point lands late** (near release),
+    which is why "elbow angle low by 91" shows on user shots.
+  - **Wrist-cock and wrist-path metrics are unmeasured on 3–4 of 7 shots**
+    (finger landmarks), so their targets rest on 3–4 values.
+  - **Some sequencing gaps read 0** on several shots (e.g. ball low → ball
+    rise), meaning events landed on the same frame at 30 fps. This is the
+    resolution problem B-2.4 addresses.
+  - Ankle rows are 0 by construction (already excluded from scoring).
+
 ## B-3. Phased implementation (Part B)
 
 **Phase 9 — Debug index + Curry viewer shell**

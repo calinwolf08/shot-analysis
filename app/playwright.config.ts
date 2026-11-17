@@ -64,7 +64,13 @@ export default defineConfig({
       // collision resolving to the wrong module) shows up here and nowhere
       // else. Kept to the page-load + navigation smoke to stay fast.
       name: "chromium-dev",
-      testMatch: ["**/smoke.spec.ts", "**/navigation.spec.ts"],
+      // + the debug tools, which are used mostly under `npm run dev` (their
+      // data is served by a dev-only middleware there).
+      testMatch: [
+        "**/smoke.spec.ts",
+        "**/navigation.spec.ts",
+        "**/debug-tools.spec.ts",
+      ],
       use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:5174" },
     },
   ],
