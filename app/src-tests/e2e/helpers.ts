@@ -51,12 +51,15 @@ export async function onboard(
 }
 
 /**
- * Waits for the continuous practice loop. The setup screen is gone: the loop
- * boots straight into practice. In replay there's no camera, so the in-loop
- * positioning gate is inactive and the replayed pose stream drives shots.
+ * The Practice tab IS the live loop: it opens the camera on arrival. This
+ * waits for it and taps the one-time "Tap to start" (audio unlock + shot
+ * detection) when shown — it's only shown once per page load.
  */
 export async function startLiveLoop(page: Page): Promise<void> {
   await page.getByTestId("practice-loop").waitFor({ timeout: 30_000 });
+  const start = page.getByTestId("practice-start");
+  if (await start.isVisible()) await start.click();
+  await start.waitFor({ state: "detached" });
 }
 
 /**

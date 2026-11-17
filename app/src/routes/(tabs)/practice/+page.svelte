@@ -1,102 +1,376 @@
 <script lang="ts">
+  /**
+   * Practice tab = the live loop (SwingCoach-style): opening the tab opens
+   * the camera and pose tracking straight away. A one-time "Tap to start"
+   * unlocks audio (mobile browsers need a gesture) and starts shot detection.
+   * Leaving the tab (e.g. to Shots) unmounts this page, which stops the camera
+   * and tracking; coming back reopens them without asking again.
+   */
+  import { onDestroy } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { useAppServices } from "$lib/shared/config/services-context";
-  import { Button, Card } from "$lib/shared/ui";
+  import type { LiveAnalysisSession } from "$lib/features/analysis";
   import {
-    FocusSheet,
-    focusSummary,
+    createLiveRepCoordinator,
+    createLiveShotPipeline,
+    createRepoShotStore,
+    LiveDebugHud,
+    LivePracticeStore,
+    PracticeScreen,
+    requiredOrientation,
+    scorecardForShot,
+    type ShotEntry,
+    type LiveRepCoordinator,
+    type SideOrientation,
+  } from "$lib/features/live-practice";
+  import {
+    DEFAULT_LIVE_TUNING,
+    loadLiveTuning,
+    type LiveTuning,
+  } from "$lib/features/live-practice/tuning";
+  import {
+    simulatedSpeechMs,
+    withAudioProbe,
+  } from "$lib/shared/audio/audio-probe";
+  import {
+    loadLiveTargets,
     normalizeAreas,
+    type LiveTargets,
   } from "$lib/features/scoring";
+  import { useAppServices } from "$lib/shared/config/services-context";
+  import { createApiClient } from "$lib/shared/api/client";
+  import { createWebAudioFeedbackService } from "$lib/shared/audio";
+  import {
+    createBrowserCaptureService,
+    type CaptureHandle,
+    type CaptureService,
+    createFileCaptureService,
+  } from "$lib/shared/media/capture";
+  import { getShotClipStore } from "$lib/shared/media/shot-clip-store";
+  import { audioUnlockState } from "$lib/shared/audio/unlock-state";
 
   const services = useAppServices();
+  // Dev/E2E: mirror everything audible into window.__scAudioLog so specs can
+  // assert what the player hears. Constant-folds away in production.
+  const devSurfaces = import.meta.env.DEV || import.meta.env.VITE_E2E === "1";
+  // E2E builds also simulate speech durations (headless has no voices).
+  const audio = devSurfaces
+    ? withAudioProbe(
+        createWebAudioFeedbackService(),
+        import.meta.env.VITE_E2E === "1"
+          ? { simulateSpeech: simulatedSpeechMs }
+          : {},
+      )
+    : createWebAudioFeedbackService();
+  const clipStore = getShotClipStore();
 
-  let focusAreas = $state<string[]>([]);
-  let focusOpen = $state(false);
+  const replayMode =
+    page.url.searchParams.get("e2e") === "replay" ||
+    import.meta.env.VITE_ANALYSIS_BACKEND === "replay";
 
-  $effect(() => {
-    void services.repos.settings
-      .get("liveFocusAreas")
-      .then((ids) => (focusAreas = normalizeAreas(ids)));
-  });
+  // Dev/e2e only: `?liveVideo=<url>` plays a recorded clip as the "camera"
+  // through the real pipeline (no webcam). Constant-folds away in production.
+  const liveVideoUrl =
+    import.meta.env.DEV || import.meta.env.VITE_E2E === "1"
+      ? page.url.searchParams.get("liveVideo")
+      : null;
 
-  function changeFocus(ids: string[]) {
+  // Dev/e2e only: `?fakecam=1` opens a real getUserMedia stream (Chromium's
+  // fake device in e2e) alongside the REPLAYED pose stream, so the camera-only
+  // paths (positioning gate, clip recording) run deterministically.
+  const fakeCam =
+    replayMode && devSurfaces && page.url.searchParams.get("fakecam") === "1";
+
+  const capture: CaptureService | null = replayMode
+    ? fakeCam
+      ? createBrowserCaptureService()
+      : null
+    : liveVideoUrl
+      ? createFileCaptureService(liveVideoUrl)
+      : createBrowserCaptureService();
+
+  const liveDebug =
+    import.meta.env.VITE_LIVE_DEBUG === "1" ||
+    ((import.meta.env.DEV || import.meta.env.VITE_E2E === "1") &&
+      page.url.searchParams.get("debug") === "live");
+
+  let phase = $state<"loading" | "running" | "error">("loading");
+  let session = $state<LiveAnalysisSession | null>(null);
+  let store = $state<LivePracticeStore | null>(null);
+  let coordinator = $state<LiveRepCoordinator | null>(null);
+  let cameraStream = $state<MediaStream | null>(null);
+  let errorMessage = $state<string | null>(null);
+  let shootingHand: "left" | "right" = "right";
+  let requiredSide = $state<SideOrientation>("side-left");
+  let playerId = "";
+  let targets: LiveTargets | null = null;
+  let captureHandle: CaptureHandle | null = null;
+  let focusAreas: string[] = [];
+  let tuning = $state<LiveTuning>(DEFAULT_LIVE_TUNING);
+  /** Shot detection + audio started (after the one-time tap). */
+  let started = $state(audioUnlockState.unlocked);
+  /** Set on unmount: an in-flight boot must not open the camera afterwards. */
+  let destroyed = false;
+  let wakeLock: { release(): Promise<void> } | null = null;
+  let initialShots: ShotEntry[] = [];
+
+  function persistFocus(ids: string[]) {
     focusAreas = ids;
     void services.repos.settings.set("liveFocusAreas", ids);
   }
 
-  function startLive() {
-    void goto(`/practice/live${page.url.search}`);
+  $effect(() => {
+    void boot();
+  });
+
+  async function boot() {
+    if (session) return;
+    const player = await services.repos.player.getFirst();
+    if (destroyed) return;
+    if (!player) {
+      await goto(`/${page.url.search}`);
+      return;
+    }
+    playerId = player.id;
+    shootingHand = player.shootingHand;
+    requiredSide = requiredOrientation(shootingHand);
+    targets = await loadLiveTargets();
+    const loaded = await loadLiveTuning();
+    tuning = loaded.tuning;
+    for (const w of loaded.warnings) console.warn("[live-tuning]", w);
+    focusAreas = normalizeAreas(
+      await services.repos.settings.get("liveFocusAreas"),
+    );
+    initialShots = await loadTodaysShots(player.id, targets);
+    if (destroyed) return;
+
+    // Dev/E2E only: `?detectDelayMs=` slows each detection in the worker to
+    // imitate a slow phone. Constant-folds away in production.
+    const detectDelay = devSurfaces
+      ? Number(page.url.searchParams.get("detectDelayMs") ?? 0) || 0
+      : 0;
+    const s = services.analysis.createLiveSession(
+      { shootingHand, profile: "pro-form" },
+      {
+        ...tuning.latency,
+        ...(detectDelay > 0 ? { debugDetectDelayMs: detectDelay } : {}),
+      },
+    );
+    session = s;
+    try {
+      await s.start();
+      if (destroyed) return;
+    } catch {
+      handleError(
+        "Unable to start pose detection. Please refresh and try again.",
+      );
+      return;
+    }
+
+    // Open the camera (real webcam, or a file in dev/e2e). Replay has none —
+    // the loop still runs from the replayed pose stream.
+    if (capture) {
+      try {
+        captureHandle = await capture.start();
+        if (destroyed) {
+          // Left the tab while the camera was opening: release it now.
+          for (const t of captureHandle.stream.getTracks()) t.stop();
+          return;
+        }
+        cameraStream = captureHandle.stream;
+      } catch {
+        cameraStream = null; // pose-only fallback
+      }
+    }
+    void engageDeviceLocks();
+    beginLoop();
+  }
+
+  function beginLoop() {
+    if (!session || !targets) return;
+    coordinator = createLiveRepCoordinator(
+      { analyze: (frames) => session!.analyzeWindow(frames) },
+      { shootingHand },
+    );
+    const activeCoordinator = coordinator;
+    session.onFrame((frame) => activeCoordinator.pushFrame(frame));
+
+    const shotStore = createRepoShotStore(services.repos.shot);
+    const pipeline = createLiveShotPipeline({
+      targets,
+      store: shotStore,
+      api: createApiClient(),
+    });
+    store = new LivePracticeStore({
+      coordinator,
+      pipeline,
+      shotStore,
+      audio,
+      playerId,
+      opts: { shootingHand, profile: "pro-form" },
+      fps: session.fps,
+      focusAreas,
+      initialShots,
+    });
+    // Already unlocked this page-load (came back from another tab): go.
+    if (started) store.start();
+    phase = "running";
+  }
+
+  /** The one-time tap: unlock audio inside the gesture, start detecting. */
+  function handleStart() {
+    audio.unlock();
+    audioUnlockState.markUnlocked();
+    started = true;
+    store?.start();
+  }
+
+  /**
+   * Today's already-recorded shots, so the counter/average/drawer continue
+   * across tab switches (Shots tab has the full history).
+   */
+  async function loadTodaysShots(
+    id: string,
+    t: LiveTargets,
+  ): Promise<ShotEntry[]> {
+    // Local midnight (plain timestamp math; no reactive Date needed).
+    const now = Date.now();
+    const d = new Date(now);
+    const startOfDay =
+      now -
+      ((d.getHours() * 60 + d.getMinutes()) * 60 + d.getSeconds()) * 1000 -
+      d.getMilliseconds();
+    try {
+      const rows = await services.repos.shot.listByPlayer(id, {
+        since: startOfDay,
+      });
+      return [...rows]
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .map((row, i) => {
+          const card = scorecardForShot(row.analysis, t);
+          return {
+            index: i + 1,
+            shotId: row.id,
+            overall: card.overall,
+            worst: card.worst,
+            scorecard: card,
+            excluded: row.excluded,
+          };
+        });
+    } catch {
+      return [];
+    }
+  }
+
+  async function engageDeviceLocks() {
+    try {
+      wakeLock = (await navigator.wakeLock?.request("screen")) ?? null;
+      if (destroyed) void wakeLock?.release();
+    } catch {
+      /* best effort */
+    }
+    try {
+      await (
+        screen.orientation as unknown as {
+          lock?: (o: string) => Promise<void>;
+        }
+      ).lock?.("portrait");
+    } catch {
+      /* best effort */
+    }
+  }
+
+  function handleError(message: string) {
+    errorMessage = message;
+    phase = "error";
+  }
+
+  onDestroy(() => {
+    destroyed = true;
+    store?.stop();
+    void session?.stop();
+    if (cameraStream) {
+      for (const track of cameraStream.getTracks()) track.stop();
+    }
+    void wakeLock?.release().catch(() => undefined);
+  });
+
+  function retry() {
+    location.reload();
   }
 </script>
 
-<h1>Practice</h1>
-<div class="options">
-  <Card>
-    <h2>Live practice</h2>
-    <p>
-      Shoot with real-time feedback after every rep. Set up side-on with your
-      shooting arm toward the camera, then take your shots.
-    </p>
-    <button
-      class="focus-row"
-      data-testid="focus-row"
-      onclick={() => (focusOpen = true)}
-    >
-      <span class="fr-label">🎯 Focus</span>
-      <span class="fr-value" data-testid="focus-value"
-        >{focusSummary(focusAreas)} ›</span
-      >
-    </button>
-    <Button testid="practice-live" onclick={startLive}>
-      Start live practice
-    </Button>
-  </Card>
-</div>
-
-<FocusSheet
-  bind:open={focusOpen}
-  selected={focusAreas}
-  onchange={changeFocus}
-/>
+{#if phase === "error"}
+  <section class="center">
+    <h2>Something went wrong</h2>
+    <p>{errorMessage}</p>
+    <button onclick={retry}>Try again</button>
+  </section>
+{:else if phase === "running" && store}
+  <PracticeScreen
+    {store}
+    {session}
+    {audio}
+    requiredOrientation={requiredSide}
+    {clipStore}
+    stream={cameraStream}
+    onfocuschange={persistFocus}
+    {tuning}
+    debug={liveDebug}
+    needsStart={!started}
+    onstart={handleStart}
+  />
+  {#if liveDebug && coordinator}
+    <LiveDebugHud {coordinator} {session} />
+  {/if}
+{:else}
+  <section class="center" data-testid="practice-loading">
+    <div class="spinner"></div>
+    <p>Starting camera…</p>
+  </section>
+{/if}
 
 <style>
-  h1 {
-    margin: 0 0 var(--sc-space-4);
-  }
-  h2 {
-    margin: 0 0 var(--sc-space-1);
-    font-size: 17px;
-  }
-  p {
-    color: var(--sc-text-dim);
-    margin: 0 0 var(--sc-space-3);
-  }
-  .options {
+  .center {
+    min-height: calc(100dvh - 84px - env(safe-area-inset-bottom));
+    max-width: 560px;
+    margin: 0 auto;
+    padding: var(--sc-space-4);
     display: flex;
     flex-direction: column;
-    gap: var(--sc-space-3);
-  }
-  .focus-row {
-    width: 100%;
-    display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--sc-space-3);
-    padding: 10px 12px;
-    margin-bottom: var(--sc-space-3);
-    border: 1px solid var(--sc-border);
+    justify-content: center;
+    gap: var(--sc-space-4);
+    text-align: center;
+  }
+  .center h2 {
+    margin: 0;
+    font-size: 20px;
+  }
+  .center p {
+    color: var(--sc-text-dim);
+    margin: 0;
+  }
+  .center button {
+    padding: 10px 24px;
     border-radius: var(--sc-radius);
-    background: var(--sc-surface);
-    color: inherit;
+    background: var(--sc-primary);
+    color: #fff;
+    border: none;
+    font-weight: 600;
     cursor: pointer;
-    font-size: 14px;
   }
-  .fr-label {
-    font-weight: 600;
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 3px solid var(--sc-border);
+    border-top-color: var(--sc-primary);
+    animation: spin 0.9s linear infinite;
   }
-  .fr-value {
-    color: var(--sc-primary);
-    font-weight: 600;
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

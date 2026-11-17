@@ -10,7 +10,6 @@ test("fake camera + replay poses + audio probe boot together", async ({
   page,
 }) => {
   await onboard(page, "?e2e=replay&fakecam=1&debug=live", "Harness");
-  await page.getByTestId("practice-live").click();
   await startLiveLoop(page);
 
   const video = page.getByTestId("loop-preview");

@@ -44,7 +44,6 @@ const statusSeen = (page: Page) =>
 async function start(page: Page, name: string) {
   // One side-on shot, looping at real speed (a new shot every ~5 s).
   await onboard(page, "?e2e=replay&replaySpeed=1", name);
-  await page.getByTestId("practice-live").click();
   await startLiveLoop(page);
   await watchStatus(page);
 }
@@ -153,5 +152,9 @@ test("muted (spotter watching the screen): the strip still walks the sequence", 
   const seen = (await statusSeen(page)).join(" ");
   expect(seen).toMatch(/captured.*readback.*ready/);
   // Nothing audible was logged while muted.
-  expect((await heard(page)).filter((e) => e.kind !== "cancel")).toEqual([]);
+  expect(
+    (await heard(page)).filter(
+      (e) => e.kind !== "cancel" && e.kind !== "unlock",
+    ),
+  ).toEqual([]);
 });

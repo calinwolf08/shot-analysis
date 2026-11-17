@@ -1,6 +1,31 @@
 import { sveltekit } from "@sveltejs/kit/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
-import { defineConfig, type PluginOption } from "vite";
+import { defineConfig, type Plugin, type PluginOption } from "vite";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+/**
+ * Dev server only: serve the replay pose fixtures at /fixtures/poses/<id>.json
+ * (as the e2e production build does via scripts/copy-fixtures-to-build.mjs),
+ * so `?e2e=replay` works under `npm run dev` too. Never part of a build.
+ */
+function devReplayFixtures(): Plugin {
+  const dir = join(process.cwd(), "src-tests", "fixtures", "poses");
+  return {
+    name: "dev-replay-fixtures",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use("/fixtures/poses", (req, res, next) => {
+        const name = (req.url ?? "").split("?")[0]!.replace(/^\//, "");
+        if (!/^[\w.-]+\.json$/.test(name)) return next();
+        const file = join(dir, name);
+        if (!existsSync(file)) return next();
+        res.setHeader("Content-Type", "application/json");
+        res.end(readFileSync(file));
+      });
+    },
+  };
+}
 
 // The repo root (library) and app workspaces carry different vite majors, so
 // plugin types from hoisted packages are not identical at the type level even
@@ -8,7 +33,7 @@ import { defineConfig, type PluginOption } from "vite";
 const svelteTestingPlugin = svelteTesting() as unknown as PluginOption;
 
 export default defineConfig({
-  plugins: [sveltekit()],
+  plugins: [sveltekit(), devReplayFixtures()],
   // Keep these external in the adapter-node SSR bundle (resolved from
   // node_modules at runtime). This never affects the client bundle — ssr.external
   // only applies to server builds, and the client still bundles

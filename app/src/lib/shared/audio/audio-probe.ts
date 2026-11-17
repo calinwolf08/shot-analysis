@@ -18,7 +18,13 @@ import type { AudioFeedbackService } from "./audio-feedback";
 export interface AudioLogEntry {
   /** performance.now() when the call was made. */
   readonly t: number;
-  readonly kind: "speak" | "speak-end" | "earcon" | "beep" | "cancel";
+  readonly kind:
+    | "speak"
+    | "speak-end"
+    | "earcon"
+    | "beep"
+    | "cancel"
+    | "unlock";
   /** Spoken text, earcon/beep kind; absent for cancel. */
   readonly text?: string;
 }
@@ -86,6 +92,10 @@ export function withAudioProbe(
       push("cancel");
       for (const finish of [...simulated]) finish();
       inner.cancel();
+    },
+    unlock() {
+      push("unlock");
+      inner.unlock();
     },
     setMuted: (m) => inner.setMuted(m),
     isMuted: () => inner.isMuted(),

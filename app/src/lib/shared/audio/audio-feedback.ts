@@ -27,6 +27,13 @@ export interface AudioFeedbackService {
   playEarcon(kind: EarconKind): Promise<void>;
   /** Stop any in-flight speech (its speak() promise resolves). */
   cancel(): void;
+  /**
+   * Call from a user gesture (tap). Mobile browsers — iOS Safari especially —
+   * keep WebAudio suspended and ignore speechSynthesis until audio has been
+   * started inside a gesture; this resumes the audio context and primes speech
+   * with a silent utterance.
+   */
+  unlock(): void;
   setMuted(muted: boolean): void;
   isMuted(): boolean;
 }
@@ -136,6 +143,18 @@ export function createWebAudioFeedbackService(): AudioFeedbackService {
       for (const finish of [...pending]) finish();
     },
 
+    unlock() {
+      audioContext();
+      if (typeof speechSynthesis === "undefined") return;
+      try {
+        const primer = new SpeechSynthesisUtterance(" ");
+        primer.volume = 0;
+        speechSynthesis.speak(primer);
+      } catch {
+        /* best effort */
+      }
+    },
+
     setMuted(next) {
       muted = next;
     },
@@ -152,6 +171,8 @@ export interface FakeAudio extends AudioFeedbackService {
   readonly sequence: string[];
   /** How many times speech was cancelled (interruptions). */
   cancels: number;
+  /** How many times unlock() was called. */
+  unlocks: number;
 }
 
 /**
@@ -174,6 +195,7 @@ export function createFakeAudio(
     earcons,
     sequence,
     cancels: 0,
+    unlocks: 0,
     get speaking() {
       return held.length;
     },
@@ -200,6 +222,9 @@ export function createFakeAudio(
     cancel() {
       fake.cancels += 1;
       fake.releaseSpeech();
+    },
+    unlock() {
+      fake.unlocks += 1;
     },
     setMuted(next: boolean) {
       muted = next;

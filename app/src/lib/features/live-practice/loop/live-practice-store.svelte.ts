@@ -94,10 +94,14 @@ export interface LivePracticeStoreDeps {
   maxWorstSpoken?: number;
   /** Live focus-area ids; [] = coach on everything (the default). */
   focusAreas?: string[];
+  /** Shots already recorded today (continues the counter/average). */
+  initialShots?: ShotEntry[];
 }
 
 export class LivePracticeStore {
   phase = $state<LoopPhase>("idle");
+  /** Shot detection is running (start() called, not stopped). */
+  running = $state(false);
   /** Per-shot announcement cycle; "tracking" between shots. */
   cycle = $state<ShotCycle>("tracking");
   /** The continuous shot history (most recent last). */
@@ -123,6 +127,7 @@ export class LivePracticeStore {
     this.maxWorstSpoken = deps.maxWorstSpoken ?? 5;
     this.muted = deps.audio.isMuted();
     this.focusAreas = deps.focusAreas ?? [];
+    this.shots = deps.initialShots ?? [];
   }
 
   /**
@@ -155,6 +160,7 @@ export class LivePracticeStore {
   start(): void {
     if (this.started) return;
     this.started = true;
+    this.running = true;
     const { coordinator } = this.deps;
     this.unsubscribes = [
       coordinator.on("stateChanged", ({ to }) => {
@@ -363,5 +369,6 @@ export class LivePracticeStore {
     for (const unsubscribe of this.unsubscribes) unsubscribe();
     this.unsubscribes = [];
     this.started = false;
+    this.running = false;
   }
 }

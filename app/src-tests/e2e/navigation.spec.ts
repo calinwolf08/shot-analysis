@@ -12,7 +12,9 @@ test("navigates every tab via the tab bar", async ({ page }) => {
 
   // Practice is the entry tab.
   await expect(page.getByTestId("tab-practice")).toBeVisible();
-  await expect(page.getByTestId("practice-live")).toBeVisible();
+  await expect(page.getByTestId("practice-loop")).toBeVisible({
+    timeout: 30_000,
+  });
 
   await page.getByTestId("tab-shots").click();
   await page.waitForURL("**/shots**");
@@ -30,7 +32,9 @@ test("navigates every tab via the tab bar", async ({ page }) => {
   // ...and back to Practice.
   await page.getByTestId("tab-practice").click();
   await page.waitForURL("**/practice**");
-  await expect(page.getByTestId("practice-live")).toBeVisible();
+  await expect(page.getByTestId("practice-loop")).toBeVisible({
+    timeout: 30_000,
+  });
 });
 
 test("profile shows the player and signs out", async ({ page }) => {

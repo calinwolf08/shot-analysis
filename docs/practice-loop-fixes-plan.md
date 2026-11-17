@@ -147,7 +147,7 @@ State machine in `LivePracticeStore`:
 
 ## 4. Phased implementation
 
-> **Status:** Phases 0–4 are implemented (see "Implementation notes" below).
+> **Status:** Phases 0–5 are implemented (see "Implementation notes" below).
 
 ### Implementation notes (Phases 0–1)
 - **Required side corrected.** Pose data shows "side-left" means the player's
@@ -259,6 +259,40 @@ State machine in `LivePracticeStore`:
 - **Known layout limit:** on a phone the big feedback card sits below the
   preview, off screen. The strip shows the score. Phase 5 (Practice tab)
   revisits the layout.
+
+### Implementation notes (Phase 5)
+- **The Practice tab is the live loop** (`routes/(tabs)/practice`). The camera
+  and pose tracking start on arrival, and the tab bar stays visible.
+  `/practice/live` redirects to it, keeping the query (hidden Home/plan
+  links, bookmarks).
+- **"Tap to start"** (once per page load, `audioUnlockState`) calls
+  `audio.unlock()`, which resumes WebAudio and primes speech with a silent
+  utterance inside the gesture. Mobile browsers need this. Shot detection
+  (`store.start()`) and spoken cues begin only after the tap. Switching
+  tabs and coming back doesn't ask again.
+- **Leaving the tab unmounts the page,** which stops the store, pose session,
+  camera tracks and wake lock. A boot still in flight when you leave releases
+  the camera as soon as it opens (no background camera).
+- **Today's shots are reloaded** on (re)entry, so the counter, average and
+  "Today" sheet continue. The Shots tab has the full history.
+- **Layout:** full-bleed in the tab layout. The preview flexes to the remaining
+  height, and the 🎯 focus chip and mute/pause are overlaid on it. The status
+  strip and a compact feedback card (score + top 3 issues) stay above the tab
+  bar. The breakdown and today's list are sheets. The camera pill says
+  "✓ In position" (the strip carries "Ready"). The "Done" button and the old
+  Practice card/focus row are gone.
+- **The dev server now serves the replay fixtures** (`vite.config.ts`, serve
+  only), so the Practice tab works with `?e2e=replay` under `npm run dev`.
+  This was found by the dev-parity e2e tier.
+- **E2E** (`practice-tab.mobile.spec.ts`):
+  - The camera is live on arrival under "Tap to start", nothing is spoken
+    before the tap, and the tap is logged as an unlock.
+  - The focus chip sits inside the preview.
+  - The strip and feedback card are above the tab bar on an iPhone 14
+    viewport.
+  - Switching to Shots ends the camera tracks. Back on Practice the camera is
+    live again, with no second tap and the counter continued.
+  - `/practice/live` redirects, and axe passes on the new screen.
 
 Each phase ends with its own validation (see §5) and lands as its own commit(s).
 

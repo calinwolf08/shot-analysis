@@ -38,7 +38,6 @@ test("mixed-angle session: wrong-angle shots are announced and never stored", as
   // behind-right, side-right ×2. No fake camera → no positioning gate, so
   // every motion reaches analysis and the per-shot orientation check decides.
   await onboard(page, "?e2e=replay&replayFixture=20190804_140654", "Mixed");
-  await page.getByTestId("practice-live").click();
   await startLiveLoop(page);
 
   await expect(page.getByTestId("practice-wrong-angle")).toBeVisible({
@@ -54,7 +53,11 @@ test("mixed-angle session: wrong-angle shots are announced and never stored", as
   // Let the rest of the fixture play through once, then stop practicing so
   // nothing new is recorded while we count.
   await page.waitForTimeout(15_000);
-  await page.getByTestId("practice-done").click();
+  await page.getByTestId("tab-shots").click();
+  // A shot already being scored as we left may still land; let it settle,
+  // then reload the list so it and the API agree.
+  await page.waitForTimeout(2_000);
+  await page.reload();
 
   const shots = await storedShots(page);
   expect(shots.length).toBeGreaterThanOrEqual(1);
@@ -68,7 +71,6 @@ test("mixed-angle session: wrong-angle shots are announced and never stored", as
   });
 
   // The Shots tab lists only those, labeled by time + issue (no orientation).
-  await page.getByTestId("tab-shots").click();
   await expect(
     page.locator('[data-testid^="shot-row-"]').first(),
   ).toBeVisible();
@@ -95,7 +97,6 @@ test("positioning gate: shots only start once side-on with the shooting arm towa
     "?e2e=replay&fakecam=1&debug=live&replaySpeed=1&replayScript=wrongside:8",
     "Armed",
   );
-  await page.getByTestId("practice-live").click();
   await startLiveLoop(page);
 
   await expect(page.getByTestId("readiness-cue")).toBeVisible();

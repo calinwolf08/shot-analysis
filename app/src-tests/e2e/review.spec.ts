@@ -17,21 +17,19 @@ async function setRange(input: Locator, value: number) {
  */
 async function openReview(page: Page) {
   await onboard(page, "?e2e=replay", "Review");
+  await startLiveLoop(page);
   // Focus is device-global; reset to "everything" so the overlay isn't
   // filtered to a selection leaked from another test.
-  await page.getByTestId("focus-row").click();
+  await page.getByTestId("focus-chip").click();
   const clear = page.getByTestId("focus-clear");
   if (await clear.isEnabled()) await clear.click();
   await page
     .getByTestId("sheet-backdrop")
     .click({ position: { x: 10, y: 10 } });
-  await page.getByTestId("practice-live").click();
-  await startLiveLoop(page);
   await expect(page.getByTestId("rep-feedback")).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByTestId("practice-done").click();
-  await page.waitForURL("**/practice**");
+  // Leaving the Practice tab stops the camera + loop.
   await page.getByTestId("tab-shots").click();
   const firstShot = page.locator('[data-testid^="shot-row-"]').first();
   await expect(firstShot).toBeVisible({ timeout: 10_000 });

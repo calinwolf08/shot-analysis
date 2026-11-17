@@ -22,7 +22,6 @@ async function serveTuning(page: Page, latency: Record<string, unknown>) {
 
 async function startRealLoop(page: Page, name: string, extraQuery = "") {
   await onboard(page, `?debug=live${extraQuery}`, name);
-  await page.getByTestId("practice-live").click();
   await startLiveLoop(page);
   await expect(page.getByTestId("loop-preview")).toBeVisible();
 }
@@ -114,7 +113,6 @@ test("replayed latency shows in the HUD (simulated 200 ms)", async ({
     "?e2e=replay&fakecam=1&debug=live&replayLatencyMs=200",
     "Replaylag",
   );
-  await page.getByTestId("practice-live").click();
   await startLiveLoop(page);
   await expect
     .poll(() => latencyMs(page), { timeout: 15_000 })

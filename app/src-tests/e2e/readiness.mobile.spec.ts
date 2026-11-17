@@ -36,7 +36,6 @@ async function startWithScript(page: Page, script: string, name: string) {
   // replaySpeed=1 keeps the fixture (after the script) at real time.
   const q = `?e2e=replay&fakecam=1&debug=live&replaySpeed=1&replayScript=${script}`;
   await onboard(page, q, name);
-  await page.getByTestId("practice-live").click();
   await startLiveLoop(page);
   await expect(page.getByTestId("loop-preview")).toBeVisible();
   await expect(page.getByTestId("readiness")).toBeVisible();

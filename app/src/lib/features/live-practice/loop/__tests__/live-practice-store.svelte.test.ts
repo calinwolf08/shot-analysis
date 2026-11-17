@@ -338,6 +338,37 @@ describe("LivePracticeStore — per-shot cycle", () => {
     expect(coordinator.start).toHaveBeenCalledTimes(2); // start() + resume()
   });
 
+  it("continues today's shots (counter + average) and numbers new ones after them", async () => {
+    const { coordinator } = fakeCoordinator();
+    const earlier = processed("old", 5, ["Set point"]);
+    const store = new LivePracticeStore({
+      coordinator,
+      pipeline: fakePipeline([[processed("s2", 3, [])]]),
+      shotStore: fakeStore().store,
+      audio: createFakeAudio(),
+      playerId: "p1",
+      opts,
+      fps: 30,
+      initialShots: [
+        {
+          index: 1,
+          shotId: "old",
+          overall: 5,
+          worst: earlier.worst,
+          scorecard: earlier.scorecard,
+          excluded: false,
+        },
+      ],
+    });
+    expect(store.shotCount).toBe(1);
+    expect(store.average).toBe(5);
+    expect(store.running).toBe(false);
+    store.start();
+    expect(store.running).toBe(true);
+    store.stop();
+    expect(store.running).toBe(false);
+  });
+
   it("toggleMute mutes the audio service", () => {
     const { store, audio } = makeStore([[]]);
     expect(store.muted).toBe(false);

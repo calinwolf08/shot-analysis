@@ -11,7 +11,6 @@ test("live practice: replayed reps score and persist to the Shots tab", async ({
 }) => {
   await onboard(page, "?e2e=replay", "Live");
 
-  await page.getByTestId("practice-live").click();
   await startLiveLoop(page);
 
   // A scored shot surfaces as per-shot feedback (overall score + worst chips).
@@ -20,11 +19,8 @@ test("live practice: replayed reps score and persist to the Shots tab", async ({
   });
   await expect(page.getByTestId("rep-feedback-score")).toBeVisible();
 
-  // Leaving is just navigation — the shot is already persisted (no summary).
-  await page.getByTestId("practice-done").click();
-  await page.waitForURL("**/practice**");
-
-  // The Shots tab lists the recorded shot; opening it reviews the scorecard.
+  // Leaving is just switching tabs — the shot is already persisted (no
+  // summary), and the Shots tab lists it; opening it reviews the scorecard.
   await page.getByTestId("tab-shots").click();
   const firstShot = page.locator('[data-testid^="shot-row-"]').first();
   await expect(firstShot).toBeVisible({ timeout: 10_000 });

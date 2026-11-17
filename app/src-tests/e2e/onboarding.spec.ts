@@ -31,13 +31,17 @@ test("fresh app onboards, persists the player, and stays onboarded", async ({
   // Lands on the Practice tab (the live-first entry).
   await page.waitForURL("**/practice**");
   await expect(page.getByTestId("tab-practice")).toBeVisible();
-  await expect(page.getByTestId("practice-live")).toBeVisible();
+  await expect(page.getByTestId("practice-loop")).toBeVisible({
+    timeout: 30_000,
+  });
 
   // Reload → still onboarded (persisted), back on Practice.
   await page.reload();
   await page.waitForSelector('[data-testid="db-ready"]', { state: "attached" });
   await expect(page).not.toHaveURL(/onboarding/);
-  await expect(page.getByTestId("practice-live")).toBeVisible();
+  await expect(page.getByTestId("practice-loop")).toBeVisible({
+    timeout: 30_000,
+  });
 
   // Handedness visible in Profile.
   await page.getByTestId("tab-profile").click();
