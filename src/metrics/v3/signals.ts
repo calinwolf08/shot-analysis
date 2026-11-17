@@ -54,11 +54,36 @@ export interface ShotSignals {
   readonly elbowAngle: Series;
   /** Torso lean from vertical, hip→shoulder (deg; sign: + = toward facing). */
   readonly spineLean: Series;
+  /**
+   * Head/neck relative to the spine (deg): lean of shoulder→ear minus lean of
+   * hip→shoulder; + = head tipped forward (toward facing) of the spine line.
+   */
+  readonly headVsSpine: Series;
+  /** Wrist hinge: interior angle elbow-wrist-index (deg; smaller = more bent). */
+  readonly wristAngle: Series;
+  /** +1 if the player faces screen-right, −1 if screen-left. */
+  readonly facing: 1 | -1;
+  /**
+   * Raw joint positions (aspect-scaled x, frame-height units; smoothed) for
+   * positional metrics: shooting wrist/elbow, near hip/knee/ankle, head (near
+   * ear, else nose), guide wrist.
+   */
+  readonly pos: Readonly<Record<PosJoint, { x: Series; y: Series }>>;
+  /** Per-sample visibility (unsmoothed) of joints that are often occluded. */
+  readonly vis: Readonly<Record<"guideWrist" | "index", Series>>;
   /** Median segment lengths over the window (frame-height units). */
   readonly segments: Readonly<Record<SegmentName, number | null>>;
 }
 
 export type SegmentName = "thigh" | "shin" | "torso" | "forearm" | "upperArm";
+export type PosJoint =
+  | "wrist"
+  | "elbow"
+  | "hip"
+  | "knee"
+  | "ankle"
+  | "head"
+  | "guideWrist";
 
 const LM = {
   nose: 0,
@@ -66,6 +91,7 @@ const LM = {
   shoulder: { left: 11, right: 12 },
   elbow: { left: 13, right: 14 },
   wrist: { left: 15, right: 16 },
+  index: { left: 19, right: 20 },
   hip: { left: 23, right: 24 },
   knee: { left: 25, right: 26 },
   ankle: { left: 27, right: 28 },
@@ -162,9 +188,32 @@ export function nearSideOf(frames: readonly SignalFrame[]): Side {
   return left >= right ? "left" : "right";
 }
 
+/**
+ * Frame times in SECONDS. Sources disagree on units: recorded pose files
+ * (test-data, fixtures) store milliseconds despite the type's "seconds", the
+ * live path stores seconds. Frame spacing tells them apart (no camera runs
+ * slower than 1 fps); missing/flat timestamps fall back to index ÷ fps.
+ */
+export function frameTimesSeconds(
+  frames: readonly SignalFrame[],
+  fallbackFps = 30,
+): number[] {
+  const deltas: number[] = [];
+  for (let i = 1; i < frames.length; i++) {
+    const d = frames[i]!.timestamp - frames[i - 1]!.timestamp;
+    if (d > 0) deltas.push(d);
+  }
+  if (deltas.length === 0) {
+    return frames.map((f) => f.frameIndex / fallbackFps);
+  }
+  const med = [...deltas].sort((a, b) => a - b)[Math.floor(deltas.length / 2)]!;
+  const scale = med > 1 ? 1 / 1000 : 1;
+  return frames.map((f) => f.timestamp * scale);
+}
+
 export function computeSignals(
   frames: readonly SignalFrame[],
-  opts: { aspect: number; shootingHand: Side; nearSide?: Side },
+  opts: { aspect: number; shootingHand: Side; nearSide?: Side; fps?: number },
 ): ShotSignals {
   const a = opts.aspect;
   const shoot = opts.shootingHand;
@@ -178,6 +227,22 @@ export function computeSignals(
   }
   const facingSign = facing >= 0 ? 1 : -1;
 
+  const guide: Side = shoot === "left" ? "right" : "left";
+  const headSpine: Series = [];
+  const wristA: Series = [];
+  const posRaw: Record<PosJoint, { x: Series; y: Series }> = {
+    wrist: { x: [], y: [] },
+    elbow: { x: [], y: [] },
+    hip: { x: [], y: [] },
+    knee: { x: [], y: [] },
+    ankle: { x: [], y: [] },
+    head: { x: [], y: [] },
+    guideWrist: { x: [], y: [] },
+  };
+  const visGuide: Series = [];
+  const visIndex: Series = [];
+  const lean = (from: P, to: P) =>
+    (Math.atan2(facingSign * (to.x - from.x), from.y - to.y) * 180) / Math.PI;
   const wristY: Series = [];
   const hipY: Series = [];
   const knee: Series = [];
@@ -210,6 +275,24 @@ export function computeSignals(
         ? (Math.atan2(facingSign * (sn.x - h.x), h.y - sn.y) * 180) / Math.PI
         : null,
     );
+    const ear = pt(f, LM.ear[near], a) ?? pt(f, LM.nose, a);
+    const idx = pt(f, LM.index[shoot], a);
+    const g = pt(f, LM.wrist[guide], a, 0);
+    headSpine.push(sn && h && ear ? lean(sn, ear) - lean(h, sn) : null);
+    wristA.push(e && w && idx ? angleAt(e, w, idx) : null);
+    const put = (j: PosJoint, q: P | null) => {
+      posRaw[j].x.push(q ? q.x : null);
+      posRaw[j].y.push(q ? q.y : null);
+    };
+    put("wrist", w);
+    put("elbow", e);
+    put("hip", h);
+    put("knee", k);
+    put("ankle", an);
+    put("head", ear);
+    put("guideWrist", g);
+    visGuide.push(f.landmarks?.[LM.wrist[guide]]?.visibility ?? null);
+    visIndex.push(f.landmarks?.[LM.index[shoot]]?.visibility ?? null);
     if (h && k) seg.thigh.push(dist(h, k));
     if (k && an) seg.shin.push(dist(k, an));
     if (sn && h) seg.torso.push(dist(sn, h));
@@ -218,18 +301,28 @@ export function computeSignals(
   }
 
   const prep = (s: Series) => smooth(bridgeGaps(s));
+  // Joint angles live in [0°, 180°]; smoothing can overshoot at the ends.
+  const prepAngle = (s: Series) =>
+    prep(s).map((v) => (v === null ? null : Math.max(0, Math.min(180, v))));
   return {
     frameIndex: frames.map((f) => f.frameIndex),
-    t: frames.map((f) => f.timestamp),
+    t: frameTimesSeconds(frames, opts.fps),
     aspect: a,
     shootingSide: shoot,
     nearSide: near,
     wristY: prep(wristY),
     hipY: prep(hipY),
-    kneeAngle: prep(knee),
-    hipAngle: prep(hipA),
-    elbowAngle: prep(elbow),
+    kneeAngle: prepAngle(knee),
+    hipAngle: prepAngle(hipA),
+    elbowAngle: prepAngle(elbow),
     spineLean: prep(spine),
+    headVsSpine: prep(headSpine),
+    wristAngle: prepAngle(wristA),
+    facing: facingSign as 1 | -1,
+    pos: Object.fromEntries(
+      Object.entries(posRaw).map(([j, v]) => [j, { x: prep(v.x), y: prep(v.y) }]),
+    ) as Record<PosJoint, { x: Series; y: Series }>,
+    vis: { guideWrist: visGuide, index: visIndex },
     segments: {
       thigh: median(seg.thigh),
       shin: median(seg.shin),

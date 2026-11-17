@@ -13,8 +13,10 @@
   import { onDestroy, onMount } from "svelte";
   import type { PoseData } from "basketball-shot-analysis";
   import {
+    asV3Shots,
     buildMetricTable,
     computeReferenceShots,
+    v3StatsTargets,
     type MetricGroup,
     type ReferenceLabels,
     type ReferenceShot,
@@ -37,7 +39,11 @@
   let error = $state<string | null>(null);
   let poses = $state.raw<PoseData | null>(null);
   let shots = $state.raw<ReferenceShot[]>([]);
-  let table = $state.raw<MetricGroup[]>([]);
+  let tableV2 = $state.raw<MetricGroup[]>([]);
+  let tableV3 = $state.raw<MetricGroup[]>([]);
+  /** Which catalog the table shows: v2 (today's targets) or v3 (new). */
+  let catalog = $state<"v2" | "v3">("v3");
+  const table = $derived(catalog === "v3" ? tableV3 : tableV2);
   let shotIdx = $state(0);
   let frame = $state(0);
   let selected = $state<{ id: string; shot: number } | null>(null);
@@ -120,10 +126,11 @@
         "right",
       );
       shots = computed;
-      table = buildMetricTable(
+      tableV2 = buildMetricTable(
         computed,
         (t as { metrics: Record<string, TargetEntry> }).metrics,
       );
+      tableV3 = buildMetricTable(asV3Shots(computed), v3StatsTargets(computed));
       selectShot(0);
       status = "ready";
       // Local-only video: served in dev when present; otherwise the picker.
@@ -371,6 +378,27 @@
         </div>
       </div>
 
+      <div class="catalog" role="tablist" aria-label="Metric catalog">
+        <button
+          role="tab"
+          aria-selected={catalog === "v3"}
+          class:active={catalog === "v3"}
+          data-testid="catalog-v3"
+          onclick={() => (catalog = "v3")}>New metrics (v3)</button
+        >
+        <button
+          role="tab"
+          aria-selected={catalog === "v2"}
+          class:active={catalog === "v2"}
+          data-testid="catalog-v2"
+          onclick={() => (catalog = "v2")}>Current targets (v2)</button
+        >
+        <span class="dim">
+          {catalog === "v3"
+            ? "Aspect-correct angles, limb-length distances, timing as % of each phase. Mean / band / SD are from these 7 shots."
+            : "What live scoring uses today (live-targets.json)."}
+        </span>
+      </div>
       <div class="table-wrap">
         <table data-testid="ref-table">
           <thead>
@@ -566,6 +594,26 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+  }
+  .catalog {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .catalog button {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--sc-border);
+    background: var(--sc-card);
+    color: inherit;
+    cursor: pointer;
+  }
+  .catalog .active {
+    border-color: var(--sc-primary);
+    color: var(--sc-primary);
+    font-weight: 700;
   }
   .table-wrap {
     overflow-x: auto;

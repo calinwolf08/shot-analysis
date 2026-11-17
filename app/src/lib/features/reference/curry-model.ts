@@ -12,6 +12,7 @@ import {
   EVENT_PAD_AFTER,
   EVENT_PAD_BEFORE,
   LABEL_FOR_EVENT,
+  computeShotMetricsV3,
   computeSignals,
   detectEvents,
   detectKeyframesFromFrames,
@@ -54,6 +55,13 @@ export interface ReferenceShot {
   readonly metrics: ReadonlyMap<string, ReferenceMetricValue>;
   /** v3 sub-frame events vs the human labels, one row per labeled event. */
   readonly events: readonly EventComparison[];
+  /** v3 metric catalog (reliable values only), by id. */
+  readonly metricsV3: ReadonlyMap<string, ReferenceMetricValue>;
+  /** v3 metric meta (unit / kind) by id, for labels and grouping. */
+  readonly metaV3: ReadonlyMap<
+    string,
+    { unit: string; kind: string; phase: string }
+  >;
 }
 
 export interface EventComparison {
@@ -141,8 +149,76 @@ export function computeReferenceShots(
       keyframes: Object.fromEntries(kf),
       metrics,
       events: compareEvents(poses, lab, shootingHand),
+      ...v3For(poses, lab, shootingHand),
     };
   });
+}
+
+function v3For(
+  poses: PoseData,
+  lab: ReferenceLabels["shots"][number],
+  shootingHand: "left" | "right",
+): Pick<ReferenceShot, "metricsV3" | "metaV3"> {
+  const lo = Math.max(0, lab.startFrame - EVENT_PAD_BEFORE);
+  const hi = Math.min(poses.frames.length - 1, lab.endFrame + EVENT_PAD_AFTER);
+  const m = computeShotMetricsV3(
+    poses.frames.slice(lo, hi + 1) as unknown as SignalFrame[],
+    { aspect: poses.width / poses.height, shootingHand },
+  );
+  const metricsV3 = new Map<string, ReferenceMetricValue>();
+  const metaV3 = new Map<
+    string,
+    { unit: string; kind: string; phase: string }
+  >();
+  for (const [id, x] of Object.entries(m.metrics)) {
+    metaV3.set(id, { unit: x.unit, kind: x.kind, phase: x.phase });
+    if (x.reliable && Number.isFinite(x.value)) {
+      metricsV3.set(id, { value: x.value, frames: x.frames });
+    }
+  }
+  return { metricsV3, metaV3 };
+}
+
+/**
+ * Target-shaped stats for the v3 catalog computed from the reference shots
+ * themselves (mean, sample SD, observed band) — what Phase 12's targets
+ * builder will emit — so the viewer can show v3 values in the same table.
+ */
+export function v3StatsTargets(
+  shots: readonly ReferenceShot[],
+): Record<string, TargetEntry> {
+  const ids = new Set(shots.flatMap((s) => [...s.metaV3.keys()]));
+  const out: Record<string, TargetEntry> = {};
+  for (const id of ids) {
+    const meta = shots.find((s) => s.metaV3.has(id))!.metaV3.get(id)!;
+    const vals = shots
+      .map((s) => s.metricsV3.get(id)?.value)
+      .filter((v): v is number => v !== undefined);
+    const n = vals.length;
+    const mean = n ? vals.reduce((a, b) => a + b, 0) / n : NaN;
+    const sd =
+      n > 1
+        ? Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1))
+        : 0;
+    out[id] = {
+      label: id.split(".")[1]!.replace(/_/g, " "),
+      phase: meta.kind === "detail" ? "details" : meta.phase,
+      section: meta.kind,
+      unit:
+        meta.unit === "deg" ? "°" : meta.unit === "s" ? " s" : ` ${meta.unit}`,
+      ideal: mean,
+      sd,
+      passMin: n ? Math.min(...vals) : NaN,
+      passMax: n ? Math.max(...vals) : NaN,
+      scored: meta.kind !== "detail" && n >= 2,
+    };
+  }
+  return out;
+}
+
+/** The reference shots viewed through their v3 metrics. */
+export function asV3Shots(shots: readonly ReferenceShot[]): ReferenceShot[] {
+  return shots.map((s) => ({ ...s, metrics: s.metricsV3 }));
 }
 
 // ---- table model -------------------------------------------------------------
@@ -188,6 +264,7 @@ const GROUP_ORDER = [
   "release",
   "followThrough",
   "sequencing",
+  "details",
 ];
 
 /** Rows (one per target metric) grouped by phase, then sequencing. */

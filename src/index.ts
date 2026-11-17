@@ -260,6 +260,10 @@ export {
   EVENT_PAD_BEFORE,
   EVENT_PAD_AFTER,
   isClippedStartLabel,
+  computeShotMetricsV3,
+  metricsFromSignals,
+  flattenMetricsV3,
+  METRICS_V3_SCHEMA_VERSION,
 } from "./metrics/v3";
 export type {
   ShotSignals,
@@ -267,4 +271,9 @@ export type {
   ShotEvents,
   EventId,
   PhaseWindows,
+  ShotMetricsV3,
+  MetricV3,
+  MetricKind,
+  MetricPhase,
+  MetricUnit,
 } from "./metrics/v3";

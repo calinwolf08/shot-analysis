@@ -84,6 +84,23 @@ describe("v3 events vs labels (Curry)", () => {
   });
 });
 
+describe("v3 catalog on the reference shots", () => {
+  it("measures the v3 metrics per shot and builds target-shaped stats", async () => {
+    const { v3StatsTargets, asV3Shots } = await import("../curry-model");
+    const t = v3StatsTargets(shots);
+    expect(t["setPoint.elbow_angle"]!.ideal).toBeLessThan(90); // bent arm
+    expect(t["detail.wrist_path_deviation"]!.scored).toBe(false);
+    const table = buildMetricTable(asV3Shots(shots), t);
+    expect(table.map((g) => g.group)).toEqual([
+      "load",
+      "rise",
+      "setPoint",
+      "release",
+      "details",
+    ]);
+  });
+});
+
 describe("buildMetricTable", () => {
   const table = buildMetricTable(shots, targets.metrics);
 

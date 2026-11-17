@@ -34,6 +34,17 @@ test("Profile → Debug tools → Curry viewer: table, cell seek, shot tabs", as
 
   // 7 shot columns + metric/mean/band/SD.
   await expect(table.locator("thead th")).toHaveCount(7 + 4);
+  // Default view: the new v3 catalog. Today's v2 targets are one tap away.
+  await expect(page.getByTestId("catalog-v3")).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByTestId("ref-row-setPoint.elbow_angle")).toBeVisible();
+  await page.screenshot({
+    path: screenPath("phase11", "v3-catalog"),
+    fullPage: true,
+  });
+  await page.getByTestId("catalog-v2").click();
   // The set-point elbow angle row shows a value for every shot.
   const row = page.getByTestId("ref-row-setPoint.elbow_angle");
   await expect(row.locator("button.cell")).toHaveCount(7);

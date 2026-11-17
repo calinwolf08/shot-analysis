@@ -759,6 +759,47 @@ ALL 141: within ±1 — v3 55% · old 73%; within ±2 — v3 75% · old 81%
   detected/labeled markers on the scrubber with a labels toggle. Clicking an
   event seeks to it.
 
+## B-2.11 Implementation notes (Phase 11)
+- **`src/metrics/v3/metrics.ts`** implements the full B-2.3 catalog: Load (12),
+  Rise (9), Set Point (8) and Release (9, with the guide hand as `dx`/`dy`),
+  plus 4 unscored details. Details: wrist path deviation, elbow height vs
+  head, release vs take-off (s), follow-through elbow max.
+  - **Angles** use true proportions.
+  - **Distances** are divided by the shot's median thigh, shin, torso, forearm
+    or leg length.
+  - **Horizontal offsets** are + toward the facing direction.
+  - **Timing** is signed (B − A) ÷ the phase's real duration.
+  - Each metric carries `kind` (structure, timing or detail), `phase` and
+    `unit`.
+  - Guide-hand metrics need the guide wrist ≥ 0.5 visible; wrist hinge and
+    snap need the index finger ≥ 0.5. Otherwise they are unreliable with a
+    note. Timing over a phase shorter than 6 frames is noted "low
+    resolution".
+  - `schemaVersion: 2`. The v2 module is untouched; it is removed from the
+    live path in Phase 14.
+- **Timestamp units:** recorded pose files store **milliseconds** while the
+  live path stores seconds. Signals detect the unit from frame spacing.
+- **Invariance tests** (`metrics.test.ts`) pass. Curry's exact pixel skeleton
+  redrawn at half size on a **portrait 1080×1920** canvas, at ×2 zoom, or
+  **mirrored as a left-hander**, and timestamps in ms vs s, all give
+  identical metrics. The tests also cover reliability rules and a golden
+  snapshot.
+- **Viewer:** a "New metrics (v3) / Current targets (v2)" switch. v3 shows
+  the 7 Curry values plus mean, band and SD computed from them (what Phase 12
+  will publish).
+- **What v3 shows on Curry** (to audit before Phase 12):
+  - **Set-point elbow is 37–75°** (v2 said 135–152°, a distortion).
+  - **Timing metrics are very spread** (e.g. rise start −2.1…+0.05 of the
+    rise) because his rise and release last only ~3–4 frames at 30 fps; all
+    are flagged low resolution. Bands from these 7 shots will be wide.
+    60 fps reference footage would tighten them.
+  - **Load elbow change is unmeasured on 6 of 7 shots:** his shooting arm is
+    the occluded far side early in the load (guide-side camera).
+  - **Curry reads as slightly leaning back** (spine −7…−17°) with the head
+    well forward of the spine line (+30…+42°). Other side-on shooters in
+    test-data lean forward in the load (+7…+28°), so the sign convention is
+    consistent. This is worth confirming against his video in the viewer.
+
 ## B-3. Phased implementation (Part B)
 
 **Phase 9 — Debug index + Curry viewer shell**

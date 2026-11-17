@@ -38,6 +38,6 @@ export { scoreShot } from "./scoring/v2";
 export type { ShotScore, CategoryScore, MetricScore } from "./scoring/v2";
 export { flattenMetrics, categoryOf, labelFor, categoryLabel, } from "./metrics/v2";
 export type { FlatMetric } from "./metrics/v2";
-export { computeSignals, detectEvents, phaseWindows, frameAt, timeAt, LABEL_FOR_EVENT, EVENT_PAD_BEFORE, EVENT_PAD_AFTER, isClippedStartLabel, } from "./metrics/v3";
-export type { ShotSignals, SignalFrame, ShotEvents, EventId, PhaseWindows, } from "./metrics/v3";
+export { computeSignals, detectEvents, phaseWindows, frameAt, timeAt, LABEL_FOR_EVENT, EVENT_PAD_BEFORE, EVENT_PAD_AFTER, isClippedStartLabel, computeShotMetricsV3, metricsFromSignals, flattenMetricsV3, METRICS_V3_SCHEMA_VERSION, } from "./metrics/v3";
+export type { ShotSignals, SignalFrame, ShotEvents, EventId, PhaseWindows, ShotMetricsV3, MetricV3, MetricKind, MetricPhase, MetricUnit, } from "./metrics/v3";
 //# sourceMappingURL=index.d.ts.map
