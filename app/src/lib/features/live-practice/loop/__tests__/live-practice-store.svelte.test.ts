@@ -12,7 +12,11 @@ import type {
   CoordinatorEvents,
   LiveRepCoordinator,
 } from "../../coordinator/coordinator";
-import { LivePracticeStore } from "../live-practice-store.svelte";
+import {
+  LivePracticeStore,
+  WRONG_ANGLE_TEXT,
+} from "../live-practice-store.svelte";
+import type { RejectedShot } from "../../pipeline";
 
 type EventName = keyof CoordinatorEvents;
 
@@ -24,6 +28,7 @@ function fakeCoordinator() {
     stop: vi.fn(),
     dismissFeedback: vi.fn(),
     pushFrame: vi.fn(),
+    setArmed: vi.fn(),
     on(event: EventName, cb: (p: never) => void) {
       const set = listeners.get(event) ?? new Set();
       set.add(cb as (p: unknown) => void);
@@ -100,11 +105,18 @@ function processed(
   return { shot: shotRecord(id), scorecard: scorecard(overall, w), worst: w };
 }
 
-function fakePipeline(results: ProcessedShot[][]): LiveShotPipeline {
+type Outcome =
+  | ProcessedShot[]
+  | { shots: ProcessedShot[]; rejected: RejectedShot[] };
+
+function fakePipeline(results: Outcome[]): LiveShotPipeline {
   let call = 0;
   return {
     location: "device",
-    process: vi.fn(async () => results[Math.min(call++, results.length - 1)]!),
+    process: vi.fn(async () => {
+      const r = results[Math.min(call++, results.length - 1)]!;
+      return Array.isArray(r) ? { shots: r, rejected: [] } : r;
+    }),
   };
 }
 
@@ -121,7 +133,7 @@ function fakeStore() {
 
 const opts: AnalyzeOptions = { shootingHand: "right", profile: "pro-form" };
 
-function makeStore(results: ProcessedShot[][]) {
+function makeStore(results: Outcome[]) {
   const { coordinator, emit } = fakeCoordinator();
   const pipeline = fakePipeline(results);
   const { store: shotStore, excluded } = fakeStore();
@@ -184,6 +196,41 @@ describe("LivePracticeStore", () => {
     await vi.waitFor(() => expect(store.noShotFlash).toBe(true));
     expect(store.shots).toHaveLength(0);
     expect(audio.earcons).toContain("ready");
+  });
+
+  it("releases the coordinator when the pipeline finds nothing", async () => {
+    const { store, emit, coordinator } = makeStore([[]]);
+    emit("repResult", repEvent());
+    await vi.waitFor(() => expect(store.noShotFlash).toBe(true));
+    expect(coordinator.dismissFeedback).toHaveBeenCalled();
+  });
+
+  it("announces a wrong-angle shot, stores nothing, resumes tracking", async () => {
+    const { store, emit, audio, coordinator } = makeStore([
+      {
+        shots: [],
+        rejected: [
+          {
+            reason: "orientation",
+            orientation: "front",
+            allowed: ["side-right"],
+          },
+        ],
+      },
+    ]);
+    emit("repResult", repEvent());
+    await vi.waitFor(() => expect(store.wrongAngleFlash).toBe(true));
+    expect(store.shots).toHaveLength(0);
+    expect(audio.spoken).toEqual([WRONG_ANGLE_TEXT]);
+    expect(audio.earcons).toContain("ready");
+    expect(store.noShotFlash).toBe(false);
+    expect(coordinator.dismissFeedback).toHaveBeenCalled();
+  });
+
+  it("forwards arming to the coordinator", () => {
+    const { store, coordinator } = makeStore([[]]);
+    store.setArmed(false);
+    expect(coordinator.setArmed).toHaveBeenCalledWith(false);
   });
 
   it("flashes and signals ready on a no-shot", () => {

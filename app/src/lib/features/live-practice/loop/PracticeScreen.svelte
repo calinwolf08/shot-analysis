@@ -150,6 +150,11 @@
     if (debug && pacer) pacerSnap = pacer.snapshot();
   }
 
+  // Shot detection only starts while positioned (no gate → always armed).
+  $effect(() => {
+    store.setArmed(gateActive ? positioned : true);
+  });
+
   // Keep a clip rolling while the player is positioned and between shots, so a
   // detected shot is captured; stop (discard) if they leave the position.
   $effect(() => {
@@ -399,7 +404,11 @@
       <p class="banner dim" data-testid="practice-paused">Paused</p>
     {:else}
       <p class="banner" data-testid="practice-idle">Take your shot</p>
-      {#if store.noShotFlash}
+      {#if store.wrongAngleFlash}
+        <p class="no-shot" data-testid="practice-wrong-angle">
+          Wrong angle — shot not counted
+        </p>
+      {:else if store.noShotFlash}
         <p class="no-shot" data-testid="practice-no-shot">
           No shot detected — keep going
         </p>

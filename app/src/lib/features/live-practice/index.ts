@@ -61,6 +61,9 @@ export {
   type PipelineLocation,
   type ProcessInput,
   type ProcessedShot,
+  type ProcessResult,
+  type RejectedShot,
+  allowedOrientations,
 } from "./pipeline";
 export { default as PracticeScreen } from "./loop/PracticeScreen.svelte";
 export { default as ShotReviewScreen } from "./review/ShotReviewScreen.svelte";

@@ -1,5 +1,12 @@
 // Public barrel for the swappable live shot-analysis pipeline.
-export { analyzeAndScore, scorecardForShot, type ScoredShot } from "./core";
+export {
+  allowedOrientations,
+  analyzeAndScore,
+  scorecardForShot,
+  type AnalyzeAndScoreResult,
+  type RejectedShot,
+  type ScoredShot,
+} from "./core";
 export {
   createRepoShotStore,
   type ShotStore,
@@ -14,4 +21,5 @@ export {
   type PipelineLocation,
   type ProcessInput,
   type ProcessedShot,
+  type ProcessResult,
 } from "./pipeline";

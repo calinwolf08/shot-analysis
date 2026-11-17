@@ -71,11 +71,12 @@ describe("createLocalPipeline (on-device analysis)", () => {
     const pipeline = createLocalPipeline({ targets, store });
     expect(pipeline.location).toBe("device");
 
-    const result = await pipeline.process({
+    const { shots: result, rejected } = await pipeline.process({
       playerId: "p1",
       poseData: pose,
       opts,
     });
+    expect(rejected).toEqual([]);
     expect(result.length).toBeGreaterThanOrEqual(1);
     expect(saved.length).toBe(result.length); // one persist per detected shot
     expect(result[0]!.shot.playerId).toBe("p1");
@@ -113,7 +114,7 @@ describe("createServerPipeline (server analysis, end-to-end)", () => {
     const pipeline = createServerPipeline({ api });
     expect(pipeline.location).toBe("server");
 
-    const result = await pipeline.process({
+    const { shots: result } = await pipeline.process({
       playerId: player.id,
       poseData: pose,
       opts, // ignored server-side (derived from the player there)
@@ -126,5 +127,27 @@ describe("createServerPipeline (server analysis, end-to-end)", () => {
     expect(shots.length).toBe(result.length);
     expect(shots[0]!.sessionId).toBeNull();
     expect(shots[0]!.playerId).toBe(player.id);
+  });
+
+  it("rejects wrong-angle shots server-side without storing them", async () => {
+    const api = createApiClient({
+      fetch: inProcessFetch(userA),
+      baseUrl: "http://localhost",
+    });
+    const repos = createRemoteRepos(api);
+    // Left-handed: the side-right fixture is the guide-arm side for them.
+    const player = await repos.player.create({
+      name: "L",
+      shootingHand: "left",
+      level: "high-school",
+    });
+    const { shots, rejected } = await createServerPipeline({ api }).process({
+      playerId: player.id,
+      poseData: pose,
+      opts,
+    });
+    expect(shots).toEqual([]);
+    expect(rejected.length).toBeGreaterThanOrEqual(1);
+    expect(await repos.shot.listByPlayer(player.id)).toEqual([]);
   });
 });

@@ -43,13 +43,19 @@
     try {
       const poses = JSON.parse(await file.text()) as PoseData;
       const t = await ensureTargets();
-      shots = analyzeAndScore(
+      const res = analyzeAndScore(
         poses,
         { shootingHand: hand, profile: "pro-form" },
         t,
       );
+      shots = res.shots;
       shotIndex = 0;
-      if (shots.length === 0) error = "No shots detected in this poses file.";
+      if (shots.length === 0) {
+        error =
+          res.rejected.length > 0
+            ? `No accepted shots: ${res.rejected.length} detected from a camera angle live practice rejects (${[...new Set(res.rejected.map((r) => r.orientation))].join(", ")}).`
+            : "No shots detected in this poses file.";
+      }
     } catch (err) {
       error = (err as Error).message;
       shots = [];

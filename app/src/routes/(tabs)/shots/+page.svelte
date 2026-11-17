@@ -4,6 +4,11 @@
   import { useAppServices } from "$lib/shared/config/services-context";
   import type { ShotRecord } from "$lib/shared/db/repos";
   import { scorecardForShot } from "$lib/features/live-practice";
+  import {
+    groupByDay,
+    shotIssue,
+    timeLabel,
+  } from "$lib/features/live-practice/review/shot-list";
   import { loadLiveTargets } from "$lib/features/scoring";
   import { EmptyState } from "$lib/shared/ui";
 
@@ -11,6 +16,8 @@
 
   let shots = $state<ShotRecord[]>([]);
   let overall = $state<Record<string, number | null>>({});
+  let issue = $state<Record<string, string | null>>({});
+  const groups = $derived(groupByDay(shots, Date.now()));
   let loading = $state(true);
 
   $effect(() => {
@@ -26,10 +33,14 @@
     const targets = await loadLiveTargets();
     shots = await services.repos.shot.listByPlayer(player.id, { limit: 50 });
     const m: Record<string, number | null> = {};
+    const iss: Record<string, string | null> = {};
     for (const s of shots) {
-      m[s.id] = scorecardForShot(s.analysis, targets).overall;
+      const card = scorecardForShot(s.analysis, targets);
+      m[s.id] = card.overall;
+      iss[s.id] = shotIssue(card);
     }
     overall = m;
+    issue = iss;
     loading = false;
   }
 
@@ -44,13 +55,6 @@
     return "#f87171";
   }
   const fmt = (n: number | null) => (n === null ? "–" : n.toFixed(1));
-  const when = (t: number) =>
-    new Date(t).toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
 </script>
 
 <main class="shots" data-testid="shots-list">
@@ -63,29 +67,36 @@
       body="Take some shots in Practice and they'll show up here to review."
     />
   {:else}
-    <ul>
-      {#each shots as s (s.id)}
-        <li class:excluded={s.excluded}>
-          <button
-            class="row"
-            data-testid="shot-row-{s.id}"
-            onclick={() => open(s.id)}
-          >
-            <span
-              class="badge"
-              style="background:{color(overall[s.id] ?? null)}"
-            >
-              {fmt(overall[s.id] ?? null)}
-            </span>
-            <span class="meta">
-              <span class="orient">{s.orientation ?? "shot"}</span>
-              <span class="date">{when(s.createdAt)}</span>
-            </span>
-            <span class="chev">›</span>
-          </button>
-        </li>
-      {/each}
-    </ul>
+    {#each groups as g (g.key)}
+      <section class="day" data-testid="shot-day-{g.key}">
+        <h2 class="day-label" data-testid="shot-day-label">{g.label}</h2>
+        <ul>
+          {#each g.rows as s (s.id)}
+            <li class:excluded={s.excluded}>
+              <button
+                class="row"
+                data-testid="shot-row-{s.id}"
+                onclick={() => open(s.id)}
+              >
+                <span
+                  class="badge"
+                  style="background:{color(overall[s.id] ?? null)}"
+                >
+                  {fmt(overall[s.id] ?? null)}
+                </span>
+                <span class="meta" data-testid="shot-label">
+                  <span class="time">{timeLabel(s.createdAt)}</span>
+                  <span class="issue"
+                    >{issue[s.id] ?? "Not enough tracked to score"}</span
+                  >
+                </span>
+                <span class="chev">›</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/each}
   {/if}
 </main>
 
@@ -144,12 +155,24 @@
     display: flex;
     flex-direction: column;
   }
-  .orient {
-    font-weight: 600;
-    text-transform: capitalize;
+  .day {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-2);
   }
-  .date {
-    font-size: 0.78rem;
+  .day-label {
+    margin: var(--sc-space-2) 0 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sc-text-dim);
+  }
+  .time {
+    font-weight: 600;
+  }
+  .issue {
+    font-size: 0.85rem;
     color: var(--sc-text-dim);
   }
   .chev {

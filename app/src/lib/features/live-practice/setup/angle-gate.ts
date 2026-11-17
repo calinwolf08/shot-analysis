@@ -32,7 +32,13 @@ export function requiredOrientation(hand: ShootingHand): SideOrientation {
   return hand === "right" ? "side-right" : "side-left";
 }
 
-/** Evaluates a detected orientation against the required setup for the hand. */
+/**
+ * Evaluates a detected orientation against the required setup for the hand.
+ *
+ * NOTE: the in-loop gate now uses ../loop/readiness (side-aware detector);
+ * this general evaluator, which also words front/behind views, is kept for
+ * when more orientations are accepted (see pipeline/core#allowedOrientations).
+ */
 export function evaluateAngleGate(
   detected: string | null | undefined,
   hand: ShootingHand,

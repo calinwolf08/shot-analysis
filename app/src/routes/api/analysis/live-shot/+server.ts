@@ -12,7 +12,8 @@ import {
 // POST /api/analysis/live-shot { playerId, poseData }
 //   De-sessioned live analysis: analyze one pose window on the server, score it
 //   against the live targets, persist the detected shot(s) rooted on the player,
-//   and return them with their deviation scorecard. This is the server backing
+//   and return them with their deviation scorecard. Shots read from a camera
+//   angle live practice doesn't accept come back in `rejected`, unstored. This is the server backing
 //   for the swappable analysis location — the on-device pipeline runs the same
 //   core locally; the scorecard is derived (from stored v2 metrics), not stored.
 export const POST = withUser(async (ctx, event) => {
@@ -26,7 +27,7 @@ export const POST = withUser(async (ctx, event) => {
     targets: readLiveTargets(),
     store: createRepoShotStore(ctx.repos.shot),
   });
-  const shots = await pipeline.process({
+  const result = await pipeline.process({
     playerId: body.playerId,
     poseData,
     opts: {
@@ -34,5 +35,6 @@ export const POST = withUser(async (ctx, event) => {
       profile: profileForLevel(player.level),
     },
   });
-  return json({ shots }, 201);
+  // { shots, rejected } — rejected = detected but wrong camera angle.
+  return json(result, 201);
 });

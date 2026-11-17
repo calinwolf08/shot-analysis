@@ -147,7 +147,7 @@ State machine in `LivePracticeStore`:
 
 ## 4. Phased implementation
 
-> **Status:** Phases 0, 1 and 2 are implemented (see "Implementation notes" below).
+> **Status:** Phases 0–3 are implemented (see "Implementation notes" below).
 
 ### Implementation notes (Phases 0–1)
 - **Required side corrected.** Pose data shows "side-left" means the player's
@@ -199,6 +199,36 @@ State machine in `LivePracticeStore`:
   stripped from production, enforced by `check:stripped`).
 - **The overlay needed no change:** with one frame in flight, landmarks arrive in
   order.
+
+### Implementation notes (Phase 3)
+- **Per-shot gate** in the shared core (`pipeline/core.ts#analyzeAndScore`), so
+  on-device and server analysis behave the same. `allowedOrientations(hand)`
+  is the single switch, with its comment explaining that other views are kept
+  but not in use. Each shot's orientation now comes from the side-aware live
+  detector, and that same reading feeds the v2 posture metrics. Previously the
+  library detector could return "unknown" side-on and silently drop them.
+- **Pipeline results** are now `{ shots, rejected }`. The server endpoint returns
+  the same, and wrong-angle shots are never stored. The store speaks "Wrong
+  angle, shot not counted" and shows a flash.
+- **Fixed an existing bug:** when the pipeline found nothing, the coordinator
+  stayed stuck in its feedback state. It is now released.
+- **`coordinator.setArmed`**: reps start only while positioned, with a 750 ms
+  grace so a gate flicker at the start of the shot can't drop it. A rep already
+  in progress is never aborted. Without a camera gate (replay), detection is
+  always armed.
+- **Migration 006** (per the product decision): deletes **all** shots,
+  including the hidden upload path, whose orientation isn't the player's
+  shooting-arm side (side-right for right-handers). That includes
+  null/"unknown". Their poses, metrics and shot scores are deleted too, and reps
+  are unlinked. This is irreversible. On-device clips for those ids age out
+  through the clip cap.
+- **Shots list:** "Today / Yesterday / Nov 14" headers and rows labeled
+  "time · worst issue". The colored deviation badge is kept instead of
+  `ScoreRing`, which is a 0–100 higher-is-better ring and would mislead on this
+  scale. The issue text uses today's metric names; plain wording comes in
+  Part B.
+- **E2E result** (mixed-angle fixture, right-handed): 2 side-right shots stored,
+  5 wrong-angle shots announced and not stored.
 
 Each phase ends with its own validation (see §5) and lands as its own commit(s).
 

@@ -5,7 +5,7 @@ import type { PoseData } from "basketball-shot-analysis";
 import { profileForLevel } from "$lib/features/assessment";
 import type { AnalyzeOptions } from "$lib/features/analysis";
 import type { LiveTargets } from "$lib/features/scoring";
-import { analyzeAndScore } from "../core";
+import { allowedOrientations, analyzeAndScore } from "../core";
 
 // Real assets (tests run with cwd = app/).
 const targets = JSON.parse(
@@ -34,8 +34,11 @@ const opts: AnalyzeOptions = {
 
 describe("analyzeAndScore (isomorphic core)", () => {
   it("analyzes a pose window and scores each detected shot", () => {
-    const shots = analyzeAndScore(pose, opts, targets);
+    const { shots, rejected } = analyzeAndScore(pose, opts, targets);
     expect(shots.length).toBeGreaterThanOrEqual(1);
+    expect(rejected).toEqual([]);
+    // The fixture is side-on, shooting (right) arm nearest the camera.
+    expect(shots[0]!.analysis.orientation).toBe("side-right");
 
     const { scorecard, worst } = shots[0]!;
     // Two top-level sections, Structure then Sequencing.
@@ -74,7 +77,55 @@ describe("analyzeAndScore (isomorphic core)", () => {
 
   it("returns no shots (not an error) for a window too short to detect one", () => {
     const tiny: PoseData = { ...pose, frames: pose.frames.slice(0, 3) };
-    const shots = analyzeAndScore(tiny, opts, targets);
+    const { shots } = analyzeAndScore(tiny, opts, targets);
     expect(Array.isArray(shots)).toBe(true);
+  });
+});
+
+describe("orientation gate", () => {
+  const load = (id: string) =>
+    JSON.parse(
+      readFileSync(
+        join(process.cwd(), "src-tests", "fixtures", "poses", `${id}.json`),
+        "utf8",
+      ),
+    ) as PoseData;
+
+  it("allows only the shooting-arm side", () => {
+    expect(allowedOrientations("right")).toEqual(["side-right"]);
+    expect(allowedOrientations("left")).toEqual(["side-left"]);
+  });
+
+  it("rejects the same side-right shot for a left-handed shooter", () => {
+    const { shots, rejected } = analyzeAndScore(
+      pose,
+      { ...opts, shootingHand: "left" },
+      targets,
+    );
+    expect(shots).toEqual([]);
+    expect(rejected.length).toBeGreaterThanOrEqual(1);
+    expect(rejected[0]).toMatchObject({
+      reason: "orientation",
+      orientation: "side-right",
+      allowed: ["side-left"],
+    });
+  });
+
+  it("keeps only side-right shots from a mixed-angle session", () => {
+    // Labeled: side-left, behind-left ×2, behind, behind-right, side-right ×2.
+    const mixed = load("20190804_140654");
+    const { shots, rejected } = analyzeAndScore(mixed, opts, targets);
+    expect(shots.length).toBeGreaterThanOrEqual(1);
+    expect(shots.every((s) => s.analysis.orientation === "side-right")).toBe(
+      true,
+    );
+    expect(rejected.length).toBeGreaterThanOrEqual(3);
+    expect(rejected.every((r) => r.orientation !== "side-right")).toBe(true);
+  });
+
+  it("measures posture as side-on for an accepted shot", () => {
+    const { shots } = analyzeAndScore(pose, opts, targets);
+    const v2 = shots[0]!.analysis.v2Metrics!;
+    expect(v2.reliability.sideView).toBe(true);
   });
 });

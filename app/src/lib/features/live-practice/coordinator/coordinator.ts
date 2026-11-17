@@ -46,6 +46,12 @@ export interface LiveRepConfig {
   velocitySmoothing: number;
   /** Buffer time included before the rep trigger in the analysis window. */
   preRollMs: number;
+  /**
+   * After setArmed(false), a rep may still START for this long (frame time).
+   * The positioning gate can flicker as the player begins the shooting motion;
+   * this keeps that flicker from swallowing a real shot.
+   */
+  disarmGraceMs: number;
 }
 
 export const DEFAULT_LIVE_REP_CONFIG: Omit<LiveRepConfig, "shootingHand"> = {
@@ -60,6 +66,7 @@ export const DEFAULT_LIVE_REP_CONFIG: Omit<LiveRepConfig, "shootingHand"> = {
   settleVelocity: 0.08,
   velocitySmoothing: 0.4,
   preRollMs: 1500,
+  disarmGraceMs: 750,
 };
 
 export type RepTrigger = "settled" | "max-duration";
@@ -116,6 +123,14 @@ export interface LiveRepCoordinator {
   pushFrame(frame: LandmarkFrame): void;
   /** FEEDBACK → READY; the UI calls this when the feedback card closes. */
   dismissFeedback(): void;
+  /**
+   * Gate rep STARTS on the player being positioned (side-on, whole body in
+   * frame). Unarmed, upward motion never starts a rep, so motion from the
+   * wrong angle is never picked up. A rep already in progress is unaffected.
+   * Armed by default (sources with no positioning gate, e.g. replay).
+   */
+  setArmed(armed: boolean): void;
+  readonly armed: boolean;
   /** Back to IDLE; clears the buffer and voids any in-flight analysis. */
   stop(): void;
   on<K extends keyof CoordinatorEvents>(
@@ -169,6 +184,15 @@ export function createLiveRepCoordinator(
   let lastRepEndTs = -Infinity;
   let nearPeak = 0;
   let nearPeakTs = 0;
+  let armed = true;
+  let lastFrameTs = 0;
+  /** Frame time when the coordinator was last disarmed (grace window). */
+  let disarmedAtTs: number | null = null;
+
+  function mayStartRep(now: number): boolean {
+    if (armed) return true;
+    return disarmedAtTs !== null && now - disarmedAtTs < cfg.disarmGraceMs;
+  }
 
   function setState(to: CoordinatorState) {
     if (state === to) return;
@@ -281,9 +305,20 @@ export function createLiveRepCoordinator(
       running = true;
     },
 
+    get armed() {
+      return armed;
+    },
+
+    setArmed(next) {
+      if (next === armed) return;
+      armed = next;
+      disarmedAtTs = next ? null : lastFrameTs;
+    },
+
     pushFrame(frame) {
       if (!running) return;
       const now = frame.timestamp;
+      lastFrameTs = now;
 
       buffer.push(frame);
       const cutoff = now - cfg.bufferMs;
@@ -322,7 +357,8 @@ export function createLiveRepCoordinator(
           }
           if (
             smoothedVelocity >= cfg.riseVelocity &&
-            now - lastRepEndTs >= cfg.minRepGapMs
+            now - lastRepEndTs >= cfg.minRepGapMs &&
+            mayStartRep(now)
           ) {
             repStartTs = now;
             settledSince = null;

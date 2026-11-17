@@ -159,6 +159,14 @@ export interface ReplayRunOptions {
   onProgress?: ProgressCallback;
   /** Emit a loading progress event every N frames (default 50). */
   progressEvery?: number;
+  /**
+   * Per-shot camera orientation override. Live practice passes its
+   * side-aware detector here (it tolerates the occluded far side); without
+   * it the library's `detectOrientation` is used (hidden upload path).
+   */
+  orientationOf?: (
+    frames: readonly PoseDataFrame[],
+  ) => ShotAnalysis["orientation"];
 }
 
 /**
@@ -219,12 +227,16 @@ export function runReplayAnalysis(
       config,
     );
 
-    const orientation = shotOrientation(
-      prepared.source,
-      shot.frameRange.start,
-      shot.frameRange.end,
-      run,
-    );
+    const orientation = run.orientationOf
+      ? run.orientationOf(
+          prepared.source.slice(shot.frameRange.start, shot.frameRange.end + 1),
+        )
+      : shotOrientation(
+          prepared.source,
+          shot.frameRange.start,
+          shot.frameRange.end,
+          run,
+        );
     const keyFramePoses = extractKeyFramePoses(prepared.source, analysis);
     const v2Metrics = computeV2Metrics(
       prepared.source,
@@ -356,6 +368,12 @@ function extractKeyFramePoses(
   return poses;
 }
 
+/**
+ * Library orientation detection (all views: front / angled / side / behind).
+ * NOTE: live practice currently accepts only the side-on, shooting-arm-nearest
+ * view and supplies its own detector via `orientationOf`; this general path is
+ * kept for the hidden upload/assessment flow and for re-enabling other views.
+ */
 function shotOrientation(
   source: readonly PoseDataFrame[],
   start: number,

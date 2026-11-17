@@ -66,3 +66,15 @@ export async function startLiveLoop(page: Page): Promise<void> {
 export function screenPath(group: string, name: string): string {
   return `test-results/screens/${group}/${name}.png`;
 }
+
+/** GET an app API route as the signed-in user (bearer token from storage). */
+export async function apiGet<T>(page: Page, path: string): Promise<T> {
+  return page.evaluate(async (p) => {
+    const token = localStorage.getItem("shotcoach.bearer_token");
+    const res = await fetch(p, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error(`${p} → HTTP ${res.status}`);
+    return res.json();
+  }, path) as Promise<T>;
+}

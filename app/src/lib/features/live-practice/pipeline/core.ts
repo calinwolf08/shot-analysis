@@ -28,6 +28,38 @@ import {
   type ShotScorecard,
 } from "$lib/features/scoring";
 import type { ReviewPoseFrame, ShotReviewPoses } from "$lib/shared/db/repos";
+import type { LandmarkFrame } from "$lib/features/analysis";
+import { requiredOrientation } from "../setup/angle-gate";
+import { detectLiveOrientation } from "../setup/live-orientation";
+import { DEFAULT_LIVE_TUNING } from "../tuning";
+
+/**
+ * The camera orientations live practice accepts, for a shooting hand.
+ *
+ * CURRENTLY ONE: side-on with the shooting arm nearest the camera. Shots read
+ * from any other angle (facing the camera, angled, behind, the guide-arm side)
+ * are rejected before scoring and never stored. Code that handles other
+ * orientations — the library's general `detectOrientation`, front-view metric
+ * handling, the angle-gate's "turn around"/"side-on" messaging — is kept but
+ * not reached from live practice. To re-enable a view, add it here (and give
+ * it scoring targets measured from that view).
+ */
+export function allowedOrientations(hand: "left" | "right"): readonly string[] {
+  return [requiredOrientation(hand)];
+}
+
+/** A detected shot that was not scored or stored. */
+export interface RejectedShot {
+  readonly reason: "orientation";
+  /** What the shot read as (e.g. "front", "side-left"). */
+  readonly orientation: string;
+  readonly allowed: readonly string[];
+}
+
+export interface AnalyzeAndScoreResult {
+  readonly shots: ScoredShot[];
+  readonly rejected: RejectedShot[];
+}
 
 export interface ScoredShot {
   /** The full analysis for one detected shot (incl. v2 metrics + keyframes). */
@@ -67,20 +99,40 @@ function filteredReviewFrames(pose: PoseData): ReviewPoseFrame[] {
  * Reuses the already-computed `v2Metrics` on each analysis (no second
  * extraction); a shot missing v2 metrics yields an empty (uncovered) scorecard
  * rather than throwing.
+ *
+ * Orientation gate: each shot's orientation is read with the side-aware live
+ * detector (tolerant of the occluded far side) — the same reading drives the
+ * v2 posture metrics — and shots outside `allowedOrientations` are returned in
+ * `rejected` instead of `shots`.
  */
 export function analyzeAndScore(
   pose: PoseData,
   opts: AnalyzeOptions,
   targets: LiveTargets,
-): ScoredShot[] {
+  gate: { maxSideSeparation: number } = {
+    maxSideSeparation: DEFAULT_LIVE_TUNING.readiness.maxSideSeparation,
+  },
+): AnalyzeAndScoreResult {
   const frames = poseDataToLandmarkFrames(pose);
+  const allowed = allowedOrientations(opts.shootingHand);
   const result = runReplayAnalysis(frames, opts, {
     fps: pose.fps,
     width: pose.width,
     height: pose.height,
+    orientationOf: (shotFrames) =>
+      detectLiveOrientation(shotFrames as unknown as LandmarkFrame[], {
+        maxSideSeparation: gate.maxSideSeparation,
+      }).orientation as ShotAnalysis["orientation"],
   });
   const allFrames = filteredReviewFrames(pose);
-  return result.shots.map((a) => {
+  const rejected: RejectedShot[] = [];
+  const kept = result.shots.filter((a) => {
+    const o = a.orientation ?? "unknown";
+    if (allowed.includes(o)) return true;
+    rejected.push({ reason: "orientation", orientation: o, allowed });
+    return false;
+  });
+  const shots = kept.map((a) => {
     const analysis = a as StoredShotAnalysis;
     const scorecard = analysis.v2Metrics
       ? scoreShotDeviation(analysis.v2Metrics, targets)
@@ -94,6 +146,7 @@ export function analyzeAndScore(
     };
     return { analysis, scorecard, worst: scorecard.worst, reviewPoses };
   });
+  return { shots, rejected };
 }
 
 /**

@@ -20,7 +20,7 @@ import type { AnalyzeOptions } from "$lib/features/analysis";
 import type { MetricDeviation, ShotScorecard } from "$lib/features/scoring";
 import type { LiveTargets } from "$lib/features/scoring";
 import type { ShotRecord } from "$lib/shared/db/repos";
-import { analyzeAndScore } from "./core";
+import { analyzeAndScore, type RejectedShot } from "./core";
 import type { ShotStore } from "./shot-store";
 
 export interface ProcessInput {
@@ -36,12 +36,19 @@ export interface ProcessedShot {
   readonly worst: readonly MetricDeviation[];
 }
 
+export interface ProcessResult {
+  /** Detected shots that passed the orientation gate: scored + persisted. */
+  readonly shots: ProcessedShot[];
+  /** Detected shots rejected before scoring (wrong camera angle). */
+  readonly rejected: RejectedShot[];
+}
+
 export type PipelineLocation = "device" | "server";
 
 export interface LiveShotPipeline {
   readonly location: PipelineLocation;
-  /** Analyze + score + persist one rep window; returns the detected shots. */
-  process(input: ProcessInput): Promise<ProcessedShot[]>;
+  /** Analyze + gate + score + persist one rep window. */
+  process(input: ProcessInput): Promise<ProcessResult>;
 }
 
 /** On-device analysis; persistence via the supplied store. */
@@ -52,7 +59,11 @@ export function createLocalPipeline(deps: {
   return {
     location: "device",
     async process({ playerId, poseData, opts }) {
-      const scored = analyzeAndScore(poseData, opts, deps.targets);
+      const { shots: scored, rejected } = analyzeAndScore(
+        poseData,
+        opts,
+        deps.targets,
+      );
       const out: ProcessedShot[] = [];
       for (const s of scored) {
         const shot = await deps.store.save({
@@ -62,7 +73,7 @@ export function createLocalPipeline(deps: {
         });
         out.push({ shot, scorecard: s.scorecard, worst: s.worst });
       }
-      return out;
+      return { shots: out, rejected };
     },
   };
 }
@@ -74,11 +85,11 @@ export function createServerPipeline(deps: {
   return {
     location: "server",
     async process({ playerId, poseData }) {
-      const { shots } = await deps.api.send<{ shots: ProcessedShot[] }>(
+      const res = await deps.api.send<ProcessResult>(
         "/api/analysis/live-shot",
         { playerId, poseData },
       );
-      return shots;
+      return { shots: res.shots, rejected: res.rejected ?? [] };
     },
   };
 }

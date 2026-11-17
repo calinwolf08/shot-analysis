@@ -30,6 +30,9 @@ import type { LiveShotPipeline } from "../pipeline";
 import type { ShotStore } from "../pipeline";
 import { buildWorstReadback } from "./readback";
 
+/** Spoken when a detected shot is rejected for the camera angle. */
+export const WRONG_ANGLE_TEXT = "Wrong angle, shot not counted";
+
 export type LoopPhase =
   | "idle"
   | "ready"
@@ -83,6 +86,8 @@ export class LivePracticeStore {
   shots = $state<ShotEntry[]>([]);
   feedback = $state<ShotFeedback | null>(null);
   noShotFlash = $state(false);
+  /** A detected shot was rejected for the camera angle (brief flash). */
+  wrongAngleFlash = $state(false);
   muted = $state(false);
   error = $state<string | null>(null);
   /** Coaching focus (ids); [] = everything. Changeable mid-session. */
@@ -100,6 +105,14 @@ export class LivePracticeStore {
     this.maxWorstSpoken = deps.maxWorstSpoken ?? 5;
     this.muted = deps.audio.isMuted();
     this.focusAreas = deps.focusAreas ?? [];
+  }
+
+  /**
+   * Shot detection only starts while the player is positioned (the in-loop
+   * gate drives this). See LiveRepCoordinator.setArmed.
+   */
+  setArmed(armed: boolean): void {
+    this.deps.coordinator.setArmed(armed);
   }
 
   /** Change the coaching focus (applies to the next scored shot). */
@@ -161,13 +174,17 @@ export class LivePracticeStore {
         this.deps.fps,
         this.deps.dims ?? {},
       );
-      const processed = await pipeline.process({
+      const { shots: processed, rejected } = await pipeline.process({
         playerId: this.deps.playerId,
         poseData,
         opts: this.deps.opts,
       });
       if (processed.length === 0) {
-        this.onNoShot();
+        // The coordinator's own window analysis saw a shot (it's in FEEDBACK);
+        // release it back to tracking since nothing will be shown.
+        this.deps.coordinator.dismissFeedback();
+        if (rejected.length > 0) this.onWrongAngle();
+        else this.onNoShot();
         return;
       }
       const first = processed[0]!;
@@ -222,6 +239,15 @@ export class LivePracticeStore {
       this.deps.audio.playEarcon("ready");
       this.dismissFeedback();
     }
+  }
+
+  /** Detected, but from an angle live practice doesn't accept: not stored. */
+  private onWrongAngle(): void {
+    this.wrongAngleFlash = true;
+    if (this.flashTimer) clearTimeout(this.flashTimer);
+    this.flashTimer = setTimeout(() => (this.wrongAngleFlash = false), 2500);
+    this.deps.audio.speak(WRONG_ANGLE_TEXT);
+    this.deps.audio.playEarcon("ready");
   }
 
   private flashNoShot(): void {

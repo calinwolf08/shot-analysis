@@ -166,8 +166,11 @@ describe("migrate", () => {
        VALUES ('shot1', 'sess1', 0, 0, '{}', 100)`,
     );
 
-    // Apply the rest (v4 de-sessions shots; v5 adds shot_poses).
-    const result = await migrate(db);
+    // Apply v4 (de-sessions shots) and v5 (adds shot_poses).
+    const result = await migrate(
+      db,
+      ALL_MIGRATIONS.filter((m) => m.version <= 5),
+    );
     expect(result.applied).toEqual([4, 5]);
 
     const [row] = await db.query<{ player_id: string; session_id: string }>(
@@ -193,6 +196,84 @@ describe("migrate", () => {
          VALUES ('shot3', 0, 0, '{}', 300)`,
       ),
     ).rejects.toThrow();
+  });
+
+  it("006 deletes shots not taken from the shooting-arm side, with dependents", async () => {
+    db = createBetterSqliteAdapter();
+    await migrate(
+      db,
+      ALL_MIGRATIONS.filter((m) => m.version <= 5),
+    );
+    await db.run(
+      `INSERT INTO players (id, name, shooting_hand, level, created_at, updated_at, user_id) VALUES
+       ('pr', 'Righty', 'right', 'youth', 0, 0, 'u1'),
+       ('pl', 'Lefty', 'left', 'youth', 0, 0, 'u1')`,
+    );
+    await db.run(
+      `INSERT INTO sessions (id, player_id, type, status, started_at, user_id)
+       VALUES ('sess1', 'pr', 'assessment', 'completed', 0, 'u1')`,
+    );
+    const shots: [string, string, string | null, string | null][] = [
+      // id, player, orientation, session
+      ["r-keep", "pr", "side-right", null],
+      ["r-guide", "pr", "side-left", null],
+      ["r-front", "pr", "front-right", null],
+      ["r-unknown", "pr", "unknown", null],
+      ["r-null", "pr", null, null],
+      ["r-assess-keep", "pr", "side-right", "sess1"],
+      ["r-assess-drop", "pr", "behind", "sess1"],
+      ["l-keep", "pl", "side-left", null],
+      ["l-drop", "pl", "side-right", null],
+    ];
+    for (const [id, player, orientation, session] of shots) {
+      await db.run(
+        `INSERT INTO shots (id, player_id, session_id, shot_index, orientation, excluded, analysis_json, created_at)
+         VALUES (?, ?, ?, 0, ?, 0, '{}', 0)`,
+        [id, player, session, orientation],
+      );
+      await db.run(
+        "INSERT INTO shot_poses (shot_id, poses_json) VALUES (?, '{}')",
+        [id],
+      );
+      await db.run(
+        "INSERT INTO shot_metrics (shot_id, metric_name, value_num) VALUES (?, 'm', 1)",
+        [id],
+      );
+    }
+    await db.run(
+      `INSERT INTO benchmarks (id, name, version, is_placeholder, data_json, created_at)
+       VALUES ('b1', 'B', 1, 1, '{}', 0)`,
+    );
+    for (const id of ["r-keep", "r-front"]) {
+      await db.run(
+        `INSERT INTO scores (id, scope, ref_id, benchmark_id, scoring_version, breakdown_json, created_at)
+         VALUES (?, 'shot', ?, 'b1', 1, '{}', 0)`,
+        [`score-${id}`, id],
+      );
+    }
+    await db.run(
+      `INSERT INTO reps (id, session_id, rep_index, shot_id, created_at)
+       VALUES ('rep1', 'sess1', 0, 'r-assess-drop', 0)`,
+    );
+
+    const result = await migrate(db);
+    expect(result.applied).toEqual([6]);
+
+    const ids = (
+      await db.query<{ id: string }>("SELECT id FROM shots ORDER BY id")
+    ).map((r) => r.id);
+    expect(ids).toEqual(["l-keep", "r-assess-keep", "r-keep"]);
+    const left = async (sql: string) =>
+      (await db.query<{ id: string }>(sql)).map((r) => r.id).sort();
+    expect(await left("SELECT shot_id AS id FROM shot_poses")).toEqual(ids);
+    expect(await left("SELECT shot_id AS id FROM shot_metrics")).toEqual(ids);
+    expect(await left("SELECT ref_id AS id FROM scores")).toEqual(["r-keep"]);
+    const [rep] = await db.query<{ shot_id: string | null }>(
+      "SELECT shot_id FROM reps WHERE id = 'rep1'",
+    );
+    expect(rep?.shot_id).toBeNull(); // rep kept, unlinked
+    // Foreign keys all still resolve.
+    expect(await db.query("PRAGMA foreign_key_check")).toEqual([]);
   });
 
   it("resumes after a failed migration once it is fixed", async () => {
