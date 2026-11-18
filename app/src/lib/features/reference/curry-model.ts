@@ -25,6 +25,7 @@ import {
   type PoseData,
   type SignalFrame,
 } from "basketball-shot-analysis";
+import { anchorsFrom, type PhaseAnchors } from "./phase-align";
 
 export interface ReferenceLabels {
   readonly video?: string;
@@ -62,6 +63,10 @@ export interface ReferenceShot {
     string,
     { unit: string; kind: string; phase: string }
   >;
+  /** v3 phase anchors (source frames) for the phase-aligned compare. */
+  readonly anchors: PhaseAnchors | null;
+  /** Body side nearest the camera (where leg/hip geometry is read). */
+  readonly nearSide: "left" | "right";
 }
 
 export interface EventComparison {
@@ -158,7 +163,7 @@ function v3For(
   poses: PoseData,
   lab: ReferenceLabels["shots"][number],
   shootingHand: "left" | "right",
-): Pick<ReferenceShot, "metricsV3" | "metaV3"> {
+): Pick<ReferenceShot, "metricsV3" | "metaV3" | "anchors" | "nearSide"> {
   const lo = Math.max(0, lab.startFrame - EVENT_PAD_BEFORE);
   const hi = Math.min(poses.frames.length - 1, lab.endFrame + EVENT_PAD_AFTER);
   const m = computeShotMetricsV3(
@@ -176,7 +181,7 @@ function v3For(
       metricsV3.set(id, { value: x.value, frames: x.frames });
     }
   }
-  return { metricsV3, metaV3 };
+  return { metricsV3, metaV3, anchors: anchorsFrom(m), nearSide: m.nearSide };
 }
 
 /**

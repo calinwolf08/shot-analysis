@@ -22,15 +22,30 @@
     type ReferenceShot,
     type TargetEntry,
   } from "$lib/features/reference/curry-model";
+  import PoseStage from "$lib/features/reference/PoseStage.svelte";
   import {
-    computeShotFraming,
-    projectWith,
-    sourceRect,
-    type Framing,
-  } from "$lib/features/live-practice/review/framing";
-  import { drawSkeleton } from "$lib/shared/ui/pose-skeleton";
+    geometryFor,
+    type GeometrySides,
+  } from "$lib/features/reference/metric-geometry";
+  import {
+    ALIGN_BOUNDARIES,
+    ALIGN_SPAN,
+    frameAtPhaseTime,
+    metricsForStoredShot,
+    phaseTimeAtFrame,
+    phaseLabel,
+    type PhaseAnchors,
+  } from "$lib/features/reference/phase-align";
+  import { useAppServices } from "$lib/shared/config/services-context";
+  import type { ShotRecord, ShotReviewPoses } from "$lib/shared/db/repos";
+  import {
+    dayLabel,
+    timeLabel,
+  } from "$lib/features/live-practice/review/shot-list";
+  import type { ShotMetricsV3 } from "basketball-shot-analysis";
 
   const enabled = import.meta.env.DEV || import.meta.env.VITE_E2E === "1";
+  const services = useAppServices();
   const REF = "/fixtures/reference/stephen-curry-1";
   /** Frames of context shown around each labeled shot window. */
   const CONTEXT = 8;
@@ -64,11 +79,8 @@
 
   let videoUrl = $state<string | null>(null);
   let localVideo = false;
-  let videoEl = $state<HTMLVideoElement | null>(null);
-  let videoReady = $state(false);
-  let canvas = $state<HTMLCanvasElement | null>(null);
-  let stageW = $state(0);
-  let stageH = $state(0);
+  /** Inspect Curry's shots, or compare one with one of mine. */
+  let mode = $state<"inspect" | "compare">("inspect");
 
   const shot = $derived(shots[shotIdx] ?? null);
   const fps = $derived(poses?.fps ?? 30);
@@ -79,24 +91,24 @@
       : 0,
   );
 
-  const windowFrames = $derived(
-    poses && shot
+  /** Stored frames of a source-frame range (landmarks only). */
+  const framesOf = (a: number, b: number) =>
+    poses
       ? poses.frames
-          .slice(lo, hi + 1)
+          .slice(Math.max(0, a), Math.min(poses.frames.length - 1, b) + 1)
           .filter((f) => f.landmarks)
-          .map((f) => ({ landmarks: f.landmarks! }))
-      : [],
+          .map((f) => ({ frameIndex: f.frameIndex, landmarks: f.landmarks! }))
+      : [];
+  const windowFrames = $derived(shot ? framesOf(lo, hi) : []);
+  const source = $derived(
+    poses
+      ? { width: poses.width, height: poses.height }
+      : { width: 16, height: 9 },
   );
-  const framing = $derived.by((): Framing | null => {
-    if (!poses || stageW <= 0 || stageH <= 0 || windowFrames.length === 0)
-      return null;
-    return computeShotFraming(
-      windowFrames,
-      { width: stageW, height: stageH },
-      { width: poses.width, height: poses.height },
-    );
+  const refSides = $derived<GeometrySides>({
+    shootingHand: "right",
+    nearSide: shot?.nearSide ?? "right",
   });
-  const videoBox = $derived(framing ? sourceRect(framing) : null);
 
   const selectedRow = $derived(
     selected
@@ -104,11 +116,157 @@
           null)
       : null,
   );
+  /** Frames the selected cell was measured at (only on its own shot). */
+  const selFrames = $derived(
+    selected && selectedRow && selected.shot === shotIdx
+      ? (selectedRow.cells[selected.shot]?.frames ?? [])
+      : [],
+  );
+  const selSpan = $derived<readonly [number, number] | null>(
+    selFrames.length > 0
+      ? [Math.min(...selFrames), Math.max(...selFrames)]
+      : null,
+  );
+  /** Geometry of the selected v3 metric (none for v2 ids). */
+  const selGeometry = $derived(
+    selected && catalog === "v3" && selSpan
+      ? { items: geometryFor(selected.id), sides: refSides, span: selSpan }
+      : null,
+  );
+
+  // ---- Compare: one of my shots vs a Curry shot, phase-time aligned -------
+  interface MyShot {
+    readonly record: ShotRecord;
+    readonly poses: ShotReviewPoses;
+    readonly v3: ShotMetricsV3;
+    readonly aspect: number;
+    readonly anchors: PhaseAnchors | null;
+    readonly hand: "left" | "right";
+  }
+  let myShots = $state.raw<ShotRecord[]>([]);
+  let myHand = $state<"left" | "right">("right");
+  let myShotsLoaded = $state(false);
+  let mine = $state.raw<MyShot | null>(null);
+  let mineError = $state<string | null>(null);
+  /** Shared phase clock (0 … ALIGN_SPAN). */
+  let u = $state(1);
+  let playing = $state(false);
+  let raf = 0;
+
+  const refAnchors = $derived(shot?.anchors ?? null);
+  const refFrameAt = $derived(
+    refAnchors ? Math.round(frameAtPhaseTime(refAnchors, u)) : frame,
+  );
+  const mineFrameAt = $derived(
+    mine?.anchors ? Math.round(frameAtPhaseTime(mine.anchors, u)) : 0,
+  );
+  const cmpRefFrames = $derived(
+    refAnchors
+      ? framesOf(
+          Math.floor(frameAtPhaseTime(refAnchors, 0)),
+          Math.ceil(frameAtPhaseTime(refAnchors, ALIGN_SPAN)),
+        )
+      : [],
+  );
+  const mineFrames = $derived(
+    mine
+      ? mine.poses.frames.map((f) => ({
+          frameIndex: f.frameIndex,
+          landmarks: f.landmarks,
+        }))
+      : [],
+  );
+  const mineSource = $derived(
+    mine
+      ? mine.poses.width && mine.poses.height
+        ? { width: mine.poses.width, height: mine.poses.height }
+        : { width: mine.aspect * 1000, height: 1000 }
+      : { width: 16, height: 9 },
+  );
+  const mineValues = $derived(
+    mine
+      ? new Map(
+          Object.entries(mine.v3.metrics)
+            .filter(([, m]) => m.reliable && Number.isFinite(m.value))
+            .map(([id, m]) => [id, m.value]),
+        )
+      : null,
+  );
+
+  async function loadMyShots() {
+    if (myShotsLoaded) return;
+    myShotsLoaded = true;
+    try {
+      const player = await services.repos.player.getFirst();
+      if (!player) return;
+      myHand = player.shootingHand === "left" ? "left" : "right";
+      myShots = await services.repos.shot.listByPlayer(player.id, {
+        limit: 50,
+      });
+    } catch {
+      myShots = [];
+    }
+  }
+
+  async function pickMine(id: string) {
+    mine = null;
+    mineError = null;
+    const record = myShots.find((s) => s.id === id);
+    if (!record) return;
+    const p = await services.repos.shot.getPoses(id).catch(() => null);
+    if (!p || p.frames.length === 0) {
+      mineError = "This shot has no stored pose track.";
+      return;
+    }
+    const { metrics, aspect } = metricsForStoredShot(p, myHand);
+    const anchors =
+      metrics.phases.load && metrics.phases.rise && metrics.phases.release
+        ? {
+            loadStart: metrics.phases.load.start,
+            loadEnd: metrics.phases.load.end,
+            setPoint: metrics.phases.rise.end,
+            armExtended: metrics.phases.release.end,
+          }
+        : null;
+    if (!anchors) mineError = "Couldn't find all phases in this shot.";
+    mine = { record, poses: p, v3: metrics, aspect, anchors, hand: myHand };
+    u = 1;
+  }
+
+  function setMode(m: "inspect" | "compare") {
+    mode = m;
+    stop();
+    if (m === "compare") {
+      catalog = "v3";
+      void loadMyShots();
+    }
+  }
+
+  /** Each phase plays in 0.6 s on the shared clock. */
+  const SEGMENT_MS = 600;
+  function play() {
+    if (playing) return stop();
+    if (u >= ALIGN_SPAN) u = 0;
+    playing = true;
+    let last = performance.now();
+    const step = (now: number) => {
+      u = Math.min(ALIGN_SPAN, u + (now - last) / SEGMENT_MS);
+      last = now;
+      if (u >= ALIGN_SPAN) return stop();
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+  }
+  function stop() {
+    playing = false;
+    cancelAnimationFrame(raf);
+  }
 
   onMount(() => {
     if (enabled) void load();
   });
   onDestroy(() => {
+    stop();
     if (videoUrl && localVideo) URL.revokeObjectURL(videoUrl);
   });
 
@@ -154,7 +312,6 @@
     if (!file) return;
     if (videoUrl && localVideo) URL.revokeObjectURL(videoUrl);
     localVideo = true;
-    videoReady = false;
     videoUrl = URL.createObjectURL(file);
   }
 
@@ -164,43 +321,12 @@
       s
     ];
     if (shotIdx !== s) selectShot(s);
-    if (cell?.frames[0] !== undefined) frame = cell.frames[0];
-  }
-
-  // Video follows the scrubbed frame (frame i is at i / fps in the source).
-  $effect(() => {
-    const v = videoEl;
-    const f = frame;
-    if (!v || !videoReady) return;
-    try {
-      v.currentTime = f / fps;
-    } catch {
-      /* not seekable yet */
+    if (cell?.frames[0] !== undefined) {
+      frame = cell.frames[0];
+      if (mode === "compare" && shots[s]?.anchors)
+        u = phaseTimeAtFrame(shots[s].anchors!, cell.frames[0]);
     }
-  });
-
-  $effect(() => {
-    const c = canvas;
-    const fr = framing;
-    const lm = poses?.frames[frame]?.landmarks;
-    if (!c) return;
-    const ctx = c.getContext("2d");
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    c.width = Math.round(stageW * dpr);
-    c.height = Math.round(stageH * dpr);
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, stageW, stageH);
-    if (!lm || !fr) return;
-    drawSkeleton(ctx, lm, stageW, stageH, {
-      strokeStyle: "rgb(64 224 120 / 90%)",
-      jointStyle: "rgb(255 255 255 / 90%)",
-      lineWidth: 3,
-      jointRadius: 3,
-      project: projectWith(fr),
-    });
-    c.dataset.frame = String(frame);
-  });
+  }
 
   const fmt = (v: number) =>
     Math.abs(v) >= 100
@@ -231,6 +357,22 @@
     {:else if status === "error"}
       <p class="err" data-testid="reference-error">{error}</p>
     {:else}
+      <div class="catalog" role="tablist" aria-label="Viewer mode">
+        <button
+          role="tab"
+          aria-selected={mode === "inspect"}
+          class:active={mode === "inspect"}
+          data-testid="mode-inspect"
+          onclick={() => setMode("inspect")}>Inspect</button
+        >
+        <button
+          role="tab"
+          aria-selected={mode === "compare"}
+          class:active={mode === "compare"}
+          data-testid="mode-compare"
+          onclick={() => setMode("compare")}>Compare with my shot</button
+        >
+      </div>
       <div class="shot-tabs" role="tablist">
         {#each shots as s, i (s.number)}
           <button
@@ -243,29 +385,134 @@
         {/each}
       </div>
 
-      <div class="viewer">
-        <div
-          class="stage"
-          bind:clientWidth={stageW}
-          bind:clientHeight={stageH}
-          data-testid="ref-stage"
-        >
-          {#if videoUrl}
-            <video
-              bind:this={videoEl}
-              src={videoUrl}
-              muted
-              playsinline
-              preload="auto"
-              data-testid="ref-video"
-              style={videoBox
-                ? `left:${videoBox.left}px;top:${videoBox.top}px;width:${videoBox.width}px;height:${videoBox.height}px`
-                : ""}
-              onloadedmetadata={() => (videoReady = true)}
-            ></video>
-          {/if}
-          <canvas bind:this={canvas} data-testid="ref-skeleton"></canvas>
-        </div>
+      {#if mode === "compare"}
+        <section class="compare" data-testid="compare">
+          <label class="pick-mine">
+            My shot:
+            <select
+              data-testid="cmp-pick"
+              onchange={(e) => void pickMine(e.currentTarget.value)}
+            >
+              <option value="">— choose —</option>
+              {#each myShots as m (m.id)}
+                <option value={m.id}
+                  >{dayLabel(m.createdAt, Date.now())} · {timeLabel(
+                    m.createdAt,
+                  )}</option
+                >
+              {/each}
+            </select>
+            {#if myShotsLoaded && myShots.length === 0}
+              <span class="dim" data-testid="cmp-none"
+                >No shots yet — record one in Practice.</span
+              >
+            {/if}
+          </label>
+          {#if mineError}<p class="err" data-testid="cmp-error">
+              {mineError}
+            </p>{/if}
+          <div class="pair">
+            <div class="col">
+              <PoseStage
+                frames={cmpRefFrames}
+                {source}
+                frame={refFrameAt}
+                {fps}
+                {videoUrl}
+                geometry={selected && selected.shot === shotIdx
+                  ? {
+                      items: geometryFor(selected.id),
+                      sides: refSides,
+                      span: selSpan ?? [refFrameAt, refFrameAt],
+                    }
+                  : null}
+                testid="cmp-ref"
+                label="Curry · shot {shot?.number ?? ''}"
+              />
+              <p
+                class="meta"
+                data-testid="cmp-ref-phase"
+                data-u={refAnchors
+                  ? phaseTimeAtFrame(refAnchors, refFrameAt).toFixed(2)
+                  : ""}
+              >
+                {phaseLabel(u)} · frame {refFrameAt}
+              </p>
+            </div>
+            <div class="col">
+              {#if mine?.anchors}
+                <PoseStage
+                  frames={mineFrames}
+                  source={mineSource}
+                  frame={mineFrameAt}
+                  fps={mine.poses.fps || 30}
+                  geometry={selected
+                    ? {
+                        items: geometryFor(selected.id),
+                        sides: {
+                          shootingHand: mine.hand,
+                          nearSide: mine.v3.nearSide,
+                        },
+                        span: [mineFrameAt, mineFrameAt],
+                      }
+                    : null}
+                  testid="cmp-mine"
+                  label="Me"
+                />
+                <p
+                  class="meta"
+                  data-testid="cmp-mine-phase"
+                  data-u={phaseTimeAtFrame(mine.anchors, mineFrameAt).toFixed(
+                    2,
+                  )}
+                >
+                  {phaseLabel(u)} · frame {mineFrameAt}
+                </p>
+              {:else}
+                <div class="placeholder">Pick one of your shots</div>
+              {/if}
+            </div>
+          </div>
+          <div class="cmp-track">
+            {#each ALIGN_BOUNDARIES as b, i (b)}
+              <span class="bound" style="left:{((i + 1) / ALIGN_SPAN) * 100}%"
+                >{b}</span
+              >
+            {/each}
+          </div>
+          <div class="cmp-controls">
+            <button
+              data-testid="cmp-play"
+              disabled={!mine?.anchors || !refAnchors}
+              onclick={play}>{playing ? "❚❚" : "▶"}</button
+            >
+            <input
+              type="range"
+              min="0"
+              max={ALIGN_SPAN}
+              step="0.01"
+              bind:value={u}
+              data-testid="cmp-scrubber"
+              aria-label="Phase-aligned time"
+            />
+          </div>
+          <p class="dim small">
+            Phase-aligned: each phase is stretched to the same length on both
+            sides, so the boundaries line up however fast each shot was.
+          </p>
+        </section>
+      {/if}
+
+      <div class="viewer" class:hidden={mode === "compare"}>
+        <PoseStage
+          frames={windowFrames}
+          {source}
+          {frame}
+          {fps}
+          {videoUrl}
+          geometry={selGeometry}
+          testid="ref"
+        />
         <div class="side">
           <div class="track" data-testid="ref-markers">
             {#if shot}
@@ -286,6 +533,13 @@
                     data-testid="mk-lab-{e.event}"
                   ></span>
                 {/if}
+              {/each}
+              {#each selFrames as f, k (k)}
+                <span
+                  class="mk selmk"
+                  style="left:{markerPct(f)}%"
+                  data-testid="mk-sel-{k}"
+                ></span>
               {/each}
             {/if}
           </div>
@@ -366,8 +620,24 @@
               <div>
                 Shot {selected.shot + 1}:
                 {c ? fmt(c.value) : "unmeasured"}{selectedRow.unit}
-                {#if c}at frame {c.frames.join(", ")}{/if}
+                {#if c}
+                  at
+                  {#each c.frames as f, k (k)}
+                    <button
+                      class="seek"
+                      data-testid="sel-frame-{k}"
+                      onclick={() => (frame = f)}>frame {f}</button
+                    >
+                  {/each}
+                {/if}
               </div>
+              {#if catalog === "v3"}
+                <div class="dim" data-testid="sel-geometry">
+                  Drawn: {geometryFor(selectedRow.id)
+                    .map((g) => g.kind)
+                    .join(" + ") || "—"}
+                </div>
+              {/if}
               <div class="dim">
                 target {fmt(selectedRow.ideal)} · band {fmt(
                   selectedRow.passMin,
@@ -408,12 +678,16 @@
               <th>Mean</th>
               <th>Band</th>
               <th>SD</th>
+              {#if mineValues && catalog === "v3"}<th>Mine</th>{/if}
             </tr>
           </thead>
           {#each table as g (g.group)}
             <tbody>
               <tr class="group"
-                ><th colspan={shots.length + 4}>{g.group}</th></tr
+                ><th
+                  colspan={shots.length +
+                    (mineValues && catalog === "v3" ? 5 : 4)}>{g.group}</th
+                ></tr
               >
               {#each g.rows as r (r.id)}
                 <tr class:unscored={!r.scored} data-testid="ref-row-{r.id}">
@@ -434,6 +708,16 @@
                   <td class="num">{fmt(r.ideal)}</td>
                   <td class="num">{fmt(r.passMin)}–{fmt(r.passMax)}</td>
                   <td class="num">{fmt(r.sd)}</td>
+                  {#if mineValues && catalog === "v3"}
+                    {@const v = mineValues.get(r.id)}
+                    <td
+                      class="mine"
+                      class:outside={v !== undefined &&
+                        (v < r.passMin || v > r.passMax)}
+                      data-testid="mine-{r.id}"
+                      >{v === undefined ? "—" : fmt(v)}</td
+                    >
+                  {/if}
                 </tr>
               {/each}
             </tbody>
@@ -495,22 +779,92 @@
       grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     }
   }
-  .stage {
-    position: relative;
+  .viewer.hidden > :global(.stage) {
+    display: none;
+  }
+  .compare {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .pick-mine {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .placeholder {
     aspect-ratio: 4 / 3;
-    background: #000;
+    display: grid;
+    place-items: center;
+    border: 1px dashed var(--sc-border);
     border-radius: var(--sc-radius);
-    overflow: hidden;
+    color: var(--sc-text-dim);
+    font-size: 13px;
   }
-  .stage video {
-    position: absolute;
-    object-fit: fill;
+  .cmp-track {
+    position: relative;
+    height: 16px;
+    margin: 0 36px 0 44px;
+    font-size: 10px;
+    color: var(--sc-text-dim);
   }
-  .stage canvas {
+  .bound {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .cmp-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .cmp-controls input {
+    flex: 1;
+  }
+  .cmp-controls button,
+  .seek {
+    border: 1px solid var(--sc-border);
+    border-radius: 6px;
+    background: var(--sc-card);
+    color: inherit;
+    cursor: pointer;
+  }
+  .cmp-controls button {
+    width: 36px;
+    height: 30px;
+  }
+  .seek {
+    font-size: 12px;
+    padding: 0 6px;
+  }
+  .small {
+    font-size: 12px;
+    margin: 0;
+  }
+  .mk.selmk {
+    top: 0;
+    height: 16px;
+    width: 4px;
+    background: #fbbf24;
+  }
+  td.mine {
+    font-weight: 700;
+  }
+  td.mine.outside {
+    color: var(--sc-warn);
   }
   .side {
     display: flex;

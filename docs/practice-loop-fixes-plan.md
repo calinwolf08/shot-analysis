@@ -839,6 +839,47 @@ ALL 141: within ±1 — v3 55% · old 73%; within ±2 — v3 75% · old 81%
   - The recorder also restarts right after a take, without waiting for the
     feedback to finish.
 
+## B-2.13 Implementation notes (Phase 13)
+- **Geometry per metric** (`app/src/lib/features/reference/metric-geometry.ts`):
+  - Every v3 metric maps to drawable primitives: `angle` (joint arc with its
+    value), `lean` (line plus a vertical reference), `offset`, `height`,
+    `segment`, `path` (a joint's trail over the metric's frames) or `timing`
+    (no body geometry; the event frames are marked on the scrubber).
+  - Joints resolve the way the metrics read them: arm on the shooting side,
+    legs, hips, shoulder and ear on the side nearest the camera.
+  - A test checks that every metric with wording has geometry.
+- **Viewer — inspect** (`PoseStage.svelte`, reused by every stage):
+  - Clicking a v3 cell selects that shot, seeks to the measured frame and
+    draws the geometry.
+  - Each frame the metric uses (e.g. start and end of a change) is a seek
+    button, and its markers are drawn on the scrubber.
+  - Outliers (> 2 SD) were already flagged in Phase 9.
+  - Canvas probe: `data-frame`, `data-geometry`.
+- **Viewer — compare** ("Compare with my shot"):
+  - Pick one of your stored shots. v3 is computed from its review pose track
+    (`metricsForStoredShot`).
+  - The shot plays side by side with the selected Curry shot on a shared
+    phase clock (`phase-align.ts`): Before (8 frames) → Load → Rise →
+    Release → After (8 frames). Every segment has equal length, so load
+    start, lowest point, set point and arm extension line up.
+  - Labels name the boundary when the clock sits on one ("Release · at Set
+    point").
+  - Play runs each phase in 0.6 s.
+  - The table gains a "Mine" column, highlighted when it falls outside the
+    band.
+  - Your skeleton is drawn as filmed. A shot taken from the other side faces
+    the other way, but the metrics are mirror-invariant.
+- **Tests:**
+  - Unit: geometry coverage, sides and drawing (a fake canvas). Alignment
+    maps boundaries 1:1, the inverse round-trips, all 7 Curry shots have
+    ordered anchors, and a stored track's ms timestamps match the frame
+    clock.
+  - E2E (`reference-compare.spec.ts`): cell → seek + angle / lean / offset /
+    height / path drawn, with a screenshot each; a two-frame metric's seek
+    buttons; timing markers. Compare: replay a shot in Practice → pick it →
+    at each boundary both stages sit on their own boundary with matching
+    labels → Mine column → play.
+
 ## B-3. Phased implementation (Part B)
 
 **Phase 9 — Debug index + Curry viewer shell**

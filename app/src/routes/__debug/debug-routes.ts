@@ -11,7 +11,7 @@ export const DEBUG_ROUTES: readonly {
     path: "/__debug/reference",
     title: "Curry model viewer",
     about:
-      "The reference shots behind the live targets: pose overlay + per-shot metric table vs the target band.",
+      "The reference shots behind the live targets: pose overlay with each metric's geometry, per-shot metric table vs the band, and a phase-aligned compare with your own shots.",
   },
   {
     path: "/__debug/replay",
