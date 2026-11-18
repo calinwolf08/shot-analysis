@@ -241,7 +241,7 @@ sequenceDiagram
     participant Co as LiveRepCoordinator
     participant Lib as ShotDetector + metrics
 
-    loop ~15 fps
+    loop ~30 fps (frames skipped while the worker is busy)
         Cam->>W: frame (RGBA)
         W->>W: MediaPipe detect
         W-->>UI: LandmarkFrame  (presence border + skeleton overlay)
@@ -282,6 +282,17 @@ shot returns `noShot`. The reverse (`nearTrigger`) — motion that got close
 to the threshold but never crossed it — is surfaced in the debug HUD
 (`?debug=live`). This is why a rep can feel like it happened yet produce no
 feedback, and it's the observability the HUD exists to expose.
+
+**After a confirmed shot** the live pipeline:
+
+- gates it on camera angle (side-on, shooting arm nearest the camera);
+- measures it with the **v3 metric catalog** from its padded pose track, and
+  scores it on the 0–10+ scale (see [§6b](#6b-live-scoring-v3));
+- persists it with its pose track and an optional on-device video clip;
+- speaks the 3 worst issues as phase-grouped cues.
+
+The shot is never picked up mid-feedback: detection resumes only after the
+"ready" tone.
 
 Because live analysis only ever sees a ~12 s window (not the whole
 session), the two paths aren't guaranteed bit-identical on the same
@@ -356,6 +367,43 @@ Thresholds and reference skeletons are currently **placeholders** built from
 `test-data` clips (see [`follow-up-work.md`](./follow-up-work.md)).
 
 ---
+
+### 6b. Live scoring (v3)
+
+Live practice, the Shots tab, review and Insights all score with the **v3
+catalog**, one path everywhere. Full catalog, events and formulas:
+[`metrics-by-phase.md`](./metrics-by-phase.md).
+
+```mermaid
+flowchart TB
+    subgraph Offline["Offline (reference shots)"]
+      CR["Curry's 7 labeled shots"] --> B3["npm run targets:build:v3<br/>band = observed range, rampSd = spread"]
+      B3 --> T3[("live-targets-v3.json<br/>+ hand-edited wording / overrides")]
+    end
+    subgraph Shot["Per live shot (device or server)"]
+      W["rep window"] --> DET["ShotDetector + angle gate"]
+      DET --> PT["padded pose track<br/>(stored with the shot)"]
+      PT --> V3["computeShotMetricsV3<br/>signals → sub-frame events → metrics"]
+      V3 --> ST["analysis.v3Metrics<br/>(schema 2, persisted)"]
+      ST --> SC3["scoreShotV3<br/>0 in band, +1 per rampSd"]
+      T3 --> SC3
+      SC3 --> FB["3 worst, in phase order<br/>voice cues + card"]
+    end
+    subgraph Read["On read (Shots, review, Insights)"]
+      OLD["schema-1 shot"] -->|recompute from pose track, save| ST
+    end
+
+    classDef store fill:#1f2a3a,stroke:#3d5a80,color:#e8f0ff;
+    class T3,ST store;
+```
+
+- **Persisted metrics, derived scores.** Metrics are stored with the shot.
+  Scores are computed on read, so editing a target band re-scores every shot
+  without re-analysis.
+- **Migration once.** A shot from before v3 is recomputed from its stored pose
+  track the first time it's read, then saved (`ShotRepo.updateAnalysis`).
+- **No pose track.** Shots stored without one show "Re-analysis unavailable"
+  and are left out of trends.
 
 ## 7. Authentication & data scoping
 
