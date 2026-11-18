@@ -1,129 +1,67 @@
 import { describe, expect, it } from "vitest";
-import type { MetricDeviation } from "$lib/features/scoring";
-import { buildWorstReadback, feedbackItems, phraseFor } from "../readback";
+import {
+  FEEDBACK_COUNT,
+  buildCueReadback,
+  feedbackItems,
+  inPhaseOrder,
+  phaseName,
+} from "../readback";
 
-function dev(over: Partial<MetricDeviation>): MetricDeviation {
-  return {
-    id: "setPoint.elbow_flare",
-    label: "Elbow flare",
-    section: "structure",
-    phase: "setPoint",
-    value: 100,
-    ideal: 90,
-    passMin: 85,
-    passMax: 95,
-    unit: "",
-    score: 3,
-    normDev: 2,
-    inBand: false,
-    direction: "high",
-    magnitude: 5,
-    scored: true,
-    ...over,
-  };
-}
+const item = (id: string, cue: string | null = `cue ${id}`) => ({
+  id,
+  phase: id.split(".")[0]!,
+  label: `label ${id}`,
+  cue,
+});
 
-describe("phraseFor", () => {
-  it("renders metric, direction and native-unit magnitude", () => {
-    expect(
-      phraseFor(
-        dev({ label: "Elbow flare", direction: "high", magnitude: 6.2 }),
-      ),
-    ).toBe("Elbow flare high by 6");
+describe("feedbackItems", () => {
+  it("takes the 3 worst, then puts them in shot order", () => {
+    expect(FEEDBACK_COUNT).toBe(3);
+    const worst = [
+      item("release.wrist_snap"),
+      item("load.knee_depth"),
+      item("setPoint.elbow_angle"),
+      item("rise.t_start"), // 4th worst: dropped
+    ];
+    expect(feedbackItems(worst).map((m) => m.id)).toEqual([
+      "load.knee_depth",
+      "setPoint.elbow_angle",
+      "release.wrist_snap",
+    ]);
   });
 
-  it("converts a Δt timing gap to whole frames when duration is known", () => {
-    const m = dev({
-      label: "Set point",
-      direction: "low",
-      unit: "Δt",
-      magnitude: 0.067,
-    });
-    expect(phraseFor(m, 30)).toBe("Set point low by 2"); // round(0.067*30)
-  });
-
-  it("keeps small fractional magnitudes legible", () => {
-    expect(
-      phraseFor(dev({ label: "Depth", direction: "low", magnitude: 0.03 })),
-    ).toBe("Depth low by 0.03");
-  });
-
-  it("drops the magnitude when there is no direction", () => {
-    expect(
-      phraseFor(dev({ label: "Elbow flare", direction: null, magnitude: 0 })),
-    ).toBe("Elbow flare");
+  it("is stable within a phase and puts unknown phases last", () => {
+    const xs = [item("x.a"), item("load.b"), item("load.c")];
+    expect(inPhaseOrder(xs).map((m) => m.id)).toEqual([
+      "load.b",
+      "load.c",
+      "x.a",
+    ]);
   });
 });
 
-describe("buildWorstReadback", () => {
-  it("reads the 3 worst, in phase order, each group named by its phase", () => {
-    // Worst-first input spanning phases out of order.
-    const worst = [
-      dev({
-        label: "Elbow flare",
-        phase: "setPoint",
-        direction: "high",
-        magnitude: 6,
-      }),
-      dev({
-        label: "Knee bend",
-        phase: "load",
-        direction: "low",
-        magnitude: 12,
-      }),
-      dev({ label: "Hips", phase: "load", direction: "high", magnitude: 0.2 }),
-      dev({
-        label: "Wrist snap",
-        phase: "release",
-        direction: "low",
-        magnitude: 9,
-      }),
-    ];
-    expect(buildWorstReadback(worst)).toBe(
-      "Load: Knee bend low by 12, Hips high by 0.2. Set point: Elbow flare high by 6.",
+describe("buildCueReadback", () => {
+  it("speaks cues grouped under their phase name", () => {
+    expect(
+      buildCueReadback([
+        item("load.knee_depth", "Bend your knees more"),
+        item("load.ball_drop", "Dip the ball lower"),
+        item("setPoint.wrist_vs_head", "Raise your set point"),
+      ]),
+    ).toBe(
+      "Load: Bend your knees more. Dip the ball lower. Set point: Raise your set point.",
     );
   });
 
-  it("converts timing gaps to frames inside the phase groups", () => {
-    const worst = [
-      dev({
-        label: "Set point",
-        phase: "rise",
-        direction: "low",
-        unit: "Δt",
-        magnitude: 0.067,
-      }),
-    ];
-    expect(buildWorstReadback(worst, { durationFrames: 30 })).toBe(
-      "Rise: Set point low by 2.",
+  it("falls back to the label without a cue; empty → empty", () => {
+    expect(buildCueReadback([item("rise.t_end", null)])).toBe(
+      "Rise: label rise.t_end.",
     );
+    expect(buildCueReadback([])).toBe("");
   });
 
-  it("caps at `max` metrics", () => {
-    const worst = Array.from({ length: 8 }, (_, i) =>
-      dev({ label: `M${i}`, direction: "high", magnitude: 2 }),
-    );
-    expect(buildWorstReadback(worst, { max: 2 })).toBe(
-      "Set point: M0 high by 2, M1 high by 2.",
-    );
-  });
-
-  it("returns an empty string when nothing is off-target", () => {
-    expect(buildWorstReadback([])).toBe("");
-  });
-});
-
-describe("feedbackItems / inPhaseOrder", () => {
-  it("keeps the worst N, then orders them load → release", () => {
-    const items = feedbackItems(
-      [
-        dev({ id: "a", phase: "release" }),
-        dev({ id: "b", phase: "load" }),
-        dev({ id: "c", phase: "setPoint" }),
-        dev({ id: "d", phase: "rise" }), // 4th worst: dropped
-      ],
-      3,
-    );
-    expect(items.map((m) => m.id)).toEqual(["b", "c", "a"]);
+  it("names phases for people", () => {
+    expect(phaseName("setPoint")).toBe("Set point");
+    expect(phaseName("other")).toBe("other");
   });
 });

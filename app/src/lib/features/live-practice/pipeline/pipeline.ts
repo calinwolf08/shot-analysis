@@ -17,8 +17,8 @@
 import type { PoseData } from "basketball-shot-analysis";
 import type { ApiClient } from "$lib/shared/api/client";
 import type { AnalyzeOptions } from "$lib/features/analysis";
-import type { MetricDeviation, ShotScorecard } from "$lib/features/scoring";
-import type { LiveTargets } from "$lib/features/scoring";
+import type { LiveTargetsV3 } from "basketball-shot-analysis";
+import type { MetricResultV3, ScorecardV3 } from "$lib/features/scoring/v3";
 import type { ShotRecord } from "$lib/shared/db/repos";
 import { analyzeAndScore, type RejectedShot } from "./core";
 import type { ShotStore } from "./shot-store";
@@ -34,8 +34,8 @@ export interface ProcessInput {
 
 export interface ProcessedShot {
   readonly shot: ShotRecord;
-  readonly scorecard: ShotScorecard;
-  readonly worst: readonly MetricDeviation[];
+  readonly scorecard: ScorecardV3;
+  readonly worst: readonly MetricResultV3[];
 }
 
 export interface ProcessResult {
@@ -55,7 +55,7 @@ export interface LiveShotPipeline {
 
 /** On-device analysis; persistence via the supplied store. */
 export function createLocalPipeline(deps: {
-  targets: LiveTargets;
+  targets: LiveTargetsV3;
   store: ShotStore;
 }): LiveShotPipeline {
   return {
@@ -114,7 +114,7 @@ export function resolvePipelineLocation(): PipelineLocation {
 
 /** Builds the configured pipeline; on-device by default. */
 export function createLiveShotPipeline(deps: {
-  targets: LiveTargets;
+  targets: LiveTargetsV3;
   store: ShotStore;
   api: ApiClient;
   location?: PipelineLocation;

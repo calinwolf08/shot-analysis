@@ -3,13 +3,14 @@
  *
  * Pure read-model over a set of scored shots: for a time window it ranks the
  * recurring issues (metrics that land off-target most often and most severely)
- * and builds the overall-score trend. No session concept — shots are grouped
- * purely by their timestamp, and scores are recomputed from stored metrics by
- * the caller (`scorecardForShot`), never stored.
+ * and builds the overall-score trend, on the v3 0–10+ scale (0 = on target).
+ * No session concept — shots are grouped purely by their timestamp, and
+ * scores are recomputed from stored metrics by the caller (shots that can't be
+ * re-analyzed are left out), never stored.
  *
  * @see docs/live-redesign-plan.md §3.10
  */
-import type { Section, ShotScorecard } from "$lib/features/scoring";
+import type { ScorecardV3 } from "$lib/features/scoring/v3";
 
 export type InsightsWindow = "today" | "7d" | "30d" | "all";
 
@@ -46,23 +47,24 @@ export function windowStart(key: InsightsWindow, now: number): number {
 
 export interface ScoredShotAt {
   readonly createdAt: number;
-  readonly scorecard: ShotScorecard;
+  readonly scorecard: ScorecardV3;
 }
 
 export interface RecurringIssue {
   readonly id: string;
   readonly label: string;
-  readonly section: Section;
+  /** v3 phase id ("load" | "rise" | "setPoint" | "release"). */
   readonly phase: string;
+  readonly kind: string;
+  /** How it's usually off ("too shallow"), the most frequent direction. */
+  readonly phrase: string | null;
   /** Shots (in the window) where this metric was off-target. */
   readonly occurrences: number;
   /** occurrences / shotCount (0..1). */
   readonly frequency: number;
-  /** Mean normalized deviation across the off-target shots. */
-  readonly avgNormDev: number;
-  /** Mean 1..10 score across the off-target shots. */
+  /** Mean 0–10+ score across the off-target shots. */
   readonly avgScore: number;
-  /** Ranking weight = occurrences × avgNormDev (frequency × severity). */
+  /** Ranking weight = occurrences × avgScore (frequency × severity). */
   readonly rank: number;
 }
 
@@ -74,7 +76,7 @@ export interface TrendPoint {
 export interface InsightsSummary {
   readonly window: InsightsWindow;
   readonly shotCount: number;
-  /** Mean overall score (1..10, lower better), or null when nothing scored. */
+  /** Mean overall score (0 = on target, lower better), or null. */
   readonly avgOverall: number | null;
   readonly issues: readonly RecurringIssue[];
   readonly trend: readonly TrendPoint[];
@@ -115,45 +117,48 @@ export function summarizeInsights(
 
   interface Agg {
     label: string;
-    section: Section;
     phase: string;
+    kind: string;
     count: number;
-    normDevSum: number;
     scoreSum: number;
+    phrases: Map<string, number>;
   }
   const agg = new Map<string, Agg>();
   for (const s of sorted) {
     for (const w of s.scorecard.worst) {
+      if (w.score === null || w.score <= 0) continue;
       const e =
         agg.get(w.id) ??
         ({
           label: w.label,
-          section: w.section,
           phase: w.phase,
+          kind: w.kind,
           count: 0,
-          normDevSum: 0,
           scoreSum: 0,
+          phrases: new Map(),
         } satisfies Agg);
       e.count += 1;
-      e.normDevSum += w.normDev;
       e.scoreSum += w.score;
+      if (w.phrase) e.phrases.set(w.phrase, (e.phrases.get(w.phrase) ?? 0) + 1);
       agg.set(w.id, e);
     }
   }
 
   const issues: RecurringIssue[] = [...agg.entries()]
     .map(([id, e]) => {
-      const avgNormDev = e.normDevSum / e.count;
+      const avgScore = e.scoreSum / e.count;
+      const phrase =
+        [...e.phrases.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
       return {
         id,
         label: e.label,
-        section: e.section,
         phase: e.phase,
+        kind: e.kind,
+        phrase,
         occurrences: e.count,
         frequency: shotCount > 0 ? round(e.count / shotCount, 3) : 0,
-        avgNormDev: round(avgNormDev, 3),
-        avgScore: round(e.scoreSum / e.count, 1),
-        rank: round(e.count * avgNormDev, 3),
+        avgScore: round(avgScore, 1),
+        rank: round(e.count * avgScore, 3),
       };
     })
     .sort((a, b) => b.rank - a.rank)

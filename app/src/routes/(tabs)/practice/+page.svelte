@@ -18,7 +18,6 @@
     LivePracticeStore,
     PracticeScreen,
     requiredOrientation,
-    scorecardForShot,
     type ShotEntry,
     type LiveRepCoordinator,
     type SideOrientation,
@@ -32,11 +31,10 @@
     simulatedSpeechMs,
     withAudioProbe,
   } from "$lib/shared/audio/audio-probe";
-  import {
-    loadLiveTargets,
-    normalizeAreas,
-    type LiveTargets,
-  } from "$lib/features/scoring";
+  import type { LiveTargetsV3 } from "basketball-shot-analysis";
+  import { normalizeAreas } from "$lib/features/scoring";
+  import { loadLiveTargetsV3 } from "$lib/features/scoring/v3";
+  import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { createApiClient } from "$lib/shared/api/client";
   import { createWebAudioFeedbackService } from "$lib/shared/audio";
@@ -105,7 +103,7 @@
   let shootingHand: "left" | "right" = "right";
   let requiredSide = $state<SideOrientation>("side-left");
   let playerId = "";
-  let targets: LiveTargets | null = null;
+  let targets: LiveTargetsV3 | null = null;
   let captureHandle: CaptureHandle | null = null;
   let focusAreas: string[] = [];
   let tuning = $state<LiveTuning>(DEFAULT_LIVE_TUNING);
@@ -136,7 +134,7 @@
     playerId = player.id;
     shootingHand = player.shootingHand;
     requiredSide = requiredOrientation(shootingHand);
-    targets = await loadLiveTargets();
+    targets = await loadLiveTargetsV3();
     const loaded = await loadLiveTuning();
     tuning = loaded.tuning;
     for (const w of loaded.warnings) console.warn("[live-tuning]", w);
@@ -235,7 +233,7 @@
    */
   async function loadTodaysShots(
     id: string,
-    t: LiveTargets,
+    t: LiveTargetsV3,
   ): Promise<ShotEntry[]> {
     // Local midnight (plain timestamp math; no reactive Date needed).
     const now = Date.now();
@@ -248,19 +246,24 @@
       const rows = await services.repos.shot.listByPlayer(id, {
         since: startOfDay,
       });
-      return [...rows]
-        .sort((a, b) => a.createdAt - b.createdAt)
-        .map((row, i) => {
-          const card = scorecardForShot(row.analysis, t);
-          return {
-            index: i + 1,
-            shotId: row.id,
-            overall: card.overall,
-            worst: card.worst,
-            scorecard: card,
-            excluded: row.excluded,
-          };
-        });
+      const sorted = [...rows].sort((a, b) => a.createdAt - b.createdAt);
+      const scored = await scoreStoredShots(
+        services.repos.shot,
+        sorted,
+        shootingHand,
+        t,
+      );
+      // Shots that can't be re-analyzed are left out of today's count.
+      return scored
+        .filter((x) => x.card !== null)
+        .map(({ record, card }, i) => ({
+          index: i + 1,
+          shotId: record.id,
+          overall: card!.overall,
+          worst: card!.worst,
+          scorecard: card!,
+          excluded: record.excluded,
+        }));
     } catch {
       return [];
     }

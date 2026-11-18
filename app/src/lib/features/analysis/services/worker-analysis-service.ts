@@ -35,6 +35,9 @@ import {
   type ToWorkerMessage,
 } from "./../worker/worker-protocol";
 
+/** Live camera capture rate (frames offered to pose detection per second). */
+export const LIVE_CAPTURE_FPS = 30;
+
 /** The slice of Worker the service needs (mockable in tests). */
 export interface WorkerLike {
   postMessage(message: unknown, transfer?: Transferable[]): void;
@@ -345,12 +348,16 @@ export function createWorkerAnalysisService(
       const live = { ...DEFAULT_LIVE_SESSION_OPTIONS, ...liveOpts };
       const subscribers = new Set<(frame: LandmarkFrame) => void>();
       let handle: WorkerHandle | null = null;
-      const fps = 15;
+      // 30 fps: v3 timing metrics need it (a reference rise lasts ~4 frames
+      // at 30 fps). Backpressure below skips ticks on phones that can't keep
+      // up, and every frame keeps its real capture time, so timing stays
+      // correct at whatever rate is actually achieved.
+      const fps = LIVE_CAPTURE_FPS;
       const liteModelPath =
         assets.liteModelPath ?? DEFAULT_ASSETS.liteModelPath!;
 
       // Backpressure: at most ONE frame in the worker at a time. Without it,
-      // capture kept posting 15 fps while a slow phone needed >66 ms per
+      // capture kept posting frames while a slow phone needed >66 ms per
       // frame, the worker queue grew without bound, and the skeleton (and the
       // positioning cues) lagged further and further behind the player.
       let inFlight = 0;

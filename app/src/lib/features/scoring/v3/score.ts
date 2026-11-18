@@ -21,6 +21,7 @@ import {
 import {
   FEEDBACK_COUNT,
   PHASE_NAME,
+  buildCueReadback,
   feedbackItems,
 } from "$lib/features/live-practice/loop/readback";
 
@@ -262,15 +263,6 @@ export function feedbackV3(
     ? card.worst.filter((r) => opts.focus!(r.id))
     : card.worst;
   const items = feedbackItems(pool, opts.max ?? FEEDBACK_COUNT);
-  const groups: { phase: string; cues: string[] }[] = [];
-  for (const r of items) {
-    const cue = r.cue ?? r.label;
-    const last = groups.at(-1);
-    if (last && last.phase === r.phase) last.cues.push(cue);
-    else groups.push({ phase: r.phase, cues: [cue] });
-  }
-  const spoken = groups
-    .map((g) => `${PHASE_NAME[g.phase] ?? g.phase}: ${g.cues.join(". ")}.`)
-    .join(" ");
+  const spoken = buildCueReadback(items);
   return { items, spoken };
 }

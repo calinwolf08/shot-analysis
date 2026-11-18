@@ -10,13 +10,9 @@
  *
  * Pure.
  */
-import {
-  computeShotMetricsV3,
-  type ShotMetricsV3,
-  type SignalFrame,
-} from "basketball-shot-analysis";
+import type { ShotMetricsV3 } from "basketball-shot-analysis";
 import type { ShotReviewPoses } from "$lib/shared/db/repos";
-import { estimateAspect } from "$lib/features/live-practice/review/framing";
+import { poseAspect, v3ForPoses } from "$lib/features/scoring/v3/shot";
 
 export const ALIGN_SEGMENTS = [
   "Before",
@@ -134,23 +130,8 @@ export function metricsForStoredShot(
   poses: ShotReviewPoses,
   shootingHand: "left" | "right",
 ): { metrics: ShotMetricsV3; aspect: number } {
-  const aspect =
-    poses.width && poses.height
-      ? poses.width / poses.height
-      : (estimateAspect(poses.frames) ?? 16 / 9);
-  const fps = poses.fps || 30;
-  const frames: SignalFrame[] = poses.frames.map((f) => ({
-    frameIndex: f.frameIndex,
-    // Stored t is ms on the capture clock; fall back to the frame index.
-    timestamp: f.t !== undefined ? f.t : (f.frameIndex / fps) * 1000,
-    landmarks: f.landmarks.map((l) => ({
-      x: l.x,
-      y: l.y,
-      visibility: l.visibility,
-    })),
-  }));
   return {
-    metrics: computeShotMetricsV3(frames, { aspect, shootingHand }),
-    aspect,
+    metrics: v3ForPoses(poses, shootingHand),
+    aspect: poseAspect(poses),
   };
 }

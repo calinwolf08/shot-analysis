@@ -29,21 +29,6 @@ export {
   type ScoringService,
   type ScoringServiceDeps,
 } from "./service";
-export {
-  scoreDeviation,
-  scoreShotDeviation,
-  scoreMetricDeviation,
-  type LiveTarget,
-  type LiveTargets,
-  type Section,
-  type MetricDeviation,
-  type PhaseGroup,
-  type SectionDeviation,
-  type ShotScorecard,
-  type DeviationOptions,
-} from "./deviation";
-export { loadLiveTargets, resetLiveTargetsCache } from "./live-targets";
-export { default as ScoreCard } from "./ScoreCard.svelte";
 export { default as FocusSheet } from "./FocusSheet.svelte";
 export {
   FOCUS_AREAS,
@@ -52,4 +37,5 @@ export {
   normalizeAreas,
   selectFocusWorst,
   type FocusArea,
+  type FocusMetric,
 } from "./focus";

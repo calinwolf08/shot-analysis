@@ -40,7 +40,7 @@ export {
   type ShotEntry,
   type ShotFeedback,
 } from "./loop/live-practice-store.svelte";
-export { buildWorstReadback, phraseFor } from "./loop/readback";
+export { buildCueReadback, feedbackItems } from "./loop/readback";
 export {
   evaluateAngleGate,
   requiredOrientation,

@@ -1,45 +1,44 @@
 import { describe, expect, it } from "vitest";
-import type { MetricDeviation, ShotScorecard } from "$lib/features/scoring";
+import type { MetricResultV3, ScorecardV3 } from "$lib/features/scoring/v3";
 import { summarizeInsights, windowStart, type ScoredShotAt } from "../insights";
 
-function worst(id: string, normDev: number, score = 3): MetricDeviation {
+function worst(id: string, score: number, phrase = "too high"): MetricResultV3 {
   return {
     id,
-    label: id.split(".").at(-1) ?? id,
-    section: "structure",
     phase: "setPoint",
+    kind: "structure",
+    label: id.split(".").at(-1) ?? id,
+    unit: "deg",
     value: 0,
-    ideal: 0,
-    passMin: 0,
-    passMax: 0,
-    unit: "",
+    note: null,
+    scored: true,
     score,
-    normDev,
-    inBand: false,
     direction: "high",
     magnitude: 1,
-    scored: true,
+    passMin: 0,
+    passMax: 0,
+    ideal: 0,
+    phrase,
+    cue: "cue",
+    frames: [],
   };
 }
 
 function card(
   overall: number | null,
-  worstList: MetricDeviation[],
-): ShotScorecard {
+  worstList: MetricResultV3[],
+): ScorecardV3 {
   return {
     overall,
-    sections: [],
+    phases: [],
+    details: [],
     worst: worstList,
-    all: worstList,
-    measuredCount: worstList.length,
-    scoredTargetCount: worstList.length,
     measuredFraction: 1,
     belowCoverageGate: false,
-    targetsVersion: 1,
   };
 }
 
-const shot = (createdAt: number, c: ShotScorecard): ScoredShotAt => ({
+const shot = (createdAt: number, c: ScorecardV3): ScoredShotAt => ({
   createdAt,
   scorecard: c,
 });
@@ -58,15 +57,15 @@ describe("windowStart", () => {
 
 describe("summarizeInsights", () => {
   it("ranks recurring issues by frequency × severity, worst first", () => {
-    // elbow: off in 3 shots (normDev 2 each) → rank 6
-    // wrist: off in 1 shot  (normDev 5)      → rank 5
+    // elbow: off in 3 shots (score 2 each) → rank 6
+    // wrist: off in 1 shot  (score 5)       → rank 5
     const shots = [
       shot(
         1,
         card(3, [worst("setPoint.elbow", 2), worst("setPoint.wrist", 5)]),
       ),
-      shot(2, card(3, [worst("setPoint.elbow", 2)])),
-      shot(3, card(3, [worst("setPoint.elbow", 2)])),
+      shot(2, card(3, [worst("setPoint.elbow", 2, "too low")])),
+      shot(3, card(3, [worst("setPoint.elbow", 2, "too low")])),
     ];
     const s = summarizeInsights(shots, { window: "7d" });
     expect(s.shotCount).toBe(3);
@@ -74,6 +73,10 @@ describe("summarizeInsights", () => {
     expect(s.issues[0]!.occurrences).toBe(3);
     expect(s.issues[0]!.frequency).toBe(1);
     expect(s.issues[0]!.rank).toBe(6);
+    expect(s.issues[0]!.avgScore).toBe(2);
+    // The way it's usually off (2 of 3 shots).
+    expect(s.issues[0]!.phrase).toBe("too low");
+    expect(s.issues[0]!.phase).toBe("setPoint");
     expect(s.issues[1]!.id).toBe("setPoint.wrist");
     expect(s.issues[1]!.rank).toBe(5);
   });

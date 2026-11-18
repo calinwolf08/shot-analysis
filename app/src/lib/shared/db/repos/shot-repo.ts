@@ -44,6 +44,11 @@ export interface ShotRepo {
     opts?: ListByPlayerOptions,
   ): Promise<ShotRecord[]>;
   setExcluded(id: string, excluded: boolean): Promise<void>;
+  /**
+   * Replaces a shot's stored analysis (read-time migration: v3 metrics
+   * recomputed from the pose track are persisted so it only happens once).
+   */
+  updateAnalysis(id: string, analysis: ShotAnalysis): Promise<void>;
   /** The persisted review pose track for a shot, or null when none was stored. */
   getPoses(id: string): Promise<ShotReviewPoses | null>;
 }
@@ -207,6 +212,13 @@ export function createShotRepo(ctx: RepoContext): ShotRepo {
     async setExcluded(id, excluded) {
       await db.run("UPDATE shots SET excluded = ? WHERE id = ?", [
         fromBool(excluded),
+        id,
+      ]);
+    },
+
+    async updateAnalysis(id, analysis) {
+      await db.run("UPDATE shots SET analysis_json = ? WHERE id = ?", [
+        JSON.stringify(analysis),
         id,
       ]);
     },

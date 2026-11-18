@@ -2,8 +2,8 @@
   /**
    * Continuous, session-less practice loop (live redesign — step 6). Renders a
    * LivePracticeStore: live preview + skeleton overlay, per-shot feedback (the
-   * overall deviation score, the worst metrics, and the full ScoreCard on
-   * demand), and a running history. No "End / summary" — you practice until you
+   * overall 0–10+ score, the 3 worst issues by phase, and the full v3
+   * scorecard on demand), and a running history. No "End / summary" — you practice until you
    * leave, and every shot is already persisted.
    */
   import { onMount, untrack } from "svelte";
@@ -26,10 +26,16 @@
     drawSkeleton,
     type SkeletonLandmark,
   } from "$lib/shared/ui/pose-skeleton";
-  import { FocusSheet, ScoreCard, focusSummary } from "$lib/features/scoring";
+  import { FocusSheet, focusSummary } from "$lib/features/scoring";
+  import {
+    ScoreCardV3,
+    describeResult,
+    displayScore,
+    scoreBand,
+  } from "$lib/features/scoring/v3";
   import type { SideOrientation } from "../setup/angle-gate";
   import { createPresenceTracker, type PresenceState } from "./presence";
-  import { phaseName, phraseFor } from "./readback";
+  import { phaseName } from "./readback";
   import {
     CUE_TEXT,
     READY_TEXT,
@@ -273,7 +279,9 @@
       videoEl.srcObject = stream;
       videoEl.onloadedmetadata = () => {
         if (session && videoEl && !frameCapture) {
-          frameCapture = createLiveFrameCapture(videoEl, session);
+          frameCapture = createLiveFrameCapture(videoEl, session, {
+            fps: session.fps,
+          });
         }
       };
       // Cap 0 ("keep video for 0 shots") = don't record at all.
@@ -288,7 +296,7 @@
     };
   });
 
-  const fmt = (n: number | null) => (n === null ? "–" : n.toFixed(1));
+  const fmt = displayScore;
 
   /**
    * One glanceable line mirroring what the player hears — for a spotter
@@ -466,7 +474,11 @@
     {#if store.feedback}
       {@const fb = store.feedback}
       <div class="feedback" data-testid="rep-feedback">
-        <p class="score sc-numeral" data-testid="rep-feedback-score">
+        <p
+          class="score sc-numeral"
+          data-band={scoreBand(fb.overall) ?? "none"}
+          data-testid="rep-feedback-score"
+        >
           {fmt(fb.overall)}
         </p>
         <div class="fb-body">
@@ -475,7 +487,7 @@
               {#each fb.worst as m (m.id)}
                 <span class="chip" data-testid="feedback-item"
                   ><b class="chip-phase">{phaseName(m.phase)}</b>
-                  {phraseFor(m)}</span
+                  {describeResult(m).replace(/^[^:]*: /, `${m.label} `)}</span
                 >
               {/each}
             </div>
@@ -546,7 +558,7 @@
       )}
       {#if entry}
         <div class="breakdown" data-testid="rep-breakdown">
-          <ScoreCard card={entry.scorecard} />
+          <ScoreCardV3 card={entry.scorecard} />
         </div>
       {/if}
     {/if}
@@ -828,6 +840,18 @@
     font-size: 40px;
     font-weight: 800;
     line-height: 1;
+  }
+  .score[data-band="good"] {
+    color: #34d399;
+  }
+  .score[data-band="fair"] {
+    color: #fde047;
+  }
+  .score[data-band="off"] {
+    color: #fb923c;
+  }
+  .score[data-band="far"] {
+    color: #f87171;
   }
   .fb-body {
     flex: 1;

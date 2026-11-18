@@ -3,13 +3,17 @@
   import { page } from "$app/state";
   import { useAppServices } from "$lib/shared/config/services-context";
   import type { ShotRecord } from "$lib/shared/db/repos";
-  import { scorecardForShot } from "$lib/features/live-practice";
   import {
     groupByDay,
     shotIssue,
     timeLabel,
   } from "$lib/features/live-practice/review/shot-list";
-  import { loadLiveTargets } from "$lib/features/scoring";
+  import {
+    displayScore,
+    loadLiveTargetsV3,
+    scoreBand,
+  } from "$lib/features/scoring/v3";
+  import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
   import { EmptyState } from "$lib/shared/ui";
 
   const services = useAppServices();
@@ -30,14 +34,22 @@
       loading = false;
       return;
     }
-    const targets = await loadLiveTargets();
-    shots = await services.repos.shot.listByPlayer(player.id, { limit: 50 });
+    const targets = await loadLiveTargetsV3();
+    const rows = await services.repos.shot.listByPlayer(player.id, {
+      limit: 50,
+    });
+    const scored = await scoreStoredShots(
+      services.repos.shot,
+      rows,
+      player.shootingHand,
+      targets,
+    );
+    shots = scored.map((x) => x.record);
     const m: Record<string, number | null> = {};
     const iss: Record<string, string | null> = {};
-    for (const s of shots) {
-      const card = scorecardForShot(s.analysis, targets);
-      m[s.id] = card.overall;
-      iss[s.id] = shotIssue(card);
+    for (const { record, card } of scored) {
+      m[record.id] = card?.overall ?? null;
+      iss[record.id] = shotIssue(card);
     }
     overall = m;
     issue = iss;
@@ -48,13 +60,17 @@
     void goto(`/shots/${id}${page.url.search}`);
   }
 
+  const BAND_COLOR = {
+    good: "#34d399",
+    fair: "#fde047",
+    off: "#fb923c",
+    far: "#f87171",
+  } as const;
   function color(n: number | null): string {
-    if (n === null) return "#6b7280";
-    if (n <= 1.5) return "#34d399";
-    if (n <= 4) return "#fbbf24";
-    return "#f87171";
+    const b = scoreBand(n);
+    return b ? BAND_COLOR[b] : "#6b7280";
   }
-  const fmt = (n: number | null) => (n === null ? "–" : n.toFixed(1));
+  const fmt = displayScore;
 </script>
 
 <main class="shots" data-testid="shots-list">

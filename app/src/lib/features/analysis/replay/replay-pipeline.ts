@@ -24,6 +24,7 @@ import {
   type PoseLandmarks as MetricsPoseLandmarks,
   type ShotAnalysis,
   type ShotMetricsV2,
+  type ShotMetricsV3,
 } from "basketball-shot-analysis";
 import type { AnalyzeOptions, LandmarkFrame, ProgressCallback } from "../types";
 
@@ -292,6 +293,12 @@ export type StoredShotAnalysis = ShotAnalysis & {
    * the reference thresholds. Persisted (not the score) so re-thresholding
    * doesn't require re-analysis. */
   v2Metrics?: ShotMetricsV2;
+  /**
+   * v3 metric catalog (Load / Rise / Set point / Release), computed from the
+   * shot's stored review pose track — what live scoring uses. Absent on shots
+   * analyzed before it existed (recomputed from the pose track on read).
+   */
+  v3Metrics?: ShotMetricsV3;
 };
 
 /**

@@ -4,16 +4,27 @@ import { describe, expect, it } from "vitest";
 import type { PoseData } from "basketball-shot-analysis";
 import { profileForLevel } from "$lib/features/assessment";
 import type { AnalyzeOptions } from "$lib/features/analysis";
-import type { LiveTargets } from "$lib/features/scoring";
-import { allowedOrientations, analyzeAndScore } from "../core";
+import type { LiveTargetsV3 } from "basketball-shot-analysis";
+import {
+  POSE_PAD_AFTER,
+  POSE_PAD_BEFORE,
+  ensureV3,
+  scoreShotV3,
+  v3ForPoses,
+} from "$lib/features/scoring/v3";
+import {
+  allowedOrientations,
+  analyzeAndScore,
+  scorecardForShot,
+} from "../core";
 
 // Real assets (tests run with cwd = app/).
 const targets = JSON.parse(
   readFileSync(
-    join(process.cwd(), "static", "reference", "live-targets.json"),
+    join(process.cwd(), "static", "reference", "live-targets-v3.json"),
     "utf8",
   ),
-) as LiveTargets;
+) as LiveTargetsV3;
 const pose = JSON.parse(
   readFileSync(
     join(
@@ -40,43 +51,70 @@ describe("analyzeAndScore (isomorphic core)", () => {
     // The fixture is side-on, shooting (right) arm nearest the camera.
     expect(shots[0]!.analysis.orientation).toBe("side-right");
 
-    const { scorecard, worst } = shots[0]!;
-    // Two top-level sections, Structure then Sequencing.
-    expect(scorecard.sections.map((s) => s.section)).toEqual([
-      "structure",
-      "sequencing",
+    const { scorecard, worst, analysis, reviewPoses } = shots[0]!;
+    // v3: the four phases, in shot order, on the 0–10+ scale.
+    expect(scorecard.phases.map((p) => p.phase)).toEqual([
+      "load",
+      "rise",
+      "setPoint",
+      "release",
     ]);
-    expect(scorecard.targetsVersion).toBe(targets.version);
-
-    // Every scored metric sits on the 1..10 (lower-better) scale.
-    for (const section of scorecard.sections) {
-      for (const group of section.phases) {
-        for (const m of group.metrics) {
-          if (!m.scored) continue;
-          expect(m.score).toBeGreaterThanOrEqual(1);
-          expect(m.score).toBeLessThanOrEqual(10);
-        }
+    for (const p of scorecard.phases) {
+      for (const m of p.metrics) {
+        if (m.score !== null) expect(m.score).toBeGreaterThanOrEqual(0);
       }
     }
-
-    // Worst list: at most 5, each a scored + off-band metric.
-    expect(worst.length).toBeLessThanOrEqual(5);
-    for (const w of worst) {
-      expect(w.scored).toBe(true);
-      expect(w.inBand).toBe(false);
+    // Worst: off-target scored metrics, worst first.
+    for (const w of worst) expect(w.score!).toBeGreaterThan(0);
+    for (let i = 1; i < worst.length; i++) {
+      expect(worst[i - 1]!.score!).toBeGreaterThanOrEqual(worst[i]!.score!);
     }
+    // The shot's phases were found, and v3 travels with the analysis.
+    expect(analysis.v3Metrics).toBeDefined();
+    expect(analysis.v3Metrics!.phases.rise).not.toBeNull();
+    expect(scorecard.overall).not.toBeNull();
 
-    // Review poses span the shot's frame range and align with its indexes.
-    const { analysis, reviewPoses } = shots[0]!;
-    const span = analysis.frameRange.end - analysis.frameRange.start + 1;
-    expect(reviewPoses.frames).toHaveLength(span);
-    expect(reviewPoses.frames[0]!.frameIndex).toBe(analysis.frameRange.start);
-    expect(reviewPoses.frames.at(-1)!.frameIndex).toBe(analysis.frameRange.end);
+    // Review poses: the shot's frame range plus context on each side (as far
+    // as the window allows), aligned with the analysis indexes.
+    const first = reviewPoses.frames[0]!.frameIndex;
+    const last = reviewPoses.frames.at(-1)!.frameIndex;
+    expect(first).toBe(
+      Math.max(0, analysis.frameRange.start - POSE_PAD_BEFORE),
+    );
+    expect(last).toBeLessThanOrEqual(analysis.frameRange.end + POSE_PAD_AFTER);
+    expect(last).toBeGreaterThan(analysis.frameRange.end);
     expect(reviewPoses.fps).toBe(pose.fps);
+    // Real capture times (ms) travel with each frame.
+    expect(typeof reviewPoses.frames[0]!.t).toBe("number");
     // The source size travels with the poses so the review can draw them
     // undistorted (the fixture is portrait 1080×1920).
     expect(reviewPoses.width).toBe(1080);
     expect(reviewPoses.height).toBe(1920);
+  });
+
+  it("a recompute from the stored pose track equals what live stored", () => {
+    const { shots } = analyzeAndScore(pose, opts, targets);
+    const { analysis, reviewPoses } = shots[0]!;
+    // Round-trip the track through JSON, as storage does.
+    const stored = JSON.parse(JSON.stringify(reviewPoses));
+    const again = v3ForPoses(stored, "right");
+    for (const [id, m] of Object.entries(analysis.v3Metrics!.metrics)) {
+      const r = again.metrics[id]!;
+      expect(r.reliable, id).toBe(m.reliable);
+      if (m.reliable) expect(r.value, id).toBeCloseTo(m.value, 6);
+    }
+    // And a v1 shot (no v3) is migrated to the same scorecard.
+    const { v3Metrics: _drop, ...v1 } = analysis;
+    const migrated = ensureV3(v1, stored, "right")!;
+    expect(migrated.recomputed).toBe(true);
+    expect(scorecardForShot(migrated.analysis, targets)!.overall).toBeCloseTo(
+      scoreShotV3(analysis.v3Metrics!.metrics, targets).overall!,
+      6,
+    );
+    // Already v3 → untouched; no pose track → can't migrate.
+    expect(ensureV3(analysis, null, "right")!.recomputed).toBe(false);
+    expect(ensureV3(v1, null, "right")).toBeNull();
+    expect(scorecardForShot(v1, targets)).toBeNull();
   });
 
   it("omits the size when the pose data doesn't know it (1×1 placeholder)", () => {
@@ -133,10 +171,9 @@ describe("orientation gate", () => {
     expect(rejected.every((r) => r.orientation !== "side-right")).toBe(true);
   });
 
-  it("measures posture as side-on for an accepted shot", () => {
+  it("reads the near side as the shooting side for an accepted shot", () => {
     const { shots } = analyzeAndScore(pose, opts, targets);
-    const v2 = shots[0]!.analysis.v2Metrics!;
-    expect(v2.reliability.sideView).toBe(true);
+    expect(shots[0]!.analysis.v3Metrics!.nearSide).toBe("right");
   });
 });
 

@@ -532,6 +532,13 @@ export function createServerRepos(
         id,
       ]);
     },
+    async updateAnalysis(id, analysis) {
+      await assert(shotOwned(id), "shot");
+      await db.run("UPDATE shots SET analysis_json = ? WHERE id = ?", [
+        JSON.stringify(analysis),
+        id,
+      ]);
+    },
   };
 
   // --- score ---------------------------------------------------------------

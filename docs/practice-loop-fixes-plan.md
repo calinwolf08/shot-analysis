@@ -880,6 +880,77 @@ ALL 141: within ±1 — v3 55% · old 73%; within ±2 — v3 75% · old 81%
     at each boundary both stages sit on their own boundary with matching
     labels → Mine column → play.
 
+## B-2.14 Implementation notes (Phase 14)
+- **Live scoring is v3.**
+  - `analyzeAndScore` (one core for on-device, the server endpoint and the
+    debug replay) still uses the shot detector to find each shot.
+  - It then stores a **padded** pose track: 15 frames before and 10 after
+    the detected range, so v3 can find the load start and arm extension.
+  - It computes v3 from exactly that track (`scoring/v3/shot.ts` →
+    `v3ForPoses`), stores it as `analysis.v3Metrics` (metrics schema 2),
+    and scores it against `live-targets-v3.json`. The server reads the
+    targets with `readLiveTargetsV3`.
+- **Feedback:** the 3 worst issues, spoken as cues grouped by phase ("Load:
+  Bend your knees more. Set point: …"). The card shows each as a
+  measurement with its phase ("Load Knee bend too shallow by 12°"). The
+  overall score uses the 0–10+ scale, colored by band. "Full breakdown" is
+  the v3 scorecard.
+- **Focus areas are phase-based:** Load, Rise, Set point, Release, plus
+  Rhythm & timing (every timing metric).
+  - Saved pre-v3 ids are mapped: base-balance / load-depth → Load;
+    elbow / head → Set point; follow-through → Release.
+  - With a focus, the readback picks the worst issues within it, even when
+    they aren't in the global top 3.
+- **Read-time migration** (`review/scored-shots.ts`): Practice (today's
+  shots), the Shots list, review and Insights all score through
+  `scoreStoredShot(s)`.
+  - A shot without `v3Metrics` is recomputed from its stored pose track and
+    saved through the new `ShotRepo.updateAnalysis` (local DB, server repo,
+    and `PATCH /api/shots/:id {analysis}`), so it only happens once.
+  - A recompute equals what live stores. A unit test checks this, and the
+    e2e checks the shot reads back as schema 2.
+  - Shots without a pose track show "Re-analysis unavailable" and are left
+    out of today's count and of Insights.
+  - Old shots stored only the detected range, so their load start may fall
+    outside the track. Those metrics then read as not measured.
+- **Review:**
+  - The scrubber spans the whole stored track.
+  - Phase markers and the current phase come from v3 (`phase-timeline.ts`;
+    set point = its frame ±1).
+  - The current phase's 2 worst issues are drawn on the pose with the
+    Phase 13 geometry (red when the score is ≥ 3). This replaced the old
+    joint rings and reference dots.
+  - Clicking a metric seeks to the frame it was measured at.
+- **Shots list:** "4:12 PM · Load: Knee bend — too shallow". Score colors
+  use the v3 bands.
+- **Insights:**
+  - Recurring issues are ranked by occurrences × mean 0–10+ score.
+  - Each is named with its phase and the way it's usually off.
+  - The trend runs on 0–10.
+- **30 fps live capture** (`LIVE_CAPTURE_FPS`):
+  - Backpressure still skips ticks on slow phones.
+  - Timing uses each frame's real timestamp.
+  - The positioning orientation window went from 30 to 60 frames (still
+    ~2 s).
+- **Removed** the v2 live path: `scoring/deviation.ts`, the
+  `live-targets.json` loader, `ScoreCard.svelte`, `review/joint-map.ts` and
+  their tests.
+  - Kept: the assessment path (`scoring/v2` thresholds);
+    `live-targets.json` as the "v2" comparison in the dev Curry viewer; and
+    `v2Metrics`, still computed on each analysis by the shared replay
+    pipeline.
+- **E2E:** `v3-migration.spec.ts`:
+  - Downgrade a replayed shot to schema 1 through the API, reload Shots →
+    the row names a phase issue → the server copy is schema 2.
+  - Review: v3 scorecard; a metric click seeks to its phase.
+  - Insights: issues with v3 ids, named by phase. Screenshots taken.
+  - `focus.spec.ts`: Rise focus → only Rise items and a "Rise: …" readback.
+- **To verify:** posture metrics often score 10+ for side-on shooters (head
+  position, torso lean, hips over knees), because Curry's targets lean back
+  with the head forward (see B-2.11). Check against his video in the viewer
+  before trusting those rows; correct the bands in `live-targets-v3.json`
+  (`override`) if needed.
+
 ## B-3. Phased implementation (Part B)
 
 **Phase 9 — Debug index + Curry viewer shell**

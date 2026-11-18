@@ -87,6 +87,11 @@ export const saveAnalysisBody = z
     message: "playerId or sessionId is required",
   });
 export const setExcludedBody = z.object({ excluded: z.boolean() });
+/** PATCH /api/shots/:id — exclude/include, or replace the analysis (migration). */
+export const patchShotBody = z.union([
+  setExcludedBody,
+  z.object({ analysis: shotAnalysisSchema }),
+]);
 
 // --- scores ----------------------------------------------------------------
 export const insertScoreBody = z.object({

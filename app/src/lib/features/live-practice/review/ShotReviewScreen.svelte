@@ -1,10 +1,11 @@
 <script lang="ts">
   /**
    * Shot review: scrub a past shot and watch the pose play back, zoomed to fill
-   * the frame so form detail is legible. The deviation scorecard highlights the
-   * phase the scrubber is in; the current phase's off-target joints are lit up
-   * on the pose with a "where it should be" target dot (aligned from the
-   * reference pose). Clicking a metric seeks to its phase.
+   * the frame so form detail is legible. The v3 scorecard (Load → Rise → Set
+   * point → Release, 0–10+) highlights the phase the scrubber is in; the
+   * current phase's worst issues are drawn on the pose as what they measure
+   * (angle arc, offset, height bar…). Clicking a metric seeks to the frame it
+   * was measured at.
    *
    * Pose comes from the server-stored skeleton track (works for every shot,
    * every device). A retained on-device clip renders behind this same overlay
@@ -17,27 +18,28 @@
   import { getShotClipStore } from "$lib/shared/media/shot-clip-store";
   import type { ShotRecord, ShotReviewPoses } from "$lib/shared/db/repos";
   import type { StoredShotAnalysis } from "$lib/features/analysis";
-  import { scorecardForShot } from "$lib/features/live-practice";
   import {
-    ScoreCard,
-    loadLiveTargets,
     metricMatchesAreas,
     normalizeAreas,
-    type MetricDeviation,
-    type ShotScorecard,
-  } from "$lib/features/scoring";
+  } from "$lib/features/scoring/focus";
+  import {
+    ScoreCardV3,
+    describeResult,
+    loadLiveTargetsV3,
+    type MetricResultV3,
+    type ScorecardV3,
+  } from "$lib/features/scoring/v3";
+  import {
+    drawGeometry,
+    geometryFor,
+  } from "$lib/features/reference/metric-geometry";
+  import { scoreStoredShot } from "./scored-shots";
+  import { phaseAtFrame, phaseMarks } from "./phase-timeline";
+  import { REANALYSIS_UNAVAILABLE } from "./shot-list";
+  import { phaseName } from "../loop/readback";
   import { Button } from "$lib/shared/ui";
-  import {
-    drawSkeleton,
-    type SkeletonLandmark,
-  } from "$lib/shared/ui/pose-skeleton";
-  import {
-    PHASE_KEYFRAME,
-    alignReferenceToPlayer,
-    landmarksForMetric,
-    type Hand,
-    type Pt,
-  } from "./joint-map";
+  import { drawSkeleton } from "$lib/shared/ui/pose-skeleton";
+  type Hand = "left" | "right";
   import {
     MIN_VIS,
     computeShotFraming,
@@ -45,21 +47,17 @@
     sourceRect,
     type Framing,
   } from "./framing";
-  import { phraseFor } from "../loop/readback";
 
   let { shotId }: { shotId: string } = $props();
 
   const services = useAppServices();
   const clipStore = getShotClipStore();
 
-  interface ReferencePoses {
-    byKeyframe: Record<string, { landmarks: Pt[] }>;
-  }
-
   let shot = $state<ShotRecord | null>(null);
   let poses = $state<ShotReviewPoses | null>(null);
-  let card = $state<ShotScorecard | null>(null);
-  let referencePoses = $state<ReferencePoses | null>(null);
+  let card = $state<ScorecardV3 | null>(null);
+  /** Pre-v3 shot without a pose track: can't be scored on the new metrics. */
+  let unavailable = $state(false);
   let current = $state(0);
   let notFound = $state(false);
   let canvas = $state<HTMLCanvasElement | null>(null);
@@ -109,34 +107,28 @@
   const analysis = $derived(
     shot ? (shot.analysis as StoredShotAnalysis) : null,
   );
-  const start = $derived(analysis?.frameRange.start ?? 0);
-  const end = $derived(analysis?.frameRange.end ?? 0);
+  const v3 = $derived(analysis?.v3Metrics ?? null);
+  /** The scrub range: the whole stored track (it's padded around the shot). */
+  const start = $derived(
+    poses && poses.frames.length > 0
+      ? poses.frames[0]!.frameIndex
+      : (analysis?.frameRange.start ?? 0),
+  );
+  const end = $derived(
+    poses && poses.frames.length > 0
+      ? poses.frames.at(-1)!.frameIndex
+      : (analysis?.frameRange.end ?? 0),
+  );
 
-  /** Phase starts (ordered) for keyframe markers + current-phase highlight. */
-  const PHASE_ORDER = [
-    "gather",
-    "load",
-    "rise",
-    "setPoint",
-    "release",
-    "followThrough",
-  ];
+  /** Phase markers (where each v3 phase begins) + the current phase. */
   const phaseStarts = $derived(
-    analysis
-      ? PHASE_ORDER.map((phase) => ({
-          phase,
-          startFrame: (
-            analysis.phases as Record<string, { startFrame?: number }>
-          )[phase]?.startFrame,
-        })).filter(
-          (p): p is { phase: string; startFrame: number } =>
-            typeof p.startFrame === "number",
-        )
+    v3
+      ? phaseMarks(v3)
+          .filter((m) => m.frame >= start && m.frame <= end)
+          .map((m) => ({ phase: m.phase, startFrame: m.frame }))
       : [],
   );
-  const currentPhase = $derived(
-    phaseStarts.filter((p) => p.startFrame <= current).at(-1)?.phase ?? null,
-  );
+  const currentPhase = $derived(v3 ? phaseAtFrame(v3, current) : null);
 
   const frame = $derived(
     poses?.frames.find((f) => f.frameIndex === current) ?? null,
@@ -147,24 +139,14 @@
    * is set, the overlay emphasizes only those areas (the full scorecard below
    * still shows everything).
    */
-  const phaseIssues = $derived<MetricDeviation[]>(
+  const phaseIssues = $derived<MetricResultV3[]>(
     card && currentPhase
-      ? card.all
-          .filter(
-            (m) =>
-              m.phase === currentPhase &&
-              m.scored &&
-              !m.inBand &&
-              (focusAreas.length === 0 || metricMatchesAreas(m.id, focusAreas)),
-          )
-          .slice()
-          .sort((a, b) => b.score - a.score)
+      ? card.worst.filter(
+          (m) =>
+            m.phase === currentPhase &&
+            (focusAreas.length === 0 || metricMatchesAreas(m, focusAreas)),
+        )
       : [],
-  );
-
-  /** Landmark indices to light up as off-target in the current phase. */
-  const offJoints = $derived<Set<number>>(
-    new Set(phaseIssues.flatMap((m) => landmarksForMetric(m.id, hand))),
   );
 
   $effect(() => {
@@ -175,22 +157,36 @@
     const [s, p, targets, player] = await Promise.all([
       services.repos.shot.get(id),
       services.repos.shot.getPoses(id),
-      loadLiveTargets(),
+      loadLiveTargetsV3(),
       services.repos.player.getFirst(),
     ]);
     if (!s) {
       notFound = true;
       return;
     }
-    shot = s;
-    poses = p;
-    card = scorecardForShot(s.analysis, targets);
-    current = s.analysis.frameRange.start;
     if (player) hand = player.shootingHand;
+    // Pre-v3 shots are re-analyzed from this pose track (and saved) here.
+    const scored = await scoreStoredShot(
+      services.repos.shot,
+      s,
+      hand,
+      targets,
+      p,
+    );
+    shot = scored.record;
+    poses = p;
+    card = scored.card;
+    unavailable = scored.card === null;
+    const v = (scored.record.analysis as StoredShotAnalysis).v3Metrics;
+    const load = v?.phases.load?.start;
+    current =
+      load !== undefined &&
+      p?.frames.some((f) => f.frameIndex === Math.round(load))
+        ? Math.round(load)
+        : (p?.frames[0]?.frameIndex ?? s.analysis.frameRange.start);
     focusAreas = normalizeAreas(
       await services.repos.settings.get("liveFocusAreas"),
     );
-    void loadReferencePoses();
     void loadClip(id);
   }
 
@@ -211,23 +207,18 @@
 
   onDestroy(revokeClip);
 
-  async function loadReferencePoses() {
-    if (referencePoses) return;
-    try {
-      // Served from static/ at the app root.
-      const res = await fetch("/reference/reference-poses.json");
-      if (res.ok) referencePoses = (await res.json()) as ReferencePoses;
-    } catch {
-      referencePoses = null; // target dots are optional; highlights still show
-    }
-  }
-
   function markerLeft(startFrame: number): number {
     const span = Math.max(end - start, 1);
     return ((startFrame - start) / span) * 100;
   }
-  function seekToPhase(phase: string) {
-    const kf = phaseStarts.find((p) => p.phase === phase);
+  /** Seek to where a metric was measured (else to its phase's start). */
+  function seekToMetric(m: MetricResultV3) {
+    const f = m.frames[0];
+    if (f !== undefined && f >= start && f <= end) {
+      current = f;
+      return;
+    }
+    const kf = phaseStarts.find((p) => p.phase === m.phase);
     if (kf) current = kf.startFrame;
   }
 
@@ -356,48 +347,30 @@
       project,
     });
 
-    // Reference target transform for the current phase (best-effort).
-    const joints = offJoints;
-    if (joints.size === 0) return;
-    const keyframe = currentPhase ? PHASE_KEYFRAME[currentPhase] : undefined;
-    const ref =
-      keyframe && referencePoses
-        ? referencePoses.byKeyframe[keyframe]?.landmarks
-        : undefined;
-    const toPlayer = ref ? alignReferenceToPlayer(ref, lm) : null;
-
-    for (const j of joints) {
-      const pl = lm[j] as SkeletonLandmark | undefined;
-      if (!pl || pl.visibility < MIN_VIS) continue;
-      const pp = project(pl);
-
-      // Target dot + connector (where the joint should be).
-      if (toPlayer && ref && ref[j]) {
-        const tp = project(toPlayer(ref[j]));
-        ctx.strokeStyle = "rgb(255 255 255 / 55%)";
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 3]);
-        ctx.beginPath();
-        ctx.moveTo(pp.x, pp.y);
-        ctx.lineTo(tp.x, tp.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = "rgb(96 165 250 / 95%)"; // target: blue dot
-        ctx.beginPath();
-        ctx.arc(tp.x, tp.y, 6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "rgb(255 255 255 / 90%)";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+    // The current phase's worst issues, drawn as what they measure.
+    const issues = phaseIssues.slice(0, 2);
+    const drawn: string[] = [];
+    const v = v3;
+    if (v) {
+      for (const m of issues) {
+        drawn.push(
+          ...drawGeometry(ctx, geometryFor(m.id), lm, {
+            shootingHand: hand,
+            nearSide: v.nearSide,
+            project,
+            pathFrames: poses!.frames
+              .filter(
+                (p) =>
+                  p.frameIndex >= Math.min(...m.frames, current) &&
+                  p.frameIndex <= Math.max(...m.frames, current),
+              )
+              .map((p) => p.landmarks),
+            color: m.score !== null && m.score >= 3 ? "#f87171" : "#fbbf24",
+          }),
+        );
       }
-
-      // Off-target joint: red ring over the player's actual joint.
-      ctx.strokeStyle = "rgb(248 113 113 / 95%)";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(pp.x, pp.y, 8, 0, Math.PI * 2);
-      ctx.stroke();
     }
+    c.dataset.geometry = drawn.join(",");
   });
 </script>
 
@@ -416,7 +389,7 @@
 
   {#if notFound}
     <p class="dim" data-testid="shot-review-missing">Shot not found.</p>
-  {:else if shot && card}
+  {:else if shot && (card || unavailable)}
     <div
       class="stage"
       bind:clientWidth={stageW}
@@ -476,10 +449,14 @@
     <!-- Below the stage (not over it) so the chips never hide the feet. -->
     {#if poses && poses.frames.length > 0 && phaseIssues.length > 0}
       <div class="phase-overlay" data-testid="review-phase-metrics">
-        <span class="po-head">{currentPhase} · off target</span>
+        <span class="po-head"
+          >{currentPhase ? phaseName(currentPhase) : ""} · off target</span
+        >
         <div class="po-chips">
-          {#each phaseIssues.slice(0, 4) as m (m.id)}
-            <span class="po-chip" class:bad={m.score > 4}>{phraseFor(m)}</span>
+          {#each phaseIssues.slice(0, 3) as m (m.id)}
+            <span class="po-chip" class:bad={(m.score ?? 0) >= 3}
+              >{describeResult(m)}</span
+            >
           {/each}
         </div>
       </div>
@@ -492,7 +469,7 @@
             <span
               class="marker"
               style="left:{markerLeft(kf.startFrame)}%"
-              title={kf.phase}
+              title={phaseName(kf.phase)}
             ></span>
           {/each}
         </div>
@@ -524,17 +501,24 @@
         <div class="scrub-meta">
           <span>frame {current - start + 1} / {end - start + 1}</span>
           {#if currentPhase}<span class="phase-tag" data-testid="review-phase"
-              >{currentPhase}</span
+              >{phaseName(currentPhase)}</span
             >{/if}
         </div>
       </div>
     {/if}
 
-    <ScoreCard
-      {card}
-      highlightPhase={currentPhase}
-      onmetric={(m) => seekToPhase(m.phase)}
-    />
+    {#if card}
+      <ScoreCardV3
+        {card}
+        highlightPhase={currentPhase}
+        onmetric={seekToMetric}
+      />
+    {:else}
+      <p class="dim" data-testid="review-reanalysis-unavailable">
+        {REANALYSIS_UNAVAILABLE}: this shot was saved without the pose data the
+        new metrics need.
+      </p>
+    {/if}
   {:else}
     <p class="dim">Loading…</p>
   {/if}

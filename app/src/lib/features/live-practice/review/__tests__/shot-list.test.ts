@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { MetricDeviation, ShotScorecard } from "$lib/features/scoring";
-import { dayLabel, groupByDay, shotIssue, timeLabel } from "../shot-list";
+import type { MetricResultV3, ScorecardV3 } from "$lib/features/scoring/v3";
+import {
+  REANALYSIS_UNAVAILABLE,
+  dayLabel,
+  groupByDay,
+  shotIssue,
+  timeLabel,
+} from "../shot-list";
 
 const at = (y: number, mo: number, d: number, h = 12, mi = 0) =>
   new Date(y, mo - 1, d, h, mi).getTime();
@@ -49,22 +55,40 @@ describe("groupByDay", () => {
 describe("shotIssue", () => {
   const card = (
     overall: number | null,
-    worst: Partial<MetricDeviation>[],
-  ): ShotScorecard =>
+    worst: Partial<MetricResultV3>[],
+  ): ScorecardV3 =>
     ({
       overall,
-      worst: worst as MetricDeviation[],
-    }) as unknown as ShotScorecard;
+      worst: worst as MetricResultV3[],
+    }) as unknown as ScorecardV3;
 
-  it("names the worst metric with its direction", () => {
+  it("names the worst metric with its phase and how it's off", () => {
     expect(
-      shotIssue(card(3.2, [{ label: "Set point", direction: "low" }])),
-    ).toBe("Set point low");
+      shotIssue(
+        card(3.2, [
+          {
+            label: "Set point height",
+            phrase: "set point too low",
+            phase: "setPoint",
+          },
+        ]),
+      ),
+    ).toBe("Set point: Set point height — set point too low");
+    expect(
+      shotIssue(
+        card(3.2, [
+          { label: "Knee bend", phrase: "too shallow", phase: "load" },
+        ]),
+      ),
+    ).toBe("Load: Knee bend — too shallow");
   });
   it("says on target when nothing is off", () => {
     expect(shotIssue(card(1, []))).toBe("On target");
   });
-  it("is null when the shot couldn't be scored", () => {
+  it("is null when too little was measured to score it", () => {
     expect(shotIssue(card(null, []))).toBeNull();
+  });
+  it("flags a pre-v3 shot that can't be re-analyzed", () => {
+    expect(shotIssue(null)).toBe(REANALYSIS_UNAVAILABLE);
   });
 });

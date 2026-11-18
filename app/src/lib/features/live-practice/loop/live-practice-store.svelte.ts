@@ -10,7 +10,8 @@
  *
  *   captured  — "captured" earcon + "Shot captured"
  *   analyzing — "Analyzing" (the pipeline scores in parallel)
- *   readback  — the worst metrics (or "On target"), shown on the card
+ *   readback  — the 3 worst as cues, in phase order (or "On target"); the
+ *               card shows the same items as measurements
  *   tracking  — "ready" earcon, then shot detection resumes
  *
  * Each step waits for the previous sound to FINISH, and the coordinator stays
@@ -26,18 +27,15 @@
 import type { AnalyzeOptions } from "$lib/features/analysis";
 import { landmarkFramesToPoseData } from "$lib/features/analysis/replay/replay-pipeline";
 import type { AudioFeedbackService } from "$lib/shared/audio";
-import {
-  selectFocusWorst,
-  type MetricDeviation,
-  type ShotScorecard,
-} from "$lib/features/scoring";
+import { selectFocusWorst } from "$lib/features/scoring/focus";
+import type { MetricResultV3, ScorecardV3 } from "$lib/features/scoring/v3";
 import type {
   CoordinatorEvents,
   LiveRepCoordinator,
 } from "../coordinator/coordinator";
 import type { LiveShotPipeline } from "../pipeline";
 import type { ShotStore } from "../pipeline";
-import { FEEDBACK_COUNT, buildWorstReadback, feedbackItems } from "./readback";
+import { FEEDBACK_COUNT, buildCueReadback, feedbackItems } from "./readback";
 
 /** Spoken when a detected shot is rejected for the camera angle. */
 export const WRONG_ANGLE_TEXT = "Wrong angle, shot not counted";
@@ -63,10 +61,11 @@ export interface ShotEntry {
   /** 1-based position in the continuous history. */
   index: number;
   shotId: string;
-  /** Overall deviation score (1..10, lower better), or null when uncovered. */
+  /** Overall score (0 = on target … 10+), or null when not enough measured. */
   overall: number | null;
-  worst: readonly MetricDeviation[];
-  scorecard: ShotScorecard;
+  /** Off-target metrics (within the focus, if any), worst first. */
+  worst: readonly MetricResultV3[];
+  scorecard: ScorecardV3;
   excluded: boolean;
   /**
    * When the rep started (pose-frame clock, ms) and the offset from that clock
@@ -79,7 +78,8 @@ export interface ShotEntry {
 export interface ShotFeedback {
   index: number;
   overall: number | null;
-  worst: readonly MetricDeviation[];
+  /** The items fed back: the worst N, in phase order. */
+  worst: readonly MetricResultV3[];
   /** The text spoken for this shot (empty when nothing was off-target). */
   spoken: string;
 }
@@ -150,7 +150,7 @@ export class LivePracticeStore {
     this.focusAreas = ids;
   }
 
-  /** Mean overall score across included shots (lower is better), or null. */
+  /** Mean overall score across included shots (0 = on target), or null. */
   get average(): number | null {
     const scores = this.shots
       .filter((s) => !s.excluded && s.overall !== null)
@@ -260,13 +260,8 @@ export class LivePracticeStore {
     // Focus steers coaching only: when areas are selected, surface the worst
     // WITHIN them (even if not globally worst); the overall score is untouched.
     const focused =
-      this.focusAreas.length > 0
-        ? (selectFocusWorst(
-            first.scorecard.all,
-            this.focusAreas,
-            this.maxWorstSpoken,
-          ) ?? [])
-        : first.worst;
+      selectFocusWorst(first.scorecard.worst, this.focusAreas, Infinity) ??
+      first.scorecard.worst;
 
     const last = event.window.frames.at(-1);
     const entry: ShotEntry = {
@@ -284,14 +279,8 @@ export class LivePracticeStore {
     };
     this.shots = [...this.shots, entry];
 
-    const durationFrames =
-      first.shot.endFrame !== null && first.shot.startFrame !== null
-        ? first.shot.endFrame - first.shot.startFrame + 1
-        : undefined;
-    let spoken = buildWorstReadback(focused, {
-      max: this.maxWorstSpoken,
-      ...(durationFrames !== undefined ? { durationFrames } : {}),
-    });
+    const items = feedbackItems(focused, this.maxWorstSpoken);
+    let spoken = buildCueReadback(items);
     // Audio-first: never fall silent after "Analyzing".
     if (!spoken) {
       spoken = this.focusAreas.length > 0 ? "Focus on target" : ON_TARGET_TEXT;
@@ -300,7 +289,7 @@ export class LivePracticeStore {
       index: entry.index,
       overall: entry.overall,
       // The same items that were spoken: worst N, in phase order.
-      worst: feedbackItems(entry.worst, this.maxWorstSpoken),
+      worst: items,
       spoken,
     };
     this.cycle = "readback";

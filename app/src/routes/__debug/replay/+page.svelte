@@ -1,54 +1,36 @@
 <script lang="ts">
   /**
-   * Dev-only replay harness for the live-first deviation scoring (step 6).
+   * Dev-only replay harness for live scoring (v3 metrics, 0–10+ scale).
    *
    * Load a `poses.json` (anything from `test-data/`, e.g. the Curry clips) — it's
    * run through the SAME isomorphic core the live pipeline uses (`analyzeAndScore`)
    * against the live targets, then each detected shot is rendered with the
-   * deviation ScoreCard plus the terse voice readback the live loop would speak.
+   * v3 scorecard plus the phase-grouped cues the live loop would speak.
    * Lets you validate scoring + targets from recorded clips with no camera.
    *
    * For the FULL live loop (rep detection + earcons + voice) driven from a video
    * instead of the webcam, use the practice route with `?liveVideo=<url>` in dev.
    */
-  import {
-    EVENT_PAD_AFTER,
-    EVENT_PAD_BEFORE,
-    computeShotMetricsV3,
-    type LiveTargetsV3,
-    type PoseData,
-    type SignalFrame,
-  } from "basketball-shot-analysis";
+  import type { LiveTargetsV3, PoseData } from "basketball-shot-analysis";
   import {
     ScoreCardV3,
     feedbackV3,
     loadLiveTargetsV3,
-    scoreShotV3,
-    type ScorecardV3,
   } from "$lib/features/scoring/v3";
   import {
-    ScoreCard,
-    loadLiveTargets,
-    type LiveTargets,
-  } from "$lib/features/scoring";
-  import {
     analyzeAndScore,
-    buildWorstReadback,
     type ScoredShot,
   } from "$lib/features/live-practice";
 
-  let targets = $state<LiveTargets | null>(null);
+  let targets = $state<LiveTargetsV3 | null>(null);
   let shots = $state<ScoredShot[]>([]);
-  /** v3 scorecard per detected shot (new metrics + 0–10+ scale). */
-  let cardsV3 = $state<(ScorecardV3 | null)[]>([]);
-  let view = $state<"v3" | "v2">("v3");
   let shotIndex = $state(0);
   let hand = $state<"left" | "right">("right");
   let fileName = $state<string | null>(null);
   let error = $state<string | null>(null);
 
-  async function ensureTargets(): Promise<LiveTargets> {
-    if (!targets) targets = await loadLiveTargets();
+  async function ensureTargets(): Promise<LiveTargetsV3> {
+    if (!targets) targets = await loadLiveTargetsV3();
     return targets;
   }
 
@@ -66,24 +48,6 @@
         t,
       );
       shots = res.shots;
-      const t3: LiveTargetsV3 = await loadLiveTargetsV3();
-      cardsV3 = res.shots.map((sh) => {
-        const { start, end } = sh.analysis.frameRange;
-        const posed = poses.frames.filter((f) => f.landmarks);
-        const lo = Math.max(0, start - EVENT_PAD_BEFORE);
-        const hi = Math.min(posed.length - 1, end + EVENT_PAD_AFTER);
-        const m = computeShotMetricsV3(
-          posed.slice(lo, hi + 1) as SignalFrame[],
-          {
-            aspect:
-              poses.width > 1 && poses.height > 1
-                ? poses.width / poses.height
-                : 9 / 16,
-            shootingHand: hand,
-          },
-        );
-        return scoreShotV3(m.metrics, t3);
-      });
       shotIndex = 0;
       if (shots.length === 0) {
         error =
@@ -98,18 +62,7 @@
   }
 
   const current = $derived(shots[shotIndex] ?? null);
-  const cardV3 = $derived(cardsV3[shotIndex] ?? null);
-  const fbV3 = $derived(cardV3 ? feedbackV3(cardV3) : null);
-  const readback = $derived(
-    current
-      ? buildWorstReadback(current.worst, {
-          durationFrames:
-            current.analysis.frameRange.end -
-            current.analysis.frameRange.start +
-            1,
-        })
-      : "",
-  );
+  const fb = $derived(current ? feedbackV3(current.scorecard) : null);
 </script>
 
 <div class="page">
@@ -141,34 +94,15 @@
         </button>
       {/each}
     </div>
-    <div class="tabs">
-      <button
-        class:active={view === "v3"}
-        data-testid="replay-view-v3"
-        onclick={() => (view = "v3")}>New scoring (v3)</button
-      >
-      <button
-        class:active={view === "v2"}
-        data-testid="replay-view-v2"
-        onclick={() => (view = "v2")}>Current (v2)</button
-      >
-    </div>
-    {#if view === "v3" && cardV3 && fbV3}
-      {#if fbV3.spoken}
+    {#if current && fb}
+      {#if fb.spoken}
         <p class="readback" data-testid="replay-readback-v3">
-          🔊 “{fbV3.spoken}”
+          🔊 “{fb.spoken}”
         </p>
       {:else}
         <p class="readback dim">On target — nothing to call out.</p>
       {/if}
-      <ScoreCardV3 card={cardV3} />
-    {:else if current}
-      {#if readback}
-        <p class="readback" data-testid="replay-readback">🔊 “{readback}”</p>
-      {:else}
-        <p class="readback dim">No metrics off target — nothing to call out.</p>
-      {/if}
-      <ScoreCard card={current.scorecard} />
+      <ScoreCardV3 card={current.scorecard} />
     {/if}
   {/if}
 </div>

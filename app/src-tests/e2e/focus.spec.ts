@@ -1,6 +1,11 @@
 import { expect, test, type Page } from "./fixtures";
 import { onboard, startLiveLoop } from "./helpers";
 
+interface Heard {
+  kind: string;
+  text?: string;
+}
+
 /**
  * Live focus: the player toggles which areas the lesson coaches, from the 🎯
  * chip overlaid on the camera in the Practice tab. The choice persists and is
@@ -53,7 +58,42 @@ test("focus is changeable mid-session", async ({ page }) => {
 
   // Add a second area → "+1".
   await page.getByTestId("focus-chip").click();
-  await page.getByTestId("focus-area-follow-through").click();
+  await page.getByTestId("focus-area-rise").click();
   await dismissSheet(page);
   await expect(page.getByTestId("focus-chip")).toContainText("+1");
+});
+
+test("focus on Rise: the feedback and voice coach only the rise", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await onboard(page, "?e2e=replay", "Focus3");
+  await startLiveLoop(page);
+  await page.getByTestId("focus-chip").click();
+  await clearFocus(page);
+  await page.getByTestId("focus-area-rise").click();
+  await dismissSheet(page);
+  await expect(page.getByTestId("focus-chip")).toContainText("Rise");
+
+  await expect(page.getByTestId("rep-feedback")).toBeVisible({
+    timeout: 60_000,
+  });
+  // Every item shown is a Rise item.
+  const phases = await page
+    .locator('[data-testid="feedback-item"] .chip-phase')
+    .allTextContents();
+  for (const p of phases) expect(p.trim()).toBe("Rise");
+
+  // And the readback (what's said after "Analyzing") only coaches the rise.
+  await expect
+    .poll(async () => {
+      const log = await page.evaluate(
+        () =>
+          (window as unknown as { __scAudioLog?: Heard[] }).__scAudioLog ?? [],
+      );
+      const said = log.filter((h) => h.kind === "speak").map((h) => h.text);
+      const i = said.lastIndexOf("Analyzing");
+      return i >= 0 ? (said[i + 1] ?? null) : null;
+    })
+    .toMatch(/^(Rise: [^:]+|Focus on target)$/);
 });

@@ -24,14 +24,7 @@ test("live practice: replayed reps score and persist to the Shots tab", async ({
   const items = page.getByTestId("feedback-item");
   const n = await items.count();
   expect(n).toBeLessThanOrEqual(3);
-  const order = [
-    "Gather",
-    "Load",
-    "Rise",
-    "Set point",
-    "Release",
-    "Follow-through",
-  ];
+  const order = ["Load", "Rise", "Set point", "Release"];
   const phases = await page
     .locator('[data-testid="feedback-item"] .chip-phase')
     .allTextContents();
@@ -48,5 +41,8 @@ test("live practice: replayed reps score and persist to the Shots tab", async ({
 
   await expect(page.getByTestId("shot-review")).toBeVisible();
   await expect(page.getByTestId("review-scrubber")).toBeVisible();
-  await expect(page.getByTestId("scorecard")).toBeVisible();
+  // The v3 scorecard: the four phases in order.
+  await expect(page.getByTestId("scorecard-v3")).toBeVisible();
+  await expect(page.getByTestId("v3-phase-load")).toBeVisible();
+  await expect(page.getByTestId("v3-phase-release")).toBeVisible();
 });

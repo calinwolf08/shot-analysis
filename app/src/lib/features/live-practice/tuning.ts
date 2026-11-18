@@ -65,7 +65,7 @@ export const DEFAULT_LIVE_TUNING: LiveTuning = {
     headMinVis: 0.5,
     fullBodyHoldMs: 1000,
     maxSideSeparation: 0.5,
-    orientationWindow: 30,
+    orientationWindow: 60,
     minOrientationAgreement: 0.6,
   },
   latency: {

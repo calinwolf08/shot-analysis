@@ -1,12 +1,16 @@
 /**
  * Shots-tab list presentation: rows grouped under day headers ("Today",
- * "Yesterday", "Nov 14"), each labeled by time + its worst issue — e.g.
- * "4:12 PM · Set point low". (The orientation used to be the label; every
+ * "Yesterday", "Nov 14"), each labeled by time + its worst issue, named with
+ * its phase — e.g. "4:12 PM · Load: Knee bend — too shallow". (The orientation used to be the label; every
  * stored shot is now the same side-on view, so it no longer tells shots apart.)
  *
  * Pure; dates use the device's local time zone.
  */
-import type { ShotScorecard } from "$lib/features/scoring";
+import type { ScorecardV3 } from "$lib/features/scoring/v3";
+import { phaseName } from "../loop/readback";
+
+/** Shown for a pre-v3 shot that has no pose track to re-analyze. */
+export const REANALYSIS_UNAVAILABLE = "Re-analysis unavailable";
 
 export interface DayGroup<T> {
   /** Local calendar day, "YYYY-MM-DD". */
@@ -47,15 +51,17 @@ export function timeLabel(t: number): string {
 }
 
 /**
- * The shot's headline issue: its worst off-target metric with direction
- * ("Set point low"), "On target" when nothing is off, or null when the shot
- * couldn't be scored (too little measured).
+ * The shot's headline issue: its worst off-target metric with its phase
+ * ("Load: Knee bend — too shallow"), "On target" when nothing is off, null when
+ * too little was measured to score it, or "Re-analysis unavailable" when the
+ * shot has no v3 scorecard at all.
  */
-export function shotIssue(card: ShotScorecard): string | null {
+export function shotIssue(card: ScorecardV3 | null): string | null {
+  if (!card) return REANALYSIS_UNAVAILABLE;
   if (card.overall === null) return null;
   const w = card.worst[0];
   if (!w) return "On target";
-  return w.direction ? `${w.label} ${w.direction}` : w.label;
+  return `${phaseName(w.phase)}: ${w.label}${w.phrase ? ` — ${w.phrase}` : ""}`;
 }
 
 /** Groups rows (already newest-first) under day headers, preserving order. */

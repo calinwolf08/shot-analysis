@@ -1,19 +1,13 @@
 /**
- * Terse voice readback for a scored shot (live redesign — step 5).
+ * Voice readback for a scored shot.
  *
- * Turns the worst deviation metrics into a short, interruptible phrase the
- * audio service speaks after each shot — no coaching instruction, just the
- * metric, which way it's off, and by how much: e.g.
- *   "Set point low by 2, Elbow flare high by 6".
+ * After each shot the player hears the 3 worst issues as COACHING CUES, in
+ * the order the shot happens, each group introduced by its phase:
+ *   "Load: Bend your knees more. Set point: Raise your set point."
+ * The screen shows the same items as measurements (see the v3 scorecard).
  *
- * Pure. Magnitude is expressed in the metric's native unit; timing gaps (Δt,
- * a fraction of shot duration) are converted to whole frames when the shot's
- * duration is known, which reads far more naturally than a raw fraction.
- *
- * @see docs/live-redesign-plan.md §3.6
+ * Pure.
  */
-import type { MetricDeviation } from "$lib/features/scoring";
-
 /** Shot phases in the order they happen (feedback is reported in this order). */
 export const PHASE_ORDER = [
   "gather",
@@ -64,48 +58,26 @@ export function feedbackItems<T extends { readonly phase: string }>(
   return inPhaseOrder(worst.slice(0, max));
 }
 
-export interface ReadbackOptions {
-  /** Max metrics to read (default 3 — the "3 worst"). */
-  readonly max?: number;
-  /** Shot length in frames, used to render Δt timing gaps as frames. */
-  readonly durationFrames?: number;
-}
-
-/** Rounds a magnitude for speech: whole numbers where sensible, else trimmed. */
-function formatMagnitude(m: MetricDeviation, durationFrames?: number): string {
-  if (m.unit === "Δt" && durationFrames && durationFrames > 0) {
-    return String(Math.max(1, Math.round(m.magnitude * durationFrames)));
-  }
-  const mag = m.magnitude;
-  if (mag >= 1) return String(Math.round(mag));
-  if (mag >= 0.1) return mag.toFixed(1);
-  return mag.toFixed(2);
-}
-
-/** One metric's phrase, e.g. "Elbow flare high by 6". */
-export function phraseFor(m: MetricDeviation, durationFrames?: number): string {
-  if (!m.direction) return m.label;
-  return `${m.label} ${m.direction} by ${formatMagnitude(m, durationFrames)}`;
+/** What a readback item needs: its phase, cue and (fallback) label. */
+export interface CueItem {
+  readonly phase: string;
+  readonly label: string;
+  readonly cue: string | null;
 }
 
 /**
- * Builds the readback for the worst metrics — the `max` worst, in phase order,
- * each group introduced by its phase: "Load: Knees end low by 0.4. Set point:
- * Elbow angle low by 91." — or "" when nothing is off-target.
+ * The spoken readback for feedback items (already chosen + ordered):
+ * cues grouped by phase — or "" when there's nothing to say.
  */
-export function buildWorstReadback(
-  worst: readonly MetricDeviation[],
-  opts: ReadbackOptions = {},
-): string {
-  const items = feedbackItems(worst, opts.max ?? FEEDBACK_COUNT);
-  const groups: { phase: string; phrases: string[] }[] = [];
+export function buildCueReadback(items: readonly CueItem[]): string {
+  const groups: { phase: string; cues: string[] }[] = [];
   for (const m of items) {
-    const phrase = phraseFor(m, opts.durationFrames);
+    const cue = m.cue ?? m.label;
     const last = groups.at(-1);
-    if (last && last.phase === m.phase) last.phrases.push(phrase);
-    else groups.push({ phase: m.phase, phrases: [phrase] });
+    if (last && last.phase === m.phase) last.cues.push(cue);
+    else groups.push({ phase: m.phase, cues: [cue] });
   }
   return groups
-    .map((g) => `${phaseName(g.phase)}: ${g.phrases.join(", ")}.`)
+    .map((g) => `${phaseName(g.phase)}: ${g.cues.join(". ")}.`)
     .join(" ");
 }

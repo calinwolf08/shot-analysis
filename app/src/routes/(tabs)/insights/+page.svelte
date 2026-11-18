@@ -1,7 +1,12 @@
 <script lang="ts">
   import { useAppServices } from "$lib/shared/config/services-context";
-  import { scorecardForShot } from "$lib/features/live-practice";
-  import { loadLiveTargets } from "$lib/features/scoring";
+  import {
+    displayScore,
+    loadLiveTargetsV3,
+    scoreBand,
+  } from "$lib/features/scoring/v3";
+  import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
+  import { phaseName } from "$lib/features/live-practice/loop/readback";
   import {
     INSIGHTS_WINDOWS,
     summarizeInsights,
@@ -31,16 +36,23 @@
       loading = false;
       return;
     }
-    const targets = await loadLiveTargets();
+    const targets = await loadLiveTargetsV3();
     const since = windowStart(key, Date.now());
     const shots = await services.repos.shot.listByPlayer(player.id, {
       ...(since > 0 ? { since } : {}),
       limit: 500,
     });
-    const scored: ScoredShotAt[] = shots.map((s) => ({
-      createdAt: s.createdAt,
-      scorecard: scorecardForShot(s.analysis, targets),
-    }));
+    // Shots that can't be re-analyzed on the v3 metrics are left out.
+    const scored: ScoredShotAt[] = (
+      await scoreStoredShots(
+        services.repos.shot,
+        shots,
+        player.shootingHand,
+        targets,
+      )
+    )
+      .filter((x) => x.card !== null)
+      .map((x) => ({ createdAt: x.record.createdAt, scorecard: x.card! }));
     summary = summarizeInsights(scored, { window: key });
     loading = false;
   }
@@ -51,24 +63,19 @@
       .filter((n): n is number => n !== null),
   );
 
+  const BAND_COLOR = {
+    good: "#34d399",
+    fair: "#fde047",
+    off: "#fb923c",
+    far: "#f87171",
+  } as const;
   function color(n: number | null): string {
-    if (n === null) return "#6b7280";
-    if (n <= 1.5) return "#34d399";
-    if (n <= 4) return "#fbbf24";
-    return "#f87171";
+    const b = scoreBand(n);
+    return b ? BAND_COLOR[b] : "#6b7280";
   }
-  const fmt = (n: number | null) => (n === null ? "–" : n.toFixed(1));
+  const fmt = displayScore;
   const pct = (n: number) => `${Math.round(n * 100)}%`;
-  const PHASE_LABELS: Record<string, string> = {
-    gather: "Gather",
-    load: "Load",
-    rise: "Rise",
-    setPoint: "Set Point",
-    release: "Release",
-    followThrough: "Follow-through",
-    sequencing: "Sequencing",
-  };
-  const phaseLabel = (p: string) => PHASE_LABELS[p] ?? p;
+  const phaseLabel = phaseName;
 </script>
 
 <main class="insights" data-testid="insights">
@@ -100,13 +107,13 @@
           {fmt(summary.avgOverall)}
         </span>
         <span class="sub"
-          >avg score · {summary.shotCount} shots · lower is better</span
+          >avg score · {summary.shotCount} shots · 0 = on target</span
         >
       </div>
       {#if trendValues.length > 1}
         <LineChart
           values={trendValues}
-          min={1}
+          min={0}
           max={10}
           testid="insights-trend"
         />
@@ -122,13 +129,16 @@
           {#each summary.issues as issue (issue.id)}
             <li data-testid="issue-{issue.id}">
               <span class="badge" style="background:{color(issue.avgScore)}">
-                {issue.avgScore.toFixed(1)}
+                {displayScore(issue.avgScore)}
               </span>
               <span class="meta">
-                <span class="label">{issue.label}</span>
+                <span class="label"
+                  ><b class="phase">{phaseLabel(issue.phase)}:</b>
+                  {issue.label}{issue.phrase ? ` — ${issue.phrase}` : ""}</span
+                >
                 <span class="freq">
                   off in {issue.occurrences} of {summary.shotCount}
-                  ({pct(issue.frequency)}) · {phaseLabel(issue.phase)}
+                  ({pct(issue.frequency)})
                 </span>
               </span>
             </li>
@@ -231,6 +241,9 @@
   }
   .label {
     font-weight: 600;
+  }
+  .phase {
+    color: var(--sc-primary);
   }
   .freq {
     font-size: 0.78rem;

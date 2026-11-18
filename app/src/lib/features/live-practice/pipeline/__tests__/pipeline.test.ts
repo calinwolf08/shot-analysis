@@ -13,7 +13,8 @@ import {
 import { profileForLevel } from "$lib/features/assessment";
 import type { AnalyzeOptions } from "$lib/features/analysis";
 import type { StoredShotAnalysis } from "$lib/features/analysis";
-import type { LiveTargets } from "$lib/features/scoring";
+import type { LiveTargetsV3 } from "basketball-shot-analysis";
+import { scoreStoredShot } from "../../review/scored-shots";
 import type { ShotRecord } from "$lib/shared/db/repos";
 import {
   createLocalPipeline,
@@ -23,10 +24,10 @@ import {
 
 const targets = JSON.parse(
   readFileSync(
-    join(process.cwd(), "static", "reference", "live-targets.json"),
+    join(process.cwd(), "static", "reference", "live-targets-v3.json"),
     "utf8",
   ),
-) as LiveTargets;
+) as LiveTargetsV3;
 const pose = JSON.parse(
   readFileSync(
     join(
@@ -81,7 +82,8 @@ describe("createLocalPipeline (on-device analysis)", () => {
     expect(saved.length).toBe(result.length); // one persist per detected shot
     expect(result[0]!.shot.playerId).toBe("p1");
     expect(result[0]!.shot.sessionId).toBeNull();
-    expect(result[0]!.scorecard.sections).toHaveLength(2);
+    expect(result[0]!.scorecard.phases).toHaveLength(4);
+    expect(saved[0]!.v3Metrics).toBeDefined();
   });
 });
 
@@ -120,13 +122,49 @@ describe("createServerPipeline (server analysis, end-to-end)", () => {
       opts, // ignored server-side (derived from the player there)
     });
     expect(result.length).toBeGreaterThanOrEqual(1);
-    expect(result[0]!.scorecard.sections).toHaveLength(2);
+    expect(result[0]!.scorecard.phases).toHaveLength(4);
 
     // Persisted player-rooted, with no session.
     const shots = await repos.shot.listByPlayer(player.id);
     expect(shots.length).toBe(result.length);
     expect(shots[0]!.sessionId).toBeNull();
     expect(shots[0]!.playerId).toBe(player.id);
+  });
+
+  it("read-time migration: a pre-v3 shot is recomputed from its pose track and saved", async () => {
+    const api = createApiClient({
+      fetch: inProcessFetch(userA),
+      baseUrl: "http://localhost",
+    });
+    const repos = createRemoteRepos(api);
+    const player = await repos.player.create({
+      name: "Old",
+      shootingHand: "right",
+      level: "high-school",
+    });
+    await createServerPipeline({ api }).process({
+      playerId: player.id,
+      poseData: pose,
+      opts,
+    });
+    const [live] = await repos.shot.listByPlayer(player.id);
+    const v3 = (live!.analysis as StoredShotAnalysis).v3Metrics!;
+    // Make it a schema-1 shot (as saved before v3), through the API.
+    const { v3Metrics: _drop, ...v1 } = live!.analysis as StoredShotAnalysis;
+    await repos.shot.updateAnalysis(live!.id, v1);
+    const old = (await repos.shot.get(live!.id))!;
+    expect((old.analysis as StoredShotAnalysis).v3Metrics).toBeUndefined();
+
+    const scored = await scoreStoredShot(repos.shot, old, "right", targets);
+    expect(scored.card).not.toBeNull();
+    // Persisted: the next read is already v3 — and equals what live stored.
+    const after = (await repos.shot.get(live!.id))!;
+    const again = (after.analysis as StoredShotAnalysis).v3Metrics!;
+    expect(again).toBeDefined();
+    expect(again.metrics["setPoint.elbow_angle"]!.value).toBeCloseTo(
+      v3.metrics["setPoint.elbow_angle"]!.value,
+      6,
+    );
   });
 
   it("rejects wrong-angle shots server-side without storing them", async () => {

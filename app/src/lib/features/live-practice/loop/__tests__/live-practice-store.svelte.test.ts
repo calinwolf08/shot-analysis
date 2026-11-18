@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createFakeAudio } from "$lib/shared/audio";
-import type { MetricDeviation, ShotScorecard } from "$lib/features/scoring";
+import type { MetricResultV3, ScorecardV3 } from "$lib/features/scoring/v3";
 import type { ShotRecord } from "$lib/shared/db/repos";
 import type { AnalyzeOptions } from "$lib/features/analysis";
 import type {
@@ -63,49 +63,47 @@ function shotRecord(id: string): ShotRecord {
   };
 }
 
-function worst(label: string): MetricDeviation {
+function worst(label: string, phase = "setPoint"): MetricResultV3 {
   return {
-    id: `setPoint.${label}`,
+    id: `${phase}.${label.toLowerCase().replace(/ /g, "_")}`,
+    phase: phase as MetricResultV3["phase"],
+    kind: "structure",
     label,
-    section: "structure",
-    phase: "setPoint",
+    unit: "deg",
     value: 100,
-    ideal: 90,
-    passMin: 85,
-    passMax: 95,
-    unit: "",
+    note: null,
+    scored: true,
     score: 3,
-    normDev: 2,
-    inBand: false,
     direction: "high",
     magnitude: 6,
-    scored: true,
+    passMin: 85,
+    passMax: 95,
+    ideal: 90,
+    phrase: "too high",
+    cue: `Fix ${label.toLowerCase()}`,
+    frames: [],
   };
 }
 
-function scorecard(
-  overall: number,
-  worstList: MetricDeviation[],
-): ShotScorecard {
+function scorecard(overall: number, worstList: MetricResultV3[]): ScorecardV3 {
   return {
     overall,
-    sections: [],
+    phases: [],
+    details: [],
     worst: worstList,
-    all: worstList,
-    measuredCount: worstList.length,
-    scoredTargetCount: worstList.length,
     measuredFraction: 1,
     belowCoverageGate: false,
-    targetsVersion: 1,
   };
 }
 
 function processed(
   id: string,
   overall: number,
-  labels: string[],
+  labels: (string | [string, string])[],
 ): ProcessedShot {
-  const w = labels.map(worst);
+  const w = labels.map((l) =>
+    typeof l === "string" ? worst(l) : worst(l[0], l[1]),
+  );
   return { shot: shotRecord(id), scorecard: scorecard(overall, w), worst: w };
 }
 
@@ -179,7 +177,7 @@ describe("LivePracticeStore — per-shot cycle", () => {
       "earcon:captured",
       `speak:${CAPTURED_TEXT}`,
       `speak:${ANALYZING_TEXT}`,
-      "speak:Set point: Elbow flare high by 6, Set point high by 6.",
+      "speak:Set point: Fix elbow flare. Fix set point.",
       "earcon:ready",
     ]);
     expect(store.shots).toHaveLength(1);
@@ -187,6 +185,37 @@ describe("LivePracticeStore — per-shot cycle", () => {
     expect(store.average).toBe(3.4);
     // Tracking resumed exactly once, at the end.
     expect(coordinator.dismissFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it("speaks the 3 worst in shot order, and only the focus when one is set", async () => {
+    const shot = () =>
+      processed("s1", 4, [
+        ["Wrist snap", "release"],
+        ["Rise timing", "rise"],
+        ["Knee bend", "load"],
+        ["Set height", "setPoint"],
+      ]);
+    const all = makeStore([[shot()]]);
+    all.emit("repResult", repEvent());
+    await vi.waitFor(() => expect(all.store.cycle).toBe("tracking"));
+    // Worst 3 (wrist snap, rise timing, knee bend), reordered by phase.
+    expect(all.audio.sequence).toContain(
+      "speak:Load: Fix knee bend. Rise: Fix rise timing. Release: Fix wrist snap.",
+    );
+    expect(all.store.feedback?.worst.map((m) => m.phase)).toEqual([
+      "load",
+      "rise",
+      "release",
+    ]);
+
+    const focused = makeStore([[shot()]]);
+    focused.store.setFocusAreas(["set-point"]);
+    focused.emit("repResult", repEvent());
+    await vi.waitFor(() => expect(focused.store.cycle).toBe("tracking"));
+    // The set-point issue is coached even though it isn't in the global top 3.
+    expect(focused.audio.sequence).toContain(
+      "speak:Set point: Fix set height.",
+    );
   });
 
   it("holds shot detection until the readback has FINISHED", async () => {

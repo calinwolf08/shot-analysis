@@ -63,7 +63,9 @@ test("clicking a metric seeks the scrubber to its phase", async ({ page }) => {
   await openReview(page);
 
   const scrubber = page.getByTestId("review-scrubber");
-  const metrics = page.locator('[data-testid^="sc-metric-"]');
+  const metrics = page.locator(
+    'section[data-testid^="v3-phase-"] [data-testid^="v3-row-"] button',
+  );
   // Two metrics from opposite ends of the scorecard are in different phases,
   // so clicking each seeks to a different frame — proving the seek works
   // without depending on scorecard order or seek direction.
