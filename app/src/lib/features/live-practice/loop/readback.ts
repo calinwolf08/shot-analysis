@@ -14,8 +14,58 @@
  */
 import type { MetricDeviation } from "$lib/features/scoring";
 
+/** Shot phases in the order they happen (feedback is reported in this order). */
+export const PHASE_ORDER = [
+  "gather",
+  "load",
+  "rise",
+  "setPoint",
+  "release",
+  "followThrough",
+] as const;
+
+/** Spoken / shown phase names. */
+export const PHASE_NAME: Record<string, string> = {
+  gather: "Gather",
+  load: "Load",
+  rise: "Rise",
+  setPoint: "Set point",
+  release: "Release",
+  followThrough: "Follow-through",
+};
+
+export const phaseName = (phase: string): string => PHASE_NAME[phase] ?? phase;
+
+/** Stable sort into shot order (unknown phases last). */
+export function inPhaseOrder<T extends { readonly phase: string }>(
+  items: readonly T[],
+): T[] {
+  const rank = (p: string) => {
+    const i = (PHASE_ORDER as readonly string[]).indexOf(p);
+    return i < 0 ? PHASE_ORDER.length : i;
+  };
+  return items
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => rank(a.m.phase) - rank(b.m.phase) || a.i - b.i)
+    .map((x) => x.m);
+}
+
+/** Default number of issues fed back per shot. */
+export const FEEDBACK_COUNT = 3;
+
+/**
+ * The shot's feedback items: the `max` WORST metrics (input is worst-first),
+ * then re-ordered by phase so they read in the order the shot happens.
+ */
+export function feedbackItems<T extends { readonly phase: string }>(
+  worst: readonly T[],
+  max: number = FEEDBACK_COUNT,
+): T[] {
+  return inPhaseOrder(worst.slice(0, max));
+}
+
 export interface ReadbackOptions {
-  /** Max metrics to read (default 5 — the "5 worst"). */
+  /** Max metrics to read (default 3 — the "3 worst"). */
   readonly max?: number;
   /** Shot length in frames, used to render Δt timing gaps as frames. */
   readonly durationFrames?: number;
@@ -39,16 +89,23 @@ export function phraseFor(m: MetricDeviation, durationFrames?: number): string {
 }
 
 /**
- * Builds the full readback string for the worst metrics, or "" when there is
- * nothing off-target to call out (the caller may stay silent or play a cue).
+ * Builds the readback for the worst metrics — the `max` worst, in phase order,
+ * each group introduced by its phase: "Load: Knees end low by 0.4. Set point:
+ * Elbow angle low by 91." — or "" when nothing is off-target.
  */
 export function buildWorstReadback(
   worst: readonly MetricDeviation[],
   opts: ReadbackOptions = {},
 ): string {
-  const max = opts.max ?? 5;
-  return worst
-    .slice(0, max)
-    .map((m) => phraseFor(m, opts.durationFrames))
-    .join(", ");
+  const items = feedbackItems(worst, opts.max ?? FEEDBACK_COUNT);
+  const groups: { phase: string; phrases: string[] }[] = [];
+  for (const m of items) {
+    const phrase = phraseFor(m, opts.durationFrames);
+    const last = groups.at(-1);
+    if (last && last.phase === m.phase) last.phrases.push(phrase);
+    else groups.push({ phase: m.phase, phrases: [phrase] });
+  }
+  return groups
+    .map((g) => `${phaseName(g.phase)}: ${g.phrases.join(", ")}.`)
+    .join(" ");
 }

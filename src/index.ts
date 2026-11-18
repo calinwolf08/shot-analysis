@@ -264,6 +264,11 @@ export {
   metricsFromSignals,
   flattenMetricsV3,
   METRICS_V3_SCHEMA_VERSION,
+  DEFAULT_WORDING,
+  wordingFor,
+  buildTargetsV3,
+  effectiveBand,
+  LIVE_TARGETS_V3_VERSION,
 } from "./metrics/v3";
 export type {
   ShotSignals,
@@ -276,4 +281,7 @@ export type {
   MetricKind,
   MetricPhase,
   MetricUnit,
+  LiveTargetsV3,
+  TargetV3,
+  MetricWording,
 } from "./metrics/v3";

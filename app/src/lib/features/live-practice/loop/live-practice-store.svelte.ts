@@ -37,7 +37,7 @@ import type {
 } from "../coordinator/coordinator";
 import type { LiveShotPipeline } from "../pipeline";
 import type { ShotStore } from "../pipeline";
-import { buildWorstReadback } from "./readback";
+import { FEEDBACK_COUNT, buildWorstReadback, feedbackItems } from "./readback";
 
 /** Spoken when a detected shot is rejected for the camera angle. */
 export const WRONG_ANGLE_TEXT = "Wrong angle, shot not counted";
@@ -97,7 +97,7 @@ export interface LivePracticeStoreDeps {
   fps: number;
   /** Pixel size of the pose frames (stored with each shot for review). */
   frameSize?: () => { width: number; height: number } | null;
-  /** Max worst metrics to read aloud (default 5). */
+  /** Max worst metrics fed back (default 3). */
   maxWorstSpoken?: number;
   /** Live focus-area ids; [] = coach on everything (the default). */
   focusAreas?: string[];
@@ -131,7 +131,7 @@ export class LivePracticeStore {
   private generation = 0;
 
   constructor(private readonly deps: LivePracticeStoreDeps) {
-    this.maxWorstSpoken = deps.maxWorstSpoken ?? 5;
+    this.maxWorstSpoken = deps.maxWorstSpoken ?? FEEDBACK_COUNT;
     this.muted = deps.audio.isMuted();
     this.focusAreas = deps.focusAreas ?? [];
     this.shots = deps.initialShots ?? [];
@@ -299,7 +299,8 @@ export class LivePracticeStore {
     this.feedback = {
       index: entry.index,
       overall: entry.overall,
-      worst: entry.worst,
+      // The same items that were spoken: worst N, in phase order.
+      worst: feedbackItems(entry.worst, this.maxWorstSpoken),
       spoken,
     };
     this.cycle = "readback";

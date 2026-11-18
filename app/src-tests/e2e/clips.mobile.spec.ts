@@ -39,6 +39,10 @@ test("each shot keeps a small, frame-synced, playable clip", async ({
   page,
 }) => {
   test.setTimeout(180_000);
+  page.on("console", (m) => {
+    if (m.text().startsWith("CLIP") || m.text().includes("positioned"))
+      console.log(m.text());
+  });
   await onboard(page, Q, "Clips");
   await recordAndOpenNewest(page, 2);
 
@@ -46,14 +50,14 @@ test("each shot keeps a small, frame-synced, playable clip", async ({
   await expect(video).toBeVisible({ timeout: 10_000 });
   await expect(video).toHaveAttribute("data-exact-sync", "true");
 
-  // Compressed: well under ~0.1 MB per second of clip (≤ 10 s segments).
+  // Compressed: well under ~0.1 MB per second of clip (≤ 15 s segments).
   const size = await video.evaluate(async (v: HTMLVideoElement) => {
     const blob = await (await fetch(v.src)).blob();
     return blob.size;
   });
   test.info().annotations.push({ type: "clip", description: `${size} bytes` });
   expect(size).toBeGreaterThan(1_000);
-  expect(size).toBeLessThan(1_200_000);
+  expect(size).toBeLessThan(1_800_000);
 
   // Frame-exact sync: scrubbing to a frame seeks the video to that frame's
   // capture time relative to the clip start (same clock).
@@ -65,8 +69,14 @@ test("each shot keeps a small, frame-synced, playable clip", async ({
   for (const f of [min, Math.round((min + max) / 2), max]) {
     await setRange(scrubber, f);
     const t = Number(await canvas.getAttribute("data-frame-t"));
-    const expected = (t - startTs) / 1000;
-    expect(expected).toBeGreaterThanOrEqual(0);
+    // Frames before the clip began (rare: a very quick shot) show its first
+    // frame; the rest of the shot must be on video.
+    const expected = Math.max(0, (t - startTs) / 1000);
+    if (f !== min)
+      expect(
+        (t - startTs) / 1000,
+        `frame ${f} (t=${t}) vs clip start ${startTs}`,
+      ).toBeGreaterThan(0);
     await expect
       .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
       .toBeCloseTo(expected, 1);

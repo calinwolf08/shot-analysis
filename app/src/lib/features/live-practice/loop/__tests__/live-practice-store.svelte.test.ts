@@ -179,7 +179,7 @@ describe("LivePracticeStore — per-shot cycle", () => {
       "earcon:captured",
       `speak:${CAPTURED_TEXT}`,
       `speak:${ANALYZING_TEXT}`,
-      "speak:Elbow flare high by 6, Set point high by 6",
+      "speak:Set point: Elbow flare high by 6, Set point high by 6.",
       "earcon:ready",
     ]);
     expect(store.shots).toHaveLength(1);

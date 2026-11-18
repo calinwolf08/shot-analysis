@@ -19,6 +19,26 @@ test("live practice: replayed reps score and persist to the Shots tab", async ({
   });
   await expect(page.getByTestId("rep-feedback-score")).toBeVisible();
 
+  // Feedback: at most the 3 worst issues, each labelled with its phase, in
+  // shot order (Load → Rise → Set point → Release).
+  const items = page.getByTestId("feedback-item");
+  const n = await items.count();
+  expect(n).toBeLessThanOrEqual(3);
+  const order = [
+    "Gather",
+    "Load",
+    "Rise",
+    "Set point",
+    "Release",
+    "Follow-through",
+  ];
+  const phases = await page
+    .locator('[data-testid="feedback-item"] .chip-phase')
+    .allTextContents();
+  const ranks = phases.map((p) => order.indexOf(p.trim()));
+  expect(ranks.every((r) => r >= 0)).toBe(true);
+  expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
+
   // Leaving is just switching tabs — the shot is already persisted (no
   // summary), and the Shots tab lists it; opening it reviews the scorecard.
   await page.getByTestId("tab-shots").click();

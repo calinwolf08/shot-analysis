@@ -29,7 +29,7 @@
   import { FocusSheet, ScoreCard, focusSummary } from "$lib/features/scoring";
   import type { SideOrientation } from "../setup/angle-gate";
   import { createPresenceTracker, type PresenceState } from "./presence";
-  import { phraseFor } from "./readback";
+  import { phaseName, phraseFor } from "./readback";
   import {
     CUE_TEXT,
     READY_TEXT,
@@ -212,6 +212,10 @@
       ? cap.repStartTs + cap.frameToWall - CLIP_PRE_ROLL_MS
       : Number.NEGATIVE_INFINITY;
     const take = await recorder.takeCovering(fromWall);
+    // Roll again straight away (during the feedback), so a quick next shot
+    // still has its lead-in on video. Positioning often flickers through the
+    // shot itself, so don't wait for it; the discard timer handles leaving.
+    if (gateActive && store.running) recorder.start();
     if (!take) return;
     try {
       await clipStore.save(entry.shotId, {
@@ -468,8 +472,11 @@
         <div class="fb-body">
           {#if fb.worst.length > 0}
             <div class="chips">
-              {#each fb.worst.slice(0, 3) as m (m.id)}
-                <span class="chip">{phraseFor(m)}</span>
+              {#each fb.worst as m (m.id)}
+                <span class="chip" data-testid="feedback-item"
+                  ><b class="chip-phase">{phaseName(m.phase)}</b>
+                  {phraseFor(m)}</span
+                >
               {/each}
             </div>
           {:else}
@@ -841,6 +848,10 @@
     border: 1px solid var(--sc-border);
     font-size: 12px;
     font-weight: 600;
+  }
+  .chip-phase {
+    color: var(--sc-primary);
+    margin-right: 4px;
   }
   .on-target {
     margin: 0;

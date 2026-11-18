@@ -800,6 +800,45 @@ ALL 141: within ±1 — v3 55% · old 73%; within ±2 — v3 75% · old 81%
     test-data lean forward in the load (+7…+28°), so the sign convention is
     consistent. This is worth confirming against his video in the viewer.
 
+## B-2.12 Implementation notes (Phase 12)
+- **Feedback is now 3 items, named by phase and in phase order** (user
+  request). This applies to the current live (v2) path now and carries into v3:
+  - `FEEDBACK_COUNT = 3` (`loop/readback.ts`). The store's `maxWorstSpoken`
+    defaults to it.
+  - `feedbackItems()` takes the 3 worst, then orders them Load → Rise → Set
+    point → Release.
+  - Voice groups by phase: "Load: knee bend too shallow. Set point: elbow
+    flare high by 6."
+  - The feedback card shows each chip with its phase name first
+    (`data-testid="feedback-item"`).
+  - E2E (`live-practice.spec.ts`) asserts ≤ 3 items, in phase order.
+- **Wording catalog** (`src/metrics/v3/wording.ts`): a label, plus a low/high
+  `phrase` (scorecard) and `cue` (voice), for every v3 metric.
+- **Targets** (`src/metrics/v3/targets.ts`, `npm run targets:build:v3` →
+  `app/static/reference/live-targets-v3.json`):
+  - 42 metrics, 37 scored.
+  - Band = mean ± SD over Curry's shots. Metrics with fewer than 3 reference
+    values are left unscored.
+  - Hand edits (label, wording, band override) survive rebuilds.
+- **Scoring** (`app/src/lib/features/scoring/v3/score.ts`):
+  - 0 inside the band, +1 per `rampSd` outside it; the display caps at "10+".
+  - Phase score = mean of its metrics; overall = mean of the phases.
+  - An excess under 5% of a ramp step counts as on target.
+  - `feedbackV3` gives the 3 worst as phase-grouped cues.
+  - `ScoreCardV3.svelte` shows the phases in order, with a legend.
+  - Curry leave-one-out scores average 0.35 (max < 0.7).
+- **Debug replay** has a v3/v2 view switch (`e2e/scoring-v3.spec.ts`). The
+  live path still scores v2 until Phase 14.
+- **Clip coverage fix:** the shot clip recorder now keeps **3 staggered 15 s
+  segments** instead of 2 × 10 s.
+  - A shot reaches the recorder only after it ends and is analyzed, ~9 s
+    after its pre-roll began. The 2 × 10 s scheme only guaranteed 5 s of
+    lookback, so a second shot's clip could start mid-shot.
+  - The new scheme guarantees ≥ 10 s of lookback.
+  - Clips are now ≤ ~1.7 MB.
+  - The recorder also restarts right after a take, without waiting for the
+    feedback to finish.
+
 ## B-3. Phased implementation (Part B)
 
 **Phase 9 — Debug index + Curry viewer shell**

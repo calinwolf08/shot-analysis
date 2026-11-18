@@ -6,3 +6,5 @@ export * from "./signals";
 export * from "./events";
 export * from "./labeled";
 export * from "./metrics";
+export * from "./wording";
+export * from "./targets";

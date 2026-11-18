@@ -1,19 +1,22 @@
 /**
  * Per-shot clip recording from the live camera stream (on-device only).
  *
- * Two staggered MediaRecorders ("ping-pong" segments) run while the player is
- * positioned. Each restarts after `segmentMs`, offset by half a segment, so at
- * any moment one of them has been recording for at least `segmentMs / 2`.
- * When a shot is captured, the shortest segment that started before the shot
- * (minus pre-roll) is kept and the other is discarded, so a clip covers the
- * shot but never grows past `segmentMs`, however long the player stands there.
+ * `segments` staggered MediaRecorders (default 3) run while the player is
+ * positioned. Each restarts after `segmentMs`, offset by `segmentMs/segments`,
+ * so at any moment one of them has been recording for at least
+ * `segmentMs × (segments−1)/segments` (10 s with the defaults) — enough to
+ * reach back past the rep's pre-roll, since a shot is only handed over once it
+ * has ended and been analyzed (~9 s after it started). When a shot is
+ * captured, the shortest segment that started before the shot (minus pre-roll)
+ * is kept and the others are discarded, so a clip covers the shot but never
+ * grows past `segmentMs`, however long the player stands there.
  *
  * Every segment records its start time on the `performance.now()` clock (the
  * same clock as live pose frames), so review can seek the video to any pose
  * frame exactly instead of guessing.
  *
  * Size is bounded by the bitrate (`videoBitsPerSecond`, default 0.9 Mbps):
- * ~0.1 MB per second of clip, ≤ ~1.1 MB for a full 10 s segment.
+ * ~0.1 MB per second of clip, ≤ ~1.7 MB for a full 15 s segment.
  *
  * Returns null when MediaRecorder isn't available (SSR, some webviews) so
  * callers never branch on platform — recording is simply skipped.
@@ -51,6 +54,8 @@ export interface RecorderLike {
 
 export interface ShotClipRecorderOptions {
   segmentMs?: number;
+  /** Staggered recorders kept rolling (≥ 2). */
+  segments?: number;
   videoBitsPerSecond?: number;
   now?: () => number;
   /** Rotation check interval (ms). */
@@ -69,7 +74,8 @@ export const PREFERRED_MIME = [
   "video/mp4", // iOS Safari / WKWebView
 ];
 
-export const DEFAULT_SEGMENT_MS = 10_000;
+export const DEFAULT_SEGMENT_MS = 15_000;
+export const DEFAULT_SEGMENTS = 3;
 export const DEFAULT_VIDEO_BPS = 900_000;
 
 function pickMime(): string {
@@ -110,6 +116,7 @@ export function createShotClipRecorder(
   if (!custom && stream.getVideoTracks().length === 0) return null;
 
   const segmentMs = opts.segmentMs ?? DEFAULT_SEGMENT_MS;
+  const segments = Math.max(2, opts.segments ?? DEFAULT_SEGMENTS);
   const bps = opts.videoBitsPerSecond ?? DEFAULT_VIDEO_BPS;
   const now = opts.now ?? (() => performance.now());
   const make = opts.makeRecorder ?? defaultMakeRecorder;
@@ -143,7 +150,7 @@ export function createShotClipRecorder(
     }
   }
 
-  /** Keep two staggered segments rolling. */
+  /** Keep `segments` staggered segments rolling. */
   function tick(): void {
     if (!active) return;
     const t = now();
@@ -152,9 +159,17 @@ export function createShotClipRecorder(
       close(s);
       return open() ?? s;
     });
-    if (slots.length === 1 && t - slots[0]!.startTs >= segmentMs / 2) {
-      const second = open();
-      if (second) slots.push(second);
+    const newest = slots.reduce<Slot | null>(
+      (a, b) => (!a || b.startTs > a.startTs ? b : a),
+      null,
+    );
+    if (
+      newest &&
+      slots.length < segments &&
+      t - newest.startTs >= segmentMs / segments
+    ) {
+      const next = open();
+      if (next) slots.push(next);
     }
   }
 

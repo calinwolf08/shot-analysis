@@ -5,11 +5,12 @@ import {
 } from "../shot-clip-recorder";
 
 /** Fake MediaRecorders on a fake clock; each emits one chunk naming itself. */
-function harness(segmentMs = 10_000) {
+function harness(segmentMs = 10_000, segments = 2) {
   let t = 0;
   const made: (RecorderLike & { id: number; stopped: boolean })[] = [];
   const recorder = createShotClipRecorder({} as MediaStream, {
     segmentMs,
+    segments,
     now: () => t,
     tickMs: 100,
     makeRecorder: () => {
@@ -98,5 +99,18 @@ describe("createShotClipRecorder (ping-pong segments)", () => {
     recorder.discard();
     expect(made.every((r) => r.state === "inactive")).toBe(true);
     expect(await recorder.takeCovering(0)).toBeNull();
+  });
+
+  it("three staggered segments always reach back ≥ 2/3 of a segment", () => {
+    const { recorder, advance, now } = harness(15_000, 3);
+    recorder.start();
+    // Long after start, at every moment some segment began ≥ 10 s ago.
+    advance(47_300);
+    const shotFrom = now() - 9_500; // shot + pre-roll began 9.5 s ago
+    return recorder.takeCovering(shotFrom).then((take) => {
+      expect(take).not.toBeNull();
+      expect(take!.startTs).toBeLessThanOrEqual(shotFrom);
+      expect(now() - take!.startTs).toBeLessThanOrEqual(15_000);
+    });
   });
 });
