@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { MetricDeviation } from "../deviation";
 import {
   FOCUS_AREAS,
   focusSummary,
@@ -8,88 +7,74 @@ import {
   selectFocusWorst,
 } from "../focus";
 
-const m = (
-  id: string,
-  normDev: number,
-  inBand = false,
-  scored = true,
-): MetricDeviation =>
-  ({ id, normDev, inBand, scored, label: id }) as unknown as MetricDeviation;
+const m = (id: string, kind = "structure") => ({
+  id,
+  phase: id.split(".")[0]!,
+  kind,
+});
 
-describe("metricMatchesAreas", () => {
-  it("matches metrics to their area", () => {
-    expect(metricMatchesAreas("setPoint.elbow_flare", ["set-point"])).toBe(
-      true,
-    );
-    expect(metricMatchesAreas("setPoint.elbow_flare", ["elbow"])).toBe(true);
-    expect(
-      metricMatchesAreas("followThrough.wrist_snap_angle", ["follow-through"]),
-    ).toBe(true);
-    expect(metricMatchesAreas("seq.set_point__legs_extend", ["rhythm"])).toBe(
-      true,
-    );
-    expect(metricMatchesAreas("gather.head", ["head"])).toBe(true);
-    expect(metricMatchesAreas("load.depth_drop", ["load-depth"])).toBe(true);
-    expect(metricMatchesAreas("gather.hips", ["base-balance"])).toBe(true);
+describe("focus areas (v3, phase-based)", () => {
+  it("one area per phase plus rhythm", () => {
+    expect(FOCUS_AREAS.map((a) => a.id)).toEqual([
+      "load",
+      "rise",
+      "set-point",
+      "release",
+      "rhythm",
+    ]);
   });
 
-  it("does not match unrelated areas", () => {
-    expect(metricMatchesAreas("followThrough.wrist_snap_angle", ["head"])).toBe(
+  it("matches by phase, and rhythm matches timing in any phase", () => {
+    expect(metricMatchesAreas(m("load.knee_depth"), ["load"])).toBe(true);
+    expect(metricMatchesAreas(m("setPoint.elbow_angle"), ["set-point"])).toBe(
+      true,
+    );
+    expect(metricMatchesAreas(m("setPoint.elbow_angle"), ["release"])).toBe(
       false,
     );
-    expect(metricMatchesAreas("seq.a__b", ["base-balance"])).toBe(false);
-    expect(metricMatchesAreas("release.knees_end", [])).toBe(false);
-  });
-});
-
-describe("selectFocusWorst", () => {
-  const all = [
-    m("setPoint.elbow_flare", 3.0),
-    m("followThrough.wrist_snap_angle", 5.0),
-    m("gather.head", 1.0, true), // in band → excluded
-    m("release.knees_end", 4.0),
-    m("gather.hips", 2.0),
-  ];
-
-  it("returns null when nothing is selected (caller uses global worst)", () => {
-    expect(selectFocusWorst(all, [])).toBeNull();
+    expect(metricMatchesAreas(m("rise.t_start", "timing"), ["rhythm"])).toBe(
+      true,
+    );
+    expect(metricMatchesAreas(m("rise.t_start", "timing"), ["rise"])).toBe(
+      true,
+    );
+    expect(metricMatchesAreas(m("load.knee_depth"), ["rhythm"])).toBe(false);
+    expect(metricMatchesAreas(m("load.knee_depth"), [])).toBe(false);
   });
 
-  it("returns only off-target metrics in the selected areas, worst first", () => {
-    const r = selectFocusWorst(all, ["set-point", "follow-through"])!;
-    expect(r.map((x) => x.id)).toEqual([
-      "followThrough.wrist_snap_angle",
-      "setPoint.elbow_flare",
+  it("selectFocusWorst keeps worst-first order within the focus", () => {
+    const worst = [
+      m("release.wrist_snap"),
+      m("rise.t_start", "timing"),
+      m("rise.spine_change"),
+      m("load.knee_depth"),
+    ];
+    expect(selectFocusWorst(worst, [])).toBeNull();
+    expect(selectFocusWorst(worst, ["rise"])!.map((x) => x.id)).toEqual([
+      "rise.t_start",
+      "rise.spine_change",
     ]);
+    expect(
+      selectFocusWorst(worst, ["rise", "load"], 1)!.map((x) => x.id),
+    ).toEqual(["rise.t_start"]);
+    expect(selectFocusWorst(worst, ["set-point"])).toEqual([]);
   });
 
-  it("excludes in-band and respects max", () => {
-    const r = selectFocusWorst(all, ["head"]);
-    expect(r).toEqual([]); // only gather.head matches, but it is in band
-    const r2 = selectFocusWorst(all, ["set-point", "follow-through"], 1)!;
-    expect(r2).toHaveLength(1);
-    expect(r2[0]!.id).toBe("followThrough.wrist_snap_angle");
+  it("normalizeAreas maps legacy ids, drops unknown, canonical order", () => {
+    expect(normalizeAreas(["release", "load"])).toEqual(["load", "release"]);
+    expect(normalizeAreas(["elbow", "head", "follow-through"])).toEqual([
+      "set-point",
+      "release",
+    ]);
+    expect(normalizeAreas(["base-balance", "load-depth", "nope"])).toEqual([
+      "load",
+    ]);
+    expect(normalizeAreas(["rhythm"])).toEqual(["rhythm"]);
   });
-});
 
-describe("focusSummary + normalizeAreas", () => {
-  it("summarizes the selection", () => {
+  it("focusSummary", () => {
     expect(focusSummary([])).toBe("Everything");
     expect(focusSummary(["set-point"])).toBe("Set point");
-    expect(focusSummary(["set-point", "elbow", "head"])).toBe("Set point +2");
-  });
-
-  it("drops unknown ids and keeps canonical order", () => {
-    expect(normalizeAreas(["bogus", "head", "set-point"])).toEqual([
-      "set-point",
-      "head",
-    ]);
-  });
-
-  it("every area has a label + hint", () => {
-    for (const a of FOCUS_AREAS) {
-      expect(a.label).toBeTruthy();
-      expect(a.hint).toBeTruthy();
-    }
+    expect(focusSummary(["load", "release"])).toBe("Load +1");
   });
 });

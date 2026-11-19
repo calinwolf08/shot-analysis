@@ -17,21 +17,19 @@ async function setRange(input: Locator, value: number) {
  */
 async function openReview(page: Page) {
   await onboard(page, "?e2e=replay", "Review");
-  // Focus is device-global; reset to "everything" so the overlay isn't
-  // filtered to a selection leaked from another test.
-  await page.getByTestId("focus-row").click();
+  await startLiveLoop(page);
+  // Reset focus to "everything" so the overlay isn't filtered to a
+  // selection (a fresh account starts there anyway; settings are per user).
+  await page.getByTestId("focus-chip").click();
   const clear = page.getByTestId("focus-clear");
   if (await clear.isEnabled()) await clear.click();
   await page
     .getByTestId("sheet-backdrop")
     .click({ position: { x: 10, y: 10 } });
-  await page.getByTestId("practice-live").click();
-  await startLiveLoop(page);
   await expect(page.getByTestId("rep-feedback")).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByTestId("practice-done").click();
-  await page.waitForURL("**/practice**");
+  // Leaving the Practice tab stops the camera + loop.
   await page.getByTestId("tab-shots").click();
   const firstShot = page.locator('[data-testid^="shot-row-"]').first();
   await expect(firstShot).toBeVisible({ timeout: 10_000 });
@@ -65,7 +63,9 @@ test("clicking a metric seeks the scrubber to its phase", async ({ page }) => {
   await openReview(page);
 
   const scrubber = page.getByTestId("review-scrubber");
-  const metrics = page.locator('[data-testid^="sc-metric-"]');
+  const metrics = page.locator(
+    'section[data-testid^="v3-phase-"] [data-testid^="v3-row-"] button',
+  );
   // Two metrics from opposite ends of the scorecard are in different phases,
   // so clicking each seeks to a different frame — proving the seek works
   // without depending on scorecard order or seek direction.
@@ -81,4 +81,16 @@ test("clicking a metric seeks the scrubber to its phase", async ({ page }) => {
   const atLast = Number(await scrubber.inputValue());
 
   expect(atFirst).not.toBe(atLast);
+});
+
+test("clicking a metric draws that metric (head pitch) in its own phase", async ({
+  page,
+}) => {
+  await openReview(page);
+  await page.getByTestId("v3-row-load.head_pitch").locator("button").click();
+  await expect(page.getByTestId("review-phase")).toHaveText("Load");
+  await expect(page.getByTestId("review-skeleton")).toHaveAttribute(
+    "data-geometry",
+    "pitch",
+  );
 });

@@ -21,5 +21,7 @@ test("a profile persists across reload via the server database", async ({
   await page.reload();
   await page.waitForSelector('[data-testid="db-ready"]', { state: "attached" });
   await expect(page).toHaveURL(/\/practice\?e2e=replay$/);
-  await expect(page.getByTestId("practice-live")).toBeVisible();
+  await expect(page.getByTestId("practice-loop")).toBeVisible({
+    timeout: 30_000,
+  });
 });

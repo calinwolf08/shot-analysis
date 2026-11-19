@@ -11,6 +11,7 @@ import {
   type AnalysisService,
 } from "$lib/features/analysis";
 import { createWorkerAnalysisService } from "$lib/features/analysis/services/worker-analysis-service";
+import { parsePositioningScript } from "$lib/features/analysis/replay/positioning-script";
 import {
   createAssessmentService,
   type AssessmentService,
@@ -162,11 +163,27 @@ export function selectAnalysisService(): AnalysisService {
       new URLSearchParams(window.location.search).get("e2e") === "replay") ||
     import.meta.env.VITE_ANALYSIS_BACKEND === "replay";
   if (replayRequested) {
+    // Test-only knobs (replay is itself a test backend):
+    //   replayFixture=<id>     which pose fixture the live stream replays
+    //   replaySpeed=<n>        fixture playback multiplier (default 4)
+    //   replayLatencyMs=<ms>   simulated detection latency per frame
+    //   replayScript=<spec>    scripted positioning before the fixture
+    //                          (see replay/positioning-script.ts)
+    const q =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : new URLSearchParams();
+    const num = (key: string, fallback: number) => {
+      const v = Number(q.get(key));
+      return q.has(key) && Number.isFinite(v) && v > 0 ? v : fallback;
+    };
     return createReplayAnalysisService({
       loadFixture: createFetchFixtureLoader(),
-      liveFixtureId: "20201212_134104",
-      liveSpeed: 4,
+      liveFixtureId: q.get("replayFixture") ?? "20201212_134104",
+      liveSpeed: num("replaySpeed", 4),
       liveLoop: true, // live mode behaves like a camera that never stops
+      liveLatencyMs: num("replayLatencyMs", 0),
+      liveScript: parsePositioningScript(q.get("replayScript")),
     });
   }
   return createWorkerAnalysisService();

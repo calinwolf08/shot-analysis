@@ -447,3 +447,52 @@ describe("debug diagnostics", () => {
     expect(near).toHaveLength(0);
   });
 });
+
+describe("arming (positioning gate)", () => {
+  it("ignores shooting motion while unarmed", () => {
+    const analyze = vi.fn().mockResolvedValue(oneShot);
+    const { coordinator, events } = harness(analyze);
+    const cursor = makeCursor();
+    feed(coordinator, stillPose(cursor, 1000));
+    coordinator.setArmed(false);
+    expect(coordinator.armed).toBe(false);
+    feed(coordinator, stillPose(cursor, 1000)); // past the grace window
+    feed(coordinator, shotArc(cursor));
+    expect(coordinator.state).toBe("READY");
+    expect(events.repStarted).toHaveLength(0);
+  });
+
+  it("starts reps again once re-armed", () => {
+    const analyze = vi.fn().mockResolvedValue(oneShot);
+    const { coordinator, events } = harness(analyze);
+    const cursor = makeCursor();
+    feed(coordinator, stillPose(cursor, 1000));
+    coordinator.setArmed(false);
+    feed(coordinator, stillPose(cursor, 1000));
+    coordinator.setArmed(true);
+    feed(coordinator, shotArc(cursor));
+    expect(events.repStarted).toHaveLength(1);
+  });
+
+  it("still starts a rep inside the disarm grace (gate flicker at shot start)", () => {
+    const analyze = vi.fn().mockResolvedValue(oneShot);
+    const { coordinator, events } = harness(analyze);
+    const cursor = makeCursor();
+    feed(coordinator, stillPose(cursor, 1000));
+    coordinator.setArmed(false); // flicker just as the shot begins
+    feed(coordinator, shotArc(cursor));
+    expect(events.repStarted).toHaveLength(1);
+  });
+
+  it("does not abort a rep already in progress", async () => {
+    const analyze = vi.fn().mockResolvedValue(oneShot);
+    const { coordinator } = harness(analyze);
+    const cursor = makeCursor();
+    feed(coordinator, stillPose(cursor, 1000));
+    feed(coordinator, shotArc(cursor));
+    expect(coordinator.state).toBe("ACTIVE");
+    coordinator.setArmed(false);
+    feed(coordinator, stillPose(cursor, 2000));
+    await waitState(coordinator, "FEEDBACK");
+  });
+});

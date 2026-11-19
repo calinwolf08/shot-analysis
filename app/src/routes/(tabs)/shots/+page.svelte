@@ -3,14 +3,25 @@
   import { page } from "$app/state";
   import { useAppServices } from "$lib/shared/config/services-context";
   import type { ShotRecord } from "$lib/shared/db/repos";
-  import { scorecardForShot } from "$lib/features/live-practice";
-  import { loadLiveTargets } from "$lib/features/scoring";
+  import {
+    groupByDay,
+    shotIssue,
+    timeLabel,
+  } from "$lib/features/live-practice/review/shot-list";
+  import {
+    displayScore,
+    loadLiveTargetsV3,
+    scoreBand,
+  } from "$lib/features/scoring/v3";
+  import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
   import { EmptyState } from "$lib/shared/ui";
 
   const services = useAppServices();
 
   let shots = $state<ShotRecord[]>([]);
   let overall = $state<Record<string, number | null>>({});
+  let issue = $state<Record<string, string | null>>({});
+  const groups = $derived(groupByDay(shots, Date.now()));
   let loading = $state(true);
 
   $effect(() => {
@@ -23,13 +34,25 @@
       loading = false;
       return;
     }
-    const targets = await loadLiveTargets();
-    shots = await services.repos.shot.listByPlayer(player.id, { limit: 50 });
+    const targets = await loadLiveTargetsV3();
+    const rows = await services.repos.shot.listByPlayer(player.id, {
+      limit: 50,
+    });
+    const scored = await scoreStoredShots(
+      services.repos.shot,
+      rows,
+      player.shootingHand,
+      targets,
+    );
+    shots = scored.map((x) => x.record);
     const m: Record<string, number | null> = {};
-    for (const s of shots) {
-      m[s.id] = scorecardForShot(s.analysis, targets).overall;
+    const iss: Record<string, string | null> = {};
+    for (const { record, card } of scored) {
+      m[record.id] = card?.overall ?? null;
+      iss[record.id] = shotIssue(card);
     }
     overall = m;
+    issue = iss;
     loading = false;
   }
 
@@ -37,20 +60,17 @@
     void goto(`/shots/${id}${page.url.search}`);
   }
 
+  const BAND_COLOR = {
+    good: "#34d399",
+    fair: "#fde047",
+    off: "#fb923c",
+    far: "#f87171",
+  } as const;
   function color(n: number | null): string {
-    if (n === null) return "#6b7280";
-    if (n <= 1.5) return "#34d399";
-    if (n <= 4) return "#fbbf24";
-    return "#f87171";
+    const b = scoreBand(n);
+    return b ? BAND_COLOR[b] : "#6b7280";
   }
-  const fmt = (n: number | null) => (n === null ? "–" : n.toFixed(1));
-  const when = (t: number) =>
-    new Date(t).toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
+  const fmt = displayScore;
 </script>
 
 <main class="shots" data-testid="shots-list">
@@ -63,29 +83,36 @@
       body="Take some shots in Practice and they'll show up here to review."
     />
   {:else}
-    <ul>
-      {#each shots as s (s.id)}
-        <li class:excluded={s.excluded}>
-          <button
-            class="row"
-            data-testid="shot-row-{s.id}"
-            onclick={() => open(s.id)}
-          >
-            <span
-              class="badge"
-              style="background:{color(overall[s.id] ?? null)}"
-            >
-              {fmt(overall[s.id] ?? null)}
-            </span>
-            <span class="meta">
-              <span class="orient">{s.orientation ?? "shot"}</span>
-              <span class="date">{when(s.createdAt)}</span>
-            </span>
-            <span class="chev">›</span>
-          </button>
-        </li>
-      {/each}
-    </ul>
+    {#each groups as g (g.key)}
+      <section class="day" data-testid="shot-day-{g.key}">
+        <h2 class="day-label" data-testid="shot-day-label">{g.label}</h2>
+        <ul>
+          {#each g.rows as s (s.id)}
+            <li class:excluded={s.excluded}>
+              <button
+                class="row"
+                data-testid="shot-row-{s.id}"
+                onclick={() => open(s.id)}
+              >
+                <span
+                  class="badge"
+                  style="background:{color(overall[s.id] ?? null)}"
+                >
+                  {fmt(overall[s.id] ?? null)}
+                </span>
+                <span class="meta" data-testid="shot-label">
+                  <span class="time">{timeLabel(s.createdAt)}</span>
+                  <span class="issue"
+                    >{issue[s.id] ?? "Not enough tracked to score"}</span
+                  >
+                </span>
+                <span class="chev">›</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/each}
   {/if}
 </main>
 
@@ -144,12 +171,24 @@
     display: flex;
     flex-direction: column;
   }
-  .orient {
-    font-weight: 600;
-    text-transform: capitalize;
+  .day {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-2);
   }
-  .date {
-    font-size: 0.78rem;
+  .day-label {
+    margin: var(--sc-space-2) 0 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sc-text-dim);
+  }
+  .time {
+    font-weight: 600;
+  }
+  .issue {
+    font-size: 0.85rem;
     color: var(--sc-text-dim);
   }
   .chev {

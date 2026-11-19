@@ -1,12 +1,15 @@
 /**
  * Angle gate (live redesign — step 5, §3.3).
  *
- * v1 scores one viewing angle: side-on with the shooting arm toward the camera,
- * matching the approved Stephen Curry side-left baseline. A right-handed shooter
- * sets up as `side-left`; a left-handed shooter mirrors to `side-right` (the
- * pose is mirrored so the same targets apply). The capture screen uses this to
- * guide the user into position and block the start until the detected
- * orientation matches.
+ * v1 scores one viewing angle: side-on with the SHOOTING ARM nearest the
+ * camera (its landmarks are then the clearest). Orientation names say which of
+ * the player's sides is nearest: "side-right" = right side nearest. So a
+ * right-handed shooter sets up as `side-right`, a left-handed one `side-left`.
+ *
+ * Note: the Stephen Curry baseline (right-handed, labeled `side-left`) was
+ * filmed from his GUIDE-hand side. Side-on 2D metrics are mirror images either
+ * way (horizontal offsets are signed "toward the hoop"), so his targets still
+ * apply; only his shooting-arm landmarks are a little noisier.
  *
  * Pure — detection (e.g. the library's `detectOrientation`) feeds the result in.
  */
@@ -25,11 +28,17 @@ export interface AngleGateResult {
 
 /** The side-on orientation a shooter sets up in, given their shooting hand. */
 export function requiredOrientation(hand: ShootingHand): SideOrientation {
-  // Right-handed matches Curry's approved side-left shots; left-handed mirrors.
-  return hand === "right" ? "side-left" : "side-right";
+  // Shooting arm nearest the camera: right hand → right side nearest.
+  return hand === "right" ? "side-right" : "side-left";
 }
 
-/** Evaluates a detected orientation against the required setup for the hand. */
+/**
+ * Evaluates a detected orientation against the required setup for the hand.
+ *
+ * NOTE: the in-loop gate now uses ../loop/readiness (side-aware detector);
+ * this general evaluator, which also words front/behind views, is kept for
+ * when more orientations are accepted (see pipeline/core#allowedOrientations).
+ */
 export function evaluateAngleGate(
   detected: string | null | undefined,
   hand: ShootingHand,

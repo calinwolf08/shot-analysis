@@ -40,7 +40,7 @@ export {
   type ShotEntry,
   type ShotFeedback,
 } from "./loop/live-practice-store.svelte";
-export { buildWorstReadback, phraseFor } from "./loop/readback";
+export { buildCueReadback, feedbackItems } from "./loop/readback";
 export {
   evaluateAngleGate,
   requiredOrientation,
@@ -61,6 +61,9 @@ export {
   type PipelineLocation,
   type ProcessInput,
   type ProcessedShot,
+  type ProcessResult,
+  type RejectedShot,
+  allowedOrientations,
 } from "./pipeline";
 export { default as PracticeScreen } from "./loop/PracticeScreen.svelte";
 export { default as ShotReviewScreen } from "./review/ShotReviewScreen.svelte";

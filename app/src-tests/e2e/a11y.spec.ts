@@ -58,8 +58,8 @@ test("main screens have no serious/critical axe violations", async ({
   await page.waitForURL("**/profile**");
   await expectClean(page, "profile");
 
-  // Live practice loop (setup-less: boots straight in).
-  await page.goto("/practice/live?e2e=replay");
+  // Live practice loop: the Practice tab itself.
+  await page.goto("/practice?e2e=replay");
   await expect(page.getByTestId("practice-loop")).toBeVisible({
     timeout: 30_000,
   });

@@ -1,0 +1,1048 @@
+{
+  "version": 2,
+  "catalog": "v3",
+  "builtFrom": "stephen-curry-1 (7 labeled shots)",
+  "shootingHand": "right",
+  "shots": 7,
+  "generatedAt": "2026-11-19T06:44:50.795Z",
+  "notes": [
+    "Band = the reference shots' observed range: inside it scores 0.",
+    "Outside, the score climbs 1 point per rampSd (the reference spread). Display caps at 10+.",
+    "Hand-edit label / wording / override freely; rebuilds keep them.",
+    "Timing metrics marked lowResolution came from phases only a few frames long — their bands are loose."
+  ],
+  "metrics": {
+    "detail.elbow_height_vs_head": {
+      "phase": "release",
+      "kind": "detail",
+      "unit": "torso",
+      "label": "Elbow height at release",
+      "wording": {
+        "low": {
+          "phrase": "below the head",
+          "cue": "Lift the elbow"
+        },
+        "high": {
+          "phrase": "above the head",
+          "cue": "—"
+        }
+      },
+      "scored": false,
+      "ideal": 0.0150052330871886,
+      "sd": 0.03701230666289832,
+      "passMin": -0.02152322664117739,
+      "passMax": 0.07966573769921688,
+      "rampSd": 0.03701230666289832,
+      "n": 7,
+      "lowResolution": false
+    },
+    "detail.follow_through_elbow_max": {
+      "phase": "release",
+      "kind": "detail",
+      "unit": "deg",
+      "label": "Follow-through extension",
+      "wording": {
+        "low": {
+          "phrase": "arm doesn't fully extend",
+          "cue": "Finish with a straight arm"
+        },
+        "high": {
+          "phrase": "arm locks out",
+          "cue": "—"
+        }
+      },
+      "scored": false,
+      "ideal": 177.39525852269932,
+      "sd": 1.9432291563805277,
+      "passMin": 174.60494209913375,
+      "passMax": 180,
+      "rampSd": 1.9432291563805277,
+      "n": 7,
+      "lowResolution": false
+    },
+    "detail.release_vs_takeoff": {
+      "phase": "release",
+      "kind": "detail",
+      "unit": "s",
+      "label": "Release vs take-off",
+      "wording": {
+        "low": {
+          "phrase": "release before take-off",
+          "cue": "—"
+        },
+        "high": {
+          "phrase": "release long after take-off",
+          "cue": "Release on the way up"
+        }
+      },
+      "scored": false,
+      "ideal": 0.25319823734050395,
+      "sd": 0.20489509921558732,
+      "passMin": 0.04874524819449455,
+      "passMax": 0.5806504828531942,
+      "rampSd": 0.20489509921558732,
+      "n": 7,
+      "lowResolution": false
+    },
+    "detail.wrist_path_deviation": {
+      "phase": "rise",
+      "kind": "detail",
+      "unit": "torso",
+      "label": "Ball path straightness",
+      "wording": {
+        "low": {
+          "phrase": "very straight",
+          "cue": "—"
+        },
+        "high": {
+          "phrase": "ball path curves",
+          "cue": "Bring the ball straight up"
+        }
+      },
+      "scored": false,
+      "ideal": 0.10447381153415593,
+      "sd": 0.05698624490076853,
+      "passMin": 0.030311499053075557,
+      "passMax": 0.21134677222190867,
+      "rampSd": 0.05698624490076853,
+      "n": 7,
+      "lowResolution": false
+    },
+    "load.ball_close": {
+      "phase": "load",
+      "kind": "structure",
+      "unit": "torso",
+      "label": "Ball distance from body",
+      "wording": {
+        "low": {
+          "phrase": "too close",
+          "cue": "Give the ball a little room"
+        },
+        "high": {
+          "phrase": "too far",
+          "cue": "Keep the ball closer"
+        }
+      },
+      "scored": true,
+      "ideal": 0.750369935769496,
+      "sd": 0.04728948269274841,
+      "passMin": 0.6697666464305552,
+      "passMax": 0.7973020907466297,
+      "rampSd": 0.04728948269274841,
+      "n": 7,
+      "lowResolution": false
+    },
+    "load.ball_drop": {
+      "phase": "load",
+      "kind": "structure",
+      "unit": "torso",
+      "label": "Ball dip",
+      "wording": {
+        "low": {
+          "phrase": "too low",
+          "cue": "Don't dip the ball so low"
+        },
+        "high": {
+          "phrase": "not low enough",
+          "cue": "Dip the ball lower"
+        }
+      },
+      "scored": true,
+      "ideal": 0.30341517365554654,
+      "sd": 0.04613727777398559,
+      "passMin": 0.260204014116176,
+      "passMax": 0.3910548953346974,
+      "rampSd": 0.04613727777398559,
+      "n": 7,
+      "lowResolution": false
+    },
+    "load.elbow_angle": {
+      "phase": "load",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Elbow at the dip",
+      "wording": {
+        "low": {
+          "phrase": "too bent",
+          "cue": "Relax your arm at the dip"
+        },
+        "high": {
+          "phrase": "too straight",
+          "cue": "Keep a bend in the elbow at the dip"
+        }
+      },
+      "scored": true,
+      "ideal": 156.85194945469,
+      "sd": 13.988939757392208,
+      "passMin": 140.1684112898169,
+      "passMax": 179.21786852397986,
+      "rampSd": 13.988939757392208,
+      "n": 7,
+      "lowResolution": false
+    },
+    "load.elbow_change": {
+      "phase": "load",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Elbow loading",
+      "wording": {
+        "low": {
+          "phrase": "folds too much",
+          "cue": "Fold the elbow less in the dip"
+        },
+        "high": {
+          "phrase": "doesn't load",
+          "cue": "Load the elbow in the dip"
+        }
+      },
+      "scored": false,
+      "ideal": -39.183831638890844,
+      "sd": 0,
+      "passMin": -39.183831638890844,
+      "passMax": -39.183831638890844,
+      "rampSd": 1.9591915819445422,
+      "n": 1,
+      "lowResolution": false
+    },
+    "load.head_pitch": {
+      "phase": "load",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Head position",
+      "wording": {
+        "low": {
+          "phrase": "tilted back",
+          "cue": "Level your head, eyes on the rim"
+        },
+        "high": {
+          "phrase": "tilted down",
+          "cue": "Lift your chin, eyes on the rim"
+        }
+      },
+      "scored": true,
+      "ideal": -5.3519296380195245,
+      "sd": 2.044618091290232,
+      "passMin": -7.789220927958857,
+      "passMax": -2.702771960704636,
+      "rampSd": 2.044618091290232,
+      "n": 7,
+      "lowResolution": false
+    },
+    "load.hip_over_knee": {
+      "phase": "load",
+      "kind": "structure",
+      "unit": "thigh",
+      "label": "Hips over knees",
+      "wording": {
+        "low": {
+          "phrase": "too far back",
+          "cue": "Sit back a little less"
+        },
+        "high": {
+          "phrase": "too far forward",
+          "cue": "Sit back more"
+        }
+      },
+      "scored": true,
+      "ideal": -0.217607072920446,
+      "sd": 0.03698976637346737,
+      "passMin": -0.26544771537203987,
+      "passMax": -0.159342810238783,
+      "rampSd": 0.03698976637346737,
+      "n": 7,
+      "lowResolution": false
+    },
+    "load.knee_depth": {
+      "phase": "load",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Knee bend",
+      "wording": {
+        "low": {
+          "phrase": "too deep",
+          "cue": "Bend your knees a little less"
+        },
+        "high": {
+          "phrase": "too shallow",
+          "cue": "Bend your knees more"
+        }
+      },
+      "scored": true,
+      "ideal": 132.79363882249183,
+      "sd": 4.326648404749096,
+      "passMin": 126.44922733271595,
+      "passMax": 140.02795586231343,
+      "rampSd": 4.326648404749096,
+      "n": 7,
+      "lowResolution": false
+    },
+    "load.knee_over_ankle": {
+      "phase": "load",
+      "kind": "structure",
+      "unit": "shin",
+      "label": "Knees over feet",
+      "wording": {
+        "low": {
+          "phrase": "too far back",
+          "cue": "Let your knees come forward"
+        },
+        "high": {
+          "phrase": "too far forward",
+          "cue": "Keep your knees over your feet"
+        }
+      },
+      "scored": true,
+      "ideal": 0.4135306509670246,
+      "sd": 0.10661159447398282,
+      "passMin": 0.2323663309250115,
+      "passMax": 0.5104823385580679,
+      "rampSd": 0.10661159447398282,
+      "n": 7,
+      "lowResolution": false
+    },
+    "load.spine_angle": {
+      "phase": "load",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Torso lean",
+      "wording": {
+        "low": {
+          "phrase": "too upright",
+          "cue": "Lean forward a little more"
+        },
+        "high": {
+          "phrase": "leaning too far forward",
+          "cue": "Stay more upright"
+        }
+      },
+      "scored": true,
+      "ideal": -9.014694652395217,
+      "sd": 2.8447760779779845,
+      "passMin": -15.228281550369474,
+      "passMax": -7.3080124454801805,
+      "rampSd": 2.8447760779779845,
+      "n": 7,
+      "lowResolution": false
+    },
+    "load.t_drop_end": {
+      "phase": "load",
+      "kind": "timing",
+      "unit": "phase",
+      "label": "Ball vs hips at the bottom",
+      "wording": {
+        "low": {
+          "phrase": "ball bottoms out before your hips",
+          "cue": "Keep the ball moving down with your hips"
+        },
+        "high": {
+          "phrase": "ball bottoms out after your hips",
+          "cue": "Get the ball down with your hips"
+        }
+      },
+      "scored": true,
+      "ideal": -0.4078482941795115,
+      "sd": 0.09553819921742232,
+      "passMin": -0.5350500255092488,
+      "passMax": -0.22168741242694748,
+      "rampSd": 0.09553819921742232,
+      "n": 7,
+      "lowResolution": false
+    },
+    "load.t_drop_start": {
+      "phase": "load",
+      "kind": "timing",
+      "unit": "phase",
+      "label": "Ball vs hips going down",
+      "wording": {
+        "low": {
+          "phrase": "ball starts down before your hips",
+          "cue": "Start the dip with your hips"
+        },
+        "high": {
+          "phrase": "ball starts down after your hips",
+          "cue": "Start the ball down with your hips"
+        }
+      },
+      "scored": true,
+      "ideal": -0.17981203867361656,
+      "sd": 0.35825420199598423,
+      "passMin": -0.7249214304324311,
+      "passMax": 0.2665459215699592,
+      "rampSd": 0.35825420199598423,
+      "n": 7,
+      "lowResolution": false
+    },
+    "load.t_elbow_bend": {
+      "phase": "load",
+      "kind": "timing",
+      "unit": "phase",
+      "label": "Elbow bend timing",
+      "wording": {
+        "low": {
+          "phrase": "too early",
+          "cue": "Bend the elbow a little later"
+        },
+        "high": {
+          "phrase": "too late",
+          "cue": "Bend the elbow sooner"
+        }
+      },
+      "scored": true,
+      "ideal": 0.39360339171758935,
+      "sd": 0.4713978876314943,
+      "passMin": -0.15071941357660762,
+      "passMax": 0.666458473632586,
+      "rampSd": 0.4713978876314943,
+      "n": 3,
+      "lowResolution": false
+    },
+    "release.elbow_path": {
+      "phase": "release",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Elbow path",
+      "wording": {
+        "low": {
+          "phrase": "drifts back",
+          "cue": "Push the elbow up and through"
+        },
+        "high": {
+          "phrase": "pushes out too far",
+          "cue": "Drive the elbow straight up"
+        }
+      },
+      "scored": true,
+      "ideal": -3.386093592399177,
+      "sd": 11.852365450466888,
+      "passMin": -15.936362023019655,
+      "passMax": 17.638635719437836,
+      "rampSd": 11.852365450466888,
+      "n": 7,
+      "lowResolution": false
+    },
+    "release.forward_drift": {
+      "phase": "release",
+      "kind": "structure",
+      "unit": "leg",
+      "label": "Forward drift",
+      "wording": {
+        "low": {
+          "phrase": "drifting back",
+          "cue": "Don't fade away"
+        },
+        "high": {
+          "phrase": "drifting forward",
+          "cue": "Land where you took off"
+        }
+      },
+      "scored": true,
+      "ideal": 0.12362827991751882,
+      "sd": 0.12043165676785318,
+      "passMin": -0.05729602695136633,
+      "passMax": 0.34377382097977904,
+      "rampSd": 0.12043165676785318,
+      "n": 7,
+      "lowResolution": false
+    },
+    "release.guide_hand_dx": {
+      "phase": "release",
+      "kind": "structure",
+      "unit": "forearm",
+      "label": "Guide hand (front/back)",
+      "wording": {
+        "low": {
+          "phrase": "too far back",
+          "cue": "Keep the guide hand on the side of the ball"
+        },
+        "high": {
+          "phrase": "too far forward",
+          "cue": "Keep the guide hand off the shot"
+        }
+      },
+      "scored": true,
+      "ideal": -0.9091694456972556,
+      "sd": 0.08851929391498937,
+      "passMin": -1.0269056084167523,
+      "passMax": -0.767217450179109,
+      "rampSd": 0.08851929391498937,
+      "n": 7,
+      "lowResolution": false
+    },
+    "release.guide_hand_dy": {
+      "phase": "release",
+      "kind": "structure",
+      "unit": "forearm",
+      "label": "Guide hand (height)",
+      "wording": {
+        "low": {
+          "phrase": "too low",
+          "cue": "Keep the guide hand up"
+        },
+        "high": {
+          "phrase": "too high",
+          "cue": "Lower the guide hand"
+        }
+      },
+      "scored": true,
+      "ideal": -0.04500576282655157,
+      "sd": 0.1526905323285454,
+      "passMin": -0.31350200181095905,
+      "passMax": 0.12683691792745685,
+      "rampSd": 0.1526905323285454,
+      "n": 7,
+      "lowResolution": false
+    },
+    "release.knee_change": {
+      "phase": "release",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Leg drive at release",
+      "wording": {
+        "low": {
+          "phrase": "legs bend during release",
+          "cue": "Finish your leg drive"
+        },
+        "high": {
+          "phrase": "legs still straightening",
+          "cue": "Straighten your legs before you release"
+        }
+      },
+      "scored": true,
+      "ideal": 14.199604802009983,
+      "sd": 10.18811657217239,
+      "passMin": 2.111468671776578,
+      "passMax": 31.34746074577285,
+      "rampSd": 10.18811657217239,
+      "n": 7,
+      "lowResolution": false
+    },
+    "release.spine_change": {
+      "phase": "release",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Torso at release",
+      "wording": {
+        "low": {
+          "phrase": "leaning back",
+          "cue": "Don't fall back"
+        },
+        "high": {
+          "phrase": "leaning forward",
+          "cue": "Stay tall through the release"
+        }
+      },
+      "scored": true,
+      "ideal": 1.9008100726876462,
+      "sd": 1.490279677981685,
+      "passMin": -0.4903920810343134,
+      "passMax": 3.53298545256286,
+      "rampSd": 1.490279677981685,
+      "n": 7,
+      "lowResolution": false
+    },
+    "release.t_legs_vs_arm": {
+      "phase": "release",
+      "kind": "timing",
+      "unit": "phase",
+      "label": "Legs vs arm finishing",
+      "wording": {
+        "low": {
+          "phrase": "legs finish too early",
+          "cue": "Time your legs with your arm"
+        },
+        "high": {
+          "phrase": "legs finish after the arm",
+          "cue": "Finish your legs before the release"
+        }
+      },
+      "scored": true,
+      "ideal": -1.274314616851004,
+      "sd": 1.236721771168314,
+      "passMin": -3.5354014571357624,
+      "passMax": -0.17399182977660665,
+      "rampSd": 1.236721771168314,
+      "n": 7,
+      "lowResolution": true
+    },
+    "release.wrist_snap": {
+      "phase": "release",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Wrist snap",
+      "wording": {
+        "low": {
+          "phrase": "not enough snap",
+          "cue": "Snap the wrist"
+        },
+        "high": {
+          "phrase": "too much snap",
+          "cue": "Smooth out the wrist snap"
+        }
+      },
+      "scored": true,
+      "ideal": 18.92453802455472,
+      "sd": 11.384079998952256,
+      "passMin": 12.402565533637073,
+      "passMax": 44.23776358628993,
+      "rampSd": 11.384079998952256,
+      "n": 7,
+      "lowResolution": false
+    },
+    "release.wrist_vs_head_end": {
+      "phase": "release",
+      "kind": "structure",
+      "unit": "torso",
+      "label": "Release height",
+      "wording": {
+        "low": {
+          "phrase": "too low",
+          "cue": "Release higher"
+        },
+        "high": {
+          "phrase": "too high",
+          "cue": "Release a little lower"
+        }
+      },
+      "scored": true,
+      "ideal": 0.5182333584467422,
+      "sd": 0.0462526620772007,
+      "passMin": 0.4799134896549205,
+      "passMax": 0.6179480096198215,
+      "rampSd": 0.0462526620772007,
+      "n": 7,
+      "lowResolution": false
+    },
+    "rise.elbow_change_1": {
+      "phase": "rise",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Elbow, early rise",
+      "wording": {
+        "low": {
+          "phrase": "folds",
+          "cue": "Keep the elbow steady as you start up"
+        },
+        "high": {
+          "phrase": "opens too early",
+          "cue": "Keep the elbow loaded as you start up"
+        }
+      },
+      "scored": true,
+      "ideal": -22.696929259474263,
+      "sd": 15.801462229309625,
+      "passMin": -46.514559373438736,
+      "passMax": 1.1106690907850378,
+      "rampSd": 15.801462229309625,
+      "n": 7,
+      "lowResolution": false
+    },
+    "rise.elbow_change_2": {
+      "phase": "rise",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Elbow, late rise",
+      "wording": {
+        "low": {
+          "phrase": "folds",
+          "cue": "Don't pull the ball back at the top"
+        },
+        "high": {
+          "phrase": "opens too early",
+          "cue": "Hold the elbow until set point"
+        }
+      },
+      "scored": true,
+      "ideal": 14.285984742659831,
+      "sd": 12.983979152137096,
+      "passMin": -10.461196588113971,
+      "passMax": 27.96383727387986,
+      "rampSd": 12.983979152137096,
+      "n": 7,
+      "lowResolution": false
+    },
+    "rise.head_pitch_change": {
+      "phase": "rise",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Head as you rise",
+      "wording": {
+        "low": {
+          "phrase": "tips back",
+          "cue": "Keep your head level as you rise"
+        },
+        "high": {
+          "phrase": "drops",
+          "cue": "Keep your chin up as you rise"
+        }
+      },
+      "scored": true,
+      "ideal": -0.16970277928117344,
+      "sd": 5.335100805265308,
+      "passMin": -5.836972370871886,
+      "passMax": 9.033751214998805,
+      "rampSd": 5.335100805265308,
+      "n": 7,
+      "lowResolution": false
+    },
+    "rise.spine_change": {
+      "phase": "rise",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Torso as you rise",
+      "wording": {
+        "low": {
+          "phrase": "tips back",
+          "cue": "Stay over the ball as you rise"
+        },
+        "high": {
+          "phrase": "tips forward",
+          "cue": "Rise straight up"
+        }
+      },
+      "scored": true,
+      "ideal": -4.2638998761185745,
+      "sd": 1.6982992153520877,
+      "passMin": -6.60997664620712,
+      "passMax": -1.4858959198586916,
+      "rampSd": 1.6982992153520877,
+      "n": 7,
+      "lowResolution": false
+    },
+    "rise.t_ball_vs_knee_bottom": {
+      "phase": "rise",
+      "kind": "timing",
+      "unit": "phase",
+      "label": "Ball up vs knee bend",
+      "wording": {
+        "low": {
+          "phrase": "ball rises while knees still bend",
+          "cue": "Finish your knee bend before lifting the ball"
+        },
+        "high": {
+          "phrase": "ball waits after the knees bottom out",
+          "cue": "Start the ball up as your knees bottom out"
+        }
+      },
+      "scored": true,
+      "ideal": -0.8985661028834467,
+      "sd": 0.7139688406148502,
+      "passMin": -1.901748699222752,
+      "passMax": 0.07846351224961653,
+      "rampSd": 0.7139688406148502,
+      "n": 7,
+      "lowResolution": true
+    },
+    "rise.t_end": {
+      "phase": "rise",
+      "kind": "timing",
+      "unit": "phase",
+      "label": "Set point vs legs",
+      "wording": {
+        "low": {
+          "phrase": "ball reaches set point too early",
+          "cue": "Let your legs carry the ball up"
+        },
+        "high": {
+          "phrase": "ball reaches set point too late",
+          "cue": "Reach set point as your legs straighten"
+        }
+      },
+      "scored": true,
+      "ideal": 0.039218590114765854,
+      "sd": 1.0261948018502913,
+      "passMin": -1.066237695326885,
+      "passMax": 1.490731992864885,
+      "rampSd": 1.0261948018502913,
+      "n": 7,
+      "lowResolution": true
+    },
+    "rise.t_spine_vs_knees": {
+      "phase": "rise",
+      "kind": "timing",
+      "unit": "phase",
+      "label": "Torso vs legs timing",
+      "wording": {
+        "low": {
+          "phrase": "torso finishes before your legs",
+          "cue": "Rise with your legs"
+        },
+        "high": {
+          "phrase": "torso finishes after your legs",
+          "cue": "Get tall as your legs finish"
+        }
+      },
+      "scored": true,
+      "ideal": -0.32503845936397885,
+      "sd": 1.0294869782408769,
+      "passMin": -1.363230194960329,
+      "passMax": 1.1470083378535776,
+      "rampSd": 1.0294869782408769,
+      "n": 7,
+      "lowResolution": true
+    },
+    "rise.t_start": {
+      "phase": "rise",
+      "kind": "timing",
+      "unit": "phase",
+      "label": "Ball vs legs starting up",
+      "wording": {
+        "low": {
+          "phrase": "ball starts up before your legs",
+          "cue": "Start the rise with your legs"
+        },
+        "high": {
+          "phrase": "ball starts up late",
+          "cue": "Bring the ball up with your legs"
+        }
+      },
+      "scored": true,
+      "ideal": -1.009162227780376,
+      "sd": 0.7721725128335031,
+      "passMin": -2.1028190899630466,
+      "passMax": 0.05300405379425886,
+      "rampSd": 0.7721725128335031,
+      "n": 7,
+      "lowResolution": true
+    },
+    "rise.wrist_hinge_change_1": {
+      "phase": "rise",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Wrist cock, early rise",
+      "wording": {
+        "low": {
+          "phrase": "too much",
+          "cue": "Less wrist cock early"
+        },
+        "high": {
+          "phrase": "not enough",
+          "cue": "Cock the wrist as you start up"
+        }
+      },
+      "scored": true,
+      "ideal": 7.965255944855325,
+      "sd": 14.101833091033829,
+      "passMin": -11.061904638857357,
+      "passMax": 28.07895115057795,
+      "rampSd": 14.101833091033829,
+      "n": 6,
+      "lowResolution": false
+    },
+    "rise.wrist_hinge_change_2": {
+      "phase": "rise",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Wrist cock, late rise",
+      "wording": {
+        "low": {
+          "phrase": "too much",
+          "cue": "Less wrist cock at the top"
+        },
+        "high": {
+          "phrase": "uncocks early",
+          "cue": "Keep the wrist cocked to set point"
+        }
+      },
+      "scored": true,
+      "ideal": -7.054496147998512,
+      "sd": 19.14645150913672,
+      "passMin": -35.99487252943433,
+      "passMax": 12.191191115512282,
+      "rampSd": 19.14645150913672,
+      "n": 7,
+      "lowResolution": false
+    },
+    "setPoint.elbow_angle": {
+      "phase": "setPoint",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Elbow at set point",
+      "wording": {
+        "low": {
+          "phrase": "too bent",
+          "cue": "Open the elbow a little at set point"
+        },
+        "high": {
+          "phrase": "too straight",
+          "cue": "Bend the elbow more at set point"
+        }
+      },
+      "scored": true,
+      "ideal": 54.98093712796261,
+      "sd": 11.85395068887829,
+      "passMin": 36.811217035518666,
+      "passMax": 75.36062529061752,
+      "rampSd": 11.85395068887829,
+      "n": 7,
+      "lowResolution": false
+    },
+    "setPoint.head_pitch": {
+      "phase": "setPoint",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Head at set point",
+      "wording": {
+        "low": {
+          "phrase": "tilted back",
+          "cue": "Level your head, eyes on the rim"
+        },
+        "high": {
+          "phrase": "tilted down",
+          "cue": "Lift your chin, eyes on the rim"
+        }
+      },
+      "scored": true,
+      "ideal": -5.521632417300698,
+      "sd": 6.374157400445653,
+      "passMin": -12.523971075397453,
+      "passMax": 6.330979254294169,
+      "rampSd": 6.374157400445653,
+      "n": 7,
+      "lowResolution": false
+    },
+    "setPoint.hip_angle": {
+      "phase": "setPoint",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Hips at set point",
+      "wording": {
+        "low": {
+          "phrase": "bent at the hips",
+          "cue": "Stand taller at set point"
+        },
+        "high": {
+          "phrase": "hips pushed through",
+          "cue": "Relax the hips at set point"
+        }
+      },
+      "scored": true,
+      "ideal": 166.65095055625676,
+      "sd": 4.632817705264424,
+      "passMin": 159.2293911930074,
+      "passMax": 174.6636258880518,
+      "rampSd": 4.632817705264424,
+      "n": 7,
+      "lowResolution": false
+    },
+    "setPoint.hip_over_knee": {
+      "phase": "setPoint",
+      "kind": "structure",
+      "unit": "thigh",
+      "label": "Hips over knees at set point",
+      "wording": {
+        "low": {
+          "phrase": "too far back",
+          "cue": "Bring your hips under you"
+        },
+        "high": {
+          "phrase": "too far forward",
+          "cue": "Keep your hips over your knees"
+        }
+      },
+      "scored": true,
+      "ideal": 0.004363064805014196,
+      "sd": 0.0726608085272258,
+      "passMin": -0.13451474205564368,
+      "passMax": 0.08005220818893549,
+      "rampSd": 0.0726608085272258,
+      "n": 7,
+      "lowResolution": false
+    },
+    "setPoint.knee_angle": {
+      "phase": "setPoint",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Knees at set point",
+      "wording": {
+        "low": {
+          "phrase": "still bent",
+          "cue": "Straighten your legs by set point"
+        },
+        "high": {
+          "phrase": "legs locked too early",
+          "cue": "Keep a little knee bend at set point"
+        }
+      },
+      "scored": true,
+      "ideal": 157.9001481921314,
+      "sd": 10.650838540395926,
+      "passMin": 138.69762783969367,
+      "passMax": 171.79450312457342,
+      "rampSd": 10.650838540395926,
+      "n": 7,
+      "lowResolution": false
+    },
+    "setPoint.knee_over_ankle": {
+      "phase": "setPoint",
+      "kind": "structure",
+      "unit": "shin",
+      "label": "Knees over feet at set point",
+      "wording": {
+        "low": {
+          "phrase": "too far back",
+          "cue": "Let your knees come forward"
+        },
+        "high": {
+          "phrase": "too far forward",
+          "cue": "Keep your knees over your feet"
+        }
+      },
+      "scored": true,
+      "ideal": 0.3617133986312044,
+      "sd": 0.10053447448403763,
+      "passMin": 0.2048384863359058,
+      "passMax": 0.5134900344583992,
+      "rampSd": 0.10053447448403763,
+      "n": 7,
+      "lowResolution": false
+    },
+    "setPoint.spine_angle": {
+      "phase": "setPoint",
+      "kind": "structure",
+      "unit": "deg",
+      "label": "Torso at set point",
+      "wording": {
+        "low": {
+          "phrase": "leaning back",
+          "cue": "Don't lean back at set point"
+        },
+        "high": {
+          "phrase": "leaning forward",
+          "cue": "Stand tall at set point"
+        }
+      },
+      "scored": true,
+      "ideal": -13.278594528513795,
+      "sd": 1.9840945546462458,
+      "passMin": -16.714177470228165,
+      "passMax": -10.021213172713692,
+      "rampSd": 1.9840945546462458,
+      "n": 7,
+      "lowResolution": false
+    },
+    "setPoint.wrist_vs_head": {
+      "phase": "setPoint",
+      "kind": "structure",
+      "unit": "torso",
+      "label": "Set point height",
+      "wording": {
+        "low": {
+          "phrase": "too low",
+          "cue": "Raise your set point"
+        },
+        "high": {
+          "phrase": "too high",
+          "cue": "Lower your set point"
+        }
+      },
+      "scored": true,
+      "ideal": 0.017122746125332555,
+      "sd": 0.12651946996364982,
+      "passMin": -0.14115351406837115,
+      "passMax": 0.2193162729222302,
+      "rampSd": 0.12651946996364982,
+      "n": 7,
+      "lowResolution": false
+    }
+  }
+}

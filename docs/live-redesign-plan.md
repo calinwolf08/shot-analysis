@@ -15,39 +15,62 @@ and the sequencing to build it. Companion docs:
 > review, the time-window Insights tab, the Practice/Shots/Insights/Profile nav,
 > and the cleanup that retired the old session-bound live path.
 >
-> Deferred (not yet built): on-device clip **video** capture + the "keep video
-> for last N shots" retention setting (the server skeleton track covers review
-> today); full 3D raw-pose persistence for re-analysis; and refreshing the
-> Playwright e2e specs that targeted the old nav/flow.
+> **Since superseded in part** by
+> [practice-loop-fixes-plan.md](./practice-loop-fixes-plan.md):
+>
+> - **Scoring.** Live scoring now uses the **v3 metric catalog** on a
+>   **0–10+ scale** (0 = inside the reference band, +1 per reference spread
+>   beyond it, display capped at "10+"). It is grouped into **four phases:
+>   Load → Rise → Set point → Release**. Gather and Follow-through are gone;
+>   the wrist snap moved into Release. See
+>   [metrics-by-phase.md](./metrics-by-phase.md) for every metric, event and
+>   formula.
+> - **Superseded sections.**
+>   - §3.1 (targets): `live-targets.json` → `live-targets-v3.json`, built by
+>     `npm run targets:build:v3`.
+>   - §3.2 (1..10 deviation scoring, Structure/Sequencing sections, removed):
+>     → `app/src/lib/features/scoring/v3/score.ts`.
+>   - §3.8 (scorecard): → `ScoreCardV3.svelte`.
+> - **Feedback.** The 3 worst issues, in shot order, named by phase: spoken
+>   as coaching cues, shown as measurements.
+> - **Focus areas** are the four phases plus "Rhythm & timing".
+> - **Stored shots.** Shots store `analysis.v3Metrics` (metrics schema 2).
+>   Older shots are recomputed from their stored pose track on first read and
+>   saved.
+> - **Video.** On-device per-shot **video clips** with a "keep video for the
+>   last N shots" setting are built (Phase 7 there).
+> - **Capture.** Live capture runs at 30 fps.
+>
+> Still deferred: full 3D raw-pose persistence.
 
 ---
 
 ## 1. Locked decisions (from the design interview)
 
-| Area | Decision |
-| --- | --- |
-| **Viewing angle (v1)** | ONE angle: **side-on, shooting-arm side**. Matches Stephen Curry's 7 approved `side-left` clips and is the most accurate angle in the labeled corpus. |
-| **Angle setup** | **Detect & guide** to side-on before capture; **block Start** until the live pose reads as the required side with adequate confidence. |
-| **Per-metric scoring** | **SwingCoach-style deviation, lower = better.** `1` = on target; ramps up toward `~10` the further outside the band. Pass-ranges where appropriate. |
-| **Phase grouping** | The existing **6 phases**: gather, load, rise, setPoint, release, followThrough. |
-| **Scorecard layout** | **Two top-level sections — Structure and Sequencing — each grouped by phase**, with a per-metric score, a per-phase group score, a per-section score, and an overall shot score. |
-| **Baseline targets** | Derived from **Curry's approved side shots' spread** (ideal = mean; pass-range from observed spread), written to an **editable JSON** file. Full multi-pro baseline is later work. |
-| **Voice readback** | After each shot, read the **5 worst** metrics (not all). **Terse, interruptible**, no coaching instruction — phrased like **"set point low by 2"**. Replaces the current single-cue audio. |
-| **Audio bracketing** | **Earcon** when a shot is recognized / analysis starts → speak the 5-worst → **earcon** when ready for the next shot. |
-| **Session model** | **No session concept. Fully de-session the schema** — shots root directly on the player with a timestamp; scoring and insights never touch sessions. |
-| **Insights** | Windows **Today / 7d / 30d / All-time**; per window show **recurring issues (ranked worst-first)** + **trends** (overall + per-metric over time). Computed on read; no stored session aggregates. |
-| **Shot storage** | **All** shots' pose data kept server-side by default. |
-| **Video storage** | **Local only, last N shots**, where N is a **user setting**. Older shots fall back to **skeleton reconstruction** from pose. |
-| **Shot review** | Review **any** past shot: scrub the clip (or skeleton) with **skeleton + keyframe markers + per-metric values** overlaid at the measured frame. Included now. |
-| **Navigation** | Top-level tabs: **Practice / Shots / Insights / Profile**. |
-| **Existing flows** | Upload assessment, training plans, drills, onboarding wizard: **hidden for now, code kept** (route the app to the live-first experience; leave the modules unreachable in the UI). |
-| **Deferred** | Metric on/off toggles, drill mode (N-rep streaks), preset/custom metric groups, per-metric video lessons. Not Milestone 1. |
+| Area                   | Decision                                                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Viewing angle (v1)** | ONE angle: **side-on, shooting-arm side**. Matches Stephen Curry's 7 approved `side-left` clips and is the most accurate angle in the labeled corpus.                                             |
+| **Angle setup**        | **Detect & guide** to side-on before capture; **block Start** until the live pose reads as the required side with adequate confidence.                                                            |
+| **Per-metric scoring** | **SwingCoach-style deviation, lower = better.** `1` = on target; ramps up toward `~10` the further outside the band. Pass-ranges where appropriate.                                               |
+| **Phase grouping**     | The existing **6 phases**: gather, load, rise, setPoint, release, followThrough.                                                                                                                  |
+| **Scorecard layout**   | **Two top-level sections — Structure and Sequencing — each grouped by phase**, with a per-metric score, a per-phase group score, a per-section score, and an overall shot score.                  |
+| **Baseline targets**   | Derived from **Curry's approved side shots' spread** (ideal = mean; pass-range from observed spread), written to an **editable JSON** file. Full multi-pro baseline is later work.                |
+| **Voice readback**     | After each shot, read the **5 worst** metrics (not all). **Terse, interruptible**, no coaching instruction — phrased like **"set point low by 2"**. Replaces the current single-cue audio.        |
+| **Audio bracketing**   | **Earcon** when a shot is recognized / analysis starts → speak the 5-worst → **earcon** when ready for the next shot.                                                                             |
+| **Session model**      | **No session concept. Fully de-session the schema** — shots root directly on the player with a timestamp; scoring and insights never touch sessions.                                              |
+| **Insights**           | Windows **Today / 7d / 30d / All-time**; per window show **recurring issues (ranked worst-first)** + **trends** (overall + per-metric over time). Computed on read; no stored session aggregates. |
+| **Shot storage**       | **All** shots' pose data kept server-side by default.                                                                                                                                             |
+| **Video storage**      | **Local only, last N shots**, where N is a **user setting**. Older shots fall back to **skeleton reconstruction** from pose.                                                                      |
+| **Shot review**        | Review **any** past shot: scrub the clip (or skeleton) with **skeleton + keyframe markers + per-metric values** overlaid at the measured frame. Included now.                                     |
+| **Navigation**         | Top-level tabs: **Practice / Shots / Insights / Profile**.                                                                                                                                        |
+| **Existing flows**     | Upload assessment, training plans, drills, onboarding wizard: **hidden for now, code kept** (route the app to the live-first experience; leave the modules unreachable in the UI).                |
+| **Deferred**           | Metric on/off toggles, drill mode (N-rep streaks), preset/custom metric groups, per-metric video lessons. Not Milestone 1.                                                                        |
 
 ### One judgment call to confirm
 
 "Fully de-session the schema" and "keep the assessment/upload code" are in mild
 tension: assessment is inherently session-shaped (one upload = one session of
-shots). **Proposed resolution:** the *live* product is fully de-sessioned —
+shots). **Proposed resolution:** the _live_ product is fully de-sessioned —
 shots root on the player, nothing live creates or reads `sessions`, and
 scoring/insights never reference them. The `sessions` table stays in the schema
 purely as dead storage for the **hidden** assessment path (kept intact, not part
@@ -87,6 +110,8 @@ every shot; the raw clip lives on-device for the most recent N shots only.
 
 ### 3.1 Baseline targets pipeline → `live-targets.json`
 
+> _Superseded: v3 targets in `live-targets-v3.json` (`npm run targets:build:v3`) — see [metrics-by-phase.md](./metrics-by-phase.md#changing-targets-and-wording)._
+
 - New script (root library `src/`, run via an `npm run` target) that loads the
   approved Curry shots in `test-data/stephen-curry-1/` (all 7 `side-left`),
   runs the **v2 metrics** (sequencing + structure) over each shot's labeled
@@ -102,32 +127,38 @@ every shot; the raw clip lives on-device for the most recent N shots only.
     "builtFrom": "stephen-curry-1 (7 side-left)",
     "metrics": {
       "setPoint.elbow_under_ball": {
-        "section": "structure", "phase": "setPoint",
-        "label": "Set point", "unit": "deg",
-        "ideal": 88.4, "sd": 3.1,
-        "passMin": 84.0, "passMax": 93.0,     // observed spread (editable)
-        "rampSd": 3.1,                         // units per deviation step for 1→10
-        "direction": { "low": "low", "high": "high" }
-      }
+        "section": "structure",
+        "phase": "setPoint",
+        "label": "Set point",
+        "unit": "deg",
+        "ideal": 88.4,
+        "sd": 3.1,
+        "passMin": 84.0,
+        "passMax": 93.0, // observed spread (editable)
+        "rampSd": 3.1, // units per deviation step for 1→10
+        "direction": { "low": "low", "high": "high" },
+      },
       // …one entry per scored metric
-    }
+    },
   }
   ```
 
 - **Direction vocabulary** is per metric family: angle/position → `low`/`high`;
   timing/sequencing gaps → `early`/`late`; extension/reach → `short`/`long`.
 - **Caveats baked into the doc output** (mirror
-  [follow-up-work §1.1–1.4](./follow-up-work.md)): 7 clips is a *placeholder*
+  [follow-up-work §1.1–1.4](./follow-up-work.md)): 7 clips is a _placeholder_
   spread; `*.ankles` posture metric is ≈0 by construction (exclude from scoring
   or swap for stance width); `set_point` is the weakest keyframe (~52% @ ±1), so
   its band is widened / down-weighted. The JSON is the hand-tune surface.
 
 ### 3.2 Deviation scoring — `app/src/lib/features/scoring/deviation.ts`
 
+> _Superseded and removed: v3 scoring (0–10+, four phases) in `app/src/lib/features/scoring/v3/score.ts` — see [metrics-by-phase.md](./metrics-by-phase.md#scoring-the-010-scale)._
+
 Pure module, fully unit-tested, no UI/DB deps.
 
 - `scoreMetric(id, value, target)` → `{ score (1–10, lower better), normDev,
-  direction, magnitude, inBand }`:
+direction, magnitude, inBand }`:
   - inside `[passMin,passMax]` → `score = 1`, `magnitude = 0`.
   - outside → `magnitude` = distance from the nearest band edge in native units
     (rounded) for the readback; `normDev = |value − ideal| / sd`;
@@ -166,11 +197,11 @@ Reshape to shot-centric (DB is wiped in dev; migration also backfills to be
 safe):
 
 - **`shots`**: drop `session_id`; add `player_id TEXT NOT NULL REFERENCES
-  players(id)`. Keep `created_at` (the time anchor), `orientation`,
+players(id)`. Keep `created_at` (the time anchor), `orientation`,
   `start/end_frame`, `overall_confidence`, `excluded`, `analysis_json`,
   `video_id`. New index `idx_shots_player ON shots(player_id, created_at)`.
   Backfill `player_id` by joining old `shots → sessions`.
-- **`reps`**: collapsed into `shots` — one live rep *is* one shot. Store rep
+- **`reps`**: collapsed into `shots` — one live rep _is_ one shot. Store rep
   feedback (cues/scorecard summary) on the shot (`feedback_json`) instead of a
   separate `reps` row. (Keep the `reps` table only if the hidden assessment path
   needs it; otherwise drop its live usage.)
@@ -206,10 +237,10 @@ Replaces `LiveSessionStore`:
   then on response **speak the worst-5** terse readback and play the **"ready"
   earcon**. Persist happens server-side.
 - **Readback builder:** for each of worst-5, `${label} ${direction} by
-  ${magnitude}` → e.g. "set point low by 2, elbow flare high by 6, …".
+${magnitude}` → e.g. "set point low by 2, elbow flare high by 6, …".
   Interruptible — a new shot cancels in-flight speech before speaking.
 - **Audio service** (`app/src/lib/shared/audio`): add `playEarcon("analyzing" |
-  "ready")` (two short distinct tones) and `cancel()`; keep `speak`/mute.
+"ready")` (two short distinct tones) and `cancel()`; keep `speak`/mute.
   `createFakeAudio` records earcons for tests.
 - Remove `end()` → summary and the summary route; practice is continuous.
   Pause/resume just stop/start the coordinator.
@@ -227,6 +258,8 @@ Replaces `LiveSessionStore`:
   storage location accordingly. (Risk flagged below.)
 
 ### 3.8 Scorecard component
+
+> _Superseded: `ScoreCardV3.svelte` (phases in shot order, plain-language rows, 0–10+ chips, legend)._
 
 - Renders overall score + two collapsible sections (**Structure**,
   **Sequencing**), each grouped by the 6 phases, with per-group scores and
@@ -271,13 +304,13 @@ Replaces `LiveSessionStore`:
 ## 4. Build sequence (ordered, each independently verifiable)
 
 1. **Targets pipeline + `live-targets.json`** (library script + npm target).
-   *Verify:* JSON emitted from Curry's 7 shots, bands sane, caveats documented.
-2. **Deviation scoring module** (`deviation.ts`) + unit tests. *Verify:* pure
+   _Verify:_ JSON emitted from Curry's 7 shots, bands sane, caveats documented.
+2. **Deviation scoring module** (`deviation.ts`) + unit tests. _Verify:_ pure
    tests for band/ramp/worst-5/grouping.
 3. **Migration 004** (de-session shots/scores, player-rooted) + repo methods +
    migration/repo tests.
 4. **Shot endpoint + server analysis**: player-rooted persistence + deviation
-   scorecard + worst-5. *Verify:* endpoint tests.
+   scorecard + worst-5. _Verify:_ endpoint tests.
 5. **Live store rewrite**: no session, angle gate, earcons + worst-5 readback,
    on-device clip capture + retention.
 6. **Scorecard component** (sections × phases).

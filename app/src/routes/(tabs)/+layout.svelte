@@ -17,7 +17,8 @@
 </script>
 
 <div class="shell">
-  <main>
+  <!-- The Practice tab is the full-screen camera loop: no page padding. -->
+  <main class:bleed={page.url.pathname.startsWith("/practice")}>
     {@render children()}
   </main>
   <nav class="tab-bar" aria-label="Main">
@@ -48,6 +49,10 @@
     max-width: 560px;
     width: 100%;
     margin: 0 auto;
+  }
+  main.bleed {
+    padding: 0 0 calc(84px + env(safe-area-inset-bottom));
+    max-width: none;
   }
   .tab-bar {
     position: fixed;

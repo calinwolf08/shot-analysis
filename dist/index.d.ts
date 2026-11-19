@@ -30,12 +30,14 @@ export type { Orientation } from "./metrics/types";
 export { poseDataSchema, frameSchema } from "./testing/types";
 export type { PoseData, Frame as PoseDataFrame } from "./testing/types";
 export { createPoseDetector, type PoseDetectorConfig, type PoseDetectorRuntime, } from "./pose/factory";
-export { extractShotMetrics, metricsForShot, computeSequencing, computeStructure, } from "./metrics/v2";
+export { extractShotMetrics, metricsForShot, keyframeFramesFromPoseData, computeSequencing, computeStructure, } from "./metrics/v2";
 export { detectKeyframesFromFrames, poseLandmarksToFrames, } from "./detection/keyframe-phases";
 export type { ShotMetricsV2, SequencingMetrics, StructureMetrics, Measurement, ExtractOptions, Thresholds, MetricThreshold, } from "./metrics/v2";
 export { deriveThresholds } from "./metrics/v2";
 export { scoreShot } from "./scoring/v2";
 export type { ShotScore, CategoryScore, MetricScore } from "./scoring/v2";
-export { flattenMetrics, categoryOf, labelFor, categoryLabel } from "./metrics/v2";
+export { flattenMetrics, categoryOf, labelFor, categoryLabel, } from "./metrics/v2";
 export type { FlatMetric } from "./metrics/v2";
+export { computeSignals, detectEvents, phaseWindows, frameAt, timeAt, LABEL_FOR_EVENT, EVENT_PAD_BEFORE, EVENT_PAD_AFTER, isClippedStartLabel, computeShotMetricsV3, metricsFromSignals, flattenMetricsV3, METRICS_V3_SCHEMA_VERSION, DEFAULT_WORDING, wordingFor, buildTargetsV3, effectiveBand, LIVE_TARGETS_V3_VERSION, } from "./metrics/v3";
+export type { ShotSignals, SignalFrame, ShotEvents, EventId, PhaseWindows, ShotMetricsV3, MetricV3, MetricKind, MetricPhase, MetricUnit, LiveTargetsV3, TargetV3, MetricWording, } from "./metrics/v3";
 //# sourceMappingURL=index.d.ts.map

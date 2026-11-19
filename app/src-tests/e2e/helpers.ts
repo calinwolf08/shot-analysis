@@ -51,10 +51,57 @@ export async function onboard(
 }
 
 /**
- * Waits for the continuous practice loop. The setup screen is gone: the loop
- * boots straight into practice. In replay there's no camera, so the in-loop
- * positioning gate is inactive and the replayed pose stream drives shots.
+ * The Practice tab IS the live loop: it opens the camera on arrival. This
+ * waits for it and taps the one-time "Tap to start" (audio unlock + shot
+ * detection) when shown — it's only shown once per page load.
  */
 export async function startLiveLoop(page: Page): Promise<void> {
   await page.getByTestId("practice-loop").waitFor({ timeout: 30_000 });
+  const start = page.getByTestId("practice-start");
+  if (await start.isVisible()) await start.click();
+  await start.waitFor({ state: "detached" });
+}
+
+/**
+ * Where review screenshots go: test-results/screens/<group>/<name>.png
+ * (Playwright clears test-results/ at the start of each run).
+ */
+export function screenPath(group: string, name: string): string {
+  return `test-results/screens/${group}/${name}.png`;
+}
+
+/** GET an app API route as the signed-in user (bearer token from storage). */
+export async function apiGet<T>(page: Page, path: string): Promise<T> {
+  return page.evaluate(async (p) => {
+    const token = localStorage.getItem("shotcoach.bearer_token");
+    const res = await fetch(p, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error(`${p} → HTTP ${res.status}`);
+    return res.json();
+  }, path) as Promise<T>;
+}
+
+/** POST JSON to an app API route as the signed-in user. */
+export async function apiPost<T>(
+  page: Page,
+  path: string,
+  body: unknown,
+): Promise<T> {
+  return page.evaluate(
+    async ({ p, b }) => {
+      const token = localStorage.getItem("shotcoach.bearer_token");
+      const res = await fetch(p, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(b),
+      });
+      if (!res.ok) throw new Error(`${p} → HTTP ${res.status}`);
+      return res.json();
+    },
+    { p: path, b: body },
+  ) as Promise<T>;
 }

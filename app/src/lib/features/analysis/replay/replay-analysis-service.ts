@@ -11,10 +11,13 @@ import type {
   AnalyzeOptions,
   LandmarkFrame,
   LiveAnalysisSession,
+  LiveSessionStats,
   ProgressCallback,
 } from "../types";
+import { createLatencyTracker } from "../services/latency";
 import { isFixtureRef } from "../types";
 import { poseDataToLandmarkFrames, runReplayAnalysis } from "./replay-pipeline";
+import { scriptFrames, type ScriptSegment } from "./positioning-script";
 
 export type FixtureLoader = (fixtureId: string) => Promise<unknown>;
 
@@ -35,6 +38,16 @@ export interface ReplayAnalysisServiceOptions {
    * live stream behaves like a camera that never stops. Default false.
    */
   liveLoop?: boolean;
+  /**
+   * Simulated pose-detection latency: each frame is stamped with `captureTs`
+   * when "captured" and delivered this many ms later. Default 0.
+   */
+  liveLatencyMs?: number;
+  /**
+   * Scripted positioning segments played (at real time, unaffected by
+   * liveSpeed) BEFORE the fixture's frames — see ./positioning-script.
+   */
+  liveScript?: readonly ScriptSegment[];
 }
 
 const defaultSchedule = (cb: () => void, ms: number): (() => void) => {
@@ -96,6 +109,8 @@ export function createReplayAnalysisService(
         schedule,
         speed: options.liveSpeed ?? 1,
         loop: options.liveLoop ?? false,
+        latencyMs: options.liveLatencyMs ?? 0,
+        script: options.liveScript ?? [],
         opts,
       });
     },
@@ -107,6 +122,8 @@ interface ReplayLiveSessionDeps {
   schedule: (cb: () => void, ms: number) => () => void;
   speed: number;
   loop: boolean;
+  latencyMs: number;
+  script: readonly ScriptSegment[];
   opts: AnalyzeOptions;
 }
 
@@ -117,6 +134,9 @@ function createReplayLiveSession(
   let cancel: (() => void) | null = null;
   let stopped = false;
   let fps = 30;
+  let size: { width: number; height: number } | null = null;
+  const latency = createLatencyTracker(30);
+  let delivered = 0;
 
   return {
     get fps() {
@@ -130,14 +150,43 @@ function createReplayLiveSession(
     async start() {
       const pose = await deps.loadPoseData();
       fps = pose.fps;
+      if (pose.width > 1 && pose.height > 1) {
+        size = { width: pose.width, height: pose.height };
+      }
       const frames = poseDataToLandmarkFrames(pose);
       const intervalMs = 1000 / (pose.fps * deps.speed);
       const spanFrames = frames.length;
       const spanMs = spanFrames * (1000 / pose.fps);
+      // Scripted positioning frames run first, at real time, then the fixture
+      // continues with indexes/timestamps offset to stay monotonic.
+      const scripted = scriptFrames(
+        deps.script,
+        pose.fps,
+        deps.opts.shootingHand,
+      );
+      const scriptMs = scripted.length * (1000 / pose.fps);
+      let s = 0;
       let i = 0;
       let lap = 0;
+      const emit = (frame: LandmarkFrame) => {
+        const stamped = { ...frame, captureTs: performance.now() };
+        const deliver = () => {
+          if (stopped) return;
+          latency.add(performance.now() - stamped.captureTs);
+          delivered += 1;
+          for (const cb of subscribers) cb(stamped);
+        };
+        if (deps.latencyMs > 0) setTimeout(deliver, deps.latencyMs);
+        else deliver();
+      };
       const tick = () => {
         if (stopped) return;
+        if (s < scripted.length) {
+          emit(scripted[s]!);
+          s += 1;
+          cancel = deps.schedule(tick, 1000 / pose.fps);
+          return;
+        }
         if (i >= frames.length) {
           if (!deps.loop) return;
           // Loop: replay from the top with monotonic indexes/timestamps.
@@ -147,15 +196,11 @@ function createReplayLiveSession(
         const source = frames[i];
         i += 1;
         if (source) {
-          const frame =
-            lap === 0
-              ? source
-              : {
-                  ...source,
-                  frameIndex: source.frameIndex + lap * spanFrames,
-                  timestamp: source.timestamp + lap * spanMs,
-                };
-          for (const cb of subscribers) cb(frame);
+          emit({
+            ...source,
+            frameIndex: source.frameIndex + lap * spanFrames + scripted.length,
+            timestamp: source.timestamp + lap * spanMs + scriptMs,
+          });
         }
         cancel = deps.schedule(tick, intervalMs);
       };
@@ -164,6 +209,21 @@ function createReplayLiveSession(
 
     async analyzeWindow(frames) {
       return runReplayAnalysis(frames, deps.opts, { fps });
+    },
+
+    frameSize() {
+      return size;
+    },
+
+    stats(): LiveSessionStats {
+      return {
+        model: null, // replay has no pose model
+        p50LatencyMs: latency.p50(),
+        framesDelivered: delivered,
+        framesSkipped: 0,
+        maxInFlight: 0,
+        fallbacks: 0,
+      };
     },
 
     async stop() {

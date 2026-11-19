@@ -95,6 +95,9 @@ export function createRemoteRepos(api: ApiClient): AppRepos {
     async setExcluded(id, excluded) {
       await api.send(`/api/shots/${id}`, { excluded }, "PATCH");
     },
+    async updateAnalysis(id, analysis) {
+      await api.send(`/api/shots/${id}`, { analysis }, "PATCH");
+    },
     async getPoses(id) {
       try {
         return await api.get<ShotReviewPoses>(`/api/shots/${id}/poses`);

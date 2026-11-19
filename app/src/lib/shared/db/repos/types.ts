@@ -99,6 +99,12 @@ export interface RepRecord {
 export interface ReviewPoseFrame {
   /** Analysis-aligned frame index (matches keyframes + metric frame refs). */
   readonly frameIndex: number;
+  /**
+   * When the frame was captured (ms, the live pose-frame clock — the same
+   * clock the shot's video clip start is recorded on). Lets review seek the
+   * video exactly. Absent on older shots.
+   */
+  readonly t?: number;
   readonly landmarks: {
     readonly x: number;
     readonly y: number;
@@ -109,5 +115,12 @@ export interface ReviewPoseFrame {
 /** A shot's persisted review pose track (the skeleton-fallback source). */
 export interface ShotReviewPoses {
   readonly fps: number;
+  /**
+   * Source frame size in pixels. Landmarks are normalized to [0,1] on EACH
+   * axis, so drawing them undistorted needs this aspect ratio. Absent on shots
+   * saved before it was recorded (the review then estimates it).
+   */
+  readonly width?: number;
+  readonly height?: number;
   readonly frames: ReviewPoseFrame[];
 }

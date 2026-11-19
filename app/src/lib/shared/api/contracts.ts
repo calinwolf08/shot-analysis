@@ -61,9 +61,14 @@ export const shotAnalysisSchema = z
   .passthrough();
 export const reviewPosesSchema = z.object({
   fps: z.number(),
+  // Source frame size (pixels) — the aspect ratio the review needs to draw
+  // the pose undistorted. Absent on shots saved before it was recorded.
+  width: z.number().positive().optional(),
+  height: z.number().positive().optional(),
   frames: z.array(
     z.object({
       frameIndex: z.number().int().nonnegative(),
+      t: z.number().optional(),
       landmarks: z.array(
         z.object({ x: z.number(), y: z.number(), visibility: z.number() }),
       ),
@@ -82,6 +87,11 @@ export const saveAnalysisBody = z
     message: "playerId or sessionId is required",
   });
 export const setExcludedBody = z.object({ excluded: z.boolean() });
+/** PATCH /api/shots/:id — exclude/include, or replace the analysis (migration). */
+export const patchShotBody = z.union([
+  setExcludedBody,
+  z.object({ analysis: shotAnalysisSchema }),
+]);
 
 // --- scores ----------------------------------------------------------------
 export const insertScoreBody = z.object({
@@ -121,6 +131,8 @@ export const setSettingBody = z.object({ value: z.unknown() });
 export const analyzeLiveShotBody = z.object({
   playerId: z.string().min(1),
   poseData: z.unknown(),
+  /** Posed-frame index of the rep trigger (one shot per rep). */
+  focusIndex: z.number().int().nonnegative().optional(),
 });
 export const analyzeSessionBody = z.object({
   playerId: z.string().min(1),

@@ -1,37 +1,36 @@
 <script lang="ts">
   /**
-   * Dev-only replay harness for the live-first deviation scoring (step 6).
+   * Dev-only replay harness for live scoring (v3 metrics, 0–10+ scale).
    *
    * Load a `poses.json` (anything from `test-data/`, e.g. the Curry clips) — it's
    * run through the SAME isomorphic core the live pipeline uses (`analyzeAndScore`)
    * against the live targets, then each detected shot is rendered with the
-   * deviation ScoreCard plus the terse voice readback the live loop would speak.
+   * v3 scorecard plus the phase-grouped cues the live loop would speak.
    * Lets you validate scoring + targets from recorded clips with no camera.
    *
    * For the FULL live loop (rep detection + earcons + voice) driven from a video
    * instead of the webcam, use the practice route with `?liveVideo=<url>` in dev.
    */
-  import type { PoseData } from "basketball-shot-analysis";
+  import type { LiveTargetsV3, PoseData } from "basketball-shot-analysis";
   import {
-    ScoreCard,
-    loadLiveTargets,
-    type LiveTargets,
-  } from "$lib/features/scoring";
+    ScoreCardV3,
+    feedbackV3,
+    loadLiveTargetsV3,
+  } from "$lib/features/scoring/v3";
   import {
     analyzeAndScore,
-    buildWorstReadback,
     type ScoredShot,
   } from "$lib/features/live-practice";
 
-  let targets = $state<LiveTargets | null>(null);
+  let targets = $state<LiveTargetsV3 | null>(null);
   let shots = $state<ScoredShot[]>([]);
   let shotIndex = $state(0);
   let hand = $state<"left" | "right">("right");
   let fileName = $state<string | null>(null);
   let error = $state<string | null>(null);
 
-  async function ensureTargets(): Promise<LiveTargets> {
-    if (!targets) targets = await loadLiveTargets();
+  async function ensureTargets(): Promise<LiveTargetsV3> {
+    if (!targets) targets = await loadLiveTargetsV3();
     return targets;
   }
 
@@ -43,13 +42,19 @@
     try {
       const poses = JSON.parse(await file.text()) as PoseData;
       const t = await ensureTargets();
-      shots = analyzeAndScore(
+      const res = analyzeAndScore(
         poses,
         { shootingHand: hand, profile: "pro-form" },
         t,
       );
+      shots = res.shots;
       shotIndex = 0;
-      if (shots.length === 0) error = "No shots detected in this poses file.";
+      if (shots.length === 0) {
+        error =
+          res.rejected.length > 0
+            ? `No accepted shots: ${res.rejected.length} detected from a camera angle live practice rejects (${[...new Set(res.rejected.map((r) => r.orientation))].join(", ")}).`
+            : "No shots detected in this poses file.";
+      }
     } catch (err) {
       error = (err as Error).message;
       shots = [];
@@ -57,16 +62,7 @@
   }
 
   const current = $derived(shots[shotIndex] ?? null);
-  const readback = $derived(
-    current
-      ? buildWorstReadback(current.worst, {
-          durationFrames:
-            current.analysis.frameRange.end -
-            current.analysis.frameRange.start +
-            1,
-        })
-      : "",
-  );
+  const fb = $derived(current ? feedbackV3(current.scorecard) : null);
 </script>
 
 <div class="page">
@@ -98,13 +94,15 @@
         </button>
       {/each}
     </div>
-    {#if current}
-      {#if readback}
-        <p class="readback" data-testid="replay-readback">🔊 “{readback}”</p>
+    {#if current && fb}
+      {#if fb.spoken}
+        <p class="readback" data-testid="replay-readback-v3">
+          🔊 “{fb.spoken}”
+        </p>
       {:else}
-        <p class="readback dim">No metrics off target — nothing to call out.</p>
+        <p class="readback dim">On target — nothing to call out.</p>
       {/if}
-      <ScoreCard card={current.scorecard} />
+      <ScoreCardV3 card={current.scorecard} />
     {/if}
   {/if}
 </div>

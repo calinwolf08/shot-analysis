@@ -13,6 +13,11 @@ const MARKERS = [
   "debug-analyze-run",
   "debug-drill-list",
   "live-debug-hud",
+  "__scAudioLog",
+  "debug-tools-link",
+  "reference-viewer",
+  "debug-index",
+  '"detectDelayMs"', // ?detectDelayMs= slow-phone knob (live page)
 ];
 
 const here = dirname(fileURLToPath(import.meta.url));

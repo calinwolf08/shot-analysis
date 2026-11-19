@@ -272,3 +272,185 @@ describe("WorkerAnalysisService.createLiveSession (mocked worker)", () => {
     expect(fake.terminated).toBe(true);
   });
 });
+
+describe("WorkerAnalysisService live backpressure + latency fallback", () => {
+  /**
+   * A worker that holds landmark replies until the test releases them, so
+   * "detection still running" can be simulated precisely.
+   */
+  function makeHeldWorker() {
+    const pending: (() => void)[] = [];
+    const fake = makeFakeWorker((message, reply) => {
+      if (message.type === "init" || message.type === "setModel") {
+        reply({ type: "ready" });
+      }
+      if (message.type === "frames") {
+        const f = message.frames[0]!;
+        pending.push(() =>
+          reply({
+            type: "landmarks",
+            frame: {
+              frameIndex: f.frameIndex,
+              timestamp: f.timestamp,
+              poseConfidence: 0.9,
+              ...(f.captureTs !== undefined ? { captureTs: f.captureTs } : {}),
+              landmarks: null,
+            },
+          }),
+        );
+      }
+    });
+    const releaseAll = () => {
+      while (pending.length) pending.shift()!();
+    };
+    return { fake, pending, releaseAll };
+  }
+
+  const frame = (i: number, captureTs?: number) => ({
+    data: new Uint8ClampedArray([0, 0, 0, 255]),
+    width: 1,
+    height: 1,
+    frameIndex: i,
+    timestamp: i * 66,
+    ...(captureTs !== undefined ? { captureTs } : {}),
+  });
+
+  it("keeps at most one frame in flight and skips while busy", async () => {
+    const { fake, pending, releaseAll } = makeHeldWorker();
+    const session = createWorkerAnalysisService({
+      makeWorker: () => fake.worker,
+    }).createLiveSession(opts);
+    const got: number[] = [];
+    session.onFrame((f) => got.push(f.frameIndex));
+    await session.start();
+
+    session.pushFrame!(frame(1));
+    await vi.waitFor(() => expect(pending).toHaveLength(1));
+    expect(session.isBusy!()).toBe(true);
+    // Capture keeps ticking while detection is slow: these must NOT queue.
+    session.pushFrame!(frame(2));
+    session.pushFrame!(frame(3));
+    expect(fake.received.filter((m) => m.type === "frames")).toHaveLength(1);
+
+    releaseAll();
+    await vi.waitFor(() => expect(got).toEqual([1]));
+    expect(session.isBusy!()).toBe(false);
+    session.pushFrame!(frame(4));
+    await vi.waitFor(() => expect(pending).toHaveLength(1));
+    releaseAll();
+    await vi.waitFor(() => expect(got).toEqual([1, 4]));
+
+    const stats = session.stats!();
+    expect(stats.maxInFlight).toBe(1);
+    expect(stats.framesSkipped).toBeGreaterThanOrEqual(2);
+    expect(stats.framesDelivered).toBe(2);
+    await session.stop();
+  });
+
+  it("stamps captureTs and measures capture→landmarks latency", async () => {
+    const { fake, pending, releaseAll } = makeHeldWorker();
+    const session = createWorkerAnalysisService({
+      makeWorker: () => fake.worker,
+    }).createLiveSession(opts);
+    await session.start();
+    session.pushFrame!(frame(1, performance.now() - 120));
+    await vi.waitFor(() => expect(pending).toHaveLength(1));
+    const sent = fake.received.find((m) => m.type === "frames");
+    expect(
+      sent && sent.type === "frames" && sent.frames[0]!.captureTs,
+    ).toBeTypeOf("number");
+    releaseAll();
+    await vi.waitFor(() =>
+      expect(session.stats!().p50LatencyMs).toBeGreaterThanOrEqual(120),
+    );
+    await session.stop();
+  });
+
+  async function driveSlow(
+    session: ReturnType<
+      ReturnType<typeof createWorkerAnalysisService>["createLiveSession"]
+    >,
+    held: ReturnType<typeof makeHeldWorker>,
+    n: number,
+    latencyMs: number,
+  ) {
+    for (let i = 0; i < n; i++) {
+      await vi.waitFor(() => expect(session.isBusy!()).toBe(false));
+      session.pushFrame!(frame(i, performance.now() - latencyMs));
+      await vi.waitFor(() => expect(held.pending.length).toBe(1));
+      held.releaseAll();
+    }
+    await vi.waitFor(() => expect(session.isBusy!()).toBe(false));
+  }
+
+  it("falls back to the lite model once when latency stays high (auto)", async () => {
+    const held = makeHeldWorker();
+    const session = createWorkerAnalysisService({
+      makeWorker: () => held.fake.worker,
+    }).createLiveSession(opts, {
+      model: "auto",
+      liteFallbackP50Ms: 150,
+      windowFrames: 4,
+      warmupFrames: 2,
+    });
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    await session.start();
+    expect(session.stats!().model).toBe("full");
+
+    await driveSlow(session, held, 6, 400);
+    const swaps = held.fake.received.filter((m) => m.type === "setModel");
+    expect(swaps).toHaveLength(1);
+    expect(swaps[0]).toMatchObject({
+      modelPath: "/mediapipe/pose_landmarker_lite.task",
+    });
+    expect(session.stats!()).toMatchObject({ model: "lite", fallbacks: 1 });
+
+    // Still slow on lite: no further swaps.
+    await driveSlow(session, held, 8, 400);
+    expect(
+      held.fake.received.filter((m) => m.type === "setModel"),
+    ).toHaveLength(1);
+    info.mockRestore();
+    await session.stop();
+  });
+
+  it("stays on full when fast, and honors a pinned model", async () => {
+    const fast = makeHeldWorker();
+    const s1 = createWorkerAnalysisService({
+      makeWorker: () => fast.fake.worker,
+    }).createLiveSession(opts, { windowFrames: 4, warmupFrames: 2 });
+    await s1.start();
+    await driveSlow(s1, fast, 8, 40);
+    expect(s1.stats!().model).toBe("full");
+    await s1.stop();
+
+    const pinned = makeHeldWorker();
+    const s2 = createWorkerAnalysisService({
+      makeWorker: () => pinned.fake.worker,
+    }).createLiveSession(opts, { model: "lite" });
+    await s2.start();
+    const init = pinned.fake.received.find((m) => m.type === "init");
+    expect(init && init.type === "init" && init.assets.modelPath).toBe(
+      "/mediapipe/pose_landmarker_lite.task",
+    );
+    await s2.stop();
+  });
+
+  it("does not wedge if a frame never comes back", async () => {
+    vi.useFakeTimers({ toFake: ["performance"] });
+    try {
+      const held = makeHeldWorker();
+      const session = createWorkerAnalysisService({
+        makeWorker: () => held.fake.worker,
+      }).createLiveSession(opts);
+      await session.start();
+      session.pushFrame!(frame(1));
+      expect(session.isBusy!()).toBe(true);
+      vi.advanceTimersByTime(2500);
+      expect(session.isBusy!()).toBe(false);
+      await session.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

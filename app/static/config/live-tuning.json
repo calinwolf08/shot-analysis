@@ -1,0 +1,26 @@
+{
+  "$comment": "Live practice tuning. Edit and reload the Practice page; no rebuild needed. Missing keys fall back to defaults; invalid values are ignored with a console warning.",
+  "cues": {
+    "$comment": "Spoken positioning cues. holdMs: a cue must be the current one this long before it is spoken. cooldownMs: silence after any spoken cue. repeatSameMs: min gap before the same cue repeats. readyHoldMs: positioned must hold this long before 'Ready' (Ready ignores the cooldown).",
+    "holdMs": 1500,
+    "cooldownMs": 5000,
+    "repeatSameMs": 10000,
+    "readyHoldMs": 1000
+  },
+  "readiness": {
+    "$comment": "nearSideMinVis/headMinVis: landmark visibility needed for 'whole body in frame' (near side only). fullBodyHoldMs: full body must hold this long. maxSideSeparation: shoulder/hip x-spread divided by torso height; at or below this counts as side-on. orientationWindow: recent frames voted on (~2 s at 30 fps). minOrientationAgreement: fraction of those frames that must agree.",
+    "nearSideMinVis": 0.5,
+    "headMinVis": 0.5,
+    "fullBodyHoldMs": 1000,
+    "maxSideSeparation": 0.5,
+    "orientationWindow": 60,
+    "minOrientationAgreement": 0.6
+  },
+  "latency": {
+    "$comment": "Pose-detection latency (capture \u2192 skeleton). model: 'auto' starts on the full model and switches to the faster 'lite' model once if the median latency over windowFrames (after warmupFrames) exceeds liteFallbackP50Ms. Force a model with 'full' or 'lite'.",
+    "model": "auto",
+    "liteFallbackP50Ms": 150,
+    "windowFrames": 30,
+    "warmupFrames": 15
+  }
+}

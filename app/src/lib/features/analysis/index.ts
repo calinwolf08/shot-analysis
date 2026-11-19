@@ -7,6 +7,8 @@ export type {
   FixtureRef,
   LandmarkFrame,
   LiveAnalysisSession,
+  LiveSessionOptions,
+  LiveSessionStats,
   ProgressCallback,
 } from "./types";
 export { isFixtureRef } from "./types";

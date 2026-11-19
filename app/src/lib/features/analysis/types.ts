@@ -44,6 +44,12 @@ export interface LandmarkFrame {
   /** Milliseconds since session start. */
   timestamp: number;
   poseConfidence: number;
+  /**
+   * performance.now() when the source image was captured (before pose
+   * detection). Lets the loop measure end-to-end latency; absent on sources
+   * that don't stamp it.
+   */
+  captureTs?: number;
   landmarks:
     | readonly {
         x: number;
@@ -81,7 +87,22 @@ export interface LiveAnalysisSession {
     height: number;
     frameIndex: number;
     timestamp: number;
+    captureTs?: number;
   }): void;
+  /**
+   * Backpressure: true while a pushed frame is still being detected (or the
+   * model is being swapped). Capture skips frames instead of queueing them,
+   * so the landmarks the player sees are never from a stale backlog.
+   */
+  isBusy?(): boolean;
+  /** Live latency/model diagnostics (debug HUD + e2e). */
+  stats?(): LiveSessionStats;
+  /**
+   * Pixel size of the frames the landmarks were detected on (aspect ratio is
+   * what matters), or null before the first frame. Stored with each shot so
+   * the review can draw the pose undistorted.
+   */
+  frameSize?(): { width: number; height: number } | null;
   start(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -104,5 +125,37 @@ export interface AnalysisService {
     onProgress?: ProgressCallback,
   ): Promise<PoseData>;
   /** Create a live session (camera-backed in production, replay in tests). */
-  createLiveSession(opts: AnalyzeOptions): LiveAnalysisSession;
+  createLiveSession(
+    opts: AnalyzeOptions,
+    live?: LiveSessionOptions,
+  ): LiveAnalysisSession;
+}
+
+/** Live pose-model selection + latency fallback (from the tuning file). */
+export interface LiveSessionOptions {
+  /** "auto" starts on the full model and may fall back to lite. */
+  readonly model?: "auto" | "full" | "lite";
+  /** Fall back to lite when the windowed median latency exceeds this (ms). */
+  readonly liteFallbackP50Ms?: number;
+  /** Latency samples per decision window. */
+  readonly windowFrames?: number;
+  /** Ignore this many first samples (warm-up). */
+  readonly warmupFrames?: number;
+  /** Dev/E2E only: extra ms per detection in the worker (slow-phone sim). */
+  readonly debugDetectDelayMs?: number;
+}
+
+export interface LiveSessionStats {
+  /** Pose model in use (null for sources without one, e.g. replay). */
+  readonly model: "full" | "lite" | null;
+  /** Median capture→landmarks latency over the recent window (ms). */
+  readonly p50LatencyMs: number | null;
+  /** Landmark frames delivered. */
+  readonly framesDelivered: number;
+  /** Capture ticks skipped because detection was still busy. */
+  readonly framesSkipped: number;
+  /** Highest number of frames ever in flight at once (1 with backpressure). */
+  readonly maxInFlight: number;
+  /** Times the session fell back to the lite model. */
+  readonly fallbacks: number;
 }

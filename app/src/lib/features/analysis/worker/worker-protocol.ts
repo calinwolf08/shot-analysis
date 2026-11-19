@@ -22,6 +22,8 @@ const framePayloadSchema = z.object({
   height: z.number().int().positive(),
   frameIndex: z.number().int().nonnegative(),
   timestamp: z.number().nonnegative(),
+  /** Main-thread performance.now() at capture (echoed back for latency). */
+  captureTs: z.number().optional(),
 });
 export type FramePayload = z.infer<typeof framePayloadSchema>;
 
@@ -35,6 +37,8 @@ export const toWorkerSchema = z.discriminatedUnion("type", [
       wasmBasePath: z.string(),
       modelPath: z.string(),
     }),
+    /** Dev/E2E only: extra ms per detection, to imitate a slow phone. */
+    debugDetectDelayMs: z.number().nonnegative().optional(),
   }),
   z.object({
     type: z.literal("frames"),
@@ -45,6 +49,9 @@ export const toWorkerSchema = z.discriminatedUnion("type", [
   // analysis) instead of running the pipeline in the worker.
   z.object({ type: z.literal("finalizePoses") }),
   z.object({ type: z.literal("cancel") }),
+  // Live mode: swap the pose model in place (e.g. full → lite when latency is
+  // too high). The worker closes the old detector and replies "ready".
+  z.object({ type: z.literal("setModel"), modelPath: z.string() }),
 ]);
 export type ToWorkerMessage = z.infer<typeof toWorkerSchema>;
 
@@ -59,6 +66,7 @@ const landmarkFrameSchema = z.object({
   frameIndex: z.number().int().nonnegative(),
   timestamp: z.number().nonnegative(),
   poseConfidence: z.number(),
+  captureTs: z.number().optional(),
   landmarks: z
     .array(
       z.object({

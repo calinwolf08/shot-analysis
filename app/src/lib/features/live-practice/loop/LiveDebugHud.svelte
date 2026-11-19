@@ -13,7 +13,36 @@
     LiveRepCoordinator,
   } from "../coordinator/coordinator";
 
-  let { coordinator }: { coordinator: LiveRepCoordinator } = $props();
+  import type {
+    LiveAnalysisSession,
+    LiveSessionStats,
+  } from "$lib/features/analysis";
+
+  let {
+    coordinator,
+    session = null,
+  }: {
+    coordinator: LiveRepCoordinator;
+    /** Source of pose latency / model stats (optional). */
+    session?: LiveAnalysisSession | null;
+  } = $props();
+
+  let stats = $state<LiveSessionStats | null>(null);
+  $effect(() => {
+    if (!session?.stats) return;
+    const s = session;
+    let lastModel: string | null = null;
+    const id = setInterval(() => {
+      stats = s.stats!();
+      if (stats.model !== lastModel) {
+        if (lastModel !== null) {
+          push(snap?.timestamp ?? 0, `pose model → ${stats.model}`);
+        }
+        lastModel = stats.model;
+      }
+    }, 500);
+    return () => clearInterval(id);
+  });
 
   type Debug = CoordinatorEvents["debug"];
   let snap = $state<Debug | null>(null);
@@ -125,6 +154,24 @@
         : "—"}
     </span>
   </div>
+  {#if stats}
+    <div class="row">
+      <span class="k">pose</span>
+      <span class="v" data-testid="live-debug-latency"
+        >{stats.p50LatencyMs === null
+          ? "—"
+          : `${Math.round(stats.p50LatencyMs)}ms`}</span
+      >
+      <span class="k">model</span>
+      <span class="v" data-testid="live-debug-model"
+        >{stats.model ?? "replay"}</span
+      >
+      <span class="k">skip</span>
+      <span class="v" data-testid="live-debug-skipped"
+        >{stats.framesSkipped}</span
+      >
+    </div>
+  {/if}
   <ol class="log" data-testid="live-debug-log">
     {#each log as entry, i (log.length - i)}
       <li>{fmtTs(entry.at)} · {entry.text}</li>

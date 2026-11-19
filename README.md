@@ -12,16 +12,17 @@ coaches the player.
 
 ## Documentation map
 
-| Doc                                                                          | What it covers                                                              |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [`SETUP.md`](SETUP.md)                                                       | Install, run locally, build, and publish the iOS/Android apps               |
-| [`docs/architecture.md`](docs/architecture.md)                               | System topology, analysis stack, scoring, auth, persistence (with diagrams) |
-| [`docs/shot-detection-and-analysis.md`](docs/shot-detection-and-analysis.md) | The detection & analysis algorithm in plain language (granular diagrams)    |
-| [`docs/metrics-by-phase.md`](docs/metrics-by-phase.md)                       | Every metric, organized by shot phase                                       |
-| [`docs/follow-up-work.md`](docs/follow-up-work.md)                           | Production-readiness recommendations                                        |
-| [`docs/test-plan.md`](docs/test-plan.md)                                     | Test-coverage audit and hardening plan                                      |
-| [`app/README.md`](app/README.md)                                             | Running the app                                                             |
-| [`app/docs/VALIDATION.md`](app/docs/VALIDATION.md)                           | Manual validation                                                           |
+| Doc                                                                          | What it covers                                                                 |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`SETUP.md`](SETUP.md)                                                       | Install, run locally, build, and publish the iOS/Android apps                  |
+| [`docs/architecture.md`](docs/architecture.md)                               | System topology, analysis stack, scoring, auth, persistence (with diagrams)    |
+| [`docs/shot-detection-and-analysis.md`](docs/shot-detection-and-analysis.md) | The detection & analysis algorithm in plain language (granular diagrams)       |
+| [`docs/metrics-by-phase.md`](docs/metrics-by-phase.md)                       | The v3 metric catalog live scoring uses: events, phases, formulas, 0–10+ scale |
+| [`docs/practice-loop-fixes-plan.md`](docs/practice-loop-fixes-plan.md)       | Practice-loop fixes + v3 metrics plan, with per-phase implementation notes     |
+| [`docs/follow-up-work.md`](docs/follow-up-work.md)                           | Production-readiness recommendations                                           |
+| [`docs/test-plan.md`](docs/test-plan.md)                                     | Test-coverage audit and hardening plan                                         |
+| [`app/README.md`](app/README.md)                                             | Running the app                                                                |
+| [`app/docs/VALIDATION.md`](app/docs/VALIDATION.md)                           | Manual validation                                                              |
 
 ---
 
@@ -66,12 +67,13 @@ The commands below share one format, so the same pipeline works for placeholder
 `test-data` clips today and real clips later. See
 [`docs/shot-detection-and-analysis.md`](docs/shot-detection-and-analysis.md#6-from-metrics-to-a-score).
 
-| Command                                 | What it does                                                                                                                                                                                                                                                                                                         |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run metrics:extract [-- <player>]` | Extract v2 metrics for every clip under `reference-data/players/<player>/clip-N/poses.json`; writes per-clip metrics + per-player summaries and prints a reliability-aware table. Scaffolds `reference-data/` on first run. Tool: `src/testing/extract-reference-metrics.ts`.                                        |
-| `npm run metrics:thresholds`            | Derive consensus bands + tightness-based weights from the summaries; writes `reference-data/out/thresholds.json` and a review `report.md`. Never clobbers a hand-tuned `thresholds.json`. Tool: `src/testing/derive-thresholds.ts`.                                                                                  |
-| `npm run metrics:reference`             | Build **placeholder** `thresholds.json` + `reference-poses.json` (pro skeletons per keyframe) from `test-data` side-view clips, into `reference/` and `app/static/reference/`. Replace with real `metrics:extract`/`metrics:thresholds` output once clips exist. Tool: `src/testing/build-placeholder-reference.ts`. |
-| `npm run metrics:golden`                | Regenerate the metrics regression golden file (`src/testing/__fixtures__/metrics-golden.json`). The golden test diffs extraction against it. Tool: `src/testing/build-metrics-golden.ts`.                                                                                                                            |
+| Command                                 | What it does                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run metrics:extract [-- <player>]` | Extract v2 metrics for every clip under `reference-data/players/<player>/clip-N/poses.json`; writes per-clip metrics + per-player summaries and prints a reliability-aware table. Scaffolds `reference-data/` on first run. Tool: `src/testing/extract-reference-metrics.ts`.                                                                                                            |
+| `npm run metrics:thresholds`            | Derive consensus bands + tightness-based weights from the summaries; writes `reference-data/out/thresholds.json` and a review `report.md`. Never clobbers a hand-tuned `thresholds.json`. Tool: `src/testing/derive-thresholds.ts`.                                                                                                                                                      |
+| `npm run metrics:reference`             | Build **placeholder** `thresholds.json` + `reference-poses.json` (pro skeletons per keyframe) from `test-data` side-view clips, into `reference/` and `app/static/reference/`. Replace with real `metrics:extract`/`metrics:thresholds` output once clips exist. Tool: `src/testing/build-placeholder-reference.ts`.                                                                     |
+| `npm run targets:build:v3`              | Build the **v3 live targets** (`app/static/reference/live-targets-v3.json`) from Curry's labeled shots: band = observed range, `rampSd` = spread, default wording; keeps hand-edited `label` / `wording` / `override`. Run `npm run build` after. Tool: `src/testing/build-live-targets-v3.ts`. See [`docs/metrics-by-phase.md`](docs/metrics-by-phase.md#changing-targets-and-wording). |
+| `npm run metrics:golden`                | Regenerate the metrics regression golden file (`src/testing/__fixtures__/metrics-golden.json`). The golden test diffs extraction against it. Tool: `src/testing/build-metrics-golden.ts`.                                                                                                                                                                                                |
 
 ### Standalone scripts (`scripts/`, run with `npx tsx`)
 

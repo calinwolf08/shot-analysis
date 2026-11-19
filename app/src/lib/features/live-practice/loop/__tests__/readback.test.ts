@@ -1,84 +1,67 @@
 import { describe, expect, it } from "vitest";
-import type { MetricDeviation } from "$lib/features/scoring";
-import { buildWorstReadback, phraseFor } from "../readback";
+import {
+  FEEDBACK_COUNT,
+  buildCueReadback,
+  feedbackItems,
+  inPhaseOrder,
+  phaseName,
+} from "../readback";
 
-function dev(over: Partial<MetricDeviation>): MetricDeviation {
-  return {
-    id: "setPoint.elbow_flare",
-    label: "Elbow flare",
-    section: "structure",
-    phase: "setPoint",
-    value: 100,
-    ideal: 90,
-    passMin: 85,
-    passMax: 95,
-    unit: "",
-    score: 3,
-    normDev: 2,
-    inBand: false,
-    direction: "high",
-    magnitude: 5,
-    scored: true,
-    ...over,
-  };
-}
+const item = (id: string, cue: string | null = `cue ${id}`) => ({
+  id,
+  phase: id.split(".")[0]!,
+  label: `label ${id}`,
+  cue,
+});
 
-describe("phraseFor", () => {
-  it("renders metric, direction and native-unit magnitude", () => {
-    expect(
-      phraseFor(
-        dev({ label: "Elbow flare", direction: "high", magnitude: 6.2 }),
-      ),
-    ).toBe("Elbow flare high by 6");
+describe("feedbackItems", () => {
+  it("takes the 3 worst, then puts them in shot order", () => {
+    expect(FEEDBACK_COUNT).toBe(3);
+    const worst = [
+      item("release.wrist_snap"),
+      item("load.knee_depth"),
+      item("setPoint.elbow_angle"),
+      item("rise.t_start"), // 4th worst: dropped
+    ];
+    expect(feedbackItems(worst).map((m) => m.id)).toEqual([
+      "load.knee_depth",
+      "setPoint.elbow_angle",
+      "release.wrist_snap",
+    ]);
   });
 
-  it("converts a Δt timing gap to whole frames when duration is known", () => {
-    const m = dev({
-      label: "Set point",
-      direction: "low",
-      unit: "Δt",
-      magnitude: 0.067,
-    });
-    expect(phraseFor(m, 30)).toBe("Set point low by 2"); // round(0.067*30)
-  });
-
-  it("keeps small fractional magnitudes legible", () => {
-    expect(
-      phraseFor(dev({ label: "Depth", direction: "low", magnitude: 0.03 })),
-    ).toBe("Depth low by 0.03");
-  });
-
-  it("drops the magnitude when there is no direction", () => {
-    expect(
-      phraseFor(dev({ label: "Elbow flare", direction: null, magnitude: 0 })),
-    ).toBe("Elbow flare");
+  it("is stable within a phase and puts unknown phases last", () => {
+    const xs = [item("x.a"), item("load.b"), item("load.c")];
+    expect(inPhaseOrder(xs).map((m) => m.id)).toEqual([
+      "load.b",
+      "load.c",
+      "x.a",
+    ]);
   });
 });
 
-describe("buildWorstReadback", () => {
-  it("joins the worst metrics into one terse phrase", () => {
-    const worst = [
-      dev({
-        label: "Set point",
-        direction: "low",
-        unit: "Δt",
-        magnitude: 0.067,
-      }),
-      dev({ label: "Elbow flare", direction: "high", magnitude: 6 }),
-    ];
-    expect(buildWorstReadback(worst, { durationFrames: 30 })).toBe(
-      "Set point low by 2, Elbow flare high by 6",
+describe("buildCueReadback", () => {
+  it("speaks cues grouped under their phase name", () => {
+    expect(
+      buildCueReadback([
+        item("load.knee_depth", "Bend your knees more"),
+        item("load.ball_drop", "Dip the ball lower"),
+        item("setPoint.wrist_vs_head", "Raise your set point"),
+      ]),
+    ).toBe(
+      "Load: Bend your knees more. Dip the ball lower. Set point: Raise your set point.",
     );
   });
 
-  it("caps at `max` metrics", () => {
-    const worst = Array.from({ length: 8 }, (_, i) =>
-      dev({ label: `M${i}`, direction: "high", magnitude: 2 }),
+  it("falls back to the label without a cue; empty → empty", () => {
+    expect(buildCueReadback([item("rise.t_end", null)])).toBe(
+      "Rise: label rise.t_end.",
     );
-    expect(buildWorstReadback(worst, { max: 3 }).split(", ")).toHaveLength(3);
+    expect(buildCueReadback([])).toBe("");
   });
 
-  it("returns an empty string when nothing is off-target", () => {
-    expect(buildWorstReadback([])).toBe("");
+  it("names phases for people", () => {
+    expect(phaseName("setPoint")).toBe("Set point");
+    expect(phaseName("other")).toBe("other");
   });
 });

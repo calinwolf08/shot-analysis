@@ -18,6 +18,9 @@ import { test as base, expect } from "@playwright/test";
 /** Benign noise that isn't a real app fault. Keep this list short. */
 const DEFAULT_ALLOW: (string | RegExp)[] = [
   /favicon\.ico/i, // browser auto-requests it; the app doesn't ship one
+  // MediaPipe's WASM runtime prints this informational line via console.error
+  // when the pose model loads on the CPU delegate. Not a fault.
+  /INFO: Created TensorFlow Lite XNNPACK delegate for CPU/,
 ];
 
 type Fixtures = {

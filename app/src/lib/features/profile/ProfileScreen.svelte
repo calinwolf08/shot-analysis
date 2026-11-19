@@ -3,12 +3,21 @@
   import { useAppServices } from "$lib/shared/config/services-context";
   import type { Player } from "$lib/shared/db/repos";
   import { Button, Card, PlaceholderBadge } from "$lib/shared/ui";
+  import {
+    CLIP_CAP_CHOICES,
+    getShotClipStore,
+  } from "$lib/shared/media/shot-clip-store";
+  import {
+    getVideoRetention,
+    setVideoRetention,
+  } from "$lib/shared/media/video-retention";
 
   const services = useAppServices();
   const auth = useAuth();
 
   let player = $state<Player | null>(null);
   let voiceFeedback = $state(true);
+  let videoRetention = $state(getVideoRetention());
 
   let changeOpen = $state(false);
   let currentPassword = $state("");
@@ -24,6 +33,15 @@
   async function load() {
     player = await services.repos.player.getFirst();
     voiceFeedback = await services.repos.settings.get("voiceFeedback");
+  }
+
+  /** Lowering the number deletes the oldest clips on this device now. */
+  async function changeRetention(n: number) {
+    videoRetention = n;
+    setVideoRetention(n);
+    await getShotClipStore()
+      .setCap(n)
+      .catch(() => undefined);
   }
 
   async function toggleVoice() {
@@ -103,8 +121,35 @@
         data-testid="voice-toggle"
       />
     </label>
+    <label class="row">
+      <span>
+        Keep video for the last
+        <small class="hint"
+          >Stored on this device only. Older shots show the skeleton.</small
+        >
+      </span>
+      <select
+        value={videoRetention}
+        onchange={(e) => void changeRetention(Number(e.currentTarget.value))}
+        data-testid="video-retention"
+      >
+        {#each CLIP_CAP_CHOICES as n (n)}
+          <option value={n}>{n === 0 ? "No video" : `${n} shots`}</option>
+        {/each}
+      </select>
+    </label>
   </Card>
 </section>
+
+<!-- TEMP: quick access to the debug tools while metrics are being audited.
+     Dev/E2E builds only (constant-folded away in production). -->
+{#if import.meta.env.DEV || import.meta.env.VITE_E2E === "1"}
+  <section class="block">
+    <a class="debug-link" href="/__debug" data-testid="debug-tools-link"
+      >Debug tools →</a
+    >
+  </section>
+{/if}
 
 <section class="block">
   <h2>Account</h2>
@@ -265,5 +310,14 @@
     color: var(--sc-success);
     margin: var(--sc-space-3) 0 0;
     font-size: 14px;
+  }
+  .hint {
+    display: block;
+    color: var(--sc-text-dim);
+    font-size: 12px;
+  }
+  .debug-link {
+    color: var(--sc-primary);
+    font-weight: 600;
   }
 </style>

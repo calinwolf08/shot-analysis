@@ -4,6 +4,7 @@ import {
   startFrameCapture,
   type FrameData,
 } from "../frame-capture";
+import { LIVE_CAPTURE_FPS } from "$lib/features/analysis/services/worker-analysis-service";
 
 // The capture loop's only DOM/GPU dependency is downsampleToImageData
 // (canvas drawImage/getImageData), which can't run against a plain mock in
@@ -50,6 +51,26 @@ describe("startFrameCapture", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("live rate: 30 fps with strictly increasing timestamps", () => {
+    const handle = startFrameCapture(
+      makeVideo(),
+      (frame) => capturedFrames.push(frame),
+      { fps: LIVE_CAPTURE_FPS },
+    );
+    vi.advanceTimersByTime(1000);
+    handle.stop();
+    expect(LIVE_CAPTURE_FPS).toBe(30);
+    // The first frame is immediate, then one per ~33 ms.
+    expect(capturedFrames.length).toBeGreaterThanOrEqual(30);
+    expect(capturedFrames.length).toBeLessThanOrEqual(32);
+    for (let i = 1; i < capturedFrames.length; i++) {
+      expect(capturedFrames[i]!.timestamp).toBeGreaterThan(
+        capturedFrames[i - 1]!.timestamp,
+      );
+      expect(capturedFrames[i]!.frameIndex).toBe(i);
+    }
   });
 
   it("captures frames at the configured FPS", () => {
@@ -148,5 +169,31 @@ describe("createLiveFrameCapture", () => {
     handle!.stop();
 
     expect(frames.length).toBeGreaterThan(0);
+  });
+});
+
+describe("frame capture backpressure", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("skips ticks (no grab) while the session is busy", () => {
+    const frames: FrameData[] = [];
+    let busy = false;
+    const session = {
+      pushFrame: (f: FrameData) => frames.push(f),
+      isBusy: () => busy,
+    };
+    const handle = createLiveFrameCapture(makeVideo(), session, { fps: 10 });
+    expect(frames).toHaveLength(1); // immediate first grab
+    busy = true;
+    vi.advanceTimersByTime(500);
+    expect(frames).toHaveLength(1);
+    busy = false;
+    vi.advanceTimersByTime(200);
+    expect(frames.length).toBe(3);
+    // Frame indexes stay contiguous over skipped ticks (only grabbed frames count).
+    expect(frames.map((f) => f.frameIndex)).toEqual([0, 1, 2]);
+    expect(frames.every((f) => typeof f.captureTs === "number")).toBe(true);
+    handle?.stop();
   });
 });

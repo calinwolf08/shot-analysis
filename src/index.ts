@@ -218,6 +218,7 @@ export {
 export {
   extractShotMetrics,
   metricsForShot,
+  keyframeFramesFromPoseData,
   computeSequencing,
   computeStructure,
 } from "./metrics/v2";
@@ -247,3 +248,40 @@ export {
   categoryLabel,
 } from "./metrics/v2";
 export type { FlatMetric } from "./metrics/v2";
+
+// v3 (in progress): aspect-correct signals + sub-frame events / phase windows.
+export {
+  computeSignals,
+  detectEvents,
+  phaseWindows,
+  frameAt,
+  timeAt,
+  LABEL_FOR_EVENT,
+  EVENT_PAD_BEFORE,
+  EVENT_PAD_AFTER,
+  isClippedStartLabel,
+  computeShotMetricsV3,
+  metricsFromSignals,
+  flattenMetricsV3,
+  METRICS_V3_SCHEMA_VERSION,
+  DEFAULT_WORDING,
+  wordingFor,
+  buildTargetsV3,
+  effectiveBand,
+  LIVE_TARGETS_V3_VERSION,
+} from "./metrics/v3";
+export type {
+  ShotSignals,
+  SignalFrame,
+  ShotEvents,
+  EventId,
+  PhaseWindows,
+  ShotMetricsV3,
+  MetricV3,
+  MetricKind,
+  MetricPhase,
+  MetricUnit,
+  LiveTargetsV3,
+  TargetV3,
+  MetricWording,
+} from "./metrics/v3";

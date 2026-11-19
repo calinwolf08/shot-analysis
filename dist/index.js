@@ -44,11 +44,13 @@ export { poseDataSchema, frameSchema } from "./testing/types";
 // locally-hosted assets)
 export { createPoseDetector, } from "./pose/factory";
 // v2 metrics (Sequencing / Structure overhaul) — extraction + measurement types
-export { extractShotMetrics, metricsForShot, computeSequencing, computeStructure, } from "./metrics/v2";
+export { extractShotMetrics, metricsForShot, keyframeFramesFromPoseData, computeSequencing, computeStructure, } from "./metrics/v2";
 export { detectKeyframesFromFrames, poseLandmarksToFrames, } from "./detection/keyframe-phases";
 export { deriveThresholds } from "./metrics/v2";
 export { scoreShot } from "./scoring/v2";
 // v2 flattening + id helpers — the flat `{ id, value, reliable }` shape that
 // thresholds and the live deviation targets are keyed by.
-export { flattenMetrics, categoryOf, labelFor, categoryLabel } from "./metrics/v2";
+export { flattenMetrics, categoryOf, labelFor, categoryLabel, } from "./metrics/v2";
+// v3 (in progress): aspect-correct signals + sub-frame events / phase windows.
+export { computeSignals, detectEvents, phaseWindows, frameAt, timeAt, LABEL_FOR_EVENT, EVENT_PAD_BEFORE, EVENT_PAD_AFTER, isClippedStartLabel, computeShotMetricsV3, metricsFromSignals, flattenMetricsV3, METRICS_V3_SCHEMA_VERSION, DEFAULT_WORDING, wordingFor, buildTargetsV3, effectiveBand, LIVE_TARGETS_V3_VERSION, } from "./metrics/v3";
 //# sourceMappingURL=index.js.map
