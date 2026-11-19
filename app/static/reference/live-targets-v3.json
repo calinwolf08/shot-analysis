@@ -19,11 +19,11 @@
       "label": "Elbow height at release",
       "wording": {
         "low": {
-          "phrase": "elbow below the head",
+          "phrase": "below the head",
           "cue": "Lift the elbow"
         },
         "high": {
-          "phrase": "elbow above the head",
+          "phrase": "above the head",
           "cue": "—"
         }
       },
@@ -115,11 +115,11 @@
       "label": "Ball distance from body",
       "wording": {
         "low": {
-          "phrase": "ball too close to the body",
+          "phrase": "too close",
           "cue": "Give the ball a little room"
         },
         "high": {
-          "phrase": "ball too far from the body",
+          "phrase": "too far",
           "cue": "Keep the ball closer"
         }
       },
@@ -139,11 +139,11 @@
       "label": "Ball dip",
       "wording": {
         "low": {
-          "phrase": "ball dropped too low",
+          "phrase": "too low",
           "cue": "Don't dip the ball so low"
         },
         "high": {
-          "phrase": "ball not dipped enough",
+          "phrase": "not low enough",
           "cue": "Dip the ball lower"
         }
       },
@@ -163,11 +163,11 @@
       "label": "Elbow at the dip",
       "wording": {
         "low": {
-          "phrase": "elbow too bent",
+          "phrase": "too bent",
           "cue": "Relax your arm at the dip"
         },
         "high": {
-          "phrase": "arm too straight",
+          "phrase": "too straight",
           "cue": "Keep a bend in the elbow at the dip"
         }
       },
@@ -187,11 +187,11 @@
       "label": "Elbow loading",
       "wording": {
         "low": {
-          "phrase": "elbow folds too much",
+          "phrase": "folds too much",
           "cue": "Fold the elbow less in the dip"
         },
         "high": {
-          "phrase": "elbow doesn't load",
+          "phrase": "doesn't load",
           "cue": "Load the elbow in the dip"
         }
       },
@@ -211,11 +211,11 @@
       "label": "Head position",
       "wording": {
         "low": {
-          "phrase": "head tilted back",
+          "phrase": "tilted back",
           "cue": "Bring your head forward, eyes on the rim"
         },
         "high": {
-          "phrase": "head dropped forward",
+          "phrase": "dropped forward",
           "cue": "Lift your head, eyes on the rim"
         }
       },
@@ -235,11 +235,11 @@
       "label": "Hips over knees",
       "wording": {
         "low": {
-          "phrase": "hips too far back",
+          "phrase": "too far back",
           "cue": "Sit back a little less"
         },
         "high": {
-          "phrase": "hips too far forward",
+          "phrase": "too far forward",
           "cue": "Sit back more"
         }
       },
@@ -283,11 +283,11 @@
       "label": "Knees over feet",
       "wording": {
         "low": {
-          "phrase": "knees too far back",
+          "phrase": "too far back",
           "cue": "Let your knees come forward"
         },
         "high": {
-          "phrase": "knees too far forward",
+          "phrase": "too far forward",
           "cue": "Keep your knees over your feet"
         }
       },
@@ -379,11 +379,11 @@
       "label": "Elbow bend timing",
       "wording": {
         "low": {
-          "phrase": "elbow bends too early",
+          "phrase": "too early",
           "cue": "Bend the elbow a little later"
         },
         "high": {
-          "phrase": "elbow bends too late",
+          "phrase": "too late",
           "cue": "Bend the elbow sooner"
         }
       },
@@ -403,11 +403,11 @@
       "label": "Elbow path",
       "wording": {
         "low": {
-          "phrase": "elbow drifts back",
+          "phrase": "drifts back",
           "cue": "Push the elbow up and through"
         },
         "high": {
-          "phrase": "elbow pushes out too far",
+          "phrase": "pushes out too far",
           "cue": "Drive the elbow straight up"
         }
       },
@@ -451,11 +451,11 @@
       "label": "Guide hand (front/back)",
       "wording": {
         "low": {
-          "phrase": "guide hand too far back",
+          "phrase": "too far back",
           "cue": "Keep the guide hand on the side of the ball"
         },
         "high": {
-          "phrase": "guide hand too far forward",
+          "phrase": "too far forward",
           "cue": "Keep the guide hand off the shot"
         }
       },
@@ -475,11 +475,11 @@
       "label": "Guide hand (height)",
       "wording": {
         "low": {
-          "phrase": "guide hand too low",
+          "phrase": "too low",
           "cue": "Keep the guide hand up"
         },
         "high": {
-          "phrase": "guide hand too high",
+          "phrase": "too high",
           "cue": "Lower the guide hand"
         }
       },
@@ -595,11 +595,11 @@
       "label": "Release height",
       "wording": {
         "low": {
-          "phrase": "release too low",
+          "phrase": "too low",
           "cue": "Release higher"
         },
         "high": {
-          "phrase": "release too high",
+          "phrase": "too high",
           "cue": "Release a little lower"
         }
       },
@@ -619,11 +619,11 @@
       "label": "Elbow, early rise",
       "wording": {
         "low": {
-          "phrase": "elbow folds early in the rise",
+          "phrase": "folds",
           "cue": "Keep the elbow steady as you start up"
         },
         "high": {
-          "phrase": "elbow opens early in the rise",
+          "phrase": "opens too early",
           "cue": "Keep the elbow loaded as you start up"
         }
       },
@@ -643,11 +643,11 @@
       "label": "Elbow, late rise",
       "wording": {
         "low": {
-          "phrase": "elbow folds near the top",
+          "phrase": "folds",
           "cue": "Don't pull the ball back at the top"
         },
         "high": {
-          "phrase": "elbow opens before set point",
+          "phrase": "opens too early",
           "cue": "Hold the elbow until set point"
         }
       },
@@ -667,11 +667,11 @@
       "label": "Head as you rise",
       "wording": {
         "low": {
-          "phrase": "head drops back",
+          "phrase": "drops back",
           "cue": "Keep your head steady"
         },
         "high": {
-          "phrase": "head drops forward",
+          "phrase": "drops forward",
           "cue": "Keep your head steady"
         }
       },
@@ -691,11 +691,11 @@
       "label": "Torso as you rise",
       "wording": {
         "low": {
-          "phrase": "torso tips back",
+          "phrase": "tips back",
           "cue": "Stay over the ball as you rise"
         },
         "high": {
-          "phrase": "torso tips forward",
+          "phrase": "tips forward",
           "cue": "Rise straight up"
         }
       },
@@ -787,11 +787,11 @@
       "label": "Wrist cock, early rise",
       "wording": {
         "low": {
-          "phrase": "wrist cocks too much",
+          "phrase": "too much",
           "cue": "Less wrist cock early"
         },
         "high": {
-          "phrase": "wrist doesn't cock",
+          "phrase": "not enough",
           "cue": "Cock the wrist as you start up"
         }
       },
@@ -811,11 +811,11 @@
       "label": "Wrist cock, late rise",
       "wording": {
         "low": {
-          "phrase": "wrist cocks too much late",
+          "phrase": "too much",
           "cue": "Less wrist cock at the top"
         },
         "high": {
-          "phrase": "wrist uncocks early",
+          "phrase": "uncocks early",
           "cue": "Keep the wrist cocked to set point"
         }
       },
@@ -835,11 +835,11 @@
       "label": "Elbow at set point",
       "wording": {
         "low": {
-          "phrase": "elbow too bent",
+          "phrase": "too bent",
           "cue": "Open the elbow a little at set point"
         },
         "high": {
-          "phrase": "elbow too straight",
+          "phrase": "too straight",
           "cue": "Bend the elbow more at set point"
         }
       },
@@ -859,11 +859,11 @@
       "label": "Head at set point",
       "wording": {
         "low": {
-          "phrase": "head tilted back",
+          "phrase": "tilted back",
           "cue": "Level your head"
         },
         "high": {
-          "phrase": "head dropped forward",
+          "phrase": "dropped forward",
           "cue": "Lift your head, eyes on the rim"
         }
       },
@@ -907,11 +907,11 @@
       "label": "Hips over knees at set point",
       "wording": {
         "low": {
-          "phrase": "hips too far back",
+          "phrase": "too far back",
           "cue": "Bring your hips under you"
         },
         "high": {
-          "phrase": "hips too far forward",
+          "phrase": "too far forward",
           "cue": "Keep your hips over your knees"
         }
       },
@@ -931,7 +931,7 @@
       "label": "Knees at set point",
       "wording": {
         "low": {
-          "phrase": "knees still bent",
+          "phrase": "still bent",
           "cue": "Straighten your legs by set point"
         },
         "high": {
@@ -955,11 +955,11 @@
       "label": "Knees over feet at set point",
       "wording": {
         "low": {
-          "phrase": "knees too far back",
+          "phrase": "too far back",
           "cue": "Let your knees come forward"
         },
         "high": {
-          "phrase": "knees too far forward",
+          "phrase": "too far forward",
           "cue": "Keep your knees over your feet"
         }
       },
@@ -1003,11 +1003,11 @@
       "label": "Set point height",
       "wording": {
         "low": {
-          "phrase": "set point too low",
+          "phrase": "too low",
           "cue": "Raise your set point"
         },
         "high": {
-          "phrase": "set point too high",
+          "phrase": "too high",
           "cue": "Lower your set point"
         }
       },

@@ -15,6 +15,7 @@ import {
 import {
   describeResult,
   displayScore,
+  issueText,
   feedbackV3,
   formatAmount,
   scoreBand,
@@ -85,17 +86,38 @@ describe("0–10+ scale", () => {
     const r = score(200).phases[0]!.metrics[0]!;
     expect(r.score).toBeCloseTo(13, 9);
     expect(displayScore(r.score)).toBe("10+");
-    expect(displayScore(9.94)).toBe("9.9");
-    expect(displayScore(0)).toBe("0.0");
+    // Whole numbers, rounded UP: anything off target shows at least 1.
+    expect(displayScore(9.94)).toBe("10+");
+    expect(displayScore(8.2)).toBe("9");
+    expect(displayScore(2)).toBe("2");
+    expect(displayScore(0.06)).toBe("1");
+    expect(displayScore(0)).toBe("0");
+    expect(displayScore(null)).toBe("–");
   });
 
-  it("bands: 0–1 good, 1–3 fair, 3–6 off, 6+ far", () => {
-    expect([0, 1.5, 4, 7].map(scoreBand)).toEqual([
+  it("bands on the shown whole numbers: 0 good, 1–3 close, 4–6 off, 7+ way off", () => {
+    expect([0, 0.2, 3, 3.1, 6, 6.5, 12].map(scoreBand)).toEqual([
       "good",
       "fair",
+      "fair",
+      "off",
       "off",
       "far",
+      "far",
     ]);
+  });
+
+  it("issueText: label, phrase and the whole score — no measured amount", () => {
+    const tt = targets({
+      "load.head_vs_spine": target({ label: "Head position" }),
+    });
+    const card = scoreShotV3({ "load.head_vs_spine": metric(115) }, tt);
+    const r = card.phases[0]!.metrics[0]!;
+    expect(r.score).toBeGreaterThan(1);
+    expect(issueText(r)).toBe(
+      `Head position: ${r.phrase} by ${Math.ceil(r.score!)}`,
+    );
+    expect(issueText(r)).not.toMatch(/°|%/);
   });
 
   it("phase = mean of its metrics; overall = mean of phases", () => {

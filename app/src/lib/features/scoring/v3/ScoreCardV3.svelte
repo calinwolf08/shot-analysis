@@ -61,8 +61,8 @@
     <p class="legend" data-testid="v3-legend">
       <span class="chip" data-band="good">0</span> on target ·
       <span class="chip" data-band="fair">1–3</span> close ·
-      <span class="chip" data-band="off">3–6</span> off ·
-      <span class="chip" data-band="far">6–10+</span> way off
+      <span class="chip" data-band="off">4–6</span> off ·
+      <span class="chip" data-band="far">7–10+</span> way off
     </p>
     {#if card.belowCoverageGate}
       <p class="gate">

@@ -29,8 +29,8 @@
   import { FocusSheet, focusSummary } from "$lib/features/scoring";
   import {
     ScoreCardV3,
-    describeResult,
     displayScore,
+    issueText,
     scoreBand,
   } from "$lib/features/scoring/v3";
   import type { SideOrientation } from "../setup/angle-gate";
@@ -487,7 +487,7 @@
               {#each fb.worst as m (m.id)}
                 <span class="chip" data-testid="feedback-item"
                   ><b class="chip-phase">{phaseName(m.phase)}</b>
-                  {describeResult(m).replace(/^[^:]*: /, `${m.label} `)}</span
+                  {issueText(m)}</span
                 >
               {/each}
             </div>

@@ -137,3 +137,28 @@ test("an older shot saved without its size is framed undistorted and marked appr
   expect(framing.aspect).toBeLessThan(1);
   await page.screenshot({ path: screenPath("phase6", "4-legacy-approx") });
 });
+
+test("review on a phone: pose, phase issues and scrubber all fit above the tab bar", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await recordShotAndOpenReview(page, "Layout");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const tabTop = (await page.locator("nav.tab-bar").boundingBox())!.y;
+  const stage = (await page.getByTestId("review-stage").boundingBox())!;
+  const scrub = (await page.getByTestId("review-scrubber").boundingBox())!;
+  expect(stage.height).toBeGreaterThan(250);
+  expect(scrub.y + scrub.height).toBeLessThanOrEqual(tabTop);
+  // Phase label is written as-is (not title-cased).
+  await expect(page.getByTestId("review-phase")).toHaveCSS(
+    "text-transform",
+    "none",
+  );
+  const chips = page.locator(".po-chip");
+  if ((await chips.count()) > 0) {
+    const last = (await chips.last().boundingBox())!;
+    expect(last.y + last.height).toBeLessThanOrEqual(tabTop);
+    expect(await chips.first().textContent()).toMatch(/: .+ by (\d|10\+)$/);
+  }
+  await page.screenshot({ path: screenPath("ux", "review-phone-layout") });
+});

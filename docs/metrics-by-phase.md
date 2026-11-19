@@ -109,19 +109,25 @@ Each scored metric has a target band from the reference shots
 - **Outside → +1 point per `rampSd`** beyond the nearest band edge. `rampSd`
   is the reference spread: the sample SD of the reference values; or range ÷ 4
   if that's 0; or 5% of the mean if both are 0.
-- **The display caps at "10+"**. The stored value isn't capped.
+- **Shown as whole numbers, rounded up**, so anything off target shows at
+  least 1 (2.1 → 3) and only a truly on-target value shows 0. This applies to
+  every score on every screen (items, phases, overall, averages). The display
+  caps at "10+". The stored value keeps its decimals and isn't capped.
 - **Phase score** = mean of its measured, scored metrics. **Overall** = mean of
   the phase scores. Overall is withheld when fewer than half the scored
   metrics could be measured.
-- **Bands:** 0–1 good · 1–3 close · 3–6 off · 6+ way off (the chip colors).
+- **Bands** (on the shown whole numbers, the chip colors): 0 on target ·
+  1–3 close · 4–6 off · 7–10+ way off.
 
 **Feedback after a shot** is the 3 worst scored metrics, re-ordered into shot
 order:
 
 - **Voice:** a coaching cue per item, grouped by phase: "Load: Bend your knees
   more. Set point: Raise your set point."
-- **Card:** the same items as measurements, e.g. "Knee bend: too shallow by
-  12°".
+- **Card** (and the review's "off target" chips): the same items on the score
+  scale, e.g. "Head position: tilted back by 2". Measured amounts (degrees,
+  % of a limb) only appear in the full scorecard rows, with the target
+  range.
 - **Focus:** with a focus area set (Load / Rise / Set point / Release, or
   Rhythm & timing = every timing metric), the 3 worst within the focus are
   used instead.

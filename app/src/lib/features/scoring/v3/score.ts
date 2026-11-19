@@ -178,20 +178,42 @@ export function scoreShotV3(
 
 // ---- display ------------------------------------------------------------------
 
-/** "0.0" … "9.9", "10+" (never shows more than the cap). */
+/**
+ * Whole-number display score: rounded UP, so anything off target shows at
+ * least 1 and only a truly on-target value shows 0 (2.1 → 3). Capped at
+ * "10+". The stored score keeps its decimals.
+ */
+export function wholeScore(score: number): number {
+  return Math.min(SCORE_CAP, Math.ceil(score - 1e-9));
+}
+
+/** "0" … "9", "10+" (never shows more than the cap). */
 export function displayScore(score: number | null): string {
   if (score === null) return "–";
-  return score >= SCORE_CAP ? "10+" : score.toFixed(1);
+  const w = wholeScore(score);
+  return w >= SCORE_CAP ? "10+" : String(w);
 }
 
 export type ScoreBand = "good" | "fair" | "off" | "far";
-/** 0–1 good · 1–3 fair · 3–6 off · 6+ far. */
+/** On the shown whole numbers: 0 good · 1–3 close · 4–6 off · 7–10+ way off. */
 export function scoreBand(score: number | null): ScoreBand | null {
   if (score === null) return null;
-  if (score < 1) return "good";
-  if (score < 3) return "fair";
-  if (score < 6) return "off";
+  const w = wholeScore(score);
+  if (w <= 0) return "good";
+  if (w <= 3) return "fair";
+  if (w <= 6) return "off";
   return "far";
+}
+
+/**
+ * Short issue text for the practice card and review chips: what's off and
+ * how far, on the score scale ("Head position: tilted back by 2"). Measured
+ * amounts (degrees, % of a limb) stay in the full scorecard.
+ */
+export function issueText(r: MetricResultV3): string {
+  if (r.value === null) return `${r.label}: not measured`;
+  if (!r.direction || r.score === null) return `${r.label}: on target`;
+  return `${r.label}: ${r.phrase} by ${displayScore(r.score)}`;
 }
 
 const UNIT_NAME: Partial<Record<MetricUnit, string>> = {

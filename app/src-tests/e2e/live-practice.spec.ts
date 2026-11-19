@@ -18,6 +18,16 @@ test("live practice: replayed reps score and persist to the Shots tab", async ({
     timeout: 30_000,
   });
   await expect(page.getByTestId("rep-feedback-score")).toBeVisible();
+  // Whole-number score (rounded up), capped at 10+.
+  await expect(page.getByTestId("rep-feedback-score")).toHaveText(
+    /^\s*(\d|10\+)\s*$/,
+  );
+  // Each item: "<phase> <label>: <how it's off> by <whole score>" — no
+  // degrees or limb percentages on the card.
+  for (const t of await page.getByTestId("feedback-item").allTextContents()) {
+    expect(t.trim()).toMatch(/^\S.*: .+ by (\d|10\+)$/);
+    expect(t).not.toMatch(/°|%/);
+  }
 
   // Feedback: at most the 3 worst issues, each labelled with its phase, in
   // shot order (Load → Rise → Set point → Release).

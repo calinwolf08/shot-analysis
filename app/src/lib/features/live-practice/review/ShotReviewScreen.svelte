@@ -24,7 +24,7 @@
   } from "$lib/features/scoring/focus";
   import {
     ScoreCardV3,
-    describeResult,
+    issueText,
     loadLiveTargetsV3,
     type MetricResultV3,
     type ScorecardV3,
@@ -446,8 +446,16 @@
         </p>
       {/if}
     </div>
-    <!-- Below the stage (not over it) so the chips never hide the feet. -->
-    {#if poses && poses.frames.length > 0 && phaseIssues.length > 0}
+    <!-- Below the stage (not over it) so the chips never hide the feet. The
+         slot keeps its height when a phase has no issues, so the scrubber
+         doesn't jump while scrubbing. -->
+    {#if poses && poses.frames.length > 0 && phaseIssues.length === 0}
+      <div class="phase-overlay" aria-hidden="true">
+        <span class="po-head"
+          >{currentPhase ? phaseName(currentPhase) : ""} · on target</span
+        >
+      </div>
+    {:else if poses && poses.frames.length > 0}
       <div class="phase-overlay" data-testid="review-phase-metrics">
         <span class="po-head"
           >{currentPhase ? phaseName(currentPhase) : ""} · off target</span
@@ -455,7 +463,7 @@
         <div class="po-chips">
           {#each phaseIssues.slice(0, 3) as m (m.id)}
             <span class="po-chip" class:bad={(m.score ?? 0) >= 3}
-              >{describeResult(m)}</span
+              >{issueText(m)}</span
             >
           {/each}
         </div>
@@ -546,6 +554,11 @@
   .stage {
     position: relative;
     aspect-ratio: 3 / 4;
+    /* On a phone, keep the phase issues + scrubber on screen above the tab
+       bar (header ≈ 56, issues ≈ 64, scrubber ≈ 64, gaps/padding ≈ 64,
+       tab bar 84 + safe area). The framing adapts to any stage size. */
+    max-height: calc(100dvh - 332px - env(safe-area-inset-bottom));
+    min-height: 260px;
     background: #000;
     border-radius: var(--sc-radius);
     overflow: hidden;
@@ -590,6 +603,7 @@
   }
   .phase-overlay {
     padding: 6px 2px 0;
+    min-height: 58px;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -597,7 +611,6 @@
   }
   .po-head {
     font-size: 0.68rem;
-    text-transform: capitalize;
     letter-spacing: 0.03em;
     color: #cbd5e1;
   }
@@ -646,7 +659,6 @@
     color: var(--sc-text-dim);
   }
   .phase-tag {
-    text-transform: capitalize;
     color: var(--sc-primary);
     font-weight: 600;
   }
