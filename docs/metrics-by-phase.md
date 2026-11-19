@@ -82,6 +82,7 @@ coarse.
 | Elbow bend start          | Onset of the elbow bending toward its most-bent point in the load                                 |
 | Hips drop start           | Onset of the hips moving down into their lowest point                                             |
 | Hips lowest               | Lowest hip point, searched from 10 frames before the ball's lowest point up to the set point      |
+| Knees deepest             | Smallest knee angle, searched from 5 frames before the hips' lowest point to the set point        |
 | Knees start straightening | Onset of knee extension after the deepest bend (deepest bend searched around the hips' low point) |
 | Knees straight            | Knees 80% of the way from deepest bend to full extension                                          |
 | **Set point**             | Onset of the elbow's extension, after its most-bent point in the rise                             |
@@ -179,17 +180,18 @@ viewer seek and draw the geometry.
 
 ### Rise
 
-| Id                          | Label                    | Definition                                     | Unit   | Frame       | Needs                      |
-| --------------------------- | ------------------------ | ---------------------------------------------- | ------ | ----------- | -------------------------- |
-| `rise.t_start`              | Ball vs legs starting up | Ball rise start − knees start straightening    | % rise | both events | —                          |
-| `rise.t_end`                | Set point vs legs        | Set point − knees straight                     | % rise | both events | —                          |
-| `rise.elbow_change_1`       | Elbow, early rise        | Elbow angle change, rise start → rise midpoint | °      | start, mid  | arm                        |
-| `rise.elbow_change_2`       | Elbow, late rise         | Elbow angle change, rise midpoint → set point  | °      | mid, end    | arm                        |
-| `rise.wrist_hinge_change_1` | Wrist cock, early rise   | Wrist angle change, start → mid                | °      | start, mid  | index finger visible ≥ 0.5 |
-| `rise.wrist_hinge_change_2` | Wrist cock, late rise    | Wrist angle change, mid → set point            | °      | mid, end    | index finger visible ≥ 0.5 |
-| `rise.spine_change`         | Torso as you rise        | Spine lean change across the rise              | °      | start, end  | hip, shoulder              |
-| `rise.t_spine_vs_knees`     | Torso vs legs timing     | Torso 90% straightened − knees straight        | % rise | both        | —                          |
-| `rise.head_pitch_change`    | Head as you rise         | Head pitch change across the rise (+ = drops)  | °      | start, end  | ear, nose                  |
+| Id                           | Label                    | Definition                                                                   | Unit   | Frame       | Needs                      |
+| ---------------------------- | ------------------------ | ---------------------------------------------------------------------------- | ------ | ----------- | -------------------------- |
+| `rise.t_start`               | Ball vs legs starting up | Ball rise start − knees start straightening                                  | % rise | both events | —                          |
+| `rise.t_ball_vs_knee_bottom` | Ball up vs knee bend     | Ball rise start − knees deepest (− = ball rising while the knees still bend) | % rise | both events | —                          |
+| `rise.t_end`                 | Set point vs legs        | Set point − knees straight                                                   | % rise | both events | —                          |
+| `rise.elbow_change_1`        | Elbow, early rise        | Elbow angle change, rise start → rise midpoint                               | °      | start, mid  | arm                        |
+| `rise.elbow_change_2`        | Elbow, late rise         | Elbow angle change, rise midpoint → set point                                | °      | mid, end    | arm                        |
+| `rise.wrist_hinge_change_1`  | Wrist cock, early rise   | Wrist angle change, start → mid                                              | °      | start, mid  | index finger visible ≥ 0.5 |
+| `rise.wrist_hinge_change_2`  | Wrist cock, late rise    | Wrist angle change, mid → set point                                          | °      | mid, end    | index finger visible ≥ 0.5 |
+| `rise.spine_change`          | Torso as you rise        | Spine lean change across the rise                                            | °      | start, end  | hip, shoulder              |
+| `rise.t_spine_vs_knees`      | Torso vs legs timing     | Torso 90% straightened − knees straight                                      | % rise | both        | —                          |
+| `rise.head_pitch_change`     | Head as you rise         | Head pitch change across the rise (+ = drops)                                | °      | start, end  | ear, nose                  |
 
 ### Set point
 

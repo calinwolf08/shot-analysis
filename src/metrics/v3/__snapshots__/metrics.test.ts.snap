@@ -31,6 +31,7 @@ exports[`v3 metric catalog > matches the golden snapshot (Curry shot 2) 1`] = `
   "rise.elbow_change_2": -10.461,
   "rise.head_pitch_change": 1.461,
   "rise.spine_change": -4.159,
+  "rise.t_ball_vs_knee_bottom": -1.902,
   "rise.t_end": -1.066,
   "rise.t_spine_vs_knees": -1.237,
   "rise.t_start": -2.103,

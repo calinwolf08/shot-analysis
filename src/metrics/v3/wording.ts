@@ -51,6 +51,7 @@ export const DEFAULT_WORDING: Readonly<Record<string, MetricWording>> = {
   "load.t_elbow_bend": w("Elbow bend timing", ["too early", "Bend the elbow a little later"], ["too late", "Bend the elbow sooner"]),
   // ---- Rise ----------------------------------------------------------------
   "rise.t_start": w("Ball vs legs starting up", ["ball starts up before your legs", "Start the rise with your legs"], ["ball starts up late", "Bring the ball up with your legs"]),
+  "rise.t_ball_vs_knee_bottom": w("Ball up vs knee bend", ["ball rises while knees still bend", "Finish your knee bend before lifting the ball"], ["ball waits after the knees bottom out", "Start the ball up as your knees bottom out"]),
   "rise.t_end": w("Set point vs legs", ["ball reaches set point too early", "Let your legs carry the ball up"], ["ball reaches set point too late", "Reach set point as your legs straighten"]),
   "rise.elbow_change_1": w("Elbow, early rise", ["folds", "Keep the elbow steady as you start up"], ["opens too early", "Keep the elbow loaded as you start up"]),
   "rise.elbow_change_2": w("Elbow, late rise", ["folds", "Don't pull the ball back at the top"], ["opens too early", "Hold the elbow until set point"]),

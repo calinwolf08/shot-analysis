@@ -23,6 +23,7 @@ export type EventId =
   | "ballRiseStart"
   | "hipDropStart"
   | "hipLowest"
+  | "kneesDeepest"
   | "kneesStartStraightening"
   | "kneesStraight"
   | "elbowBendStart"
@@ -280,6 +281,7 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
     ballRiseStart: null,
     hipDropStart: null,
     hipLowest: null,
+    kneesDeepest: null,
     kneesStartStraightening: null,
     kneesStraight: null,
     elbowBendStart: null,
@@ -367,6 +369,8 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
     ballRiseStart,
     hipDropStart,
     hipLowest,
+    // Deepest knee bend (the knees stop bending).
+    kneesDeepest: kneeMin,
     // Knees START straightening: onset of extension after the deepest bend.
     kneesStartStraightening:
       kneeMin !== null && kneeMax !== null

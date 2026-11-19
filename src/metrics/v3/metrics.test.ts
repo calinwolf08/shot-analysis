@@ -63,7 +63,7 @@ describe("v3 metric catalog", () => {
       "load.ball_close", "load.t_drop_start", "load.t_drop_end", "load.t_elbow_bend",
       "rise.t_start", "rise.t_end", "rise.elbow_change_1", "rise.elbow_change_2",
       "rise.wrist_hinge_change_1", "rise.wrist_hinge_change_2", "rise.spine_change",
-      "rise.t_spine_vs_knees", "rise.head_pitch_change",
+      "rise.t_spine_vs_knees", "rise.head_pitch_change", "rise.t_ball_vs_knee_bottom",
       "setPoint.wrist_vs_head", "setPoint.elbow_angle", "setPoint.spine_angle",
       "setPoint.knee_angle", "setPoint.hip_angle", "setPoint.hip_over_knee",
       "setPoint.knee_over_ankle", "setPoint.head_pitch",

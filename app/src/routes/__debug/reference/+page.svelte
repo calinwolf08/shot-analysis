@@ -71,6 +71,7 @@
     ballLowest: "Ball lowest",
     ballRiseStart: "Ball starts rising",
     hipLowest: "Hips lowest",
+    kneesDeepest: "Knees deepest",
     kneesStartStraightening: "Knees start straightening",
     setPoint: "Set point",
     kneesStraight: "Knees straight",

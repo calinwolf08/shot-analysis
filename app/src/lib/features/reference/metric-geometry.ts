@@ -75,6 +75,7 @@ const BY_ID: Readonly<Record<string, readonly Geometry[]>> = {
   "load.t_elbow_bend": [TIMING],
   "rise.t_start": [TIMING],
   "rise.t_end": [TIMING],
+  "rise.t_ball_vs_knee_bottom": [TIMING],
   "rise.elbow_change_1": [ELBOW],
   "rise.elbow_change_2": [ELBOW],
   "rise.wrist_hinge_change_1": [WRIST],

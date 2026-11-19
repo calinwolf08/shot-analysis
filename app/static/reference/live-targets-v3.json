@@ -4,7 +4,7 @@
   "builtFrom": "stephen-curry-1 (7 labeled shots)",
   "shootingHand": "right",
   "shots": 7,
-  "generatedAt": "2026-11-19T03:14:48.822Z",
+  "generatedAt": "2026-11-19T06:44:50.795Z",
   "notes": [
     "Band = the reference shots' observed range: inside it scores 0.",
     "Outside, the score climbs 1 point per rampSd (the reference spread). Display caps at 10+.",
@@ -707,6 +707,30 @@
       "rampSd": 1.6982992153520877,
       "n": 7,
       "lowResolution": false
+    },
+    "rise.t_ball_vs_knee_bottom": {
+      "phase": "rise",
+      "kind": "timing",
+      "unit": "phase",
+      "label": "Ball up vs knee bend",
+      "wording": {
+        "low": {
+          "phrase": "ball rises while knees still bend",
+          "cue": "Finish your knee bend before lifting the ball"
+        },
+        "high": {
+          "phrase": "ball waits after the knees bottom out",
+          "cue": "Start the ball up as your knees bottom out"
+        }
+      },
+      "scored": true,
+      "ideal": -0.8985661028834467,
+      "sd": 0.7139688406148502,
+      "passMin": -1.901748699222752,
+      "passMax": 0.07846351224961653,
+      "rampSd": 0.7139688406148502,
+      "n": 7,
+      "lowResolution": true
     },
     "rise.t_end": {
       "phase": "rise",

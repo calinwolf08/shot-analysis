@@ -199,6 +199,9 @@ export function metricsFromSignals(
   const R = w.rise;
   const mid = R ? (R.start + R.end) / 2 : null;
   timing("rise.t_start", "rise", R, ev.kneesStartStraightening, ev.ballRiseStart, "rise start not detected");
+  // Ball starts up vs the knees reaching their deepest bend: − = the ball was
+  // already rising while the knees were still bending.
+  timing("rise.t_ball_vs_knee_bottom", "rise", R, ev.kneesDeepest, ev.ballRiseStart, "deepest knee bend not detected");
   timing("rise.t_end", "rise", R, ev.kneesStraight, ev.setPoint, "knees straight / set point not detected");
   put("rise.elbow_change_1", "structure", "rise", "deg", R ? diff(sig.elbowAngle, R.start, mid) : null, R ? [R.start, mid] : []);
   put("rise.elbow_change_2", "structure", "rise", "deg", R ? diff(sig.elbowAngle, mid, R.end) : null, R ? [mid, R.end] : []);
