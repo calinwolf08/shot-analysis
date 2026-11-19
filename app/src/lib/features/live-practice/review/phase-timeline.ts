@@ -34,11 +34,14 @@ export function phaseMarks(v3: ShotMetricsV3): PhaseMark[] {
   const out: PhaseMark[] = [];
   for (const [phase, f] of marks) {
     if (f === null || f === undefined) continue;
-    // Release starts at set point; nudge its marker past the set-point frame.
+    // Rise starts the frame after the load's last frame; Release starts
+    // just past the set-point frames.
     const frame =
       phase === "release"
         ? Math.round(f) + SET_POINT_HALF_WIDTH + 1
-        : Math.round(f);
+        : phase === "rise"
+          ? Math.round(f) + 1
+          : Math.round(f);
     out.push({ phase, name: phaseName(phase), frame });
   }
   return out;
@@ -54,7 +57,9 @@ export function phaseAtFrame(
   if (sp !== null && Math.abs(frame - sp) <= SET_POINT_HALF_WIDTH)
     return "setPoint";
   if (sp !== null && frame > sp) return "release";
-  if (load && frame < load.end) return "load";
+  // The load's last frame (e.g. hips lowest, where load metrics are read)
+  // is still the load.
+  if (load && frame <= Math.round(load.end)) return "load";
   if (rise || (load && sp !== null)) return "rise";
   return load ? "load" : null;
 }

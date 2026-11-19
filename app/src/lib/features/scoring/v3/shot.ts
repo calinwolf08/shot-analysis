@@ -6,6 +6,7 @@
  * Pure.
  */
 import {
+  METRICS_V3_SCHEMA_VERSION,
   computeShotMetricsV3,
   EVENT_PAD_AFTER,
   EVENT_PAD_BEFORE,
@@ -19,8 +20,12 @@ import type { ShotReviewPoses } from "$lib/shared/db/repos";
 import { estimateAspect } from "$lib/features/live-practice/review/framing";
 import { scoreShotV3, type ScorecardV3 } from "./score";
 
-/** Bumped from 1 (v2 metrics only) when a shot carries `v3Metrics`. */
-export const METRICS_SCHEMA_VERSION = 2 as const;
+/**
+ * The current metrics schema: 1 = v2 metrics only; 2+ = `v3Metrics` with the
+ * library's METRICS_V3_SCHEMA_VERSION (3: head pitch). A stored shot below
+ * the current version is recomputed from its pose track on read.
+ */
+export const METRICS_SCHEMA_VERSION = METRICS_V3_SCHEMA_VERSION;
 
 /**
  * Frames of context stored around a shot's detected range, so v3 can find the
@@ -54,8 +59,10 @@ export function v3ForPoses(
   });
 }
 
+/** True when the shot's stored v3 metrics are the current definition. */
 export function hasV3(analysis: ShotAnalysis): boolean {
-  return !!(analysis as StoredShotAnalysis).v3Metrics;
+  const v = (analysis as StoredShotAnalysis).v3Metrics;
+  return !!v && v.schemaVersion >= METRICS_SCHEMA_VERSION;
 }
 
 /**
@@ -69,8 +76,11 @@ export function ensureV3(
   shootingHand: "left" | "right",
 ): { analysis: StoredShotAnalysis; recomputed: boolean } | null {
   const a = analysis as StoredShotAnalysis;
-  if (a.v3Metrics) return { analysis: a, recomputed: false };
-  if (!poses || poses.frames.length === 0) return null;
+  if (hasV3(a)) return { analysis: a, recomputed: false };
+  if (!poses || poses.frames.length === 0) {
+    // Outdated v3 without a track: keep scoring what we have.
+    return a.v3Metrics ? { analysis: a, recomputed: false } : null;
+  }
   return {
     analysis: { ...a, v3Metrics: v3ForPoses(poses, shootingHand) },
     recomputed: true,

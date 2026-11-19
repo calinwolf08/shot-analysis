@@ -109,9 +109,9 @@ describe("0–10+ scale", () => {
 
   it("issueText: label, phrase and the whole score — no measured amount", () => {
     const tt = targets({
-      "load.head_vs_spine": target({ label: "Head position" }),
+      "load.head_pitch": target({ label: "Head position" }),
     });
-    const card = scoreShotV3({ "load.head_vs_spine": metric(115) }, tt);
+    const card = scoreShotV3({ "load.head_pitch": metric(115) }, tt);
     const r = card.phases[0]!.metrics[0]!;
     expect(r.score).toBeGreaterThan(1);
     expect(issueText(r)).toBe(

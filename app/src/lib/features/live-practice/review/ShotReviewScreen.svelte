@@ -211,8 +211,12 @@
     const span = Math.max(end - start, 1);
     return ((startFrame - start) / span) * 100;
   }
+  /** The metric last clicked in the scorecard (drawn on the stage). */
+  let picked = $state<MetricResultV3 | null>(null);
+
   /** Seek to where a metric was measured (else to its phase's start). */
   function seekToMetric(m: MetricResultV3) {
+    picked = m;
     const f = m.frames[0];
     if (f !== undefined && f >= start && f <= end) {
       current = f;
@@ -348,7 +352,12 @@
     });
 
     // The current phase's worst issues, drawn as what they measure.
-    const issues = phaseIssues.slice(0, 2);
+    // A metric clicked in the scorecard is drawn on its own (until the
+    // scrubber moves); otherwise the current phase's 2 worst issues.
+    const issues =
+      picked && picked.phase === currentPhase
+        ? [picked]
+        : phaseIssues.slice(0, 2);
     const drawn: string[] = [];
     const v = v3;
     if (v) {
@@ -365,7 +374,12 @@
                   p.frameIndex <= Math.max(...m.frames, current),
               )
               .map((p) => p.landmarks),
-            color: m.score !== null && m.score >= 3 ? "#f87171" : "#fbbf24",
+            color:
+              m.score === null || m.score === 0
+                ? "#34d399"
+                : m.score >= 3
+                  ? "#f87171"
+                  : "#fbbf24",
           }),
         );
       }
@@ -497,6 +511,7 @@
           min={start}
           max={end}
           oninput={() => {
+            picked = null;
             if (playing) {
               videoEl?.pause();
               playing = false;

@@ -19,7 +19,7 @@ describe("v3 phase timeline", () => {
   it("marks each phase where it begins, in order", () => {
     expect(phaseMarks(v3)).toEqual([
       { phase: "load", name: "Load", frame: 10 },
-      { phase: "rise", name: "Rise", frame: 21 },
+      { phase: "rise", name: "Rise", frame: 22 },
       { phase: "setPoint", name: "Set point", frame: 30 },
       { phase: "release", name: "Release", frame: 32 },
     ]);
@@ -28,7 +28,10 @@ describe("v3 phase timeline", () => {
   it("assigns frames: before/at load → Load, then Rise, Set point ±1, Release", () => {
     expect(phaseAtFrame(v3, 0)).toBe("load");
     expect(phaseAtFrame(v3, 20)).toBe("load");
-    expect(phaseAtFrame(v3, 21)).toBe("rise");
+    // The load's last frame (rounded load end, where hips-lowest metrics
+    // are read) is still Load.
+    expect(phaseAtFrame(v3, 21)).toBe("load");
+    expect(phaseAtFrame(v3, 22)).toBe("rise");
     expect(phaseAtFrame(v3, 29)).toBe("rise");
     expect(phaseAtFrame(v3, 30)).toBe("setPoint");
     expect(phaseAtFrame(v3, 31)).toBe("setPoint");

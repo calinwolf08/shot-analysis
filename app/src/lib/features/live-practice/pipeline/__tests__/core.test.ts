@@ -111,6 +111,19 @@ describe("analyzeAndScore (isomorphic core)", () => {
       scoreShotV3(analysis.v3Metrics!.metrics, targets).overall!,
       6,
     );
+    // An older v3 definition (before head pitch) is recomputed too.
+    const outdated = {
+      ...analysis,
+      v3Metrics: { ...analysis.v3Metrics!, schemaVersion: 2 },
+    } as unknown as typeof analysis;
+    const refreshed = ensureV3(outdated, stored, "right")!;
+    expect(refreshed.recomputed).toBe(true);
+    expect(refreshed.analysis.v3Metrics!.schemaVersion).toBe(3);
+    expect(
+      refreshed.analysis.v3Metrics!.metrics["load.head_pitch"],
+    ).toBeDefined();
+    // …but without a track it keeps what it has.
+    expect(ensureV3(outdated, null, "right")!.recomputed).toBe(false);
     // Already v3 → untouched; no pose track → can't migrate.
     expect(ensureV3(analysis, null, "right")!.recomputed).toBe(false);
     expect(ensureV3(v1, null, "right")).toBeNull();

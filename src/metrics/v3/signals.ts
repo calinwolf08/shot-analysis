@@ -55,10 +55,11 @@ export interface ShotSignals {
   /** Torso lean from vertical, hip→shoulder (deg; sign: + = toward facing). */
   readonly spineLean: Series;
   /**
-   * Head/neck relative to the spine (deg): lean of shoulder→ear minus lean of
-   * hip→shoulder; + = head tipped forward (toward facing) of the spine line.
+   * Head pitch: the near ear → nose line from horizontal, degrees; + = chin
+   * DOWN (nose below the ear), − = chin up / head tilted back. Independent of
+   * torso lean (the head can stay level while the torso leans).
    */
-  readonly headVsSpine: Series;
+  readonly headPitch: Series;
   /** Wrist hinge: interior angle elbow-wrist-index (deg; smaller = more bent). */
   readonly wristAngle: Series;
   /** +1 if the player faces screen-right, −1 if screen-left. */
@@ -228,7 +229,7 @@ export function computeSignals(
   const facingSign = facing >= 0 ? 1 : -1;
 
   const guide: Side = shoot === "left" ? "right" : "left";
-  const headSpine: Series = [];
+  const headPitch: Series = [];
   const wristA: Series = [];
   const posRaw: Record<PosJoint, { x: Series; y: Series }> = {
     wrist: { x: [], y: [] },
@@ -241,8 +242,6 @@ export function computeSignals(
   };
   const visGuide: Series = [];
   const visIndex: Series = [];
-  const lean = (from: P, to: P) =>
-    (Math.atan2(facingSign * (to.x - from.x), from.y - to.y) * 180) / Math.PI;
   const wristY: Series = [];
   const hipY: Series = [];
   const knee: Series = [];
@@ -278,7 +277,17 @@ export function computeSignals(
     const ear = pt(f, LM.ear[near], a) ?? pt(f, LM.nose, a);
     const idx = pt(f, LM.index[shoot], a);
     const g = pt(f, LM.wrist[guide], a, 0);
-    headSpine.push(sn && h && ear ? lean(sn, ear) - lean(h, sn) : null);
+    // Pitch needs the real ear AND nose (no fallback): ear → nose direction
+    // vs horizontal, x toward the facing direction, + = nose below the ear.
+    const earOnly = pt(f, LM.ear[near], a);
+    const nose = pt(f, LM.nose, a);
+    headPitch.push(
+      earOnly && nose && (nose.x !== earOnly.x || nose.y !== earOnly.y)
+        ? (Math.atan2(nose.y - earOnly.y, facingSign * (nose.x - earOnly.x)) *
+            180) /
+            Math.PI
+        : null,
+    );
     wristA.push(e && w && idx ? angleAt(e, w, idx) : null);
     const put = (j: PosJoint, q: P | null) => {
       posRaw[j].x.push(q ? q.x : null);
@@ -316,7 +325,7 @@ export function computeSignals(
     hipAngle: prepAngle(hipA),
     elbowAngle: prepAngle(elbow),
     spineLean: prep(spine),
-    headVsSpine: prep(headSpine),
+    headPitch: prep(headPitch),
     wristAngle: prepAngle(wristA),
     facing: facingSign as 1 | -1,
     pos: Object.fromEntries(

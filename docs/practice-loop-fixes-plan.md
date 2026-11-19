@@ -561,6 +561,33 @@ builds on Phase 2's backpressure and lite-model fallback.
     Load in his own browser; voice off → practice starts muted, a shot is
     scored with nothing spoken, and the toggle persists.
 
+## Head pitch (follow-up)
+
+- **Why:** the old head metric (`head_vs_spine`) was the neck line's angle
+  against the torso line, so it mostly followed torso lean. A forward-leaning
+  shooter with a level head read as "tilted back" (the test shot: "tilted
+  back by 68°" while its chin was actually down 24°). Every non-Curry shooter
+  checked (−27 to +31) fell outside Curry's +36 to +42 band.
+- **Now:** `headPitch` is the near ear → nose line from horizontal, + = chin
+  down. It needs the real ear and the nose (no fallback). The metrics are
+  `load.head_pitch`, `rise.head_pitch_change` and `setPoint.head_pitch`.
+  Review and the Curry viewer draw the ear → nose line against a horizontal
+  reference ("12° down").
+- **Targets from Curry:** load −7.8° to −2.7° (chin slightly up), set point
+  −12.5° to +6.3°, change over the rise −5.8° to +9.0°. The load band is
+  narrow (SD 2°), so ordinary head positions can still score high until
+  there's more reference data.
+- **Schema 3:** `METRICS_V3_SCHEMA_VERSION` is now 3. Stored shots with an
+  older v3 are recomputed from their pose track on read (`hasV3` /
+  `ensureV3`) and saved, the same path as the pre-v3 migration.
+- **Tests:**
+  - Sign: nose lowered → pitch rises.
+  - Independence: shifting the head and shoulders forward changes torso lean
+    but not pitch.
+  - Geometry draws "pitch".
+  - An outdated v3 is recomputed.
+  - The golden snapshot changed only the three head metrics.
+
 ## B-1. Investigation findings
 
 | Area              | Today                                                                                                                                                                                                                                | Gap vs. request                                                                                                                                                                                                                                                 |

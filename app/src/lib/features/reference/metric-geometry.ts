@@ -22,11 +22,15 @@ export type Joint =
   | "knee"
   | "ankle"
   | "shoulderNear"
-  | "head";
+  | "head"
+  | "ear"
+  | "nose";
 
 export type Geometry =
   /** Joint angle at the middle joint. */
   | { readonly kind: "angle"; readonly joints: readonly [Joint, Joint, Joint] }
+  /** Line from → to, with a HORIZONTAL reference through `from` (pitch). */
+  | { readonly kind: "pitch"; readonly from: Joint; readonly to: Joint }
   /** Line from → to, with a vertical reference through `from`. */
   | { readonly kind: "lean"; readonly from: Joint; readonly to: Joint }
   /** Horizontal offset of `a` from `b` (bar at a's height). */
@@ -53,12 +57,12 @@ const HIP: Geometry = {
 };
 const WRIST: Geometry = { kind: "angle", joints: ["elbow", "wrist", "index"] };
 const SPINE: Geometry = { kind: "lean", from: "hip", to: "shoulderNear" };
-const HEAD: Geometry = { kind: "lean", from: "shoulderNear", to: "head" };
+const HEAD: Geometry = { kind: "pitch", from: "ear", to: "nose" };
 const TIMING: Geometry = { kind: "timing" };
 
 const BY_ID: Readonly<Record<string, readonly Geometry[]>> = {
   "load.spine_angle": [SPINE],
-  "load.head_vs_spine": [SPINE, HEAD],
+  "load.head_pitch": [HEAD],
   "load.knee_depth": [KNEE],
   "load.hip_over_knee": [{ kind: "offset", a: "hip", b: "knee" }],
   "load.knee_over_ankle": [{ kind: "offset", a: "knee", b: "ankle" }],
@@ -77,7 +81,7 @@ const BY_ID: Readonly<Record<string, readonly Geometry[]>> = {
   "rise.wrist_hinge_change_2": [WRIST],
   "rise.spine_change": [SPINE],
   "rise.t_spine_vs_knees": [TIMING],
-  "rise.head_vs_spine_change": [SPINE, HEAD],
+  "rise.head_pitch_change": [HEAD],
   "setPoint.wrist_vs_head": [{ kind: "height", a: "wrist", b: "head" }],
   "setPoint.elbow_angle": [ELBOW],
   "setPoint.spine_angle": [SPINE],
@@ -85,7 +89,7 @@ const BY_ID: Readonly<Record<string, readonly Geometry[]>> = {
   "setPoint.hip_angle": [HIP],
   "setPoint.hip_over_knee": [{ kind: "offset", a: "hip", b: "knee" }],
   "setPoint.knee_over_ankle": [{ kind: "offset", a: "knee", b: "ankle" }],
-  "setPoint.head_vs_spine": [SPINE, HEAD],
+  "setPoint.head_pitch": [HEAD],
   "release.elbow_path": [{ kind: "path", joint: "elbow" }],
   "release.wrist_vs_head_end": [{ kind: "height", a: "wrist", b: "head" }],
   "release.guide_hand_dx": [{ kind: "offset", a: "guideWrist", b: "wrist" }],
@@ -158,7 +162,10 @@ export function jointIndex(j: Joint, s: GeometrySides): number {
     case "shoulderNear":
       return LM.shoulder[s.nearSide];
     case "head":
+    case "ear":
       return LM.ear[s.nearSide];
+    case "nose":
+      return LM.nose;
   }
 }
 
@@ -282,6 +289,26 @@ export function drawGeometry(
         const deg = (Math.atan2(b.x - a.x, a.y - b.y) * 180) / Math.PI;
         label(`${Math.abs(deg).toFixed(0)}°`, { x: b.x + 6, y: b.y - 6 });
         drawn.push("lean");
+        break;
+      }
+      case "pitch": {
+        const a = P(g.from);
+        const b = P(g.to);
+        if (!a || !b) break;
+        // Horizontal reference toward where the face points, as long as the
+        // ear → nose line, then the line itself.
+        const len = Math.max(18, Math.hypot(b.x - a.x, b.y - a.y) * 1.6);
+        const dir = b.x >= a.x ? 1 : -1;
+        line(a, { x: a.x + dir * len, y: a.y }, [4, 4]);
+        const k = len / Math.max(1e-6, Math.hypot(b.x - a.x, b.y - a.y));
+        line(a, { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k });
+        const deg =
+          (Math.atan2(b.y - a.y, Math.abs(b.x - a.x)) * 180) / Math.PI;
+        label(`${Math.abs(deg).toFixed(0)}° ${deg >= 0 ? "down" : "up"}`, {
+          x: a.x + dir * (len + 4) - (dir < 0 ? 52 : 0),
+          y: a.y - 6,
+        });
+        drawn.push("pitch");
         break;
       }
       case "offset": {

@@ -4,7 +4,7 @@
   "builtFrom": "stephen-curry-1 (7 labeled shots)",
   "shootingHand": "right",
   "shots": 7,
-  "generatedAt": "2026-11-18T02:45:27.247Z",
+  "generatedAt": "2026-11-19T03:14:48.822Z",
   "notes": [
     "Band = the reference shots' observed range: inside it scores 0.",
     "Outside, the score climbs 1 point per rampSd (the reference spread). Display caps at 10+.",
@@ -204,7 +204,7 @@
       "n": 1,
       "lowResolution": false
     },
-    "load.head_vs_spine": {
+    "load.head_pitch": {
       "phase": "load",
       "kind": "structure",
       "unit": "deg",
@@ -212,19 +212,19 @@
       "wording": {
         "low": {
           "phrase": "tilted back",
-          "cue": "Bring your head forward, eyes on the rim"
+          "cue": "Level your head, eyes on the rim"
         },
         "high": {
-          "phrase": "dropped forward",
-          "cue": "Lift your head, eyes on the rim"
+          "phrase": "tilted down",
+          "cue": "Lift your chin, eyes on the rim"
         }
       },
       "scored": true,
-      "ideal": 38.28063349293855,
-      "sd": 1.9706716446907215,
-      "passMin": 35.69330884517094,
-      "passMax": 41.62909208890077,
-      "rampSd": 1.9706716446907215,
+      "ideal": -5.3519296380195245,
+      "sd": 2.044618091290232,
+      "passMin": -7.789220927958857,
+      "passMax": -2.702771960704636,
+      "rampSd": 2.044618091290232,
       "n": 7,
       "lowResolution": false
     },
@@ -660,27 +660,27 @@
       "n": 7,
       "lowResolution": false
     },
-    "rise.head_vs_spine_change": {
+    "rise.head_pitch_change": {
       "phase": "rise",
       "kind": "structure",
       "unit": "deg",
       "label": "Head as you rise",
       "wording": {
         "low": {
-          "phrase": "drops back",
-          "cue": "Keep your head steady"
+          "phrase": "tips back",
+          "cue": "Keep your head level as you rise"
         },
         "high": {
-          "phrase": "drops forward",
-          "cue": "Keep your head steady"
+          "phrase": "drops",
+          "cue": "Keep your chin up as you rise"
         }
       },
       "scored": true,
-      "ideal": -3.1861423258176464,
-      "sd": 3.408280807204081,
-      "passMin": -8.123331172483091,
-      "passMax": 2.8110494695053987,
-      "rampSd": 3.408280807204081,
+      "ideal": -0.16970277928117344,
+      "sd": 5.335100805265308,
+      "passMin": -5.836972370871886,
+      "passMax": 9.033751214998805,
+      "rampSd": 5.335100805265308,
       "n": 7,
       "lowResolution": false
     },
@@ -852,7 +852,7 @@
       "n": 7,
       "lowResolution": false
     },
-    "setPoint.head_vs_spine": {
+    "setPoint.head_pitch": {
       "phase": "setPoint",
       "kind": "structure",
       "unit": "deg",
@@ -860,19 +860,19 @@
       "wording": {
         "low": {
           "phrase": "tilted back",
-          "cue": "Level your head"
+          "cue": "Level your head, eyes on the rim"
         },
         "high": {
-          "phrase": "dropped forward",
-          "cue": "Lift your head, eyes on the rim"
+          "phrase": "tilted down",
+          "cue": "Lift your chin, eyes on the rim"
         }
       },
       "scored": true,
-      "ideal": 35.09449116712091,
-      "sd": 3.475611519607606,
-      "passMin": 29.76658637586943,
-      "passMax": 39.26947066310727,
-      "rampSd": 3.475611519607606,
+      "ideal": -5.521632417300698,
+      "sd": 6.374157400445653,
+      "passMin": -12.523971075397453,
+      "passMax": 6.330979254294169,
+      "rampSd": 6.374157400445653,
       "n": 7,
       "lowResolution": false
     },

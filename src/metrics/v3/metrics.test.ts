@@ -58,15 +58,15 @@ describe("v3 metric catalog", () => {
   it("produces the agreed metric set for each phase", () => {
     const ids = Object.keys(base.metrics);
     for (const id of [
-      "load.spine_angle", "load.head_vs_spine", "load.knee_depth", "load.hip_over_knee",
+      "load.spine_angle", "load.head_pitch", "load.knee_depth", "load.hip_over_knee",
       "load.knee_over_ankle", "load.ball_drop", "load.elbow_angle", "load.elbow_change",
       "load.ball_close", "load.t_drop_start", "load.t_drop_end", "load.t_elbow_bend",
       "rise.t_start", "rise.t_end", "rise.elbow_change_1", "rise.elbow_change_2",
       "rise.wrist_hinge_change_1", "rise.wrist_hinge_change_2", "rise.spine_change",
-      "rise.t_spine_vs_knees", "rise.head_vs_spine_change",
+      "rise.t_spine_vs_knees", "rise.head_pitch_change",
       "setPoint.wrist_vs_head", "setPoint.elbow_angle", "setPoint.spine_angle",
       "setPoint.knee_angle", "setPoint.hip_angle", "setPoint.hip_over_knee",
-      "setPoint.knee_over_ankle", "setPoint.head_vs_spine",
+      "setPoint.knee_over_ankle", "setPoint.head_pitch",
       "release.elbow_path", "release.wrist_vs_head_end", "release.guide_hand_dx",
       "release.guide_hand_dy", "release.knee_change", "release.spine_change",
       "release.wrist_snap", "release.forward_drift", "release.t_legs_vs_arm",
@@ -74,7 +74,7 @@ describe("v3 metric catalog", () => {
       expect(ids, id).toContain(id);
     }
     expect(ids.filter((i) => i.startsWith("detail."))).toHaveLength(4);
-    expect(base.schemaVersion).toBe(2);
+    expect(base.schemaVersion).toBe(3);
   });
 
   it("measures Curry's set-point elbow as a bent arm (aspect-correct)", () => {
@@ -87,6 +87,46 @@ describe("v3 metric catalog", () => {
     const rise = base.phases.rise!;
     expect(rise.end - rise.start).toBeLessThan(6);
     expect(base.metrics["rise.t_start"]!.note).toBe("low resolution");
+  });
+
+  it("head pitch: + = chin down, independent of torso lean", () => {
+    // Drop the nose (chin down) relative to the ear → pitch rises.
+    const chinDown = window.map((f) => ({
+      ...f,
+      landmarks: f.landmarks
+        ? f.landmarks.map((l, i) => (i === 0 ? { ...l, y: l.y + 0.01 } : l))
+        : null,
+    }));
+    const down = computeShotMetricsV3(chinDown as SignalFrame[], {
+      aspect: P.width / P.height,
+      shootingHand: "right",
+    });
+    expect(down.metrics["load.head_pitch"]!.value).toBeGreaterThan(
+      base.metrics["load.head_pitch"]!.value + 5,
+    );
+    // Lean the whole upper body forward (rotate shoulders + head about the
+    // hips): head pitch follows the head only. Here the head is moved without
+    // rotating it, so pitch is unchanged while the torso lean changes.
+    const shifted = window.map((f) => ({
+      ...f,
+      landmarks: f.landmarks
+        ? f.landmarks.map((l, i) =>
+            i <= 12 ? { ...l, x: l.x - 0.02 * base.facing } : l,
+          )
+        : null,
+    }));
+    const lean = computeShotMetricsV3(shifted as SignalFrame[], {
+      aspect: P.width / P.height,
+      shootingHand: "right",
+    });
+    expect(lean.metrics["load.spine_angle"]!.value).not.toBeCloseTo(
+      base.metrics["load.spine_angle"]!.value,
+      0,
+    );
+    expect(lean.metrics["load.head_pitch"]!.value).toBeCloseTo(
+      base.metrics["load.head_pitch"]!.value,
+      6,
+    );
   });
 
   it("matches the golden snapshot (Curry shot 2)", () => {

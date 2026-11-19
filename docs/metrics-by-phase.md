@@ -27,16 +27,16 @@ frames don't distort timing.
 
 **Signals** (`signals.ts`), per frame:
 
-| Signal             | Definition                                                                                 | Landmarks                                                     |
-| ------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| Knee angle         | Interior angle hip–knee–ankle                                                              | near side 23/24, 25/26, 27/28                                 |
-| Hip angle          | Interior angle shoulder–hip–knee                                                           | near side 11/12, 23/24, 25/26                                 |
-| Elbow angle        | Interior angle shoulder–elbow–wrist                                                        | shooting side 11/12, 13/14, 15/16                             |
-| Wrist angle        | Interior angle elbow–wrist–index finger                                                    | shooting side 13/14, 15/16, 19/20                             |
-| Spine lean         | Angle of hip→shoulder from vertical; **+ = leaning toward the direction the player faces** | near hip, near shoulder                                       |
-| Head vs spine      | Lean of shoulder→ear minus spine lean; **+ = head forward of the spine line**              | near shoulder, near ear (nose if the ear is hidden), near hip |
-| Wrist / hip height | Screen y of the shooting wrist / near hip                                                  | 15/16, 23/24                                                  |
-| Joint positions    | Wrist, elbow, hip, knee, ankle, head, guide wrist                                          | as above                                                      |
+| Signal             | Definition                                                                                                    | Landmarks                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| Knee angle         | Interior angle hip–knee–ankle                                                                                 | near side 23/24, 25/26, 27/28     |
+| Hip angle          | Interior angle shoulder–hip–knee                                                                              | near side 11/12, 23/24, 25/26     |
+| Elbow angle        | Interior angle shoulder–elbow–wrist                                                                           | shooting side 11/12, 13/14, 15/16 |
+| Wrist angle        | Interior angle elbow–wrist–index finger                                                                       | shooting side 13/14, 15/16, 19/20 |
+| Spine lean         | Angle of hip→shoulder from vertical; **+ = leaning toward the direction the player faces**                    | near hip, near shoulder           |
+| Head pitch         | Ear → nose line from horizontal; **+ = chin down**, − = chin up (head tilted back). Independent of torso lean | near ear, nose (both needed)      |
+| Wrist / hip height | Screen y of the shooting wrist / near hip                                                                     | 15/16, 23/24                      |
+| Joint positions    | Wrist, elbow, hip, knee, ankle, head, guide wrist                                                             | as above                          |
 
 - **True proportions:** x is multiplied by the frame's width ÷ height before
   any angle or distance is computed. Raw normalized coordinates stretch angles
@@ -162,20 +162,20 @@ viewer seek and draw the geometry.
 
 ### Load
 
-| Id                     | Label                      | Definition                                          | Unit   | Frame           | Needs                   |
-| ---------------------- | -------------------------- | --------------------------------------------------- | ------ | --------------- | ----------------------- |
-| `load.spine_angle`     | Torso lean                 | Spine lean (+ forward)                              | °      | hips lowest     | hip, shoulder           |
-| `load.head_vs_spine`   | Head position              | Head vs spine (+ head forward)                      | °      | hips lowest     | ear/nose, shoulder, hip |
-| `load.knee_depth`      | Knee bend                  | Smallest knee angle in the load (smaller = deeper)  | °      | deepest bend    | hip, knee, ankle        |
-| `load.hip_over_knee`   | Hips over knees            | Hip x − knee x (+ hips ahead) ÷ thigh               | ×thigh | hips lowest     | hip, knee               |
-| `load.knee_over_ankle` | Knees over feet            | Knee x − ankle x (+ knees ahead) ÷ shin             | ×shin  | hips lowest     | knee, ankle             |
-| `load.ball_drop`       | Ball dip                   | Wrist height above the hip (+ above) ÷ torso        | ×torso | ball lowest     | wrist, hip              |
-| `load.elbow_angle`     | Elbow at the dip           | Elbow angle                                         | °      | ball lowest     | shoulder, elbow, wrist  |
-| `load.elbow_change`    | Elbow loading              | Elbow angle at load end − at load start (− = folds) | °      | load start, end | arm                     |
-| `load.ball_close`      | Ball distance from body    | Wrist–hip distance ÷ torso                          | ×torso | ball lowest     | wrist, hip              |
-| `load.t_drop_start`    | Ball vs hips going down    | Ball drop start − hips drop start                   | % load | both events     | —                       |
-| `load.t_drop_end`      | Ball vs hips at the bottom | Ball lowest − hips lowest                           | % load | both events     | —                       |
-| `load.t_elbow_bend`    | Elbow bend timing          | Elbow bend start − ball drop start                  | % load | both events     | —                       |
+| Id                     | Label                      | Definition                                          | Unit   | Frame           | Needs                  |
+| ---------------------- | -------------------------- | --------------------------------------------------- | ------ | --------------- | ---------------------- |
+| `load.spine_angle`     | Torso lean                 | Spine lean (+ forward)                              | °      | hips lowest     | hip, shoulder          |
+| `load.head_pitch`      | Head position              | Head pitch (+ chin down)                            | °      | hips lowest     | ear, nose              |
+| `load.knee_depth`      | Knee bend                  | Smallest knee angle in the load (smaller = deeper)  | °      | deepest bend    | hip, knee, ankle       |
+| `load.hip_over_knee`   | Hips over knees            | Hip x − knee x (+ hips ahead) ÷ thigh               | ×thigh | hips lowest     | hip, knee              |
+| `load.knee_over_ankle` | Knees over feet            | Knee x − ankle x (+ knees ahead) ÷ shin             | ×shin  | hips lowest     | knee, ankle            |
+| `load.ball_drop`       | Ball dip                   | Wrist height above the hip (+ above) ÷ torso        | ×torso | ball lowest     | wrist, hip             |
+| `load.elbow_angle`     | Elbow at the dip           | Elbow angle                                         | °      | ball lowest     | shoulder, elbow, wrist |
+| `load.elbow_change`    | Elbow loading              | Elbow angle at load end − at load start (− = folds) | °      | load start, end | arm                    |
+| `load.ball_close`      | Ball distance from body    | Wrist–hip distance ÷ torso                          | ×torso | ball lowest     | wrist, hip             |
+| `load.t_drop_start`    | Ball vs hips going down    | Ball drop start − hips drop start                   | % load | both events     | —                      |
+| `load.t_drop_end`      | Ball vs hips at the bottom | Ball lowest − hips lowest                           | % load | both events     | —                      |
+| `load.t_elbow_bend`    | Elbow bend timing          | Elbow bend start − ball drop start                  | % load | both events     | —                      |
 
 ### Rise
 
@@ -189,7 +189,7 @@ viewer seek and draw the geometry.
 | `rise.wrist_hinge_change_2` | Wrist cock, late rise    | Wrist angle change, mid → set point            | °      | mid, end    | index finger visible ≥ 0.5 |
 | `rise.spine_change`         | Torso as you rise        | Spine lean change across the rise              | °      | start, end  | hip, shoulder              |
 | `rise.t_spine_vs_knees`     | Torso vs legs timing     | Torso 90% straightened − knees straight        | % rise | both        | —                          |
-| `rise.head_vs_spine_change` | Head as you rise         | Head-vs-spine change across the rise           | °      | start, end  | head, torso                |
+| `rise.head_pitch_change`    | Head as you rise         | Head pitch change across the rise (+ = drops)  | °      | start, end  | ear, nose                  |
 
 ### Set point
 
@@ -204,7 +204,7 @@ All read at the set-point moment.
 | `setPoint.hip_angle`       | Hips at set point            | Hip angle (shoulder–hip–knee)             | °      |
 | `setPoint.hip_over_knee`   | Hips over knees at set point | Hip x − knee x ÷ thigh                    | ×thigh |
 | `setPoint.knee_over_ankle` | Knees over feet at set point | Knee x − ankle x ÷ shin                   | ×shin  |
-| `setPoint.head_vs_spine`   | Head at set point            | Head vs spine                             | °      |
+| `setPoint.head_pitch`      | Head at set point            | Head pitch (+ chin down)                  | °      |
 
 ### Release
 

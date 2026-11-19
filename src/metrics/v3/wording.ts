@@ -10,7 +10,8 @@
  *      `cue`    — what to do, for the voice ("Bend your knees more").
  *
  * Sign conventions (from ./metrics): angles in degrees (joint angles: smaller
- * = more bent); lean/offsets + = toward the direction the player faces;
+ * = more bent); head pitch + = chin down; lean/offsets + = toward the
+ * direction the player faces;
  * heights + = higher; timing = (event B − event A) ÷ phase, + = B later.
  */
 
@@ -37,7 +38,7 @@ const w = (
 export const DEFAULT_WORDING: Readonly<Record<string, MetricWording>> = {
   // ---- Load ----------------------------------------------------------------
   "load.spine_angle": w("Torso lean", ["too upright", "Lean forward a little more"], ["leaning too far forward", "Stay more upright"]),
-  "load.head_vs_spine": w("Head position", ["tilted back", "Bring your head forward, eyes on the rim"], ["dropped forward", "Lift your head, eyes on the rim"]),
+  "load.head_pitch": w("Head position", ["tilted back", "Level your head, eyes on the rim"], ["tilted down", "Lift your chin, eyes on the rim"]),
   "load.knee_depth": w("Knee bend", ["too deep", "Bend your knees a little less"], ["too shallow", "Bend your knees more"]),
   "load.hip_over_knee": w("Hips over knees", ["too far back", "Sit back a little less"], ["too far forward", "Sit back more"]),
   "load.knee_over_ankle": w("Knees over feet", ["too far back", "Let your knees come forward"], ["too far forward", "Keep your knees over your feet"]),
@@ -57,7 +58,7 @@ export const DEFAULT_WORDING: Readonly<Record<string, MetricWording>> = {
   "rise.wrist_hinge_change_2": w("Wrist cock, late rise", ["too much", "Less wrist cock at the top"], ["uncocks early", "Keep the wrist cocked to set point"]),
   "rise.spine_change": w("Torso as you rise", ["tips back", "Stay over the ball as you rise"], ["tips forward", "Rise straight up"]),
   "rise.t_spine_vs_knees": w("Torso vs legs timing", ["torso finishes before your legs", "Rise with your legs"], ["torso finishes after your legs", "Get tall as your legs finish"]),
-  "rise.head_vs_spine_change": w("Head as you rise", ["drops back", "Keep your head steady"], ["drops forward", "Keep your head steady"]),
+  "rise.head_pitch_change": w("Head as you rise", ["tips back", "Keep your head level as you rise"], ["drops", "Keep your chin up as you rise"]),
   // ---- Set point -----------------------------------------------------------
   "setPoint.wrist_vs_head": w("Set point height", ["too low", "Raise your set point"], ["too high", "Lower your set point"]),
   "setPoint.elbow_angle": w("Elbow at set point", ["too bent", "Open the elbow a little at set point"], ["too straight", "Bend the elbow more at set point"]),
@@ -66,7 +67,7 @@ export const DEFAULT_WORDING: Readonly<Record<string, MetricWording>> = {
   "setPoint.hip_angle": w("Hips at set point", ["bent at the hips", "Stand taller at set point"], ["hips pushed through", "Relax the hips at set point"]),
   "setPoint.hip_over_knee": w("Hips over knees at set point", ["too far back", "Bring your hips under you"], ["too far forward", "Keep your hips over your knees"]),
   "setPoint.knee_over_ankle": w("Knees over feet at set point", ["too far back", "Let your knees come forward"], ["too far forward", "Keep your knees over your feet"]),
-  "setPoint.head_vs_spine": w("Head at set point", ["tilted back", "Level your head"], ["dropped forward", "Lift your head, eyes on the rim"]),
+  "setPoint.head_pitch": w("Head at set point", ["tilted back", "Level your head, eyes on the rim"], ["tilted down", "Lift your chin, eyes on the rim"]),
   // ---- Release -------------------------------------------------------------
   "release.elbow_path": w("Elbow path", ["drifts back", "Push the elbow up and through"], ["pushes out too far", "Drive the elbow straight up"]),
   "release.wrist_vs_head_end": w("Release height", ["too low", "Release higher"], ["too high", "Release a little lower"]),

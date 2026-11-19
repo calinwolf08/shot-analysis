@@ -35,7 +35,12 @@ import {
   type Side,
 } from "./signals";
 
-export const METRICS_V3_SCHEMA_VERSION = 2 as const;
+/**
+ * Bumped when a metric's definition changes, so stored shots are recomputed
+ * from their pose track on read. 3: head metrics measure head PITCH (ear →
+ * nose from horizontal) instead of the neck angle against the spine.
+ */
+export const METRICS_V3_SCHEMA_VERSION = 3 as const;
 
 export type MetricKind = "structure" | "timing" | "detail";
 export type MetricPhase = "load" | "rise" | "setPoint" | "release";
@@ -168,7 +173,7 @@ export function metricsFromSignals(
   const L = w.load;
   const deep = ev.hipLowest;
   put("load.spine_angle", "structure", "load", "deg", at(sig.spineLean, deep), [deep]);
-  put("load.head_vs_spine", "structure", "load", "deg", at(sig.headVsSpine, deep), [deep]);
+  put("load.head_pitch", "structure", "load", "deg", at(sig.headPitch, deep), [deep]);
   const kneeMinL = L ? extremum(sig.kneeAngle, L.start, L.end + 2, "min") : null;
   put("load.knee_depth", "structure", "load", "deg", at(sig.kneeAngle, kneeMinL), [kneeMinL]);
   put("load.hip_over_knee", "structure", "load", "thigh", norm(fwd("hip", "knee", deep), seg.thigh), [deep]);
@@ -207,7 +212,7 @@ export function metricsFromSignals(
   put("rise.spine_change", "structure", "rise", "deg", R ? diff(sig.spineLean, R.start, R.end) : null, R ? [R.start, R.end] : []);
   const spineStraight = R ? reachFraction(sig.spineLean, R.start, R.end, 0.9) : null;
   timing("rise.t_spine_vs_knees", "rise", R, ev.kneesStraight, spineStraight, "spine/knees not detected");
-  put("rise.head_vs_spine_change", "structure", "rise", "deg", R ? diff(sig.headVsSpine, R.start, R.end) : null, R ? [R.start, R.end] : []);
+  put("rise.head_pitch_change", "structure", "rise", "deg", R ? diff(sig.headPitch, R.start, R.end) : null, R ? [R.start, R.end] : []);
 
   // ---- Set point (snapshot) --------------------------------------------------
   const sp = ev.setPoint;
@@ -218,7 +223,7 @@ export function metricsFromSignals(
   put("setPoint.hip_angle", "structure", "setPoint", "deg", at(sig.hipAngle, sp), [sp]);
   put("setPoint.hip_over_knee", "structure", "setPoint", "thigh", norm(fwd("hip", "knee", sp), seg.thigh), [sp]);
   put("setPoint.knee_over_ankle", "structure", "setPoint", "shin", norm(fwd("knee", "ankle", sp), seg.shin), [sp]);
-  put("setPoint.head_vs_spine", "structure", "setPoint", "deg", at(sig.headVsSpine, sp), [sp]);
+  put("setPoint.head_pitch", "structure", "setPoint", "deg", at(sig.headPitch, sp), [sp]);
 
   // ---- Release -------------------------------------------------------------
   const Rel = w.release;

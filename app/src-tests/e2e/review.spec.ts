@@ -82,3 +82,15 @@ test("clicking a metric seeks the scrubber to its phase", async ({ page }) => {
 
   expect(atFirst).not.toBe(atLast);
 });
+
+test("clicking a metric draws that metric (head pitch) in its own phase", async ({
+  page,
+}) => {
+  await openReview(page);
+  await page.getByTestId("v3-row-load.head_pitch").locator("button").click();
+  await expect(page.getByTestId("review-phase")).toHaveText("Load");
+  await expect(page.getByTestId("review-skeleton")).toHaveAttribute(
+    "data-geometry",
+    "pitch",
+  );
+});

@@ -77,6 +77,7 @@ describe("metric geometry", () => {
     expect(geometryFamily("setPoint.wrist_vs_head")).toBe("height");
     expect(geometryFamily("release.elbow_path")).toBe("path");
     expect(geometryFamily("rise.t_start")).toBe("timing");
+    expect(geometryFamily("load.head_pitch")).toBe("pitch");
     expect(geometryFamily("nope")).toBeNull();
   });
 
@@ -114,6 +115,18 @@ describe("metric geometry", () => {
     expect(drawn).toEqual(["angle"]);
     expect(calls.some((c) => c.startsWith("arc("))).toBe(true);
     expect(calls.some((c) => c.startsWith("fillText(90°"))).toBe(true);
+  });
+
+  it("draws head pitch from the ear with a horizontal reference", () => {
+    const lm = pose();
+    lm[0] = { x: 0.55, y: 0.22, visibility: 1 }; // nose below + ahead of ear
+    const { ctx, calls } = fakeCtx();
+    const drawn = drawGeometry(ctx, geometryFor("load.head_pitch"), lm, {
+      ...sides,
+      project,
+    });
+    expect(drawn).toEqual(["pitch"]);
+    expect(calls.some((c) => /^fillText\(\d+° down/.test(c))).toBe(true);
   });
 
   it("draws nothing for a joint that isn't visible on this frame", () => {
