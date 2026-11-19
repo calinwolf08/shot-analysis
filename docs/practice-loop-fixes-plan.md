@@ -394,10 +394,8 @@ State machine in `LivePracticeStore`:
 
 ### Findings for later (not fixed in Phases 0–7)
 
-- **Server settings are global, not per user** (`settings` table has no
-  `user_id`). Live focus areas, voice feedback and similar settings are shared
-  by every account on a server. Fix: a migration adding `user_id` and
-  scoping the settings repo. Video retention avoided it by being per device.
+- ~~**Server settings are global, not per user**~~ — **fixed** (see
+  "Per-user settings" below).
 - **Frame spacing vs. assumed fps:** since Phase 2's backpressure skips camera
   ticks, live frames can be unevenly spaced. The analysis still assumes a
   fixed 15 fps (time = index / fps). Fraction-of-shot timing metrics are mostly
@@ -540,6 +538,28 @@ Run on iPhone Safari, Android Chrome, and the native iOS/Android builds:
 Phases 9–15 follow Part A (phases 0–8). They depend on Phase 0's harness and
 Phase 6's review framing (reused by the viewer). The 30 fps change (B-2.4)
 builds on Phase 2's backpressure and lite-model fallback.
+
+## Per-user settings (follow-up, after Part B)
+
+- **Migration 007** adds `user_settings (user_id, key, value)` and copies
+  each existing global setting to every known user (anyone owning a player,
+  session or video), so nobody's choices reset. The server settings repo
+  reads and writes only the signed-in user's rows; unset keys fall back to
+  defaults. The old `settings` table is kept for the on-device (single-user)
+  database.
+- **Now per user:** `liveFocusAreas`, `voiceFeedback`, `onboarded`,
+  `activeBenchmarkId`.
+- **Still per device** (browser storage): video retention and stored clips.
+- **Voice feedback now works:** Profile → "Voice feedback" off makes practice
+  start muted (no cues, no readback, no tones). The in-session speaker button
+  still unmutes for that session only. Before this, the toggle was saved but
+  never read.
+- **Tests:**
+  - Unit: two users' settings are isolated; migration 007 copies globals to
+    each user.
+  - E2E (`user-settings.spec.ts`): Alice's Rise focus survives Bob choosing
+    Load in his own browser; voice off → practice starts muted, a shot is
+    scored with nothing spoken, and the toggle persists.
 
 ## B-1. Investigation findings
 

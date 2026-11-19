@@ -137,17 +137,17 @@ of it.
 
 Query knobs (dev / E2E builds only; stripped from production):
 
-| Param | Effect |
-| --- | --- |
-| `replayFixture=<id>` | Which pose fixture the replay backend plays |
-| `replaySpeed=<n>` | Fixture playback multiplier (default 4; 1 = real time) |
-| `replayLatencyMs=<ms>` | Simulated pose-detection latency per frame |
-| `replayScript=<spec>` | Scripted positioning before the fixture, e.g. `facing:3,wrongside:3,side:8` (stances: `facing`, `side`, `wrongside`, `cutoff`, `none`; seconds each) |
-| `fakecam=1` | Use the browser's fake camera (video clips, capture path) |
-| `detectDelayMs=<ms>` | Slow every detection in the worker (imitates a slow phone; exercises backpressure + the lite-model fallback) |
-| `debug=live` | Live debug HUD (coordinator state, latency, buffer) |
-| `liveVideo=<url>` | Drive the live loop from a video file instead of the webcam |
-| `analysis=server` | Run live analysis on the server endpoint instead of on device |
+| Param                  | Effect                                                                                                                                               |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `replayFixture=<id>`   | Which pose fixture the replay backend plays                                                                                                          |
+| `replaySpeed=<n>`      | Fixture playback multiplier (default 4; 1 = real time)                                                                                               |
+| `replayLatencyMs=<ms>` | Simulated pose-detection latency per frame                                                                                                           |
+| `replayScript=<spec>`  | Scripted positioning before the fixture, e.g. `facing:3,wrongside:3,side:8` (stances: `facing`, `side`, `wrongside`, `cutoff`, `none`; seconds each) |
+| `fakecam=1`            | Use the browser's fake camera (video clips, capture path)                                                                                            |
+| `detectDelayMs=<ms>`   | Slow every detection in the worker (imitates a slow phone; exercises backpressure + the lite-model fallback)                                         |
+| `debug=live`           | Live debug HUD (coordinator state, latency, buffer)                                                                                                  |
+| `liveVideo=<url>`      | Drive the live loop from a video file instead of the webcam                                                                                          |
+| `analysis=server`      | Run live analysis on the server endpoint instead of on device                                                                                        |
 
 E2E builds simulate speech durations and record everything the app would say
 or play in `window.__scAudioLog`, so voice-feedback order is testable.
@@ -182,14 +182,14 @@ there for CocoaPods). Manual device checks: `docs/device-testing.md`.
 
 ## Content needed before real users (placeholder inventory)
 
-| Placeholder                              | Where                                        | Replace with                            |
-| ---------------------------------------- | -------------------------------------------- | --------------------------------------- |
+| Placeholder                              | Where                                        | Replace with                                        |
+| ---------------------------------------- | -------------------------------------------- | --------------------------------------------------- |
 | Live targets from one reference shooter  | `static/reference/live-targets-v3.json`      | Bands from several elite shooters (side-on, 60 fps) |
-| Benchmark profile `elite-placeholder-v1` | `src/lib/features/benchmarks/data/`          | Real elite-shooter metric distributions |
-| 12 drill entries (copy + coaching cues)  | `src/lib/features/drills/data/drills.json`   | Coach-reviewed drill programming        |
-| Drill video `placeholder.webm`           | `static/drills/`                             | Real per-drill footage                  |
-| App icon / splash                        | `assets/`, `android/`, `ios/`                | Brand design                            |
-| "Why it matters" issue copy              | `src/lib/features/diagnosis/issue-groups.ts` | Coach-reviewed copy                     |
+| Benchmark profile `elite-placeholder-v1` | `src/lib/features/benchmarks/data/`          | Real elite-shooter metric distributions             |
+| 12 drill entries (copy + coaching cues)  | `src/lib/features/drills/data/drills.json`   | Coach-reviewed drill programming                    |
+| Drill video `placeholder.webm`           | `static/drills/`                             | Real per-drill footage                              |
+| App icon / splash                        | `assets/`, `android/`, `ios/`                | Brand design                                        |
+| "Why it matters" issue copy              | `src/lib/features/diagnosis/issue-groups.ts` | Coach-reviewed copy                                 |
 
 Everything placeholder-derived renders with a `PlaceholderBadge` in the UI.
 

@@ -658,14 +658,14 @@ export function createServerRepos(
   };
 
   // --- settings ------------------------------------------------------------
-  // App-level config + seed flags (onboarded, active benchmark, …); global for
-  // now. Per-user settings are a later refinement (see docs/follow-up-work.md).
+  // Per user (migration 007): each account has its own focus areas, voice
+  // feedback, onboarding flag and benchmark. Unset keys fall back to defaults.
   const settings: SettingsRepo = {
     async get(key) {
       const spec = SETTINGS[key];
       const rows = await db.query<{ value: string }>(
-        "SELECT value FROM settings WHERE key = ?",
-        [key],
+        "SELECT value FROM user_settings WHERE user_id = ? AND key = ?",
+        [userId, key],
       );
       const raw = rows[0]?.value;
       if (raw === undefined) return spec.default as never;
@@ -679,8 +679,8 @@ export function createServerRepos(
       const spec = SETTINGS[key];
       const parsed = spec.schema.parse(value);
       await db.run(
-        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-        [key, JSON.stringify(parsed)],
+        "INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)",
+        [userId, key, JSON.stringify(parsed)],
       );
     },
   };

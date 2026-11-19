@@ -141,6 +141,9 @@
     focusAreas = normalizeAreas(
       await services.repos.settings.get("liveFocusAreas"),
     );
+    // Profile → "Voice feedback" off = practice starts muted (the speaker
+    // button still unmutes for this session).
+    audio.setMuted(!(await services.repos.settings.get("voiceFeedback")));
     initialShots = await loadTodaysShots(player.id, targets);
     await clipStore.setCap(getVideoRetention()).catch(() => undefined);
     if (destroyed) return;

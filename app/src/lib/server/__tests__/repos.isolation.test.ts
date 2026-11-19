@@ -30,6 +30,20 @@ describe("server repos — per-user isolation", () => {
     B = createServerRepos(db, "user-b");
   });
 
+  it("keeps settings per user (one user's focus / voice never changes another's)", async () => {
+    await A.settings.set("liveFocusAreas", ["rise"]);
+    await A.settings.set("voiceFeedback", false);
+    expect(await A.settings.get("liveFocusAreas")).toEqual(["rise"]);
+    expect(await A.settings.get("voiceFeedback")).toBe(false);
+    // B still has the defaults…
+    expect(await B.settings.get("liveFocusAreas")).toEqual([]);
+    expect(await B.settings.get("voiceFeedback")).toBe(true);
+    // …and B's own change doesn't touch A.
+    await B.settings.set("liveFocusAreas", ["load"]);
+    expect(await A.settings.get("liveFocusAreas")).toEqual(["rise"]);
+    expect(await B.settings.get("liveFocusAreas")).toEqual(["load"]);
+  });
+
   it("scopes players per user", async () => {
     const pA = await A.player.create({
       name: "A",

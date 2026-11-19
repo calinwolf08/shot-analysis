@@ -11,8 +11,8 @@ interface Heard {
  * chip overlaid on the camera in the Practice tab. The choice persists and is
  * changeable mid-session.
  *
- * Settings are device-global (like voice feedback), so each test first resets
- * the selection to "everything" for a known starting point.
+ * Settings are per user (each test signs up a fresh account, so it starts from
+ * "everything"); each test still clears first, as a known starting point.
  */
 async function clearFocus(page: Page) {
   const clear = page.getByTestId("focus-clear");

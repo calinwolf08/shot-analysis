@@ -68,6 +68,7 @@ const EXPECTED_TABLES: Record<string, string[]> = {
     "primary_cue",
   ],
   settings: ["key", "value"],
+  user_settings: ["user_id", "key", "value"],
   shot_poses: ["shot_id", "poses_json"],
   schema_migrations: ["version", "applied_at"],
 };
@@ -94,6 +95,35 @@ describe("migrate", () => {
         expect(cols, `${table}.${col}`).toContain(col);
       }
     }
+  });
+
+  it("007 copies the old global settings to every existing user", async () => {
+    db = createBetterSqliteAdapter();
+    const before = ALL_MIGRATIONS.filter((m) => m.version < 7);
+    await migrate(db, before);
+    const now = 1;
+    // Two users (one owns a player, one only a session), one global setting.
+    await db.run(
+      `INSERT INTO players (id, name, shooting_hand, level, created_at, updated_at, user_id)
+       VALUES ('p1', 'A', 'right', 'advanced', ?, ?, 'user-a')`,
+      [now, now],
+    );
+    await db.run(
+      `INSERT INTO sessions (id, player_id, type, status, started_at, user_id)
+       VALUES ('s1', 'p1', 'live_practice', 'completed', ?, 'user-b')`,
+      [now],
+    );
+    await db.run(
+      `INSERT INTO settings (key, value) VALUES ('liveFocusAreas', '["rise"]')`,
+    );
+    await migrate(db);
+    const rows = await db.query<{ user_id: string; value: string }>(
+      "SELECT user_id, value FROM user_settings WHERE key = 'liveFocusAreas' ORDER BY user_id",
+    );
+    expect(rows).toEqual([
+      { user_id: "user-a", value: '["rise"]' },
+      { user_id: "user-b", value: '["rise"]' },
+    ]);
   });
 
   it("is idempotent: a second run applies nothing", async () => {
@@ -257,7 +287,7 @@ describe("migrate", () => {
     );
 
     const result = await migrate(db);
-    expect(result.applied).toEqual([6]);
+    expect(result.applied).toContain(6);
 
     const ids = (
       await db.query<{ id: string }>("SELECT id FROM shots ORDER BY id")
