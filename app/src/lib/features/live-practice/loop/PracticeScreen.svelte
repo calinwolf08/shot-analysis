@@ -174,16 +174,26 @@
 
   // Keep a clip rolling while the player is positioned and between shots, so a
   // detected shot is captured. Positioning flickers as the shooting motion
-  // starts, so only discard after the player has really left (segments are
-  // capped at 10 s, so rolling a little longer costs nothing).
+  // starts, so only discard after the player has really left, and never while
+  // a shot is in progress or being processed (segments are capped at 15 s, so
+  // rolling a little longer costs nothing).
   const CLIP_DISCARD_AFTER_MS = 3000;
   let discardTimer: ReturnType<typeof setTimeout> | null = null;
+  /** A shot is in progress, being analyzed, or being announced. */
+  const shotInFlight = $derived(
+    store.phase === "active" ||
+      store.phase === "analyzing" ||
+      store.phase === "feedback" ||
+      store.cycle !== "tracking",
+  );
+  // Hold segment rotation for the whole shot, so a slow analysis can't
+  // rotate away the segment that holds the shot's start.
+  $effect(() => {
+    recorder?.hold(shotInFlight);
+  });
   $effect(() => {
     if (!clipStore || !recorder || !gateActive) return;
-    const idle =
-      store.running &&
-      store.phase !== "analyzing" &&
-      store.cycle === "tracking";
+    const idle = store.running && !shotInFlight;
     if (positioned) {
       if (discardTimer) clearTimeout(discardTimer);
       discardTimer = null;
@@ -192,7 +202,7 @@
       const r = recorder;
       discardTimer = setTimeout(() => {
         discardTimer = null;
-        if (!positioned && store.cycle === "tracking") r.discard();
+        if (!positioned && !shotInFlight) r.discard();
       }, CLIP_DISCARD_AFTER_MS);
     }
   });
@@ -215,7 +225,10 @@
     if (!clipStore || !recorder || !recorder.recording) return;
     const cap = entry.capture;
     const fromWall = cap
-      ? cap.repStartTs + cap.frameToWall - CLIP_PRE_ROLL_MS
+      ? // The whole rep window (it holds the stored pose track), else a
+        // fixed lead-in before the trigger.
+        (cap.windowStartTs ?? cap.repStartTs - CLIP_PRE_ROLL_MS) +
+        cap.frameToWall
       : Number.NEGATIVE_INFINITY;
     const take = await recorder.takeCovering(fromWall);
     // Roll again straight away (during the feedback), so a quick next shot

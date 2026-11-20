@@ -18,6 +18,7 @@ const MARKERS = [
   "reference-viewer",
   "debug-index",
   '"detectDelayMs"', // ?detectDelayMs= slow-phone knob (live page)
+  '"analysisDelayMs"', // ?analysisDelayMs= slow-analysis knob (live page)
 ];
 
 const here = dirname(fileURLToPath(import.meta.url));
