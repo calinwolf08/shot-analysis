@@ -41,6 +41,14 @@ export interface ShotClipRecorder {
   takeCovering(fromTs: number): Promise<ClipTake | null>;
   /** Stop and drop everything (e.g. the player walked out of position). */
   discard(): void;
+  /**
+   * Pause segment rotation (true) while a shot is in progress and being
+   * analyzed, so the segments that started before it aren't replaced before
+   * its clip is taken — analysis on a slow phone can take longer than a
+   * rotation. Rotation resumes on hold(false), or after MAX_HOLD_MS as a size
+   * guard.
+   */
+  hold(on: boolean): void;
 }
 
 /** The slice of MediaRecorder used here (injectable for tests). */
@@ -75,6 +83,8 @@ export const PREFERRED_MIME = [
 ];
 
 export const DEFAULT_SEGMENT_MS = 15_000;
+/** A hold never lasts longer than this (bounds clip size if stuck). */
+export const MAX_HOLD_MS = 60_000;
 export const DEFAULT_SEGMENTS = 3;
 export const DEFAULT_VIDEO_BPS = 900_000;
 
@@ -150,12 +160,18 @@ export function createShotClipRecorder(
     }
   }
 
+  /** When the current hold began (null = rotating normally). */
+  let heldSince: number | null = null;
+
   /** Keep `segments` staggered segments rolling. */
   function tick(): void {
     if (!active) return;
     const t = now();
+    if (heldSince !== null && t - heldSince >= MAX_HOLD_MS) heldSince = null;
+    const held = heldSince !== null;
+    // Held: never replace a segment (adding staggered ones is still fine).
     slots = slots.map((s) => {
-      if (t - s.startTs < segmentMs) return s;
+      if (held || t - s.startTs < segmentMs) return s;
       close(s);
       return open() ?? s;
     });
@@ -219,6 +235,11 @@ export function createShotClipRecorder(
         }
       });
       return blob ? { blob, mime: blob.type, startTs: keep.startTs } : null;
+    },
+
+    hold(on) {
+      if (on) heldSince ??= now();
+      else heldSince = null;
     },
 
     discard() {

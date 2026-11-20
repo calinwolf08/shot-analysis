@@ -200,11 +200,29 @@
     session.onFrame((frame) => activeCoordinator.pushFrame(frame));
 
     const shotStore = createRepoShotStore(services.repos.shot);
-    const pipeline = createLiveShotPipeline({
+    const realPipeline = createLiveShotPipeline({
       targets,
       store: shotStore,
       api: createApiClient(),
     });
+    // Dev/E2E only: `?analysisDelayMs=` makes each shot's analysis slow (a
+    // slow phone), so clip coverage can be tested. Constant-folds away in
+    // production.
+    const analysisDelay = devSurfaces
+      ? Number(page.url.searchParams.get("analysisDelayMs") ?? 0) || 0
+      : 0;
+    const pipeline =
+      analysisDelay > 0
+        ? {
+            ...realPipeline,
+            async process(
+              input: Parameters<typeof realPipeline.process>[0],
+            ): ReturnType<typeof realPipeline.process> {
+              await new Promise((r) => setTimeout(r, analysisDelay));
+              return realPipeline.process(input);
+            },
+          }
+        : realPipeline;
     store = new LivePracticeStore({
       coordinator,
       pipeline,

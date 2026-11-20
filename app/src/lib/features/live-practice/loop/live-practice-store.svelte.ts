@@ -72,7 +72,12 @@ export interface ShotEntry {
    * to performance.now() — lets the clip recorder pick and align the video.
    * Absent for shots loaded from history.
    */
-  capture?: { repStartTs: number; frameToWall: number };
+  capture?: {
+    repStartTs: number;
+    /** First frame of the rep window (pose-frame clock, ms). */
+    windowStartTs?: number;
+    frameToWall: number;
+  };
 }
 
 export interface ShotFeedback {
@@ -273,6 +278,7 @@ export class LivePracticeStore {
       excluded: false,
       capture: {
         repStartTs: event.window.startedAt,
+        windowStartTs: event.window.frames[0]?.timestamp,
         frameToWall:
           last?.captureTs !== undefined ? last.captureTs - last.timestamp : 0,
       },

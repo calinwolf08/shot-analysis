@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  MAX_HOLD_MS,
   createShotClipRecorder,
   type RecorderLike,
 } from "../shot-clip-recorder";
@@ -110,6 +111,41 @@ describe("createShotClipRecorder (ping-pong segments)", () => {
     return recorder.takeCovering(shotFrom).then((take) => {
       expect(take).not.toBeNull();
       expect(take!.startTs).toBeLessThanOrEqual(shotFrom);
+      expect(now() - take!.startTs).toBeLessThanOrEqual(15_000);
+    });
+  });
+
+  it("hold: a slow analysis can't rotate away the segment holding the shot", () => {
+    const { recorder, advance, now } = harness(15_000, 3);
+    recorder.start();
+    advance(20_000);
+    const shotFrom = now() - 1_500; // the shot's window began 1.5 s ago
+    recorder.hold(true); // shot in progress → analysis…
+    advance(25_000); // …takes far longer than a rotation
+    return recorder.takeCovering(shotFrom).then((take) => {
+      expect(take).not.toBeNull();
+      expect(take!.startTs).toBeLessThanOrEqual(shotFrom);
+    });
+  });
+
+  it("without the hold, the same delay loses the shot's start (the bug)", () => {
+    const { recorder, advance, now } = harness(15_000, 3);
+    recorder.start();
+    advance(20_000);
+    const shotFrom = now() - 1_500;
+    advance(25_000);
+    return recorder.takeCovering(shotFrom).then((take) => {
+      expect(take!.startTs).toBeGreaterThan(shotFrom);
+    });
+  });
+
+  it("hold(false) resumes rotation; a stuck hold ends after MAX_HOLD_MS", () => {
+    const { recorder, advance, now } = harness(15_000, 3);
+    recorder.start();
+    recorder.hold(true);
+    advance(MAX_HOLD_MS + 20_000);
+    // Rotation resumed by itself: no segment is older than a segment + tick.
+    return recorder.takeCovering(now()).then((take) => {
       expect(now() - take!.startTs).toBeLessThanOrEqual(15_000);
     });
   });

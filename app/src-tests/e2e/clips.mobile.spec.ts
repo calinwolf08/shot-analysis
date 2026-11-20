@@ -69,14 +69,13 @@ test("each shot keeps a small, frame-synced, playable clip", async ({
   for (const f of [min, Math.round((min + max) / 2), max]) {
     await setRange(scrubber, f);
     const t = Number(await canvas.getAttribute("data-frame-t"));
-    // Frames before the clip began (rare: a very quick shot) show its first
-    // frame; the rest of the shot must be on video.
-    const expected = Math.max(0, (t - startTs) / 1000);
-    if (f !== min)
-      expect(
-        (t - startTs) / 1000,
-        `frame ${f} (t=${t}) vs clip start ${startTs}`,
-      ).toBeGreaterThan(0);
+    // The clip covers the whole rep window, so every stored frame — the
+    // first one included — is on video.
+    const expected = (t - startTs) / 1000;
+    expect(
+      expected,
+      `frame ${f} (t=${t}) vs clip start ${startTs}`,
+    ).toBeGreaterThanOrEqual(0);
     await expect
       .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
       .toBeCloseTo(expected, 1);
@@ -123,4 +122,26 @@ test("Profile 'No video' removes stored clips and stops recording", async ({
   await page.reload();
   await page.getByTestId("tab-profile").click();
   await expect(page.getByTestId("video-retention")).toHaveValue("0");
+});
+
+test("slow analysis (a slow phone): the clip still covers the whole shot", async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  // 12 s of analysis per shot — longer than one recorder segment rotation.
+  await onboard(page, `${Q}&analysisDelayMs=12000`, "SlowClip");
+  await recordAndOpenNewest(page, 2);
+  const video = page.getByTestId("review-video");
+  await expect(video).toBeVisible({ timeout: 10_000 });
+  await expect(video).toHaveAttribute("data-exact-sync", "true");
+  const startTs = Number(await video.getAttribute("data-start-frame-ts"));
+  const scrubber = page.getByTestId("review-scrubber");
+  const canvas = page.getByTestId("review-skeleton");
+  // The first frame of the stored shot is on video (not before the clip).
+  await setRange(scrubber, Number(await scrubber.getAttribute("min")));
+  const t = Number(await canvas.getAttribute("data-frame-t"));
+  expect(
+    t - startTs,
+    `first pose frame ${t} vs clip start ${startTs}`,
+  ).toBeGreaterThanOrEqual(0);
 });
