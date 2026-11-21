@@ -30,7 +30,7 @@
   import {
     ScoreCardV3,
     displayScore,
-    issueText,
+    feedbackText,
     scoreBand,
   } from "$lib/features/scoring/v3";
   import type { SideOrientation } from "../setup/angle-gate";
@@ -500,7 +500,7 @@
               {#each fb.worst as m (m.id)}
                 <span class="chip" data-testid="feedback-item"
                   ><b class="chip-phase">{phaseName(m.phase)}</b>
-                  {issueText(m)}</span
+                  {feedbackText(m, store.wording)}</span
                 >
               {/each}
             </div>

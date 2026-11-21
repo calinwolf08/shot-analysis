@@ -62,25 +62,27 @@ describe("shotIssue", () => {
       worst: worst as MetricResultV3[],
     }) as unknown as ScorecardV3;
 
-  it("names the worst metric with its phase and how it's off", () => {
-    expect(
-      shotIssue(
-        card(3.2, [
-          {
-            label: "Set point height",
-            phrase: "set point too low",
-            phase: "setPoint",
-          },
-        ]),
-      ),
-    ).toBe("Set point: Set point height — set point too low");
-    expect(
-      shotIssue(
-        card(3.2, [
-          { label: "Knee bend", phrase: "too shallow", phase: "load" },
-        ]),
-      ),
-    ).toBe("Load: Knee bend — too shallow");
+  it("names the worst metric with its phase, in the short wording", () => {
+    const w = {
+      format: "{phrase} by {n}",
+      metrics: {
+        "load.knee_depth": { low: "Knees deep", high: "Knees shallow" },
+      },
+    };
+    const worst = {
+      id: "load.knee_depth",
+      label: "Knee bend",
+      phrase: "too shallow",
+      phase: "load",
+      direction: "high",
+      score: 3.2,
+      value: 150,
+    } as Partial<MetricResultV3>;
+    expect(shotIssue(card(3.2, [worst]), w)).toBe("Load: Knees shallow by 4");
+    // Without configured wording: the scorecard text.
+    expect(shotIssue(card(3.2, [worst]))).toBe(
+      "Load: Knee bend: too shallow by 4",
+    );
   });
   it("says on target when nothing is off", () => {
     expect(shotIssue(card(1, []))).toBe("On target");

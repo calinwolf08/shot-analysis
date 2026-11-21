@@ -14,13 +14,16 @@
   import type { LiveTargetsV3, PoseData } from "basketball-shot-analysis";
   import {
     ScoreCardV3,
-    feedbackV3,
+    EMPTY_FEEDBACK_WORDING,
+    feedbackReadback,
+    loadFeedbackWording,
     loadLiveTargetsV3,
   } from "$lib/features/scoring/v3";
   import {
     analyzeAndScore,
     type ScoredShot,
   } from "$lib/features/live-practice";
+  import { feedbackItems } from "$lib/features/live-practice/loop/readback";
 
   let targets = $state<LiveTargetsV3 | null>(null);
   let shots = $state<ScoredShot[]>([]);
@@ -62,7 +65,19 @@
   }
 
   const current = $derived(shots[shotIndex] ?? null);
-  const fb = $derived(current ? feedbackV3(current.scorecard) : null);
+  let wording = $state.raw(EMPTY_FEEDBACK_WORDING);
+  void loadFeedbackWording().then((w) => (wording = w.wording));
+  // What the live loop would say: the 3 worst, in shot order, short wording.
+  const fb = $derived(
+    current
+      ? {
+          spoken: feedbackReadback(
+            feedbackItems(current.scorecard.worst),
+            wording,
+          ),
+        }
+      : null,
+  );
 </script>
 
 <div class="page">

@@ -10,6 +10,7 @@
   } from "$lib/features/live-practice/review/shot-list";
   import {
     displayScore,
+    loadFeedbackWording,
     loadLiveTargetsV3,
     scoreBand,
   } from "$lib/features/scoring/v3";
@@ -34,7 +35,11 @@
       loading = false;
       return;
     }
-    const targets = await loadLiveTargetsV3();
+    const [targets, w] = await Promise.all([
+      loadLiveTargetsV3(),
+      loadFeedbackWording(),
+    ]);
+    const wording = w.wording;
     const rows = await services.repos.shot.listByPlayer(player.id, {
       limit: 50,
     });
@@ -49,7 +54,7 @@
     const iss: Record<string, string | null> = {};
     for (const { record, card } of scored) {
       m[record.id] = card?.overall ?? null;
-      iss[record.id] = shotIssue(card);
+      iss[record.id] = shotIssue(card, wording);
     }
     overall = m;
     issue = iss;
