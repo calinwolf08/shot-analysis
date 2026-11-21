@@ -33,7 +33,11 @@
   } from "$lib/shared/audio/audio-probe";
   import type { LiveTargetsV3 } from "basketball-shot-analysis";
   import { normalizeAreas } from "$lib/features/scoring";
-  import { loadLiveTargetsV3 } from "$lib/features/scoring/v3";
+  import {
+    loadFeedbackWording,
+    loadLiveTargetsV3,
+    type FeedbackWording,
+  } from "$lib/features/scoring/v3";
   import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { createApiClient } from "$lib/shared/api/client";
@@ -104,6 +108,7 @@
   let requiredSide = $state<SideOrientation>("side-left");
   let playerId = "";
   let targets: LiveTargetsV3 | null = null;
+  let feedbackWording: FeedbackWording | undefined;
   let captureHandle: CaptureHandle | null = null;
   let focusAreas: string[] = [];
   let tuning = $state<LiveTuning>(DEFAULT_LIVE_TUNING);
@@ -135,7 +140,12 @@
     shootingHand = player.shootingHand;
     requiredSide = requiredOrientation(shootingHand);
     targets = await loadLiveTargetsV3();
-    const loaded = await loadLiveTuning();
+    const [loaded, fw] = await Promise.all([
+      loadLiveTuning(),
+      loadFeedbackWording(),
+    ]);
+    feedbackWording = fw.wording;
+    for (const w of fw.warnings) console.warn("[feedback-wording]", w);
     tuning = loaded.tuning;
     for (const w of loaded.warnings) console.warn("[live-tuning]", w);
     focusAreas = normalizeAreas(
@@ -231,6 +241,7 @@
       playerId,
       opts: { shootingHand, profile: "pro-form" },
       fps: session.fps,
+      ...(feedbackWording ? { wording: feedbackWording } : {}),
       frameSize: () => session?.frameSize?.() ?? null,
       focusAreas,
       initialShots,

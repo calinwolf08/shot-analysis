@@ -1,12 +1,17 @@
 /**
  * Shots-tab list presentation: rows grouped under day headers ("Today",
  * "Yesterday", "Nov 14"), each labeled by time + its worst issue, named with
- * its phase — e.g. "4:12 PM · Load: Knee bend — too shallow". (The orientation used to be the label; every
+ * its phase — e.g. "4:12 PM · Load: Knees shallow by 4". (The orientation used to be the label; every
  * stored shot is now the same side-on view, so it no longer tells shots apart.)
  *
  * Pure; dates use the device's local time zone.
  */
 import type { ScorecardV3 } from "$lib/features/scoring/v3";
+import {
+  EMPTY_FEEDBACK_WORDING,
+  feedbackText,
+  type FeedbackWording,
+} from "$lib/features/scoring/v3/feedback-wording";
 import { phaseName } from "../loop/readback";
 
 /** Shown for a pre-v3 shot that has no pose track to re-analyze. */
@@ -52,16 +57,19 @@ export function timeLabel(t: number): string {
 
 /**
  * The shot's headline issue: its worst off-target metric with its phase
- * ("Load: Knee bend — too shallow"), "On target" when nothing is off, null when
+ * ("Load: Knees shallow by 4", from the feedback wording file), "On target" when nothing is off, null when
  * too little was measured to score it, or "Re-analysis unavailable" when the
  * shot has no v3 scorecard at all.
  */
-export function shotIssue(card: ScorecardV3 | null): string | null {
+export function shotIssue(
+  card: ScorecardV3 | null,
+  wording: FeedbackWording = EMPTY_FEEDBACK_WORDING,
+): string | null {
   if (!card) return REANALYSIS_UNAVAILABLE;
   if (card.overall === null) return null;
   const w = card.worst[0];
   if (!w) return "On target";
-  return `${phaseName(w.phase)}: ${w.label}${w.phrase ? ` — ${w.phrase}` : ""}`;
+  return `${phaseName(w.phase)}: ${feedbackText(w, wording)}`;
 }
 
 /** Groups rows (already newest-first) under day headers, preserving order. */

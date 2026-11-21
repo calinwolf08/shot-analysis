@@ -24,7 +24,10 @@
   } from "$lib/features/scoring/focus";
   import {
     ScoreCardV3,
-    issueText,
+    feedbackText,
+    loadFeedbackWording,
+    EMPTY_FEEDBACK_WORDING,
+    type FeedbackWording,
     loadLiveTargetsV3,
     type MetricResultV3,
     type ScorecardV3,
@@ -56,6 +59,7 @@
   let shot = $state<ShotRecord | null>(null);
   let poses = $state<ShotReviewPoses | null>(null);
   let card = $state<ScorecardV3 | null>(null);
+  let wording = $state.raw<FeedbackWording>(EMPTY_FEEDBACK_WORDING);
   /** Pre-v3 shot without a pose track: can't be scored on the new metrics. */
   let unavailable = $state(false);
   let current = $state(0);
@@ -154,12 +158,14 @@
   });
 
   async function load(id: string) {
-    const [s, p, targets, player] = await Promise.all([
+    const [s, p, targets, player, w] = await Promise.all([
       services.repos.shot.get(id),
       services.repos.shot.getPoses(id),
       loadLiveTargetsV3(),
       services.repos.player.getFirst(),
+      loadFeedbackWording(),
     ]);
+    wording = w.wording;
     if (!s) {
       notFound = true;
       return;
@@ -477,7 +483,7 @@
         <div class="po-chips">
           {#each phaseIssues.slice(0, 3) as m (m.id)}
             <span class="po-chip" class:bad={(m.score ?? 0) >= 3}
-              >{issueText(m)}</span
+              >{feedbackText(m, wording)}</span
             >
           {/each}
         </div>

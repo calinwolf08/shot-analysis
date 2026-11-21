@@ -35,7 +35,12 @@ import type {
 } from "../coordinator/coordinator";
 import type { LiveShotPipeline } from "../pipeline";
 import type { ShotStore } from "../pipeline";
-import { FEEDBACK_COUNT, buildCueReadback, feedbackItems } from "./readback";
+import { FEEDBACK_COUNT, feedbackItems } from "./readback";
+import {
+  EMPTY_FEEDBACK_WORDING,
+  feedbackReadback,
+  type FeedbackWording,
+} from "$lib/features/scoring/v3/feedback-wording";
 
 /** Spoken when a detected shot is rejected for the camera angle. */
 export const WRONG_ANGLE_TEXT = "Wrong angle, shot not counted";
@@ -106,6 +111,8 @@ export interface LivePracticeStoreDeps {
   maxWorstSpoken?: number;
   /** Live focus-area ids; [] = coach on everything (the default). */
   focusAreas?: string[];
+  /** Short feedback wording (static/config/feedback-wording.json). */
+  wording?: FeedbackWording;
   /** Shots already recorded today (continues the counter/average). */
   initialShots?: ShotEntry[];
 }
@@ -132,11 +139,14 @@ export class LivePracticeStore {
   private unsubscribes: (() => void)[] = [];
   private flashTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly maxWorstSpoken: number;
+  /** Short feedback wording, used for the voice and the feedback card. */
+  readonly wording: FeedbackWording;
   /** Bumped by pause/stop so an in-flight cycle stops where it is. */
   private generation = 0;
 
   constructor(private readonly deps: LivePracticeStoreDeps) {
     this.maxWorstSpoken = deps.maxWorstSpoken ?? FEEDBACK_COUNT;
+    this.wording = deps.wording ?? EMPTY_FEEDBACK_WORDING;
     this.muted = deps.audio.isMuted();
     this.focusAreas = deps.focusAreas ?? [];
     this.shots = deps.initialShots ?? [];
@@ -286,7 +296,7 @@ export class LivePracticeStore {
     this.shots = [...this.shots, entry];
 
     const items = feedbackItems(focused, this.maxWorstSpoken);
-    let spoken = buildCueReadback(items);
+    let spoken = feedbackReadback(items, this.wording);
     // Audio-first: never fall silent after "Analyzing".
     if (!spoken) {
       spoken = this.focusAreas.length > 0 ? "Focus on target" : ON_TARGET_TEXT;

@@ -123,12 +123,18 @@ Each scored metric has a target band from the reference shots
 **Feedback after a shot** is the 3 worst scored metrics, re-ordered into shot
 order:
 
-- **Voice:** a coaching cue per item, grouped by phase: "Load: Bend your knees
-  more. Set point: Raise your set point."
-- **Card** (and the review's "off target" chips): the same items on the score
-  scale, e.g. "Head position: tilted back by 2". Measured amounts (degrees,
-  % of a limb) only appear in the full scorecard rows, with the target
-  range.
+- **Voice and card** (plus the review's "off target" chips and the Shots
+  list) use the same short wording: the body part, which way it's off (the
+  fault), and the whole-number score, grouped by phase, e.g. "Load: Spine
+  forward by 3. Knees deep by 4." The number is how far that metric is from 0
+  (on target).
+- **Wording is editable without a rebuild** in
+  `app/static/config/feedback-wording.json`. Each metric has a `low` phrase
+  (value below target) and a `high` phrase (value above target), and one
+  `format` builds each item (`{phrase} by {n}`). A metric missing from the file
+  falls back to its scorecard wording (or, for the voice, its coaching cue).
+- **Measured amounts** (degrees, % of a limb) only appear in the full
+  scorecard rows, with the target range.
 - **Focus:** with a focus area set (Load / Rise / Set point / Release, or
   Rhythm & timing = every timing metric), the 3 worst within the focus are
   used instead.

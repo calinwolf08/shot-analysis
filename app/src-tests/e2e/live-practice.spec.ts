@@ -25,7 +25,10 @@ test("live practice: replayed reps score and persist to the Shots tab", async ({
   // Each item: "<phase> <label>: <how it's off> by <whole score>" — no
   // degrees or limb percentages on the card.
   for (const t of await page.getByTestId("feedback-item").allTextContents()) {
-    expect(t.trim()).toMatch(/^\S.*: .+ by (\d|10\+)$/);
+    // "<phase> <body part> <fault> by <n>", e.g. "Load Spine forward by 3".
+    expect(t.trim()).toMatch(
+      /^(Load|Rise|Set point|Release)\s+[A-Z][^:]* by (\d|10\+)$/,
+    );
     expect(t).not.toMatch(/°|%/);
   }
 
@@ -55,4 +58,50 @@ test("live practice: replayed reps score and persist to the Shots tab", async ({
   await expect(page.getByTestId("scorecard-v3")).toBeVisible();
   await expect(page.getByTestId("v3-phase-load")).toBeVisible();
   await expect(page.getByTestId("v3-phase-release")).toBeVisible();
+});
+
+test("feedback wording comes from the editable config file (card + voice)", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  // Serve an edited wording file: every phrase becomes "ZZ <id>" and the
+  // format changes — the card and the spoken readback must follow it.
+  await page.route("**/config/feedback-wording.json", async (route) => {
+    const res = await route.fetch();
+    const json = (await res.json()) as {
+      metrics: Record<string, { low: string; high: string }>;
+    };
+    for (const [id, m] of Object.entries(json.metrics)) {
+      m.low = `ZZ ${id} low`;
+      m.high = `ZZ ${id} high`;
+    }
+    await route.fulfill({
+      json: { ...json, format: "{phrase} score {n}" },
+    });
+  });
+  await onboard(page, "?e2e=replay", "Wording");
+  await startLiveLoop(page);
+  await expect(page.getByTestId("rep-feedback")).toBeVisible({
+    timeout: 60_000,
+  });
+  const items = await page.getByTestId("feedback-item").allTextContents();
+  expect(items.length).toBeGreaterThan(0);
+  for (const t of items) {
+    expect(t).toMatch(/ZZ \S+ (low|high) score (\d|10\+)$/);
+  }
+  await expect
+    .poll(async () => {
+      const log = await page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __scAudioLog?: { kind: string; text?: string }[];
+            }
+          ).__scAudioLog ?? [],
+      );
+      const said = log.filter((h) => h.kind === "speak").map((h) => h.text);
+      const i = said.lastIndexOf("Analyzing");
+      return i >= 0 ? (said[i + 1] ?? "") : "";
+    })
+    .toMatch(/^(Load|Rise|Set point|Release): ZZ .+ score (\d|10\+)\./);
 });

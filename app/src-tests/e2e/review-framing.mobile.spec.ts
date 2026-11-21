@@ -158,7 +158,9 @@ test("review on a phone: pose, phase issues and scrubber all fit above the tab b
   if ((await chips.count()) > 0) {
     const last = (await chips.last().boundingBox())!;
     expect(last.y + last.height).toBeLessThanOrEqual(tabTop);
-    expect(await chips.first().textContent()).toMatch(/: .+ by (\d|10\+)$/);
+    expect(await chips.first().textContent()).toMatch(
+      /^[A-Z][^:]* by (\d|10\+)$/,
+    );
   }
   await page.screenshot({ path: screenPath("ux", "review-phone-layout") });
 });

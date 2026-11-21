@@ -163,7 +163,9 @@ builds):
 
 **Live tuning** without a rebuild: `static/config/live-tuning.json` holds the
 positioning-cue pacing, readiness thresholds and pose-latency fallback.
-Scoring targets and wording live in `static/reference/live-targets-v3.json`
+The short feedback wording ("Spine forward by 3") lives in
+`static/config/feedback-wording.json` (edit + reload). Scoring targets and the
+scorecard wording live in `static/reference/live-targets-v3.json`
 (see [`../docs/metrics-by-phase.md`](../docs/metrics-by-phase.md)).
 
 - Chromium is expected preinstalled via `PLAYWRIGHT_BROWSERS_PATH`. If the
