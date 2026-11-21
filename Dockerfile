@@ -9,7 +9,9 @@
 #
 # Runtime env (set these in Coolify; see SETUP.md §5):
 #   AUTH_SECRET            required  — better-auth signing secret
-#   DATABASE_PATH          required  — e.g. /data/shotcoach.sqlite (persistent volume)
+#   DATABASE_PATH          required  — e.g. /data/shotcoach.sqlite (persistent volume);
+#                                     the server refuses to start in production without
+#                                     it (or a Postgres DATABASE_URL, once supported)
 #   ORIGIN                 required  — public https origin, e.g. https://app.example.com
 #   AUTH_TRUSTED_ORIGINS   required  — web origin + capacitor://localhost + http://localhost
 #   PORT (3000) / BODY_SIZE_LIMIT (64M) default below; override as needed.

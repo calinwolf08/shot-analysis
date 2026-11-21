@@ -180,6 +180,62 @@ oc.columns([...]).doUpdateSet(...))`;
 - Remove the legacy `migrate()` once no SQLite database older than version 7
   can exist (after one release).
 
+## Implementation notes
+
+### Phases 1–2 (done)
+
+- **Config** (`lib/server/database/config.ts`):
+  - A `DATABASE_URL` with a `postgres://` or `postgresql://` scheme selects
+    Postgres.
+  - Otherwise `DATABASE_PATH` selects SQLite. A non-Postgres `DATABASE_URL` is
+    still read as a SQLite path, for compatibility.
+  - Setting both is an error.
+  - **Production guard:** with `NODE_ENV=production` and neither set, the
+    server refuses to start. The Docker image sets `NODE_ENV=production`.
+    - A SvelteKit `init` hook in `hooks.server.ts` opens and migrates the
+      database at startup. A bad config or a failed migration therefore exits
+      the process (code 1, error logged) instead of failing every request.
+    - The guard is skipped while `vite build` renders pages (`building`).
+  - `describeDbConfig` hides credentials in logs.
+- **Schema types** (`schema.ts`): a Kysely `Database` interface for all 15
+  app tables.
+- **Dialects** (`kysely.ts`):
+  - **SQLite:** `createSqliteKysely` over an open better-sqlite3 connection.
+  - **Postgres:** `createPostgresKysely` over a `pg.Pool`, with a per-pool
+    type parser that turns int8 into a number.
+  - **Tests:** PGlite via `kysely-pglite-dialect`, in `__tests__/pglite.ts`.
+- **Server wiring** (`lib/server/db.ts`):
+  - One better-sqlite3 connection is shared by the raw-SQL adapter (repos,
+    until Phase 3) and Kysely. `getKysely()` exposes the latter.
+  - A Postgres `DATABASE_URL` currently stops startup with a clear message,
+    since the queries move over in Phase 3.
+  - better-auth still opens the SQLite file itself (Phase 4).
+- **Migrations** (`migrate.ts`, `migrations/0001-baseline.ts`):
+  - **Legacy SQLite files** (those with a `schema_migrations` table) first
+    finish the legacy runs 001–007 on the same connection.
+  - **Kysely's `Migrator`** then runs `0001-baseline`, which builds today's
+    schema with the schema builder.
+  - **Fresh database (either kind):** the baseline creates all 15 tables and
+    13 indexes. On Postgres, the sessions → plan_items foreign key is added
+    after both tables exist.
+  - **Upgraded database:** the baseline is recorded but does nothing.
+  - **Rollback safety:** a fresh SQLite database also gets the legacy
+    `schema_migrations` rows 1–7, so an older release's runner sees it as
+    current.
+- **Tests (17):**
+  - Config, including the guard and credential hiding.
+  - Both dialects run; Postgres BIGINT comes back as a number.
+  - Fresh baseline on both, including the Postgres sessions → plan_items FK.
+  - Schema parity:
+    - **Baseline vs legacy on SQLite:** exact match on types, nullability,
+      defaults and indexes.
+    - **SQLite vs Postgres:** match on columns, nullability, defaults and
+      indexes.
+  - Legacy v5 → current with data intact, including 007's settings copy.
+  - Idempotent on both.
+  - Rollback safety.
+  - Typed insert/select and CHECK constraints on both.
+
 ## 4. Risks
 
 | Risk                                                                  | Mitigation                                                                                                   |
