@@ -102,6 +102,8 @@ test("a picked metric shows its target zone; a timing metric its window on the s
   const skeleton = page.getByTestId("review-skeleton");
   await page.getByTestId("v3-row-load.knee_depth").locator("button").click();
   await expect(skeleton).toHaveAttribute("data-zone", "rect");
+  await page.getByTestId("v3-row-load.spine_angle").locator("button").click();
+  await expect(skeleton).toHaveAttribute("data-zone", "wedge");
 
   await page
     .getByTestId("v3-row-rise.t_ball_vs_knee_bottom")

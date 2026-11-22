@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { targetZone } from "../target-zone";
+import { targetZone, zoneStyleFor } from "../target-zone";
 
 /** A right-shooter, right-near-side pose with given joints (others hidden). */
 function pose(j: Record<number, [number, number]>) {
@@ -97,5 +97,30 @@ describe("targetZone", () => {
     expect(
       targetZone(knee, { ...sides, project, lm: pose({}), style: "rect" }),
     ).toBeNull();
+  });
+
+  it("picks the visualization per metric", () => {
+    for (const id of [
+      "load.knee_depth",
+      "setPoint.knee_angle",
+      "release.knee_change",
+      "load.hip_over_knee",
+      "setPoint.wrist_vs_head",
+      "release.guide_hand_dx",
+    ])
+      expect([id, zoneStyleFor(id)]).toEqual([id, "rect"]);
+    for (const id of [
+      "load.spine_angle",
+      "rise.spine_change",
+      "load.head_pitch",
+      "setPoint.elbow_angle",
+      "load.elbow_change",
+      "setPoint.hip_angle",
+      "release.wrist_snap",
+    ])
+      expect([id, zoneStyleFor(id)]).toEqual([id, "wedge"]);
+    // Without an override, targetZone follows it.
+    const z = targetZone(knee, { ...sides, project, lm });
+    expect(z?.kind).toBe("rect");
   });
 });

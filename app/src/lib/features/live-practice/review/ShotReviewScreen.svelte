@@ -46,7 +46,6 @@
   import {
     drawTargetZone,
     targetZone,
-    type ZoneStyle,
   } from "$lib/features/reference/target-zone";
   type Hand = "left" | "right";
   import {
@@ -128,11 +127,6 @@
     poses && poses.frames.length > 0
       ? poses.frames.at(-1)!.frameIndex
       : (analysis?.frameRange.end ?? 0),
-  );
-
-  /** Target-zone design (both offered while one is chosen: ?zone=wedge). */
-  const zoneStyle = $derived<ZoneStyle>(
-    page.url.searchParams.get("zone") === "wedge" ? "wedge" : "rect",
   );
 
   /**
@@ -478,7 +472,6 @@
         lm,
         firstLm:
           poses!.frames.find((p) => p.frameIndex === first)?.landmarks ?? null,
-        style: zoneStyle,
         facing: v.facing,
       });
       if (z) {

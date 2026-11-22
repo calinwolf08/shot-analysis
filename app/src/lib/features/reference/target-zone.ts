@@ -2,7 +2,9 @@
  * Where a body part should be for a v3 metric to score 0, as drawable screen
  * geometry: the target zone shown when a metric is picked in shot review.
  *
- * Two styles for angle-like metrics (joint angles, torso lean, head pitch):
+ * Each metric gets one style (`zoneStyleFor`): a box for "where should this
+ * body part be" (knee bend, offsets, heights), a wedge for angles and
+ * orientation (torso lean, head pitch, elbow / wrist / hip angles). Styles:
  *  - "wedge": joint angles — at the joint, the target angle centred on the
  *             measured angle (one green sliver per side, where each side of
  *             the angle should be); lean / pitch — the band from the vertical
@@ -11,7 +13,7 @@
  *             elbow for elbow angle) belongs across the band, plus a dashed
  *             ghost limb mid-band; lean / pitch — a box where the shoulder /
  *             nose belongs.
- * Offsets and heights are a box in either style (the band along x / y).
+ * Offsets and heights are always a box (the band along x / y).
  * Change metrics (elbow change, spine change…) are relative: the target is the
  * angle at the change's first frame plus the band, drawn on its last frame.
  * Paths, segments and timing have no zone here (timing is a scrubber band).
@@ -61,7 +63,8 @@ export interface ZoneInput extends GeometrySides {
   readonly lm: readonly Landmark[] | null | undefined;
   /** Landmarks on the metric's first frame (change metrics' baseline). */
   readonly firstLm?: readonly Landmark[] | null;
-  readonly style: ZoneStyle;
+  /** Override the per-metric choice (`zoneStyleFor`) — tests / previews. */
+  readonly style?: ZoneStyle;
   /** The shot's facing (+1 = screen-right), as the metrics computed it. */
   readonly facing?: 1 | -1;
 }
@@ -194,6 +197,23 @@ function limbAt(
 }
 
 /**
+ * The visualization each metric gets:
+ *  - "rect" where the question is WHERE a body part should be — knee bend
+ *    (where the knee belongs, feet planted) and every offset / height
+ *    (hips over knees, wrist vs head, ball drop, guide hand…);
+ *  - "wedge" where it's an ANGLE or orientation — torso lean, head pitch,
+ *    elbow, wrist hinge and hip angle (and their changes).
+ */
+export function zoneStyleFor(id: string): ZoneStyle {
+  const g = geometryFor(id)[0];
+  if (!g) return "rect";
+  if (g.kind === "angle") {
+    return g.joints.join(",") === "hip,knee,ankle" ? "rect" : "wedge";
+  }
+  return g.kind === "lean" || g.kind === "pitch" ? "wedge" : "rect";
+}
+
+/**
  * The target zone for a metric on the shown frame, or null (no zone for this
  * kind of metric, or a joint isn't visible).
  */
@@ -207,6 +227,7 @@ export function targetZone(m: ZoneMetric, o: ZoneInput): Zone | null {
   const change = isChange(m.id);
   if (change && m.frames.length < 2) return null;
   const facing = o.facing ?? facingOf(o.lm, o);
+  const style = o.style ?? zoneStyleFor(m.id);
 
   switch (g.kind) {
     case "angle": {
@@ -226,7 +247,7 @@ export function targetZone(m: ZoneMetric, o: ZoneInput): Zone | null {
       }
       const lo = clampDeg(base + Math.min(m.passMin, m.passMax));
       const hi = clampDeg(base + Math.max(m.passMin, m.passMax));
-      if (o.style === "wedge") {
+      if (style === "wedge") {
         // At the joint, the size of the measured arc: the target angle
         // centred on the current angle's bisector — each side of the angle
         // should land in its green sliver.
@@ -288,7 +309,7 @@ export function targetZone(m: ZoneMetric, o: ZoneInput): Zone | null {
         Math.atan2(-Math.cos(lean * RAD), facing * Math.sin(lean * RAD));
       const radius = Math.hypot(top.x - hip.x, top.y - hip.y);
       return angular(
-        o.style,
+        style,
         hip,
         radius,
         toScreen(base + m.passMin),
@@ -315,7 +336,7 @@ export function targetZone(m: ZoneMetric, o: ZoneInput): Zone | null {
         Math.hypot(nose.x - ear.x, nose.y - ear.y) * 1.6,
       );
       return angular(
-        o.style,
+        style,
         ear,
         radius,
         toScreen(base + m.passMin),
