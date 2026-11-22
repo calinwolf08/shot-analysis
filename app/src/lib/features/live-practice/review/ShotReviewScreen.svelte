@@ -34,6 +34,7 @@
   } from "$lib/features/scoring/v3";
   import {
     drawGeometry,
+    geometryFamily,
     geometryFor,
   } from "$lib/features/reference/metric-geometry";
   import { scoreStoredShot } from "./scored-shots";
@@ -42,6 +43,10 @@
   import { phaseName } from "../loop/readback";
   import { Button } from "$lib/shared/ui";
   import { drawSkeleton } from "$lib/shared/ui/pose-skeleton";
+  import {
+    drawTargetZone,
+    targetZone,
+  } from "$lib/features/reference/target-zone";
   type Hand = "left" | "right";
   import {
     MIN_VIS,
@@ -124,6 +129,23 @@
       : (analysis?.frameRange.end ?? 0),
   );
 
+  /**
+   * A picked timing metric on the scrubber: its two events, and the window
+   * the second should fall in (first event + band × phase duration).
+   */
+  const timingBand = $derived.by(() => {
+    const m = picked;
+    if (!m || !v3 || geometryFamily(m.id) !== "timing" || m.frames.length < 2)
+      return null;
+    const win = v3.phases[m.phase as keyof typeof v3.phases];
+    if (!win) return null;
+    const d = win.end - win.start;
+    const a = m.frames[0]!;
+    const lo = Math.max(start, Math.min(end, a + m.passMin * d));
+    const hi = Math.max(start, Math.min(end, a + m.passMax * d));
+    return { a, b: m.frames[1]!, lo: Math.min(lo, hi), hi: Math.max(lo, hi) };
+  });
+
   /** Phase markers (where each v3 phase begins) + the current phase. */
   const phaseStarts = $derived(
     v3
@@ -200,10 +222,84 @@
     revokeClip();
     videoReady = false;
     const clip = await clipStore.get(id).catch(() => null);
+    clipInfo = null;
     if (clip) {
       clipStartFrameTs = clip.startFrameTs;
+      clipMeta = { mime: clip.mime || clip.blob.type, bytes: clip.blob.size };
       clipUrl = URL.createObjectURL(clip.blob);
     }
+  }
+
+  /**
+   * Recorded WebM (MediaRecorder) carries no duration or seek index, so
+   * browsers report `duration = Infinity` and some (Firefox) won't seek or
+   * play from an arbitrary point until the file has been scanned. Seeking far
+   * past the end forces that scan; then back to the start before enabling
+   * scrubbing.
+   */
+  async function prepareVideo(v: HTMLVideoElement): Promise<void> {
+    if (!isFinite(v.duration) || v.duration === 0) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(done, 4000);
+        function done() {
+          clearTimeout(timer);
+          v.removeEventListener("durationchange", onChange);
+          v.removeEventListener("seeked", onChange);
+          resolve();
+        }
+        function onChange() {
+          if (isFinite(v.duration) && v.duration > 0) done();
+        }
+        v.addEventListener("durationchange", onChange);
+        v.addEventListener("seeked", onChange);
+        try {
+          v.currentTime = 1e7;
+        } catch {
+          done();
+        }
+      });
+      try {
+        v.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+    }
+    readClipInfo(v);
+    videoReady = true;
+  }
+
+  /** Clip size/format and what the browser can seek in it (diagnostics). */
+  let clipMeta = $state<{ mime: string; bytes: number } | null>(null);
+  let clipInfo = $state<{
+    duration: number;
+    seekableEnd: number;
+    expectedEnd: number | null;
+  } | null>(null);
+  function readClipInfo(v: HTMLVideoElement) {
+    const sk = v.seekable;
+    const lastT = poses?.frames.at(-1)?.t;
+    clipInfo = {
+      duration: v.duration,
+      seekableEnd: sk && sk.length > 0 ? sk.end(sk.length - 1) : 0,
+      expectedEnd:
+        clipStartFrameTs !== null && typeof lastT === "number"
+          ? (lastT - clipStartFrameTs) / 1000
+          : null,
+    };
+  }
+  /** The clip can't reach the shot's frames (shown so it can be reported). */
+  const clipProblem = $derived(
+    !!clipInfo &&
+      (!isFinite(clipInfo.duration) ||
+        clipInfo.seekableEnd <= 0 ||
+        (clipInfo.expectedEnd !== null &&
+          clipInfo.duration + 0.5 < clipInfo.expectedEnd)),
+  );
+  const showClipInfo = $derived(
+    clipProblem || page.url.searchParams.get("debug") === "video",
+  );
+  function fmtSec(n: number): string {
+    return isFinite(n) ? `${n.toFixed(1)} s` : "unknown";
   }
 
   function revokeClip() {
@@ -223,7 +319,9 @@
   /** Seek to where a metric was measured (else to its phase's start). */
   function seekToMetric(m: MetricResultV3) {
     picked = m;
-    const f = m.frames[0];
+    // The measured frame (a change's end; a timing metric's second event —
+    // when it actually happened).
+    const f = m.frames.at(-1);
     if (f !== undefined && f >= start && f <= end) {
       current = f;
       return;
@@ -357,22 +455,40 @@
       project,
     });
 
-    // The current phase's worst issues, drawn as what they measure.
-    // A metric clicked in the scorecard is drawn on its own (until the
-    // scrubber moves); otherwise the current phase's 2 worst issues.
-    const issues =
-      picked && picked.phase === currentPhase
-        ? [picked]
-        : phaseIssues.slice(0, 2);
+    // The current phase's worst issues (or the metric clicked in the
+    // scorecard, on its own until the scrubber moves): the measured body part
+    // highlighted, plus its target zone on the frame it was measured. Paths
+    // (no zone) still draw their trace.
+    const issues = picked ? [picked] : phaseIssues.slice(0, 2);
     const drawn: string[] = [];
+    const zones: string[] = [];
     const v = v3;
     if (v) {
       for (const m of issues) {
+        if (current === m.frames.at(-1)) {
+          const first = m.frames[0];
+          const z = targetZone(m, {
+            shootingHand: hand,
+            nearSide: v.nearSide,
+            project,
+            lm,
+            firstLm:
+              poses!.frames.find((p) => p.frameIndex === first)?.landmarks ??
+              null,
+            facing: v.facing,
+          });
+          if (z) {
+            drawTargetZone(ctx, z);
+            zones.push(z.kind);
+          }
+        }
+        const family = geometryFamily(m.id);
         drawn.push(
           ...drawGeometry(ctx, geometryFor(m.id), lm, {
             shootingHand: hand,
             nearSide: v.nearSide,
             project,
+            highlightOnly: family !== "path",
             pathFrames: poses!.frames
               .filter(
                 (p) =>
@@ -390,6 +506,7 @@
         );
       }
     }
+    c.dataset.zone = zones.join(",");
     c.dataset.geometry = drawn.join(",");
   });
 </script>
@@ -435,7 +552,7 @@
             if (v.videoWidth && v.videoHeight) {
               videoSize = { width: v.videoWidth, height: v.videoHeight };
             }
-            videoReady = true;
+            void prepareVideo(v);
           }}
         ></video>
       {/if}
@@ -492,7 +609,7 @@
 
     {#if poses && poses.frames.length > 0}
       <div class="scrubber">
-        <div class="track">
+        <div class="track" class:timing={!!timingBand}>
           {#each phaseStarts as kf (kf.phase)}
             <span
               class="marker"
@@ -500,6 +617,28 @@
               title={phaseName(kf.phase)}
             ></span>
           {/each}
+          {#if timingBand}
+            <span
+              class="t-band"
+              data-testid="review-timing-band"
+              style="left:{markerLeft(timingBand.lo)}%;width:{Math.max(
+                0.8,
+                markerLeft(timingBand.hi) - markerLeft(timingBand.lo),
+              )}%"
+              title="Target window"
+            ></span>
+            <span
+              class="t-event first"
+              style="left:{markerLeft(timingBand.a)}%"
+              title="First event"
+            ></span>
+            <span
+              class="t-event second"
+              data-testid="review-timing-actual"
+              style="left:{markerLeft(timingBand.b)}%"
+              title="When it happened"
+            ></span>
+          {/if}
         </div>
         {#if clipUrl}
           <button
@@ -527,12 +666,30 @@
           data-testid="review-scrubber"
           aria-label="Scrub shot"
         />
+        {#if timingBand}
+          <p class="t-legend" data-testid="review-timing-legend">
+            <span class="dot first"></span> starts ·
+            <span class="dot second"></span> when it happened ·
+            <span class="swatch"></span> when it should happen
+          </p>
+        {/if}
         <div class="scrub-meta">
           <span>frame {current - start + 1} / {end - start + 1}</span>
           {#if currentPhase}<span class="phase-tag" data-testid="review-phase"
               >{phaseName(currentPhase)}</span
             >{/if}
         </div>
+        {#if showClipInfo && clipInfo}
+          <p class="clip-info" data-testid="review-clip-info">
+            {#if clipProblem}Video can't reach every frame of this shot ·
+            {/if}clip {fmtSec(clipInfo.duration)}, seekable to {fmtSec(
+              clipInfo.seekableEnd,
+            )}{#if clipInfo.expectedEnd !== null}, shot ends at {fmtSec(
+                clipInfo.expectedEnd,
+              )}{/if}{#if clipMeta}
+              · {clipMeta.mime || "?"} · {(clipMeta.bytes / 1e6).toFixed(2)} MB{/if}
+          </p>
+        {/if}
       </div>
     {/if}
 
@@ -541,6 +698,7 @@
         {card}
         highlightPhase={currentPhase}
         onmetric={seekToMetric}
+        {wording}
       />
     {:else}
       <p class="dim" data-testid="review-reanalysis-unavailable">
@@ -662,6 +820,61 @@
     position: relative;
     height: 6px;
   }
+  .track.timing {
+    height: 14px;
+    margin-bottom: 4px;
+  }
+  .t-legend {
+    margin: 2px 0 0;
+    font-size: 0.75rem;
+    color: var(--sc-text-dim);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .t-legend .dot,
+  .t-legend .swatch {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+  .t-legend .dot.first {
+    background: #94a3b8;
+  }
+  .t-legend .dot.second {
+    background: #fbbf24;
+  }
+  .t-legend .swatch {
+    width: 14px;
+    border-radius: 2px;
+    background: rgb(52 211 153 / 35%);
+    border: 1px dashed #34d399;
+  }
+  .t-band {
+    position: absolute;
+    top: 0;
+    height: 12px;
+    border-radius: 3px;
+    background: rgb(52 211 153 / 35%);
+    border: 1px dashed #34d399;
+  }
+  .t-event {
+    position: absolute;
+    top: 1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    transform: translateX(-5px);
+    border: 2px solid #fff;
+  }
+  .t-event.first {
+    background: #94a3b8;
+  }
+  .t-event.second {
+    background: #fbbf24;
+  }
   .marker {
     position: absolute;
     top: 0;
@@ -672,6 +885,11 @@
   }
   .scrubber input {
     width: 100%;
+  }
+  .clip-info {
+    margin: 0.25rem 0 0;
+    font-size: 0.75rem;
+    color: var(--sc-text-dim);
   }
   .scrub-meta {
     display: flex;

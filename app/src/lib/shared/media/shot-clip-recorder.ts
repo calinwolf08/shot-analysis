@@ -75,9 +75,12 @@ export interface ShotClipRecorderOptions {
   ) => RecorderLike;
 }
 
+// VP8 first: far cheaper to encode than VP9, which matters with three
+// recorders running beside pose detection on a phone (a starved encoder emits
+// only a handful of frames — a clip that looks like a still).
 export const PREFERRED_MIME = [
-  "video/webm;codecs=vp9",
   "video/webm;codecs=vp8",
+  "video/webm;codecs=vp9",
   "video/webm",
   "video/mp4", // iOS Safari / WKWebView
 ];
@@ -87,6 +90,8 @@ export const DEFAULT_SEGMENT_MS = 15_000;
 export const MAX_HOLD_MS = 60_000;
 export const DEFAULT_SEGMENTS = 3;
 export const DEFAULT_VIDEO_BPS = 900_000;
+/** MediaRecorder timeslice (ms). */
+export const CHUNK_MS = 1000;
 
 function pickMime(): string {
   if (typeof MediaRecorder === "undefined") return "";
@@ -143,7 +148,10 @@ export function createShotClipRecorder(
       rec.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) slot.chunks.push(e.data);
       };
-      rec.start();
+      // A timeslice makes the encoder flush regularly instead of holding the
+      // whole segment until stop() (some browsers only write a playable,
+      // seekable stream that way).
+      rec.start(CHUNK_MS);
       return slot;
     } catch {
       return null;

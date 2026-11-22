@@ -94,3 +94,31 @@ test("clicking a metric draws that metric (head pitch) in its own phase", async 
     "pitch",
   );
 });
+
+test("a picked metric shows its target zone; a timing metric its window on the scrubber", async ({
+  page,
+}) => {
+  await openReview(page);
+  const skeleton = page.getByTestId("review-skeleton");
+  await page.getByTestId("v3-row-load.knee_depth").locator("button").click();
+  await expect(skeleton).toHaveAttribute("data-zone", "rect");
+  await page.getByTestId("v3-row-load.spine_angle").locator("button").click();
+  await expect(skeleton).toHaveAttribute("data-zone", "wedge");
+
+  await page
+    .getByTestId("v3-row-rise.t_ball_vs_knee_bottom")
+    .locator("button")
+    .click();
+  await expect(page.getByTestId("review-timing-band")).toBeVisible();
+  await expect(page.getByTestId("review-timing-legend")).toBeVisible();
+  // Seeks to when the second event actually happened.
+  const actual = page.getByTestId("review-timing-actual");
+  const box = (await actual.boundingBox())!;
+  const track = (await page.getByTestId("review-scrubber").boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(track.x - 10);
+
+  // Scrubbing away clears the pick (and its band).
+  const scrubber = page.getByTestId("review-scrubber");
+  await setRange(scrubber, Number(await scrubber.getAttribute("min")));
+  await expect(page.getByTestId("review-timing-band")).toHaveCount(0);
+});

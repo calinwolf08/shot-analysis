@@ -202,6 +202,12 @@ export interface DrawOptions extends GeometrySides {
   /** Landmarks over the metric's frames (for `path`). */
   readonly pathFrames?: readonly (readonly Landmark[] | null | undefined)[];
   readonly color?: string;
+  /**
+   * Only highlight the measured body part (the limb / torso / head line, or
+   * the joint for offsets and heights) — no angle labels, arcs or dashed
+   * reference lines. Used with a target zone.
+   */
+  readonly highlightOnly?: boolean;
 }
 
 /**
@@ -242,6 +248,59 @@ export function drawGeometry(
     ctx.stroke();
     ctx.setLineDash([]);
   };
+  const ring = (p: Pt) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 7, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3.5, 0, 2 * Math.PI);
+    ctx.fill();
+  };
+  if (o.highlightOnly) {
+    ctx.lineWidth = 5;
+    for (const g of items) {
+      switch (g.kind) {
+        case "angle": {
+          const [a, b, c] = g.joints.map((j) => P(j));
+          if (!a || !b || !c) break;
+          line(a, b);
+          line(b, c);
+          ring(b);
+          drawn.push("angle");
+          break;
+        }
+        case "lean":
+        case "pitch":
+        case "segment": {
+          const a = P(g.kind === "segment" ? g.a : g.from);
+          const b = P(g.kind === "segment" ? g.b : g.to);
+          if (!a || !b) break;
+          // The ear→nose line is short: extend it to read as the head's
+          // direction (matching the pitch wedge's radius).
+          line(
+            a,
+            g.kind === "pitch"
+              ? { x: a.x + (b.x - a.x) * 3, y: a.y + (b.y - a.y) * 3 }
+              : b,
+          );
+          drawn.push(g.kind);
+          break;
+        }
+        case "offset":
+        case "height": {
+          const a = P(g.a);
+          if (!a) break;
+          ring(a);
+          drawn.push(g.kind);
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    ctx.restore();
+    return drawn;
+  }
   for (const g of items) {
     switch (g.kind) {
       case "angle": {

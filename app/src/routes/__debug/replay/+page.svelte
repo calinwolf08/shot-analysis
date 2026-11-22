@@ -117,7 +117,7 @@
       {:else}
         <p class="readback dim">On target — nothing to call out.</p>
       {/if}
-      <ScoreCardV3 card={current.scorecard} />
+      <ScoreCardV3 card={current.scorecard} {wording} />
     {/if}
   {/if}
 </div>
