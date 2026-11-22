@@ -28,27 +28,47 @@ describe("targetZone", () => {
     frames: [5],
   };
 
-  it("wedge: the band of hip directions around the knee", () => {
+  it("wedge: at the knee, the target angle centred on the measured one", () => {
     const z = targetZone(knee, { ...sides, project, lm, style: "wedge" });
     expect(z?.kind).toBe("wedge");
     if (z?.kind !== "wedge") return;
     expect(z.center).toEqual({ x: 100, y: 0 });
-    expect(z.radius).toBeCloseTo(100);
-    // 170–180° from the shin (pointing down), on the thigh's side (left) =
-    // up, tilted toward the hip: screen angles 260–270° (≡ −100…−90°).
-    const ends = [z.from, z.to].map((a) => Math.round((a * 180) / Math.PI));
-    expect(ends.sort((a, b) => a - b)).toEqual([260, 270]);
+    // Measured 90° between the thigh (180°) and shin (90°): bisector 135°.
+    // Target 170–180° = 85–90° either side of it.
+    const deg = (r: number) =>
+      ((Math.round((r * 180) / Math.PI) % 360) + 360) % 360;
+    const sectors = z.sectors.map((x) =>
+      [deg(x.from), deg(x.to)].sort((p, q) => p - q),
+    );
+    expect(sectors).toEqual([
+      [220, 225],
+      [45, 50],
+    ]);
+    expect(z.radius).toBeLessThanOrEqual(64);
   });
 
-  it("rect: a box around where the hips belong", () => {
+  it("rect: a box where the KNEE belongs (feet planted), with a ghost leg", () => {
     const z = targetZone(knee, { ...sides, project, lm, style: "rect" });
     expect(z?.kind).toBe("rect");
     if (z?.kind !== "rect") return;
-    // Hip target ≈ (83..100, -100..-98): the box surrounds it.
-    expect(z.x).toBeLessThan(83);
-    expect(z.x + z.w).toBeGreaterThan(100);
-    expect(z.y).toBeLessThan(-100);
-    expect(z.y + z.h).toBeGreaterThan(-98);
+    // Straight leg (180°): the knee on the ankle→hip line, a shin from the
+    // ankle (≈ 29, 29); at 170° slightly toward where it bends now.
+    expect(z.x).toBeLessThan(29);
+    expect(z.x + z.w).toBeGreaterThan(29);
+    expect(z.y).toBeLessThan(29);
+    expect(z.y + z.h).toBeGreaterThan(29);
+    expect(z.ghost?.[0]).toEqual({ x: 100, y: 100 }); // the planted ankle
+  });
+
+  it("rect: a small change in bend keeps the box at the knee", () => {
+    const z = targetZone(
+      { ...knee, passMin: 95, passMax: 100 },
+      { ...sides, project, lm, style: "rect" },
+    );
+    if (z?.kind !== "rect") throw new Error("no rect");
+    const cx = z.x + z.w / 2;
+    const cy = z.y + z.h / 2;
+    expect(Math.hypot(cx - 100, cy - 0)).toBeLessThan(25);
   });
 
   it("offset: the band of x where the hip belongs, in thigh lengths", () => {

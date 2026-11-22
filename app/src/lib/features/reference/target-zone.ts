@@ -3,9 +3,14 @@
  * geometry: the target zone shown when a metric is picked in shot review.
  *
  * Two styles for angle-like metrics (joint angles, torso lean, head pitch):
- *  - "wedge": the sector of target angles at the pivot joint,
- *  - "rect":  a box around where the MOVING joint lands across the target
- *             range (hips for knee bend, wrist for elbow, shoulder for lean…).
+ *  - "wedge": joint angles — at the joint, the target angle centred on the
+ *             measured angle (one green sliver per side, where each side of
+ *             the angle should be); lean / pitch — the band from the vertical
+ *             / horizontal reference,
+ *  - "rect":  joint angles — a box where the JOINT itself (knee for knee bend,
+ *             elbow for elbow angle) belongs across the band, plus a dashed
+ *             ghost limb mid-band; lean / pitch — a box where the shoulder /
+ *             nose belongs.
  * Offsets and heights are a box in either style (the band along x / y).
  * Change metrics (elbow change, spine change…) are relative: the target is the
  * angle at the change's first frame plus the band, drawn on its last frame.
@@ -30,9 +35,8 @@ export type Zone =
       readonly kind: "wedge";
       readonly center: Pt;
       readonly radius: number;
-      /** Screen angles (radians, canvas convention) of the band's edges. */
-      readonly from: number;
-      readonly to: number;
+      /** Filled sectors (screen angles, radians, canvas convention). */
+      readonly sectors: readonly { from: number; to: number }[];
     }
   | {
       readonly kind: "rect";
@@ -40,6 +44,8 @@ export type Zone =
       readonly y: number;
       readonly w: number;
       readonly h: number;
+      /** A dashed "ghost" limb in the middle of the target range. */
+      readonly ghost?: readonly Pt[];
     };
 
 export interface ZoneMetric {
@@ -60,11 +66,14 @@ export interface ZoneInput extends GeometrySides {
   readonly facing?: 1 | -1;
 }
 
-/** Which joint of an angle triple moves into the zone (0 = first, 2 = last). */
+/**
+ * Which end of an angle triple moves (0 = first, 2 = last); the other end is
+ * the anchor that stays put while the joint bends.
+ */
 const MOVING: Readonly<Record<string, 0 | 2>> = {
-  "hip,knee,ankle": 0, // knee bend: hips drop, the shin stays planted
-  "shoulderNear,hip,knee": 0, // hip angle: the torso moves
-  "shoulder,elbow,wrist": 2, // elbow: the forearm / ball moves
+  "hip,knee,ankle": 0, // knee bend: feet planted, hips rise / sink
+  "shoulderNear,hip,knee": 0, // hip angle: knee stays, the torso moves
+  "shoulder,elbow,wrist": 2, // elbow: shoulder stays, the ball moves
   "elbow,wrist,index": 2, // wrist hinge: the hand moves
 };
 
@@ -138,8 +147,50 @@ function angular(
   a1: number,
 ): Zone {
   return style === "wedge"
-    ? { kind: "wedge", center, radius, from: a0, to: a1 }
+    ? { kind: "wedge", center, radius, sectors: [{ from: a0, to: a1 }] }
     : bounds(arcPoints(center, radius, a0, a1));
+}
+
+/**
+ * Where the middle joint of a limb lands for interior angle `deg`: the
+ * anchor end stays put, the other end slides along the anchor→end line
+ * (feet planted while the hips rise/sink; shoulder fixed while the forearm
+ * folds), both segment lengths kept, the joint bending to the same side.
+ */
+function limbAt(
+  anchor: Pt,
+  joint: Pt,
+  end: Pt,
+  deg: number,
+): { joint: Pt; end: Pt } | null {
+  const l1 = Math.hypot(joint.x - anchor.x, joint.y - anchor.y);
+  const l2 = Math.hypot(end.x - joint.x, end.y - joint.y);
+  const dx = end.x - anchor.x;
+  const dy = end.y - anchor.y;
+  const dl = Math.hypot(dx, dy);
+  if (l1 < 1 || l2 < 1 || dl < 1) return null;
+  const ux = dx / dl;
+  const uy = dy / dl;
+  const d = Math.sqrt(
+    Math.max(1e-6, l1 * l1 + l2 * l2 - 2 * l1 * l2 * Math.cos(deg * RAD)),
+  );
+  const cosA = Math.max(
+    -1,
+    Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d)),
+  );
+  const alpha = Math.acos(cosA);
+  // Bend to the side the joint is on now.
+  const side =
+    ux * (joint.y - anchor.y) - uy * (joint.x - anchor.x) < 0 ? -1 : 1;
+  const ca = Math.cos(side * alpha);
+  const sa = Math.sin(side * alpha);
+  return {
+    joint: {
+      x: anchor.x + l1 * (ux * ca - uy * sa),
+      y: anchor.y + l1 * (ux * sa + uy * ca),
+    },
+    end: { x: anchor.x + ux * d, y: anchor.y + uy * d },
+  };
 }
 
 /**
@@ -159,39 +210,66 @@ export function targetZone(m: ZoneMetric, o: ZoneInput): Zone | null {
 
   switch (g.kind) {
     case "angle": {
-      const key = g.joints.join(",");
-      const mv = MOVING[key];
+      const mv = MOVING[g.joints.join(",")];
       if (mv === undefined) return null;
-      const fixedJ = g.joints[mv === 0 ? 2 : 0];
-      const movingJ = g.joints[mv];
-      const pivot = P(g.joints[1]);
-      const fixed = P(fixedJ);
-      const moving = P(movingJ);
-      if (!pivot || !fixed || !moving) return null;
+      const a = P(g.joints[0]);
+      const b = P(g.joints[1]);
+      const c = P(g.joints[2]);
+      if (!a || !b || !c) return null;
       let base = 0;
       if (change) {
-        const a = P(g.joints[0], o.firstLm);
-        const b = P(g.joints[1], o.firstLm);
-        const c = P(g.joints[2], o.firstLm);
-        if (!a || !b || !c) return null;
-        base = interior(a, b, c);
+        const a0 = P(g.joints[0], o.firstLm);
+        const b0 = P(g.joints[1], o.firstLm);
+        const c0 = P(g.joints[2], o.firstLm);
+        if (!a0 || !b0 || !c0) return null;
+        base = interior(a0, b0, c0);
       }
-      const tFixed = Math.atan2(fixed.y - pivot.y, fixed.x - pivot.x);
-      const tMoving = Math.atan2(moving.y - pivot.y, moving.x - pivot.x);
-      let d = tMoving - tFixed;
-      while (d > Math.PI) d -= 2 * Math.PI;
-      while (d < -Math.PI) d += 2 * Math.PI;
-      const sign = d < 0 ? -1 : 1;
-      const lo = clampDeg(base + m.passMin);
-      const hi = clampDeg(base + m.passMax);
-      const radius = Math.hypot(moving.x - pivot.x, moving.y - pivot.y);
-      return angular(
-        o.style,
-        pivot,
-        radius,
-        tFixed + sign * lo * RAD,
-        tFixed + sign * hi * RAD,
-      );
+      const lo = clampDeg(base + Math.min(m.passMin, m.passMax));
+      const hi = clampDeg(base + Math.max(m.passMin, m.passMax));
+      if (o.style === "wedge") {
+        // At the joint, the size of the measured arc: the target angle
+        // centred on the current angle's bisector — each side of the angle
+        // should land in its green sliver.
+        const t1 = Math.atan2(a.y - b.y, a.x - b.x);
+        const t2 = Math.atan2(c.y - b.y, c.x - b.x);
+        let d = t2 - t1;
+        while (d > Math.PI) d -= 2 * Math.PI;
+        while (d < -Math.PI) d += 2 * Math.PI;
+        const bis = t1 + d / 2;
+        const s = d < 0 ? -1 : 1;
+        const radius = Math.max(
+          26,
+          Math.min(
+            64,
+            0.6 *
+              Math.min(
+                Math.hypot(a.x - b.x, a.y - b.y),
+                Math.hypot(c.x - b.x, c.y - b.y),
+              ),
+          ),
+        );
+        const h = (x: number) => (x / 2) * RAD;
+        return {
+          kind: "wedge",
+          center: b,
+          radius,
+          sectors: [
+            { from: bis - s * h(hi), to: bis - s * h(lo) },
+            { from: bis + s * h(lo), to: bis + s * h(hi) },
+          ],
+        };
+      }
+      // Where the joint itself belongs across the band (anchor end fixed).
+      const anchor = mv === 0 ? c : a;
+      const end = mv === 0 ? a : c;
+      const pts: Pt[] = [];
+      for (let i = 0; i <= 12; i++) {
+        const r = limbAt(anchor, b, end, lo + ((hi - lo) * i) / 12);
+        if (r) pts.push(r.joint);
+      }
+      const mid = limbAt(anchor, b, end, (lo + hi) / 2);
+      if (pts.length === 0 || !mid) return null;
+      return { ...bounds(pts), ghost: [anchor, mid.joint, mid.end] } as Zone;
     }
     case "lean": {
       // Lean from vertical, + = toward facing (signals.ts spineLean).
@@ -310,12 +388,14 @@ export function drawTargetZone(
   ctx.setLineDash([6, 4]);
   ctx.beginPath();
   if (z.kind === "wedge") {
-    let d = z.to - z.from;
-    while (d > Math.PI) d -= 2 * Math.PI;
-    while (d < -Math.PI) d += 2 * Math.PI;
-    ctx.moveTo(z.center.x, z.center.y);
-    ctx.arc(z.center.x, z.center.y, z.radius, z.from, z.from + d, d < 0);
-    ctx.closePath();
+    for (const sec of z.sectors) {
+      let d = sec.to - sec.from;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      ctx.moveTo(z.center.x, z.center.y);
+      ctx.arc(z.center.x, z.center.y, z.radius, sec.from, sec.from + d, d < 0);
+      ctx.closePath();
+    }
   } else {
     const r = Math.min(8, z.w / 3, z.h / 3);
     ctx.roundRect(z.x, z.y, z.w, z.h, r);
@@ -324,5 +404,13 @@ export function drawTargetZone(
   ctx.fill();
   ctx.globalAlpha = 0.95;
   ctx.stroke();
+  if (z.kind === "rect" && z.ghost && z.ghost.length > 1) {
+    ctx.beginPath();
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.8;
+    ctx.moveTo(z.ghost[0]!.x, z.ghost[0]!.y);
+    for (const p of z.ghost.slice(1)) ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
   ctx.restore();
 }
