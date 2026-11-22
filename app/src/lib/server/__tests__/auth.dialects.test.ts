@@ -12,8 +12,10 @@ import {
   getKysely,
 } from "../db";
 import type { AppDatabase } from "../database/kysely";
-import { migrateDatabase } from "../database/migrate";
-import { createPgliteDatabase } from "../database/__tests__/pglite";
+import {
+  TEST_DATABASES,
+  disposeTestDatabase,
+} from "../database/__tests__/dialects";
 
 /**
  * Sign-in runs on the server's shared connection — the same flows on SQLite
@@ -33,23 +35,26 @@ afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-const DIALECTS = ["sqlite", "postgres"] as const;
+/** SQLite on a real file (the server's own path), then each Postgres. */
+const CASES: [string, (() => Promise<AppDatabase>) | null][] = [
+  ["sqlite (file)", null],
+  ...TEST_DATABASES.filter(([n]) => n.startsWith("postgres")),
+];
 
-describe.each(DIALECTS)("auth on %s", (kind) => {
+describe.each(CASES)("auth on %s", (_name, makePg) => {
   let pg: AppDatabase | null = null;
   beforeEach(async () => {
     resetDbSingletonForTests();
-    if (kind === "postgres") {
+    if (makePg) {
       delete process.env.DATABASE_PATH;
-      pg = createPgliteDatabase();
-      await migrateDatabase(pg);
+      pg = await makePg();
       useDatabaseForTests(pg);
     } else {
       process.env.DATABASE_PATH = join(dir, `auth-${Date.now()}.sqlite`);
     }
   });
   afterEach(async () => {
-    if (pg) await pg.db.destroy();
+    if (pg) await disposeTestDatabase(pg);
     pg = null;
   });
 

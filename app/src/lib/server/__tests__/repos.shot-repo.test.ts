@@ -1,12 +1,10 @@
+import { sql } from "kysely";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   createTestServices,
   type TestServices,
 } from "$lib/shared/config/test-services";
 import { makeShotAnalysis } from "$lib/shared/testing/fixtures";
-import { createPlayerRepo } from "../player-repo";
-import { createSessionRepo } from "../session-repo";
-import { createShotRepo } from "../shot-repo";
 
 let services: TestServices;
 let sessionId: string;
@@ -14,14 +12,14 @@ let playerId: string;
 
 beforeEach(async () => {
   services = await createTestServices();
-  const player = await createPlayerRepo(services).create({
+  const player = await services.repos.player.create({
     name: "A",
     shootingHand: "right",
     level: "youth",
   });
   playerId = player.id;
   sessionId = (
-    await createSessionRepo(services).create({
+    await services.repos.session.create({
       playerId: player.id,
       type: "assessment",
     })
@@ -30,7 +28,7 @@ beforeEach(async () => {
 
 describe("ShotRepo.saveAnalysis", () => {
   it("round-trips a full ShotAnalysis through analysis_json", async () => {
-    const repo = createShotRepo(services);
+    const repo = services.repos.shot;
     const analysis = makeShotAnalysis({
       shotIndex: 2,
       orientation: "side-right",
@@ -49,19 +47,16 @@ describe("ShotRepo.saveAnalysis", () => {
   });
 
   it("writes a consistent shot_metrics projection (numeric + categorical)", async () => {
-    const repo = createShotRepo(services);
+    const repo = services.repos.shot;
     const analysis = makeShotAnalysis();
     const saved = await repo.saveAnalysis({ sessionId, analysis });
 
-    const rows = await services.db.query<{
-      metric_name: string;
-      value_num: number | null;
-      value_text: string | null;
-      unit: string;
-      confidence: number;
-    }>("SELECT * FROM shot_metrics WHERE shot_id = ? ORDER BY metric_name", [
-      saved.id,
-    ]);
+    const rows = await services.kdb
+      .selectFrom("shot_metrics")
+      .selectAll()
+      .where("shot_id", "=", saved.id)
+      .orderBy("metric_name")
+      .execute();
 
     expect(rows).toHaveLength(Object.keys(analysis.metrics).length);
 
@@ -76,23 +71,23 @@ describe("ShotRepo.saveAnalysis", () => {
   });
 
   it("rolls back atomically when the metrics write fails", async () => {
-    const repo = createShotRepo(services);
+    const repo = services.repos.shot;
     // Metric name with a NUL-free but absurdly long name still works; force
     // failure via a duplicate metric insert instead: craft an analysis whose
     // serialization succeeds but insert violates the PK by duplicating names
     // after case folding is NOT possible in SQLite… so instead simulate
     // failure by dropping the shot_metrics table mid-flight.
-    await services.db.run("DROP TABLE shot_metrics");
+    await sql`DROP TABLE shot_metrics`.execute(services.kdb);
     await expect(
       repo.saveAnalysis({ sessionId, analysis: makeShotAnalysis() }),
     ).rejects.toThrow();
 
-    const shots = await services.db.query("SELECT id FROM shots");
+    const shots = await services.kdb.selectFrom("shots").select("id").execute();
     expect(shots).toHaveLength(0); // the shots insert rolled back too
   });
 
   it("listBySession respects excluded flag and ordering", async () => {
-    const repo = createShotRepo(services);
+    const repo = services.repos.shot;
     const s0 = await repo.saveAnalysis({
       sessionId,
       analysis: makeShotAnalysis({ shotIndex: 0 }),
@@ -120,7 +115,7 @@ describe("ShotRepo.saveAnalysis", () => {
 
 describe("ShotRepo player-rooted (de-sessioned) shots", () => {
   it("saves a shot with only a playerId (no session)", async () => {
-    const repo = createShotRepo(services);
+    const repo = services.repos.shot;
     const saved = await repo.saveAnalysis({
       playerId,
       analysis: makeShotAnalysis(),
@@ -134,14 +129,14 @@ describe("ShotRepo player-rooted (de-sessioned) shots", () => {
   });
 
   it("throws when neither playerId nor sessionId is given", async () => {
-    const repo = createShotRepo(services);
+    const repo = services.repos.shot;
     await expect(
       repo.saveAnalysis({ analysis: makeShotAnalysis() }),
     ).rejects.toThrow();
   });
 
   it("persists and reads back a review pose track", async () => {
-    const repo = createShotRepo(services);
+    const repo = services.repos.shot;
     const reviewPoses = {
       fps: 30,
       frames: [
@@ -165,7 +160,7 @@ describe("ShotRepo player-rooted (de-sessioned) shots", () => {
   });
 
   it("listByPlayer returns newest-first and honors since/limit/excluded", async () => {
-    const repo = createShotRepo(services);
+    const repo = services.repos.shot;
     const a = await repo.saveAnalysis({
       playerId,
       analysis: makeShotAnalysis({ shotIndex: 0 }),

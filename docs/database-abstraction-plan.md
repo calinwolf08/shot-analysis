@@ -305,6 +305,57 @@ oc.columns([...]).doUpdateSet(...))`;
     signs in.
   - Old-setup account compatibility.
 
+### Phase 5 (done)
+
+- **Test databases** (`server/database/__tests__/dialects.ts`): every
+  database-touching suite runs on SQLite and PGlite (in-process Postgres).
+  With `TEST_DATABASE_URL` set, it also runs on a **real Postgres server**.
+  - The suites: repos (isolation, core, shot, score/settings), migrations,
+    domain, auth, and the live pipeline through the API.
+  - On the real server, each test starts from an emptied `public` schema, so
+    those suites run one file at a time: `npm run test:db`.
+  - Per-test schemas would allow parallel runs, but PGlite's socket server
+    (used to validate locally) shares one session across connections, so
+    that approach couldn't be checked here.
+- **Baseline fix:** the "already migrated?" check now looks only in the
+  current schema (`to_regclass('players')`), not every schema on the server.
+- **E2E on Postgres:** `E2E_DATABASE_URL=postgres://…` runs the prod-build
+  Playwright server on Postgres. The dev-server parity tier stays on SQLite.
+- **CI** (`.github/workflows/ci.yml`, job `postgres`): a `postgres:16` service
+  container. The job runs `npm run test:db` against it, then the prod-build
+  e2e projects (`chromium`, `mobile-fakecam`) with `E2E_DATABASE_URL`.
+- **Validated locally** against PGlite's socket server, which speaks the real
+  Postgres protocol:
+  - `test:db`: 95 tests, 22 of them on the server.
+  - The full prod-build e2e suite on Postgres: 60/60. One earlier run had a
+    timing flake in a UI test, which passed on rerun.
+  - The real GitHub job will run on its first push.
+
+### Phase 7 (done)
+
+- **Removed the on-device database code:**
+  - the `sql.js` and Capacitor SQLite drivers, `create-database`,
+    `bytes-store` and the transactions helper, plus their tests;
+  - the `sql.js`, `@types/sql.js` and `@capacitor-community/sqlite`
+    dependencies and `static/sqljs/sql-wasm.wasm`;
+  - the plugin's references in `android/` (gradle) and `ios/App/Podfile`.
+    Run `npx cap sync` on a machine with the native toolchains to refresh
+    any other generated files.
+- **Removed `flushDb`** and the `db` fields (`RepoContext`, `AppServices`,
+  assessment deps). The client had no persistence to flush.
+- **Retired the duplicate SQLite repos** in `shared/db/repos`. Their
+  interfaces, input types and the `SETTINGS` registry stay as the repo
+  contracts.
+  - Test services use the server's Kysely repos for one test user.
+  - The repo tests moved to `server/__tests__/repos.*.test.ts`.
+    - **Dropped:** the two tests of on-device-only behavior (switching the
+      current user, claiming pre-sign-in players).
+    - **Score tests:** now use real, owned refs.
+  - The training-plan service's `players` dependency is now required.
+- **Kept:** the legacy migration runner (001–007) and the raw better-sqlite3
+  adapter. Upgrading an older SQLite file still needs them. They can go once
+  no database older than version 7 can exist.
+
 ## 4. Risks
 
 | Risk                                                                  | Mitigation                                                                                                   |

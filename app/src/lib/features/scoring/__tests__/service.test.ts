@@ -86,9 +86,11 @@ describe("ScoringService persistence", () => {
     );
     expect(sessionRow?.overallScore).toBeCloseTo(session.overall!, 6);
     expect(sessionRow?.consistencyScore).toBeCloseTo(session.consistency!, 6);
-    const shotRows = await services.db.query(
-      "SELECT * FROM scores WHERE scope = 'shot'",
-    );
+    const shotRows = await services.kdb
+      .selectFrom("scores")
+      .selectAll()
+      .where("scope", "=", "shot")
+      .execute();
     expect(shotRows).toHaveLength(3);
   });
 
@@ -101,10 +103,17 @@ describe("ScoringService persistence", () => {
     await service.scoreAndPersistSession(sessionId, bench);
 
     const bench2: BenchmarkProfile = { ...bench, id: "bench-v2", version: 2 };
-    await services.db.run(
-      `INSERT INTO benchmarks (id, name, version, is_placeholder, data_json, created_at)
-       VALUES ('bench-v2', 'v2', 2, 1, '{}', 0)`,
-    );
+    await services.kdb
+      .insertInto("benchmarks")
+      .values({
+        id: "bench-v2",
+        name: "v2",
+        version: 2,
+        is_placeholder: 1,
+        data_json: "{}",
+        created_at: 0,
+      })
+      .execute();
     services.clock.advance(1000);
     await service.scoreAndPersistSession(sessionId, bench2);
 

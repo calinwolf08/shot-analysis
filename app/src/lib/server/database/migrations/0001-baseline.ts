@@ -31,10 +31,16 @@ export function baselineMigration(kind: DbKind): Migration {
 
   return {
     async up(db: Kysely<unknown>): Promise<void> {
-      const existing = new Set(
-        (await db.introspection.getTables()).map((t) => t.name),
-      );
-      if (existing.has("players")) return; // upgraded legacy database
+      // Already there (upgraded legacy SQLite)? Checked in the CURRENT
+      // schema only — a Postgres server may hold other schemas with their own
+      // `players` table (other apps, parallel test schemas).
+      const found = pg
+        ? await sql<{
+            t: string | null;
+          }>`SELECT to_regclass('players')::text AS t`.execute(db)
+        : await sql<{ t: string | null }>`SELECT name AS t FROM sqlite_master
+            WHERE type = 'table' AND name = 'players'`.execute(db);
+      if (found.rows[0]?.t) return; // upgraded legacy database
 
       await db.schema
         .createTable("players")

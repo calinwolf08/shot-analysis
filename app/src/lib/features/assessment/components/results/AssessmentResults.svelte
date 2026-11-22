@@ -8,7 +8,6 @@
   import Scorecard from "$lib/features/scoring/v2/Scorecard.svelte";
   import { loadThresholds } from "$lib/features/scoring/v2/service";
   import { useAppServices } from "$lib/shared/config/services-context";
-  import { flushDb } from "$lib/shared/db";
   import type { ScoreRecord, Session, ShotRecord } from "$lib/shared/db/repos";
   import { Button, Card, PlaceholderBadge, ScoreRing } from "$lib/shared/ui";
   import DeltaStrip from "./DeltaStrip.svelte";
@@ -139,7 +138,6 @@
             session.planItemId,
           )
         : await services.trainingPlan.generateForSession(sessionId, player.id);
-      await flushDb(services.db);
       // The plan-item binding is spent once the next plan exists.
       // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local URL builder, never reactive state
       const params = new URLSearchParams(page.url.search);

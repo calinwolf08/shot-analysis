@@ -14,7 +14,7 @@
  *
  * Server-only.
  */
-import { noRawSql, type RepoContext } from "$lib/shared/db/repo-base";
+import type { RepoContext } from "$lib/shared/db/repo-base";
 import type { AppKysely } from "./database/kysely";
 import { systemClock, uuidIdGenerator } from "$lib/shared/utils";
 import { createDrillService } from "$lib/features/drills";
@@ -43,7 +43,6 @@ export interface ServerDomain {
 /** The server's repo context: Kysely only (no raw-SQL adapter). */
 function serverContext(kdb: AppKysely): RepoContext {
   return {
-    db: noRawSql("the server"),
     kdb,
     clock: systemClock,
     ids: uuidIdGenerator,

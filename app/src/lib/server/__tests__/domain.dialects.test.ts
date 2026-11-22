@@ -1,19 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ShotAnalysis } from "basketball-shot-analysis";
-import {
-  createBetterSqliteAdapterFor,
-  openBetterSqlite,
-} from "$lib/shared/db/drivers/better-sqlite3";
-import { noRawSql, type RepoContext } from "$lib/shared/db/repo-base";
+import type { RepoContext } from "$lib/shared/db/repo-base";
 import { createFakeClock, createFakeIdGenerator } from "$lib/shared/utils";
 import { createBenchmarkRepo } from "$lib/features/benchmarks/repo/benchmark-repo";
 import { createDrillRepo } from "$lib/features/drills/repo/drill-repo";
 import { createFocusAreaRepo } from "$lib/features/diagnosis/repo/focus-area-repo";
 import { createPlanRepo } from "$lib/features/training-plan/repo/plan-repo";
 import { createProgressService } from "$lib/features/progress/service";
-import { createSqliteKysely, type AppDatabase } from "../database/kysely";
-import { migrateDatabase } from "../database/migrate";
-import { createPgliteDatabase } from "../database/__tests__/pglite";
+import type { AppDatabase } from "../database/kysely";
+import {
+  TEST_DATABASES,
+  disposeTestDatabase,
+} from "../database/__tests__/dialects";
 import { createServerRepos } from "../repos";
 import { seedGlobals } from "../services";
 
@@ -23,27 +21,6 @@ import { seedGlobals } from "../services";
  * aggregates whose types differ by database (COUNT/SUM → int8, AVG → numeric;
  * both must come back as JS numbers).
  */
-const DIALECTS: [string, () => Promise<AppDatabase>][] = [
-  [
-    "sqlite",
-    async () => {
-      const conn = openBetterSqlite(":memory:");
-      const app: AppDatabase = { kind: "sqlite", db: createSqliteKysely(conn) };
-      await migrateDatabase(app, {
-        legacy: createBetterSqliteAdapterFor(conn),
-      });
-      return app;
-    },
-  ],
-  [
-    "postgres (PGlite)",
-    async () => {
-      const app = createPgliteDatabase();
-      await migrateDatabase(app);
-      return app;
-    },
-  ],
-];
 
 const DAY = 86_400_000;
 
@@ -61,20 +38,19 @@ function analysis(knee: number): ShotAnalysis {
   } as unknown as ShotAnalysis;
 }
 
-describe.each(DIALECTS)("domain on %s", (_name, make) => {
+describe.each(TEST_DATABASES)("domain on %s", (_name, make) => {
   let app: AppDatabase;
   let ctx: RepoContext;
   beforeEach(async () => {
     app = await make();
     ctx = {
-      db: noRawSql("test"),
       kdb: app.db,
       clock: createFakeClock(10 * DAY + 5_000),
       ids: createFakeIdGenerator(),
     };
   });
   afterEach(async () => {
-    await app.db.destroy();
+    await disposeTestDatabase(app);
   });
 
   it("seeds the global catalogs; upserts update in place", async () => {

@@ -37,23 +37,15 @@ import {
   createScoringService,
   type ScoringService,
 } from "$lib/features/scoring";
-import type { DatabaseAdapter } from "../db";
 import { noDatabase, type RepoContext } from "../db/repo-base";
-import {
-  createPlayerRepo,
-  createRepRepo,
-  createScoreRepo,
-  createSessionRepo,
-  createSettingsRepo,
-  createShotRepo,
-  createVideoRepo,
-  type PlayerRepo,
-  type RepRepo,
-  type ScoreRepo,
-  type SessionRepo,
-  type SettingsRepo,
-  type ShotRepo,
-  type VideoRepo,
+import type {
+  PlayerRepo,
+  RepRepo,
+  ScoreRepo,
+  SessionRepo,
+  SettingsRepo,
+  ShotRepo,
+  VideoRepo,
 } from "../db/repos";
 import type { Clock, IdGenerator } from "../utils";
 import { systemClock, uuidIdGenerator } from "../utils";
@@ -79,7 +71,6 @@ export interface AppRepos {
 }
 
 export interface AppServices extends RepoContext {
-  db: DatabaseAdapter;
   clock: Clock;
   ids: IdGenerator;
   repos: AppRepos;
@@ -115,7 +106,6 @@ export function createDomainServices(
   });
   const diagnosis = createDiagnosisService(ctx);
   const assessment = createAssessmentService({
-    db: ctx.db,
     repos,
     analysis,
     scoring,
@@ -136,19 +126,6 @@ export function createDomainServices(
     drills,
     trainingPlan,
     progress,
-  };
-}
-
-/** Builds the shared repo set from a RepoContext. */
-export function createRepos(ctx: RepoContext): AppRepos {
-  return {
-    player: createPlayerRepo(ctx),
-    video: createVideoRepo(ctx),
-    session: createSessionRepo(ctx),
-    shot: createShotRepo(ctx),
-    score: createScoreRepo(ctx),
-    rep: createRepRepo(ctx),
-    settings: createSettingsRepo(ctx),
   };
 }
 
@@ -190,27 +167,6 @@ export function selectAnalysisService(): AnalysisService {
 }
 
 /**
- * The client no longer owns a database — all user data lives on the server.
- * This stub satisfies the {@link DatabaseAdapter} shape for the few call sites
- * that still reference `services.db` (e.g. `flushDb`, which becomes a no-op
- * because there is nothing to persist locally). Any actual query/run is a bug.
- */
-function createNoClientDb(): DatabaseAdapter {
-  const fail = (): never => {
-    throw new Error(
-      "No client database: user data lives on the server — use the API/remote repos",
-    );
-  };
-  return {
-    run: async () => fail(),
-    query: async () => fail(),
-    transaction: async () => fail(),
-    close: async () => {},
-    // No `flush` → flushDb() is a no-op.
-  };
-}
-
-/**
  * Production composition (client): a remote data layer over the SvelteKit API.
  * The on-device database is gone — repos and read-model services call the
  * server (user-scoped by the bearer token), scoring runs over the remote repos,
@@ -220,7 +176,6 @@ function createNoClientDb(): DatabaseAdapter {
 export async function createAppServices(): Promise<AppServices> {
   const api = createApiClient();
   const ctx: RepoContext = {
-    db: createNoClientDb(),
     kdb: noDatabase("the browser (all data goes through the API)"),
     clock: systemClock,
     ids: uuidIdGenerator,

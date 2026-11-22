@@ -13,8 +13,10 @@ import {
 import type { PoseData } from "basketball-shot-analysis";
 import { resetDbSingletonForTests, useDatabaseForTests } from "$lib/server/db";
 import type { AppDatabase } from "$lib/server/database/kysely";
-import { migrateDatabase } from "$lib/server/database/migrate";
-import { createPgliteDatabase } from "$lib/server/database/__tests__/pglite";
+import {
+  TEST_DATABASES,
+  disposeTestDatabase,
+} from "$lib/server/database/__tests__/dialects";
 import { createApiClient } from "$lib/shared/api/client";
 import { createRemoteRepos } from "$lib/shared/api/remote-repos";
 import {
@@ -98,9 +100,15 @@ describe("createLocalPipeline (on-device analysis)", () => {
   });
 });
 
-describe.each(["sqlite", "postgres"] as const)(
+/** SQLite on a real file (the server's own path), then each Postgres. */
+const CASES: [string, (() => Promise<AppDatabase>) | null][] = [
+  ["sqlite (file)", null],
+  ...TEST_DATABASES.filter(([n]) => n.startsWith("postgres")),
+];
+
+describe.each(CASES)(
   "createServerPipeline (server analysis, end-to-end) [%s]",
-  (kind) => {
+  (_name, makePg) => {
     const dir = mkdtempSync(join(tmpdir(), "shotcoach-pipeline-"));
     const userA: SessionUser = { id: "user-a", email: "a@ex.com", name: "A" };
 
@@ -116,14 +124,13 @@ describe.each(["sqlite", "postgres"] as const)(
     let pg: AppDatabase | null = null;
     beforeEach(async () => {
       resetDbSingletonForTests();
-      if (kind === "postgres") {
-        pg = createPgliteDatabase();
-        await migrateDatabase(pg);
+      if (makePg) {
+        pg = await makePg();
         useDatabaseForTests(pg);
       }
     });
     afterEach(async () => {
-      if (pg) await pg.db.destroy();
+      if (pg) await disposeTestDatabase(pg);
       pg = null;
     });
 

@@ -56,27 +56,34 @@ describe("AssessmentService.runAssessment (fixtures end-to-end)", () => {
     expect(session?.completedAt).not.toBeNull();
 
     // Videos: one per input.
-    const videos = await services.db.query("SELECT id FROM videos");
+    const videos = await services.kdb
+      .selectFrom("videos")
+      .select("id")
+      .execute();
     expect(videos).toHaveLength(inputs.length);
 
     // shots ↔ shot_metrics consistency.
-    const shotRows = await services.db.query<{ id: string }>(
-      "SELECT id FROM shots WHERE session_id = ?",
-      [outcome.sessionId],
-    );
+    const shotRows = await services.kdb
+      .selectFrom("shots")
+      .select("id")
+      .where("session_id", "=", outcome.sessionId)
+      .execute();
     expect(shotRows).toHaveLength(expectedShots);
     for (const row of shotRows) {
-      const metrics = await services.db.query(
-        "SELECT metric_name FROM shot_metrics WHERE shot_id = ?",
-        [row.id],
-      );
+      const metrics = await services.kdb
+        .selectFrom("shot_metrics")
+        .select("metric_name")
+        .where("shot_id", "=", row.id)
+        .execute();
       expect(metrics.length).toBeGreaterThanOrEqual(15);
     }
 
     // Scores: one per shot + one session-scope.
-    const shotScores = await services.db.query(
-      "SELECT id FROM scores WHERE scope = 'shot'",
-    );
+    const shotScores = await services.kdb
+      .selectFrom("scores")
+      .select("id")
+      .where("scope", "=", "shot")
+      .execute();
     expect(shotScores).toHaveLength(expectedShots);
     const sessionScore = await services.repos.score.latestForRef(
       "session",
@@ -138,9 +145,10 @@ describe("AssessmentService.runAssessment (fixtures end-to-end)", () => {
       ),
     ).rejects.toThrow(AssessmentAbortedError);
 
-    const sessions = await services.db.query<{ status: string }>(
-      "SELECT status FROM sessions",
-    );
+    const sessions = await services.kdb
+      .selectFrom("sessions")
+      .select("status")
+      .execute();
     expect(sessions[0]?.status).toBe("aborted");
   }, 60_000);
 });

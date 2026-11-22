@@ -1,14 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ShotAnalysis } from "basketball-shot-analysis";
 import { afterEach } from "vitest";
-import {
-  createBetterSqliteAdapterFor,
-  openBetterSqlite,
-} from "$lib/shared/db/drivers/better-sqlite3";
 import type { AppRepos } from "$lib/shared/config/services";
-import { createSqliteKysely, type AppDatabase } from "../database/kysely";
-import { migrateDatabase } from "../database/migrate";
-import { createPgliteDatabase } from "../database/__tests__/pglite";
+import type { AppDatabase } from "../database/kysely";
+import {
+  TEST_DATABASES,
+  disposeTestDatabase,
+} from "../database/__tests__/dialects";
 import { createServerRepos } from "../repos";
 import { ForbiddenError } from "../errors";
 
@@ -24,29 +22,8 @@ function fakeAnalysis(shotIndex = 0): ShotAnalysis {
 }
 
 /** A fresh, migrated database of each kind the server supports. */
-const DIALECTS: [string, () => Promise<AppDatabase>][] = [
-  [
-    "sqlite",
-    async () => {
-      const conn = openBetterSqlite(":memory:");
-      const app: AppDatabase = { kind: "sqlite", db: createSqliteKysely(conn) };
-      await migrateDatabase(app, {
-        legacy: createBetterSqliteAdapterFor(conn),
-      });
-      return app;
-    },
-  ],
-  [
-    "postgres (PGlite)",
-    async () => {
-      const app = createPgliteDatabase();
-      await migrateDatabase(app);
-      return app;
-    },
-  ],
-];
 
-describe.each(DIALECTS)(
+describe.each(TEST_DATABASES)(
   "server repos — per-user isolation [%s]",
   (_name, make) => {
     let app: AppDatabase;
@@ -59,7 +36,7 @@ describe.each(DIALECTS)(
       B = createServerRepos(app.db, "user-b");
     });
     afterEach(async () => {
-      await app.db.destroy();
+      await disposeTestDatabase(app);
     });
 
     it("keeps settings per user (one user's focus / voice never changes another's)", async () => {

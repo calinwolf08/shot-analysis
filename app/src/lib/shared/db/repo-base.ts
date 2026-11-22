@@ -5,18 +5,13 @@ import type { Clock, IdGenerator } from "../utils";
 
 /** Everything a repository needs; built once in AppServices. */
 export interface RepoContext {
-  /**
-   * Raw-SQL adapter — only the legacy SQLite repos in ./repos (used by unit
-   * tests) still read it; removed in database-abstraction-plan Phase 7.
-   */
-  db: DatabaseAdapter;
-  /** Typed queries (SQLite or Postgres) — what the feature repos use. */
+  /** Typed queries (SQLite or Postgres). */
   kdb: Kysely<Database>;
   clock: Clock;
   ids: IdGenerator;
 }
 
-/** A raw-SQL `db` for contexts that have none (server on Postgres, browser). */
+/** A raw-SQL adapter for contexts that have none (the server on Postgres). */
 export function noRawSql(where: string): DatabaseAdapter {
   const fail = (): never => {
     throw new Error(`No raw-SQL database in ${where}; use kdb (Kysely)`);
