@@ -48,3 +48,40 @@ frames where the player turns toward the camera (it calibrates their
 proportions for the angle estimate).
 
     npm run test:pro-review       # smoke test of the review page
+
+## Building the app's targets
+
+    npm run targets:build:pros            # writes the app's targets + profiles
+    npm run targets:build:pros -- --dry-run   # report only
+
+Uses approved attempts only (see `reference-data/out/report.md` after a run):
+
+- each attempt is measured from your labelled key frames, corrected for its
+  confirmed camera angle; flagged metrics and metrics beyond their camera-angle
+  limit (25° in-plane / timing, 15° arm and head, guide hand never) are left
+  out;
+- each pro's value is a weighted mean of their attempts (near-side-on shots
+  count more); every pro counts equally in the pooled targets;
+- band = the 20th–80th percentile of pooled pro shots, so pros can score
+  above 0; metrics where pros disagree far more than any one varies are
+  marked **style** and left unscored.
+
+It writes `app/static/reference/live-targets-v3.json`,
+`app/static/reference/pro-profiles.json` and each player's proportions (in
+`player.json`). Nothing is written while no pro has enough usable attempts.
+
+Optional `reference-data/targets-config.json` (all keys optional):
+
+```json
+{
+  "percentiles": {
+    "default": [0.2, 0.8],
+    "byMetric": { "load.knee_depth": [0.25, 0.75] }
+  },
+  "minShotsPerPlayer": 5,
+  "styleRatio": 2,
+  "styleScored": false,
+  "includeFlagged": false,
+  "angleLimits": { "setPoint.elbow_angle": 20 }
+}
+```

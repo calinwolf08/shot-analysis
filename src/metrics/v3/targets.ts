@@ -38,6 +38,10 @@ export interface TargetV3 {
   readonly n: number;
   /** Some reference values were measured over too few frames (timing). */
   readonly lowResolution: boolean;
+  /** Pros the stats came from (pro builds). */
+  readonly players?: number;
+  /** Pros disagree far more than any one varies (pro builds). */
+  readonly style?: boolean;
   /** Hand-set band / scored flag; wins over the computed values. */
   readonly override?: TargetOverride;
 }

@@ -8,7 +8,8 @@
  *  - Frontal widths come from the WIDEST frames anywhere in the clips (the
  *    player turning toward the camera: walking back, between shots), at the
  *    95th percentile so one glitchy frame can't set them. When the player
- *    never turns far enough (`frontalObserved` false) the defaults apply.
+ *    never turns close to front-on (`frontalObserved` false) the defaults
+ *    apply.
  */
 import { DEFAULT_FRONTAL, widthRatios } from "./camera-angle";
 import { MIN_VIS, type SignalFrame } from "./signals";
@@ -30,8 +31,14 @@ export interface Proportions {
 
 /** Apparent shoulder width ÷ torso below this counts as side-on (≈ < 20°). */
 export const SIDE_ON_RATIO = 0.27;
-/** Frontal widths count as observed when shoulders reach this ratio. */
-export const FRONTAL_MIN_RATIO = 0.6;
+/**
+ * Observed widths only replace the defaults when they're close to a true
+ * front-on view (≥ 90% of the default ratio). A player who only ever turns
+ * part-way (e.g. shoulders at 0.66 of torso length ≈ 55° off side-on) would
+ * otherwise be taken as narrow, inflating every angle estimate.
+ */
+export const FRONTAL_MIN_SHARE = 0.9;
+export const FRONTAL_MIN_RATIO = DEFAULT_FRONTAL.shoulders * FRONTAL_MIN_SHARE;
 
 const LM = {
   shoulder: { left: 11, right: 12 },
@@ -96,13 +103,19 @@ export function estimateProportions(
   }
   const observed =
     shoulders.length > 0 && quantile(shoulders, 0.95) >= FRONTAL_MIN_RATIO;
+  const hipsSeen =
+    observed &&
+    quantile(hips, 0.95) >= DEFAULT_FRONTAL.hips * FRONTAL_MIN_SHARE;
   return {
     thigh: median(seg.thigh),
     shin: median(seg.shin),
     upperArm: median(seg.upperArm),
     forearm: median(seg.forearm),
     frontal: observed
-      ? { shoulders: quantile(shoulders, 0.95), hips: quantile(hips, 0.95) }
+      ? {
+          shoulders: quantile(shoulders, 0.95),
+          hips: hipsSeen ? quantile(hips, 0.95) : DEFAULT_FRONTAL.hips,
+        }
       : { ...DEFAULT_FRONTAL },
     frontalObserved: observed,
     sideOnFrames: sideOn,
