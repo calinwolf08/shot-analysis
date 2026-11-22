@@ -34,3 +34,23 @@ export function isClippedStartLabel(
     label === startFrame
   );
 }
+
+/**
+ * A labelled shot's key frames as v3 event frames (source frame indexes), to
+ * measure the shot from the labels instead of detection. Start-of-movement
+ * labels clipped by the window (see `isClippedStartLabel`) are left out, so
+ * those events are still detected.
+ */
+export function labeledEventFrames(
+  shot: { startFrame: number } & Record<string, unknown>,
+): Partial<Record<EventId, number>> {
+  const out: Partial<Record<EventId, number>> = {};
+  const keys = (shot.keyframes as Record<string, unknown> | undefined) ?? shot;
+  for (const [event, key] of LABEL_FOR_EVENT) {
+    const v = keys[key];
+    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    if (isClippedStartLabel(key, v, shot.startFrame)) continue;
+    out[event] = v;
+  }
+  return out;
+}

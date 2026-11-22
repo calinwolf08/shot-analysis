@@ -118,7 +118,7 @@ describe("analyzeAndScore (isomorphic core)", () => {
     } as unknown as typeof analysis;
     const refreshed = ensureV3(outdated, stored, "right")!;
     expect(refreshed.recomputed).toBe(true);
-    expect(refreshed.analysis.v3Metrics!.schemaVersion).toBe(3);
+    expect(refreshed.analysis.v3Metrics!.schemaVersion).toBe(4);
     expect(
       refreshed.analysis.v3Metrics!.metrics["load.head_pitch"],
     ).toBeDefined();

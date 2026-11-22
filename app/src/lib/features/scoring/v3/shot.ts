@@ -22,7 +22,7 @@ import { scoreShotV3, type ScorecardV3 } from "./score";
 
 /**
  * The current metrics schema: 1 = v2 metrics only; 2+ = `v3Metrics` with the
- * library's METRICS_V3_SCHEMA_VERSION (3: head pitch). A stored shot below
+ * library's METRICS_V3_SCHEMA_VERSION (4: centre-line torso). A stored shot below
  * the current version is recomputed from its pose track on read.
  */
 export const METRICS_SCHEMA_VERSION = METRICS_V3_SCHEMA_VERSION;

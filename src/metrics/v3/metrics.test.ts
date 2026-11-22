@@ -74,7 +74,7 @@ describe("v3 metric catalog", () => {
       expect(ids, id).toContain(id);
     }
     expect(ids.filter((i) => i.startsWith("detail."))).toHaveLength(4);
-    expect(base.schemaVersion).toBe(3);
+    expect(base.schemaVersion).toBe(4);
   });
 
   it("measures Curry's set-point elbow as a bent arm (aspect-correct)", () => {

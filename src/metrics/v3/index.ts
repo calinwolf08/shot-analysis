@@ -8,3 +8,5 @@ export * from "./labeled";
 export * from "./metrics";
 export * from "./wording";
 export * from "./targets";
+export * from "./camera-angle";
+export * from "./proportions";

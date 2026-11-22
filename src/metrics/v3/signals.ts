@@ -15,8 +15,16 @@
  * Longer gaps stay null.
  *
  * Side conventions: the SHOOTING arm comes from the shooting hand; the legs
- * and torso use the NEAR side (higher visibility over the window), since the
- * far side is occluded side-on.
+ * use the NEAR side (higher visibility over the window), since the far side
+ * is occluded side-on. The torso's DIRECTION (lean, and the torso arm of the
+ * hip angle) uses the CENTRE line, mid-hips → mid-shoulders, whenever both
+ * sides are tracked: shoulders are wider than hips, so off a true side view
+ * the near hip → near shoulder line tilts by the width difference (~12° at
+ * 40° off side-on), while the centre line doesn't.
+ *
+ * `cameraAngle` (degrees off side-on; reference/pro data only) stretches
+ * horizontal distances by 1 / cos(angle) — the foreshortening a camera that
+ * isn't square to the shooter's side applies to front-to-back movement.
  */
 
 export interface SignalLandmark {
@@ -42,6 +50,10 @@ export interface ShotSignals {
   readonly aspect: number;
   readonly shootingSide: Side;
   readonly nearSide: Side;
+  /** Torso direction measured on the centre line (else the near side). */
+  readonly centreLine: boolean;
+  /** Camera angle corrected for (deg off side-on; 0 = none). */
+  readonly cameraAngle: number;
   /** Shooting wrist height (screen y, DOWN is +, units of frame height). */
   readonly wristY: Series;
   /** Near hip screen y. */
@@ -52,7 +64,10 @@ export interface ShotSignals {
   readonly hipAngle: Series;
   /** Shooting elbow angle shoulder-elbow-wrist (deg). */
   readonly elbowAngle: Series;
-  /** Torso lean from vertical, hip→shoulder (deg; sign: + = toward facing). */
+  /**
+   * Torso lean from vertical, mid-hips → mid-shoulders (near side when the
+   * far side isn't tracked) (deg; sign: + = toward facing).
+   */
   readonly spineLean: Series;
   /**
    * Head pitch: the near ear → nose line from horizontal, degrees; + = chin
@@ -84,7 +99,9 @@ export type PosJoint =
   | "knee"
   | "ankle"
   | "head"
-  | "guideWrist";
+  | "guideWrist"
+  /** Mid-hips when the centre line is used, else the near hip. */
+  | "hipCentre";
 
 const LM = {
   nose: 0,
@@ -99,6 +116,15 @@ const LM = {
 } as const;
 
 export const MIN_VIS = 0.3;
+/**
+ * The far shoulder / hip only need this much visibility for the centre line:
+ * MediaPipe still places occluded joints sensibly, just with low confidence.
+ */
+export const FAR_VIS = 0.05;
+/** Centre line used when both sides are tracked on this share of frames. */
+export const CENTRE_LINE_MIN_SHARE = 0.7;
+/** Largest camera angle a correction is applied for (beyond: clamped). */
+export const MAX_CAMERA_ANGLE = 60;
 
 type P = { x: number; y: number };
 
@@ -214,9 +240,17 @@ export function frameTimesSeconds(
 
 export function computeSignals(
   frames: readonly SignalFrame[],
-  opts: { aspect: number; shootingHand: Side; nearSide?: Side; fps?: number },
+  opts: {
+    aspect: number;
+    shootingHand: Side;
+    nearSide?: Side;
+    fps?: number;
+    /** Degrees off side-on (pro data): stretch x by 1 / cos(angle). */
+    cameraAngle?: number;
+  },
 ): ShotSignals {
-  const a = opts.aspect;
+  const cam = Math.min(MAX_CAMERA_ANGLE, Math.abs(opts.cameraAngle ?? 0));
+  const a = opts.aspect / Math.cos((cam * Math.PI) / 180);
   const shoot = opts.shootingHand;
   const near = opts.nearSide ?? nearSideOf(frames);
   // Which way the player faces (+x or −x on screen): nose ahead of the ears.
@@ -227,6 +261,24 @@ export function computeSignals(
     if (n && e) facing += n.x - e.x;
   }
   const facingSign = facing >= 0 ? 1 : -1;
+
+  const far: Side = near === "left" ? "right" : "left";
+  // Centre line for the torso when the far shoulder + hip are tracked often
+  // enough (decided per window, so the signal never switches mid-shot).
+  let both = 0;
+  for (const f of frames) {
+    if (
+      pt(f, LM.shoulder[near], a) &&
+      pt(f, LM.hip[near], a) &&
+      pt(f, LM.shoulder[far], a, FAR_VIS) &&
+      pt(f, LM.hip[far], a, FAR_VIS)
+    )
+      both++;
+  }
+  const centreLine =
+    frames.length > 0 && both / frames.length >= CENTRE_LINE_MIN_SHARE;
+  const mid = (p: P | null, q: P | null): P | null =>
+    p && q ? { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 } : null;
 
   const guide: Side = shoot === "left" ? "right" : "left";
   const headPitch: Series = [];
@@ -239,6 +291,7 @@ export function computeSignals(
     ankle: { x: [], y: [] },
     head: { x: [], y: [] },
     guideWrist: { x: [], y: [] },
+    hipCentre: { x: [], y: [] },
   };
   const visGuide: Series = [];
   const visIndex: Series = [];
@@ -266,12 +319,23 @@ export function computeSignals(
     const an = pt(f, LM.ankle[near], a);
     wristY.push(w ? w.y : null);
     hipY.push(h ? h.y : null);
+    // Torso direction: centre line (see header), else the near side.
+    const top = centreLine
+      ? mid(sn, pt(f, LM.shoulder[far], a, FAR_VIS))
+      : sn;
+    const base = centreLine ? mid(h, pt(f, LM.hip[far], a, FAR_VIS)) : h;
     knee.push(h && k && an ? angleAt(h, k, an) : null);
-    hipA.push(sn && h && k ? angleAt(sn, h, k) : null);
+    // Hip angle: the torso direction, placed at the near hip, vs the thigh.
+    hipA.push(
+      top && base && h && k
+        ? angleAt({ x: h.x + top.x - base.x, y: h.y + top.y - base.y }, h, k)
+        : null,
+    );
     elbow.push(s && e && w ? angleAt(s, e, w) : null);
     spine.push(
-      sn && h
-        ? (Math.atan2(facingSign * (sn.x - h.x), h.y - sn.y) * 180) / Math.PI
+      top && base
+        ? (Math.atan2(facingSign * (top.x - base.x), base.y - top.y) * 180) /
+            Math.PI
         : null,
     );
     const ear = pt(f, LM.ear[near], a) ?? pt(f, LM.nose, a);
@@ -300,6 +364,7 @@ export function computeSignals(
     put("ankle", an);
     put("head", ear);
     put("guideWrist", g);
+    put("hipCentre", base);
     visGuide.push(f.landmarks?.[LM.wrist[guide]]?.visibility ?? null);
     visIndex.push(f.landmarks?.[LM.index[shoot]]?.visibility ?? null);
     if (h && k) seg.thigh.push(dist(h, k));
@@ -319,6 +384,8 @@ export function computeSignals(
     aspect: a,
     shootingSide: shoot,
     nearSide: near,
+    centreLine,
+    cameraAngle: cam,
     wristY: prep(wristY),
     hipY: prep(hipY),
     kneeAngle: prepAngle(knee),
