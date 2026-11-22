@@ -25,6 +25,7 @@
     "lint": "prettier --check .",
     "format": "prettier --write .",
     "validate": "npm run build:browser && npx tsx server.ts",
+    "test:pro-review": "npm run build:browser && tsx scripts/pro-review-smoke.ts",
     "metrics:golden": "tsx src/testing/build-metrics-golden.ts",
     "metrics:reference": "tsx src/testing/build-placeholder-reference.ts",
     "targets:build": "tsx src/testing/build-live-targets.ts",

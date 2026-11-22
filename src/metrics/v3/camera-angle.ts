@@ -87,19 +87,20 @@ const toAngle = (ratio: number, frontal: number) =>
   (Math.asin(Math.min(1, Math.max(0, ratio / frontal))) * 180) / Math.PI;
 
 /**
- * Camera angle for one shot from its SETUP frames (before the dip, when the
- * player is stillest and square): pass those frames, e.g. the window start up
- * to the hip-drop event. Null when no frame has both shoulders and hips.
+ * Camera angle for one shot from the frames passed — the dip's start → the
+ * set point works best (the shooter is squared to the basket; before the dip
+ * they're often still turning into the shot). Null when no frame has both
+ * shoulders and hips.
  */
 export function estimateCameraAngle(
-  setupFrames: readonly SignalFrame[],
+  frames: readonly SignalFrame[],
   opts: {
     aspect: number;
     frontal?: { shoulders: number; hips: number };
   },
 ): CameraAngleEstimate | null {
   const frontal = opts.frontal ?? DEFAULT_FRONTAL;
-  const r = setupFrames
+  const r = frames
     .map((f) => widthRatios(f, opts.aspect))
     .filter((x): x is WidthRatios => x !== null);
   if (r.length === 0) return null;

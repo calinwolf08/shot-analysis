@@ -13,6 +13,8 @@
 import {
   DEFAULT_WORDING,
   effectiveBand,
+  NEGLIGIBLE_SCORE,
+  scoreValue,
   type LiveTargetsV3,
   type MetricPhase,
   type MetricUnit,
@@ -39,7 +41,7 @@ export const SCORE_CAP = 10;
  * Excess smaller than this share of a reference spread counts as on target
  * (avoids "too far forward by 0%" rows scoring 0.0).
  */
-export const NEGLIGIBLE = 0.05;
+export const NEGLIGIBLE = NEGLIGIBLE_SCORE;
 
 export interface MetricResultV3 {
   readonly id: string;
@@ -109,20 +111,7 @@ export function scoreShotV3(
     let direction: "low" | "high" | null = null;
     let magnitude = 0;
     if (measured) {
-      const v = m!.value;
-      if (v < band.passMin) {
-        direction = "low";
-        magnitude = band.passMin - v;
-      } else if (v > band.passMax) {
-        direction = "high";
-        magnitude = v - band.passMax;
-      }
-      score = magnitude / t.rampSd;
-      if (score < NEGLIGIBLE) {
-        score = 0;
-        direction = null;
-        magnitude = 0;
-      }
+      ({ score, direction, magnitude } = scoreValue(t, m!.value));
     }
     const words = direction ? t.wording[direction] : null;
     results.push({

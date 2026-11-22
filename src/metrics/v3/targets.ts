@@ -66,6 +66,34 @@ export function effectiveBand(t: TargetV3): {
   };
 }
 
+/** Scores below this round to 0 (on target). */
+export const NEGLIGIBLE_SCORE = 0.05;
+
+/**
+ * One value against its target: 0 = inside the band, +1 per `rampSd` outside
+ * (unrounded; the app rounds up for display and caps at 10+). The single
+ * scoring rule shared by the app and the reference tools.
+ */
+export function scoreValue(
+  t: TargetV3,
+  value: number,
+): { score: number; direction: "low" | "high" | null; magnitude: number } {
+  const band = effectiveBand(t);
+  let direction: "low" | "high" | null = null;
+  let magnitude = 0;
+  if (value < band.passMin) {
+    direction = "low";
+    magnitude = band.passMin - value;
+  } else if (value > band.passMax) {
+    direction = "high";
+    magnitude = value - band.passMax;
+  }
+  const score = magnitude / t.rampSd;
+  return score < NEGLIGIBLE_SCORE
+    ? { score: 0, direction: null, magnitude: 0 }
+    : { score, direction, magnitude };
+}
+
 function rampScale(sd: number, range: number, ideal: number): number {
   if (sd > 0) return sd;
   if (range > 0) return range / 4;

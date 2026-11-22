@@ -33,7 +33,7 @@ approved there.
   - MediaPipe's own errors, which grow at oblique angles.
     At 10–15° off all of this is below tracking noise; it matters from ~20–25°.
 - **The camera angle has to come from the body.** No full court is in view.
-  Use apparent shoulder/hip width at setup, calibrated per shooter from their
+  Use apparent shoulder/hip width over the shot (dip → set point), calibrated per shooter from their
   widest frames. Scenery (backboard corners, two parallel floor lines, floor
   boards) is an optional cross-check. Expect ±5°, which is ~0.5–1° on joint
   angles at 20° off. A data-driven step (Phase 4) removes any consistent bias.
@@ -106,7 +106,8 @@ build measure identically.
    - angle = asin(ratio ÷ frontal ratio), with the frontal ratio taken from the
      shooter's proportions when known, else population defaults
      (shoulders 0.80, hips 0.50);
-   - per attempt: the median over the setup frames, before the dip;
+   - per attempt: the median over the dip → set point (frames before the dip
+     are unreliable: players are often still turning into the shot);
    - returns shoulders, hips, combined, and the frames used;
    - flags shoulder/hip disagreement over 8° (standing open / rotating).
 3. **Proportions** (`proportions.ts`): from a player's clips, the median

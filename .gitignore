@@ -16,3 +16,8 @@ reference-data/out/
 test-data/**/*.mp4
 test-data/**/*.mov
 test-data/**/*.webm
+
+# Local-only reference videos (poses.json/labels.json are committed).
+reference-data/**/*.mp4
+reference-data/**/*.mov
+reference-data/**/*.webm
