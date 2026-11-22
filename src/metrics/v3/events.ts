@@ -172,6 +172,19 @@ export function frameAt(sig: ShotSignals, idx: number): number {
 export function timeAt(sig: ShotSignals, idx: number): number {
   return interp(sig.t, idx);
 }
+/** Inverse of `frameAt`: the fractional sample index of a source frame. */
+export function sampleAt(sig: ShotSignals, frame: number): number {
+  const xs = sig.frameIndex;
+  if (xs.length === 0) return 0;
+  if (frame <= xs[0]!) return 0;
+  for (let i = 1; i < xs.length; i++) {
+    if (frame <= xs[i]!) {
+      const span = xs[i]! - xs[i - 1]!;
+      return i - 1 + (span > 0 ? (frame - xs[i - 1]!) / span : 0);
+    }
+  }
+  return xs.length - 1;
+}
 function interp(xs: readonly number[], idx: number): number {
   const i = Math.max(0, Math.min(xs.length - 1, Math.floor(idx)));
   const j = Math.min(xs.length - 1, i + 1);

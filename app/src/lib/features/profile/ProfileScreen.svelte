@@ -11,6 +11,8 @@
     getVideoRetention,
     setVideoRetention,
   } from "$lib/shared/media/video-retention";
+  import { loadProProfiles } from "$lib/features/pros";
+  import type { ProProfile } from "basketball-shot-analysis";
 
   const services = useAppServices();
   const auth = useAuth();
@@ -18,6 +20,9 @@
   let player = $state<Player | null>(null);
   let voiceFeedback = $state(true);
   let videoRetention = $state(getVideoRetention());
+  /** Pros the targets were built from (empty until the first pro build). */
+  let pros = $state<readonly ProProfile[]>([]);
+  let scoreAgainst = $state<string | null>(null);
 
   let changeOpen = $state(false);
   let currentPassword = $state("");
@@ -33,6 +38,13 @@
   async function load() {
     player = await services.repos.player.getFirst();
     voiceFeedback = await services.repos.settings.get("voiceFeedback");
+    pros = (await loadProProfiles())?.pros ?? [];
+    scoreAgainst = await services.repos.settings.get("scoreAgainstPro");
+  }
+
+  async function changeScoreAgainst(id: string) {
+    scoreAgainst = id || null;
+    await services.repos.settings.set("scoreAgainstPro", scoreAgainst);
   }
 
   /** Lowering the number deletes the oldest clips on this device now. */
@@ -138,6 +150,26 @@
         {/each}
       </select>
     </label>
+    {#if pros.length > 0}
+      <label class="row">
+        <span>
+          Score against
+          <small class="hint"
+            >Targets from all pros, or centred on one pro's form.</small
+          >
+        </span>
+        <select
+          value={scoreAgainst ?? ""}
+          onchange={(e) => void changeScoreAgainst(e.currentTarget.value)}
+          data-testid="score-against"
+        >
+          <option value="">All pros</option>
+          {#each pros as p (p.id)}
+            <option value={p.id}>{p.name}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
   </Card>
 </section>
 

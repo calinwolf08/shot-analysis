@@ -11,9 +11,9 @@
   import {
     displayScore,
     loadFeedbackWording,
-    loadLiveTargetsV3,
     scoreBand,
   } from "$lib/features/scoring/v3";
+  import { loadScoringTargets } from "$lib/features/pros";
   import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
   import { EmptyState } from "$lib/shared/ui";
 
@@ -36,7 +36,7 @@
       return;
     }
     const [targets, w] = await Promise.all([
-      loadLiveTargetsV3(),
+      loadScoringTargets(services.repos.settings).then((x) => x.targets),
       loadFeedbackWording(),
     ]);
     const wording = w.wording;

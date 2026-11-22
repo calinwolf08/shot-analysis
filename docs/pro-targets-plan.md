@@ -11,6 +11,31 @@ Every step is reviewed by a person in the validator tool
 angle and any metric that looks wrong. The target build only uses what was
 approved there.
 
+## Status
+
+All five phases are implemented; what remains is data (reviewing pro clips).
+
+| Phase                  | Where                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Measurement fixes    | `src/metrics/v3` (centre-line torso, `camera-angle.ts`, `proportions.ts`, `cameraAngle` / `events` options); metrics schema 4                                 |
+| 2 Review tool          | `/pros` — `pro-review.html`, `tools/pro-review/`, `src/pro-reference/` (labels v2, angle limits, attempt measurement), `server.ts`; `npm run test:pro-review` |
+| 3 Target build         | `npm run targets:build:pros` — `src/pro-reference/build.ts`, `src/testing/build-pro-targets.ts`                                                               |
+| 4 Leftover angle error | `src/pro-reference/angle-trend.ts` (applied in the build once there's enough data)                                                                            |
+| 5 App                  | `app/src/lib/features/pros` (profiles, closest pros, score against a pro), Profile "Score against", Insights "Closest pros", live camera-angle hint           |
+
+Changes from the plan below, found while building:
+
+- The camera angle is estimated over the dip → set point, not the setup
+  frames: players are often still turning into the shot before the dip.
+- A player's frontal widths only replace the defaults when they were seen
+  close to front-on (a part-way turn inflated Curry's angles to ~50°).
+- `static/reference/pro-profiles.json` ships empty until the first build; the
+  app hides the pro features while it has no pros.
+- The live camera check is a soft on-screen hint, not a change to the
+  positioning gate.
+
+How to use it: `reference-data/README.md`.
+
 ## Background: what we found
 
 - **Curry's clip is ~35–40° off side-on.** Measured from apparent shoulder and
@@ -33,7 +58,7 @@ approved there.
   - MediaPipe's own errors, which grow at oblique angles.
     At 10–15° off all of this is below tracking noise; it matters from ~20–25°.
 - **The camera angle has to come from the body.** No full court is in view.
-  Use apparent shoulder/hip width at setup, calibrated per shooter from their
+  Use apparent shoulder/hip width over the shot (dip → set point), calibrated per shooter from their
   widest frames. Scenery (backboard corners, two parallel floor lines, floor
   boards) is an optional cross-check. Expect ±5°, which is ~0.5–1° on joint
   angles at 20° off. A data-driven step (Phase 4) removes any consistent bias.
@@ -106,7 +131,8 @@ build measure identically.
    - angle = asin(ratio ÷ frontal ratio), with the frontal ratio taken from the
      shooter's proportions when known, else population defaults
      (shoulders 0.80, hips 0.50);
-   - per attempt: the median over the setup frames, before the dip;
+   - per attempt: the median over the dip → set point (frames before the dip
+     are unreliable: players are often still turning into the shot);
    - returns shoulders, hips, combined, and the frames used;
    - flags shoulder/hip disagreement over 8° (standing open / rotating).
 3. **Proportions** (`proportions.ts`): from a player's clips, the median

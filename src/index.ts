@@ -268,7 +268,17 @@ export {
   wordingFor,
   buildTargetsV3,
   effectiveBand,
+  scoreValue,
+  NEGLIGIBLE_SCORE,
   LIVE_TARGETS_V3_VERSION,
+  labeledEventFrames,
+  sampleAt,
+  overrideEvents,
+  estimateCameraAngle,
+  widthRatios,
+  DEFAULT_FRONTAL,
+  OPEN_DISAGREEMENT,
+  estimateProportions,
 } from "./metrics/v3";
 export type {
   ShotSignals,
@@ -284,4 +294,14 @@ export type {
   LiveTargetsV3,
   TargetV3,
   MetricWording,
+  ShotMetricsOptions,
+  CameraAngleEstimate,
+  Proportions,
 } from "./metrics/v3";
+
+// Pro reference profiles (written by npm run targets:build:pros).
+export type {
+  ProProfiles,
+  ProProfile,
+  PlayerMetric,
+} from "./pro-reference/build";

@@ -49,6 +49,8 @@ var ShotAnalysis = (() => {
     calculateDistance: () => calculateDistance,
     calculateDistance2D: () => calculateDistance2D,
     calculateRelativePosition: () => calculateRelativePosition,
+    computeSequencing: () => computeSequencing,
+    computeStructure: () => computeStructure,
     createConfig: () => createConfig,
     createDefaultConfig: () => createDefaultConfig,
     createEmptyAnalysisResult: () => createEmptyAnalysisResult,
@@ -62,9 +64,11 @@ var ShotAnalysis = (() => {
     createPoseShotDetector: () => createPoseShotDetector,
     createShotAnalyzer: () => createShotAnalyzer,
     createVideoElementProvider: () => createVideoElementProvider,
+    deriveThresholds: () => deriveThresholds,
     detectKeyframesFromFrames: () => detectKeyframesFromFrames,
     detectOrientation: () => detectOrientation,
     detectShotsFromPoses: () => detectShots,
+    extractShotMetrics: () => extractShotMetrics,
     filterMetricsByConfidence: () => filterMetricsByConfidence,
     formProfileSchema: () => formProfileSchema,
     getAverageMetricConfidence: () => getAverageMetricConfidence,
@@ -78,6 +82,7 @@ var ShotAnalysis = (() => {
     isSuccessfulMetricResult: () => isSuccessfulMetricResult,
     metricPrioritySchema: () => metricPrioritySchema,
     metricTargetSchema: () => metricTargetSchema,
+    metricsForShot: () => metricsForShot,
     movingAverage: () => movingAverage,
     movingAveragePoint3D: () => movingAveragePoint3D,
     normalizeToBodyScale: () => normalizeToBodyScale,
@@ -85,7 +90,9 @@ var ShotAnalysis = (() => {
     phasesFromKeyframes: () => phasesFromKeyframes,
     poseLandmarksToFrames: () => poseLandmarksToFrames,
     proFormProfile: () => proFormProfile,
+    referenceOnFrame: () => referenceOnFrame,
     safeValidateConfig: () => safeValidateConfig,
+    scoreShot: () => scoreShot,
     setKeyframeDiagnosticsSink: () => setKeyframeDiagnosticsSink,
     shootingHandSchema: () => shootingHandSchema,
     smoothLandmarkSequence: () => smoothLandmarkSequence,
@@ -4297,11 +4304,11 @@ var ShotAnalysis = (() => {
   }
 
   // src/utils/coordinates.ts
-  function normalizeToBodyScale(distance, shoulderWidth) {
-    if (shoulderWidth <= 0) {
+  function normalizeToBodyScale(distance, shoulderWidth2) {
+    if (shoulderWidth2 <= 0) {
       throw new Error("Shoulder width must be greater than zero");
     }
-    return distance / shoulderWidth;
+    return distance / shoulderWidth2;
   }
   function calculateRelativePosition(point, reference) {
     return {
@@ -4833,8 +4840,8 @@ var ShotAnalysis = (() => {
       const ideal = target.ideal;
       const deviation = value - ideal;
       const isInRange = value >= min && value <= max;
-      const range2 = max - min;
-      const warningZone = range2 * this.options.warningThreshold;
+      const range3 = max - min;
+      const warningZone = range3 * this.options.warningThreshold;
       const innerMin = min + warningZone;
       const innerMax = max - warningZone;
       let status;
@@ -4842,7 +4849,7 @@ var ShotAnalysis = (() => {
       if (!isInRange) {
         status = "fail";
         isTooLow = value < min;
-      } else if (range2 > 0 && value !== min && value !== max && (value < innerMin || value > innerMax)) {
+      } else if (range3 > 0 && value !== min && value !== max && (value < innerMin || value > innerMax)) {
         status = "warning";
         isTooLow = value < innerMin;
       } else {
@@ -9169,12 +9176,12 @@ var ShotAnalysis = (() => {
       if (!poseLandmarks) {
         return null;
       }
-      const landmarks = poseLandmarks.map((lm) => ({
-        x: lm.x,
-        y: lm.y,
-        z: lm.z,
-        visibility: lm.visibility ?? 0,
-        confidence: lm.visibility ?? 0
+      const landmarks = poseLandmarks.map((lm2) => ({
+        x: lm2.x,
+        y: lm2.y,
+        z: lm2.z,
+        visibility: lm2.visibility ?? 0,
+        confidence: lm2.visibility ?? 0
         // Use visibility as confidence
       }));
       while (landmarks.length < TOTAL_LANDMARKS2) {
@@ -9186,7 +9193,7 @@ var ShotAnalysis = (() => {
           confidence: 0
         });
       }
-      const poseConfidence = landmarks.reduce((sum, lm) => sum + lm.visibility, 0) / TOTAL_LANDMARKS2;
+      const poseConfidence = landmarks.reduce((sum, lm2) => sum + lm2.visibility, 0) / TOTAL_LANDMARKS2;
       const poseLandmarksResult = {
         landmarks,
         poseConfidence
@@ -9413,12 +9420,12 @@ var ShotAnalysis = (() => {
       if (!poseLandmarks) {
         return null;
       }
-      const landmarks = poseLandmarks.map((lm) => ({
-        x: lm.x,
-        y: lm.y,
-        z: lm.z,
-        visibility: lm.visibility ?? 0,
-        confidence: lm.visibility ?? 0
+      const landmarks = poseLandmarks.map((lm2) => ({
+        x: lm2.x,
+        y: lm2.y,
+        z: lm2.z,
+        visibility: lm2.visibility ?? 0,
+        confidence: lm2.visibility ?? 0
         // Use visibility as confidence
       }));
       while (landmarks.length < TOTAL_LANDMARKS2) {
@@ -9430,7 +9437,7 @@ var ShotAnalysis = (() => {
           confidence: 0
         });
       }
-      const poseConfidence = landmarks.reduce((sum, lm) => sum + lm.visibility, 0) / TOTAL_LANDMARKS2;
+      const poseConfidence = landmarks.reduce((sum, lm2) => sum + lm2.visibility, 0) / TOTAL_LANDMARKS2;
       const poseLandmarksResult = {
         landmarks,
         poseConfidence
@@ -10368,11 +10375,11 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         const rightKnee = landmarks[LANDMARK_INDEX.RIGHT_KNEE];
         const leftAnkle = landmarks[LANDMARK_INDEX.LEFT_ANKLE];
         const rightAnkle = landmarks[LANDMARK_INDEX.RIGHT_ANKLE];
-        const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
+        const shoulderWidth2 = Math.abs(rightShoulder.x - leftShoulder.x);
         const handDx = rightIndex.x - leftIndex.x;
         const handDy = rightIndex.y - leftIndex.y;
         const handDistance = Math.sqrt(handDx * handDx + handDy * handDy);
-        const handSeparation = shoulderWidth > 0 ? handDistance / shoulderWidth : handDistance;
+        const handSeparation = shoulderWidth2 > 0 ? handDistance / shoulderWidth2 : handDistance;
         const leftKneeAngle = this.calculateKneeAngle(
           leftHip,
           leftKnee,
@@ -10434,10 +10441,10 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       this.assignPhases(frameData, state, baseFrame);
       const maxFrameIndex = baseFrame + frameData.length - 1;
       const phases = {};
-      for (const [phase, range2] of state.phases) {
+      for (const [phase, range3] of state.phases) {
         phases[phase] = {
-          startFrame: range2.startFrame,
-          endFrame: Math.min(range2.endFrame, maxFrameIndex)
+          startFrame: range3.startFrame,
+          endFrame: Math.min(range3.endFrame, maxFrameIndex)
         };
       }
       return phases;
@@ -10744,9 +10751,9 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       for (const frame of frameData) {
         allFrames.add(frame.frameIndex);
       }
-      for (const range2 of Object.values(phases)) {
-        if (range2) {
-          for (let i2 = range2.startFrame; i2 <= range2.endFrame; i2++) {
+      for (const range3 of Object.values(phases)) {
+        if (range3) {
+          for (let i2 = range3.startFrame; i2 <= range3.endFrame; i2++) {
             if (allFrames.has(i2)) {
               coveredFrames++;
             }
@@ -10920,13 +10927,13 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
   }
   function getFrameElbowAnglesPerArm(frame, visibilityThreshold) {
     if (!frame.landmarks) return { left: null, right: null };
-    const lm = frame.landmarks;
-    const ls2 = lm[LANDMARK_INDICES.LEFT_SHOULDER];
-    const le2 = lm[LANDMARK_INDICES.LEFT_ELBOW];
-    const lw = lm[LANDMARK_INDICES.LEFT_WRIST];
-    const rs2 = lm[LANDMARK_INDICES.RIGHT_SHOULDER];
-    const re2 = lm[LANDMARK_INDICES.RIGHT_ELBOW];
-    const rw = lm[LANDMARK_INDICES.RIGHT_WRIST];
+    const lm2 = frame.landmarks;
+    const ls2 = lm2[LANDMARK_INDICES.LEFT_SHOULDER];
+    const le2 = lm2[LANDMARK_INDICES.LEFT_ELBOW];
+    const lw = lm2[LANDMARK_INDICES.LEFT_WRIST];
+    const rs2 = lm2[LANDMARK_INDICES.RIGHT_SHOULDER];
+    const re2 = lm2[LANDMARK_INDICES.RIGHT_ELBOW];
+    const rw = lm2[LANDMARK_INDICES.RIGHT_WRIST];
     const leftVisible = ls2 && le2 && lw && ls2.visibility >= visibilityThreshold && le2.visibility >= visibilityThreshold && lw.visibility >= visibilityThreshold;
     const rightVisible = rs2 && re2 && rw && rs2.visibility >= visibilityThreshold && re2.visibility >= visibilityThreshold && rw.visibility >= visibilityThreshold;
     return {
@@ -10958,20 +10965,153 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     }
     return null;
   }
+  function getReliableKneeAngle(frame, visibilityThreshold) {
+    if (!frame.landmarks) return null;
+    const lm2 = frame.landmarks;
+    const legVis = (hip, knee, ankle) => {
+      var _a2, _b, _c2;
+      return Math.min(
+        ((_a2 = lm2[hip]) == null ? void 0 : _a2.visibility) ?? 0,
+        ((_b = lm2[knee]) == null ? void 0 : _b.visibility) ?? 0,
+        ((_c2 = lm2[ankle]) == null ? void 0 : _c2.visibility) ?? 0
+      );
+    };
+    const lVis = legVis(
+      LANDMARK_INDICES.LEFT_HIP,
+      LANDMARK_INDICES.LEFT_KNEE,
+      LANDMARK_INDICES.LEFT_ANKLE
+    );
+    const rVis = legVis(
+      LANDMARK_INDICES.RIGHT_HIP,
+      LANDMARK_INDICES.RIGHT_KNEE,
+      LANDMARK_INDICES.RIGHT_ANKLE
+    );
+    if (Math.max(lVis, rVis) < visibilityThreshold) return null;
+    if (lVis >= rVis) {
+      return calculateKneeAngle(
+        lm2[LANDMARK_INDICES.LEFT_HIP],
+        lm2[LANDMARK_INDICES.LEFT_KNEE],
+        lm2[LANDMARK_INDICES.LEFT_ANKLE]
+      );
+    }
+    return calculateKneeAngle(
+      lm2[LANDMARK_INDICES.RIGHT_HIP],
+      lm2[LANDMARK_INDICES.RIGHT_KNEE],
+      lm2[LANDMARK_INDICES.RIGHT_ANKLE]
+    );
+  }
+  var HIP_DROP_MIN_RANGE = 0.02;
+  function getHipAnkleDrop(frame, visibilityThreshold) {
+    if (!frame.landmarks) return null;
+    const lm2 = frame.landmarks;
+    const side = (hipI, ankleI) => {
+      const hip = lm2[hipI];
+      const ankle = lm2[ankleI];
+      if (!hip || !ankle) return null;
+      return {
+        vis: Math.min(hip.visibility ?? 0, ankle.visibility ?? 0),
+        drop: ankle.y - hip.y
+      };
+    };
+    const l2 = side(LANDMARK_INDICES.LEFT_HIP, LANDMARK_INDICES.LEFT_ANKLE);
+    const r2 = side(LANDMARK_INDICES.RIGHT_HIP, LANDMARK_INDICES.RIGHT_ANKLE);
+    const best = l2 && r2 ? l2.vis >= r2.vis ? l2 : r2 : l2 ?? r2;
+    if (!best || best.vis < visibilityThreshold) return null;
+    return best.drop;
+  }
+  function hipDropBasin(frames, lo2, hi2, visibilityThreshold) {
+    const pts = [];
+    for (const frame of frames) {
+      const idx = frame.frameIndex;
+      if (idx < lo2 || idx > hi2) continue;
+      const drop = getHipAnkleDrop(frame, visibilityThreshold);
+      if (drop !== null) pts.push({ frameIndex: idx, v: drop });
+    }
+    if (pts.length < 3) return null;
+    pts.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
+    const series = pts.map((p2, i2) => {
+      var _a2, _b;
+      const prev = (_a2 = pts[i2 - 1]) == null ? void 0 : _a2.v;
+      const next = (_b = pts[i2 + 1]) == null ? void 0 : _b.v;
+      let sum = p2.v;
+      let n2 = 1;
+      if (prev !== void 0) {
+        sum += prev;
+        n2++;
+      }
+      if (next !== void 0) {
+        sum += next;
+        n2++;
+      }
+      return { frameIndex: p2.frameIndex, v: sum / n2 };
+    });
+    let min = Infinity;
+    let max = -Infinity;
+    for (const p2 of series) {
+      if (p2.v < min) min = p2.v;
+      if (p2.v > max) max = p2.v;
+    }
+    return { series, min, range: max - min };
+  }
   function detectLegBendLowPoint(frames, startFrame, endFrame, config = DEFAULT_CONFIG4) {
     const shotDuration = endFrame - startFrame + 1;
     const searchEndFrame = startFrame + Math.floor(shotDuration * config.legBendSearchWindow);
-    let minAngle = Infinity;
-    let minAngleFrame = null;
+    const basin = hipDropBasin(
+      frames,
+      startFrame,
+      searchEndFrame,
+      config.visibilityThreshold
+    );
+    if (basin && basin.range >= HIP_DROP_MIN_RANGE) {
+      const eps = Math.max(2e-3, 0.05 * basin.range);
+      for (const p2 of basin.series) {
+        if (p2.v <= basin.min + eps) {
+          emitDiagnostic({
+            keyframe: "leg_bend_low_point",
+            frame: p2.frameIndex,
+            method: "hip-drop-basin-onset",
+            detail: `hips lowest vs ankles (drop ${basin.min.toFixed(3)}, range ${basin.range.toFixed(3)}) in window ${startFrame}-${searchEndFrame}`
+          });
+          return p2.frameIndex;
+        }
+      }
+    }
+    const pts = [];
     for (const frame of frames) {
       const frameIdx = frame.frameIndex;
       if (frameIdx < startFrame || frameIdx > searchEndFrame) {
         continue;
       }
-      const kneeAngle = getFrameKneeAngle(frame, config.visibilityThreshold);
-      if (kneeAngle !== null && kneeAngle < minAngle) {
-        minAngle = kneeAngle;
-        minAngleFrame = frameIdx;
+      const kneeAngle = getReliableKneeAngle(frame, config.visibilityThreshold);
+      if (kneeAngle !== null) {
+        pts.push({ frameIndex: frameIdx, angle: kneeAngle });
+      }
+    }
+    let minAngle = Infinity;
+    let minAngleFrame = null;
+    if (pts.length > 0) {
+      pts.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
+      const sm = pts.map((p2, i2) => {
+        var _a2, _b;
+        const prev = (_a2 = pts[i2 - 1]) == null ? void 0 : _a2.angle;
+        const next = (_b = pts[i2 + 1]) == null ? void 0 : _b.angle;
+        let sum = p2.angle;
+        let n2 = 1;
+        if (prev !== void 0) {
+          sum += prev;
+          n2++;
+        }
+        if (next !== void 0) {
+          sum += next;
+          n2++;
+        }
+        return sum / n2;
+      });
+      for (let i2 = 0; i2 < sm.length; i2++) {
+        if (sm[i2] < minAngle) {
+          minAngle = sm[i2];
+          minAngleFrame = pts[i2].frameIndex;
+        }
       }
     }
     if (minAngleFrame === null) {
@@ -11000,36 +11140,62 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
   function detectBallLowPoint(frames, startFrame, endFrame, config = DEFAULT_CONFIG4) {
     const shotDuration = endFrame - startFrame + 1;
     const searchEndFrame = startFrame + Math.floor(shotDuration * config.ballLowPointSearchWindow);
-    const findMaxWristYFrame = (visThreshold) => {
-      let maxWristY = -Infinity;
-      let maxWristYFrame2 = null;
+    const findBasinOnset = (visThreshold) => {
+      const pts = [];
       for (const frame of frames) {
         const frameIdx = frame.frameIndex;
         if (frameIdx < startFrame || frameIdx > searchEndFrame) {
           continue;
         }
         const wristY = getFrameWristY(frame, visThreshold);
-        if (wristY !== null && wristY > maxWristY) {
-          maxWristY = wristY;
-          maxWristYFrame2 = frameIdx;
+        if (wristY !== null) {
+          pts.push({ frameIndex: frameIdx, y: wristY });
         }
       }
-      return maxWristYFrame2;
+      if (pts.length === 0) return null;
+      pts.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
+      const sm = pts.map((p2, i2) => {
+        var _a2, _b;
+        const prev = (_a2 = pts[i2 - 1]) == null ? void 0 : _a2.y;
+        const next = (_b = pts[i2 + 1]) == null ? void 0 : _b.y;
+        let sum = p2.y;
+        let n2 = 1;
+        if (prev !== void 0) {
+          sum += prev;
+          n2++;
+        }
+        if (next !== void 0) {
+          sum += next;
+          n2++;
+        }
+        return sum / n2;
+      });
+      let maxY = -Infinity;
+      let minY = Infinity;
+      for (const v2 of sm) {
+        if (v2 > maxY) maxY = v2;
+        if (v2 < minY) minY = v2;
+      }
+      const eps = Math.max(2e-3, 0.03 * (maxY - minY));
+      for (let i2 = 0; i2 < sm.length; i2++) {
+        if (sm[i2] >= maxY - eps) return pts[i2].frameIndex;
+      }
+      return pts[pts.length - 1].frameIndex;
     };
-    let maxWristYFrame = findMaxWristYFrame(config.visibilityThreshold);
+    let lowPointFrame = findBasinOnset(config.visibilityThreshold);
     if (config.visibilityThreshold <= 0.3) {
       const firstHalfEnd = startFrame + Math.floor((searchEndFrame - startFrame) / 2);
-      if (maxWristYFrame !== null && maxWristYFrame > firstHalfEnd) {
-        const lowVisFrame = findMaxWristYFrame(0.01);
-        if (lowVisFrame !== null && lowVisFrame < maxWristYFrame) {
-          maxWristYFrame = lowVisFrame;
+      if (lowPointFrame !== null && lowPointFrame > firstHalfEnd) {
+        const lowVisFrame = findBasinOnset(0.01);
+        if (lowVisFrame !== null && lowVisFrame < lowPointFrame) {
+          lowPointFrame = lowVisFrame;
         }
       }
-      if (maxWristYFrame === null) {
-        maxWristYFrame = findMaxWristYFrame(0.01);
+      if (lowPointFrame === null) {
+        lowPointFrame = findBasinOnset(0.01);
       }
     }
-    return maxWristYFrame;
+    return lowPointFrame;
   }
   function calculateVelocity(values) {
     const velocities = [];
@@ -11048,6 +11214,28 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
   function detectLegsStartExtending(frames, legBendLowPointFrame, endFrame, config = DEFAULT_CONFIG4) {
     const shotDuration = endFrame - legBendLowPointFrame + 1;
     const searchEndFrame = legBendLowPointFrame + Math.floor(shotDuration * config.riseSearchWindow);
+    const basin = hipDropBasin(
+      frames,
+      legBendLowPointFrame,
+      searchEndFrame,
+      config.visibilityThreshold
+    );
+    if (basin && basin.range >= HIP_DROP_MIN_RANGE) {
+      const eps = Math.max(2e-3, 0.05 * basin.range);
+      let lastIdx = -1;
+      for (let i2 = 0; i2 < basin.series.length; i2++) {
+        if (basin.series[i2].v <= basin.min + eps) lastIdx = i2;
+      }
+      if (lastIdx >= 0) {
+        emitDiagnostic({
+          keyframe: "legs_start_extending",
+          frame: basin.series[lastIdx].frameIndex,
+          method: "hip-drop-basin-turn",
+          detail: `hips begin rising after the bottom (drop ${basin.min.toFixed(3)}, range ${basin.range.toFixed(3)}) in window ${legBendLowPointFrame}-${searchEndFrame}`
+        });
+        return basin.series[lastIdx].frameIndex;
+      }
+    }
     const frameAngles = [];
     for (const frame of frames) {
       const frameIdx = frame.frameIndex;
@@ -11083,6 +11271,71 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     }
     return null;
   }
+  function detectLegsFullyExtended(frames, legsStartExtendingFrame, endFrame, config = DEFAULT_CONFIG4) {
+    const shotDuration = endFrame - legsStartExtendingFrame + 1;
+    const searchEndFrame = legsStartExtendingFrame + Math.floor(shotDuration * 0.7);
+    const basin = hipDropBasin(
+      frames,
+      legsStartExtendingFrame,
+      Math.min(searchEndFrame, endFrame),
+      config.visibilityThreshold
+    );
+    if (basin && basin.range >= HIP_DROP_MIN_RANGE) {
+      const max = basin.min + basin.range;
+      const eps = Math.max(2e-3, 0.05 * basin.range);
+      for (const p2 of basin.series) {
+        if (p2.v >= max - eps) {
+          emitDiagnostic({
+            keyframe: "legs_fully_extended",
+            frame: p2.frameIndex,
+            method: "hip-drop-basin-peak",
+            detail: `hips highest vs ankles (drop ${max.toFixed(3)}, range ${basin.range.toFixed(3)}) in window ${legsStartExtendingFrame}-${searchEndFrame}`
+          });
+          return p2.frameIndex;
+        }
+      }
+    }
+    const pts = [];
+    for (const frame of frames) {
+      const idx = frame.frameIndex;
+      if (idx < legsStartExtendingFrame || idx > searchEndFrame) continue;
+      const angle = getReliableKneeAngle(frame, config.visibilityThreshold);
+      if (angle !== null) pts.push({ frameIndex: idx, angle });
+    }
+    if (pts.length < 3) return null;
+    pts.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
+    const sm = pts.map((p2, i2) => {
+      var _a2, _b;
+      const prev = (_a2 = pts[i2 - 1]) == null ? void 0 : _a2.angle;
+      const next = (_b = pts[i2 + 1]) == null ? void 0 : _b.angle;
+      let sum = p2.angle;
+      let n2 = 1;
+      if (prev !== void 0) {
+        sum += prev;
+        n2++;
+      }
+      if (next !== void 0) {
+        sum += next;
+        n2++;
+      }
+      return sum / n2;
+    });
+    let maxAngle = -Infinity;
+    let maxFrame = null;
+    for (let i2 = 0; i2 < sm.length; i2++) {
+      if (sm[i2] > maxAngle) {
+        maxAngle = sm[i2];
+        maxFrame = pts[i2].frameIndex;
+      }
+    }
+    emitDiagnostic({
+      keyframe: "legs_fully_extended",
+      frame: maxFrame,
+      method: "knee-angle-max",
+      detail: `straightest knee (${maxAngle === -Infinity ? "n/a" : maxAngle.toFixed(0) + "\xB0"}) in window ${legsStartExtendingFrame}-${searchEndFrame}`
+    });
+    return maxFrame;
+  }
   function detectBallStartsUpward(frames, ballLowPointFrame, endFrame, config = DEFAULT_CONFIG4) {
     const shotDuration = endFrame - ballLowPointFrame + 1;
     const searchEndFrame = ballLowPointFrame + Math.floor(shotDuration * config.riseSearchWindow);
@@ -11102,25 +11355,36 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         return null;
       }
       framePositions.sort((a2, b2) => a2.frameIndex - b2.frameIndex);
-      const wristYValues = framePositions.map((fp) => fp.wristY);
-      const smoothedVelocities = calculateSmoothedVelocity(
-        wristYValues,
-        config.smoothingWindowSize
-      );
-      let consecutiveNegative = 0;
-      for (let i2 = 0; i2 < smoothedVelocities.length; i2++) {
-        const velocity = smoothedVelocities[i2];
-        if (velocity < config.wristVelocityThreshold) {
-          consecutiveNegative++;
-          if (consecutiveNegative >= config.minConsecutiveFrames) {
-            const startIdx = i2 - config.minConsecutiveFrames + 1;
-            return framePositions[startIdx + 1].frameIndex;
-          }
-        } else {
-          consecutiveNegative = 0;
+      const sm = framePositions.map((p2, i2) => {
+        var _a2, _b;
+        const prev = (_a2 = framePositions[i2 - 1]) == null ? void 0 : _a2.wristY;
+        const next = (_b = framePositions[i2 + 1]) == null ? void 0 : _b.wristY;
+        let sum = p2.wristY;
+        let n2 = 1;
+        if (prev !== void 0) {
+          sum += prev;
+          n2++;
         }
+        if (next !== void 0) {
+          sum += next;
+          n2++;
+        }
+        return sum / n2;
+      });
+      let maxY = -Infinity;
+      let minY = Infinity;
+      for (const v2 of sm) {
+        if (v2 > maxY) maxY = v2;
+        if (v2 < minY) minY = v2;
       }
-      return null;
+      if (maxY - minY < 0.01) return null;
+      const EPS = 1e-6;
+      let maxIdx = -1;
+      for (let i2 = 0; i2 < sm.length; i2++) {
+        if (sm[i2] >= maxY - EPS) maxIdx = i2;
+      }
+      if (maxIdx < 0 || maxIdx === sm.length - 1) return null;
+      return framePositions[maxIdx].frameIndex;
     };
     let result = findBallStartsUpward(config.visibilityThreshold);
     if (config.visibilityThreshold <= 0.3) {
@@ -11137,14 +11401,59 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     emitDiagnostic({
       keyframe: "ball_starts_upward",
       frame: result,
-      method: "wristY-velocity",
-      detail: `first sustained upward wrist motion (<${config.wristVelocityThreshold}/frame for ${config.minConsecutiveFrames} frames) after ball_low_point@${ballLowPointFrame}, window ${ballLowPointFrame}-${searchEndFrame}`
+      method: "wristY-bottom",
+      detail: `deepest ball (max smoothed wrist Y) in rise window ${ballLowPointFrame}-${searchEndFrame} \u2014 the ball starts rising here`
     });
     return result;
   }
   var SET_POINT_FLEX_MAX_DEG = 140;
   var SET_POINT_MIN_DEPTH_DEG = 125;
   var SET_POINT_MIN_DIP_DEG = 15;
+  var SET_POINT_ADVANCE_GUARD_GAP = 0.1;
+  var SET_POINT_ABOVE_SHOULDER_GAP = 0.35;
+  var SET_POINT_MAX_ADVANCE_FRAMES = 8;
+  function wristAboveShoulderGap(frame, visibilityThreshold) {
+    const lm2 = frame.landmarks;
+    if (!lm2) return null;
+    const vis = (l2) => l2 && l2.visibility >= visibilityThreshold ? l2 : null;
+    const avgY2 = (a2, b2) => {
+      const la2 = vis(lm2[a2]);
+      const lb = vis(lm2[b2]);
+      if (la2 && lb) return (la2.y + lb.y) / 2;
+      return (la2 == null ? void 0 : la2.y) ?? (lb == null ? void 0 : lb.y) ?? null;
+    };
+    const wristY = avgY2(LANDMARK_INDICES.LEFT_WRIST, LANDMARK_INDICES.RIGHT_WRIST);
+    const shoulderY = avgY2(
+      LANDMARK_INDICES.LEFT_SHOULDER,
+      LANDMARK_INDICES.RIGHT_SHOULDER
+    );
+    const hipY = avgY2(LANDMARK_INDICES.LEFT_HIP, LANDMARK_INDICES.RIGHT_HIP);
+    if (wristY === null || shoulderY === null || hipY === null) return null;
+    const torso = Math.abs(hipY - shoulderY);
+    if (torso < 1e-4) return null;
+    return (shoulderY - wristY) / torso;
+  }
+  function advanceSetPointToBallUp(frames, candidateFrame, searchEndFrame, config) {
+    const byIndex = /* @__PURE__ */ new Map();
+    for (const f2 of frames) byIndex.set(f2.frameIndex, f2);
+    const gapAt = (fi2) => {
+      const f2 = byIndex.get(fi2);
+      return f2 ? wristAboveShoulderGap(f2, config.visibilityThreshold) : null;
+    };
+    const startGap = gapAt(candidateFrame);
+    if (startGap === null || startGap > SET_POINT_ADVANCE_GUARD_GAP) {
+      return candidateFrame;
+    }
+    const limit = Math.min(
+      searchEndFrame,
+      candidateFrame + SET_POINT_MAX_ADVANCE_FRAMES
+    );
+    for (let frame = candidateFrame; frame <= limit; frame++) {
+      const g2 = gapAt(frame);
+      if (g2 !== null && g2 >= SET_POINT_ABOVE_SHOULDER_GAP) return frame;
+    }
+    return candidateFrame;
+  }
   function detectSetPoint(frames, ballStartsUpwardFrame, endFrame, config = DEFAULT_CONFIG4) {
     const shotDuration = endFrame - ballStartsUpwardFrame + 1;
     const searchEndFrame = ballStartsUpwardFrame + Math.floor(shotDuration * config.setPointSearchWindow);
@@ -11241,13 +11550,20 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       how = "deepest flex (no significant local min)";
     }
     if (shootingKey && chosen) {
+      const setFrame = advanceSetPointToBallUp(
+        frames,
+        chosen.frameIndex,
+        searchEndFrame,
+        config
+      );
+      const advanced = setFrame !== chosen.frameIndex ? ` -> ball-up @${setFrame}` : "";
       emitDiagnostic({
         keyframe: "set_point",
-        frame: chosen.frameIndex,
+        frame: setFrame,
         method: `shooting-${shootingKey}-elbow`,
-        detail: `shooting arm=${shootingKey} (flex-run L ${flexRun(arms.left)} / R ${flexRun(arms.right)}, min L ${minRaw(arms.left) === Infinity ? "n/a" : minRaw(arms.left).toFixed(0) + "\xB0"} / R ${minRaw(arms.right) === Infinity ? "n/a" : minRaw(arms.right).toFixed(0) + "\xB0"}, jitter L ${jitter(arms.left).toFixed(1)} / R ${jitter(arms.right).toFixed(1)}). ${how} (${chosen.smooth.toFixed(0)}\xB0) @${chosen.frameIndex}; window ${ballStartsUpwardFrame}-${searchEndFrame}`
+        detail: `shooting arm=${shootingKey} (flex-run L ${flexRun(arms.left)} / R ${flexRun(arms.right)}, min L ${minRaw(arms.left) === Infinity ? "n/a" : minRaw(arms.left).toFixed(0) + "\xB0"} / R ${minRaw(arms.right) === Infinity ? "n/a" : minRaw(arms.right).toFixed(0) + "\xB0"}, jitter L ${jitter(arms.left).toFixed(1)} / R ${jitter(arms.right).toFixed(1)}). ${how} (${chosen.smooth.toFixed(0)}\xB0) @${chosen.frameIndex}${advanced}; window ${ballStartsUpwardFrame}-${searchEndFrame}`
       });
-      return chosen.frameIndex;
+      return setFrame;
     }
     const avg = [];
     {
@@ -11270,13 +11586,19 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     }
     const avgSig = firstSignificantMin(avg);
     if (avgSig) {
+      const setFrame = advanceSetPointToBallUp(
+        frames,
+        avgSig.frameIndex,
+        searchEndFrame,
+        config
+      );
       emitDiagnostic({
         keyframe: "set_point",
-        frame: avgSig.frameIndex,
+        frame: setFrame,
         method: "avg-elbow-first-flex",
-        detail: `no single arm clearly cocked; averaged elbow first significant flex (${avgSig.smooth.toFixed(0)}\xB0) @${avgSig.frameIndex}, window ${ballStartsUpwardFrame}-${searchEndFrame}`
+        detail: `no single arm clearly cocked; averaged elbow first significant flex (${avgSig.smooth.toFixed(0)}\xB0) @${avgSig.frameIndex}${setFrame !== avgSig.frameIndex ? ` -> ball-up @${setFrame}` : ""}, window ${ballStartsUpwardFrame}-${searchEndFrame}`
       });
-      return avgSig.frameIndex;
+      return setFrame;
     }
     let peak = null;
     for (const frame of frames) {
@@ -11424,9 +11746,9 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       if (frameIdx < releaseFrame || frameIdx > searchEndFrame) {
         continue;
       }
-      const elbowAngle = getFrameElbowAngle(frame, config.visibilityThreshold);
-      if (elbowAngle !== null && elbowAngle > maxElbowAngle) {
-        maxElbowAngle = elbowAngle;
+      const elbowAngle2 = getFrameElbowAngle(frame, config.visibilityThreshold);
+      if (elbowAngle2 !== null && elbowAngle2 > maxElbowAngle) {
+        maxElbowAngle = elbowAngle2;
         maxElbowAngleFrame = frameIdx;
       }
     }
@@ -11553,6 +11875,17 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         keyframeId: "legs_start_extending",
         frameIndex: legsExtendingFrame,
         confidence: legsExtendingFrame !== null ? 0.8 : 0
+      });
+      const legsFullyExtendedFrame = legsExtendingFrame !== null ? detectLegsFullyExtended(
+        frames,
+        legsExtendingFrame,
+        endFrame,
+        this.config
+      ) : null;
+      keyframes.push({
+        keyframeId: "legs_fully_extended",
+        frameIndex: legsFullyExtendedFrame,
+        confidence: legsFullyExtendedFrame !== null ? 0.8 : 0
       });
       const ballUpwardFrame = detectBallStartsUpward(
         frames,
@@ -11751,6 +12084,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       }
     } else {
       detectedKeyframes.set("legs_start_extending", null);
+      detectedKeyframes.set("legs_fully_extended", null);
       detectedKeyframes.set("ball_starts_upward", null);
     }
     let releaseFrame = null;
@@ -11935,8 +12269,8 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
               startFrame,
               endFrame
             );
-            for (const [phase, range2] of Object.entries(phaseResult.phases)) {
-              if (range2 && frameIndex >= range2.startFrame && frameIndex <= range2.endFrame) {
+            for (const [phase, range3] of Object.entries(phaseResult.phases)) {
+              if (range3 && frameIndex >= range3.startFrame && frameIndex <= range3.endFrame) {
                 currentPhase = phase;
                 break;
               }
@@ -12027,6 +12361,9 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       };
     }
   };
+  function createShotDetector(config = {}) {
+    return new ShotDetector(config);
+  }
 
   // src/metrics/types.ts
   function createEmptyMetricValue(frame = 0) {
@@ -12344,14 +12681,14 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       if (!shoulder || !elbow || !wrist) {
         return { error: "Required arm landmarks missing" };
       }
-      const elbowAngle = calculateAngle(
+      const elbowAngle2 = calculateAngle(
         shoulder.position,
         elbow.position,
         wrist.position
       );
       const confidence = calculateMinConfidence([shoulder, elbow, wrist]);
       const value = {
-        value: Math.round(elbowAngle * 10) / 10,
+        value: Math.round(elbowAngle2 * 10) / 10,
         unit: this.unit,
         frame: targetPhase.startFrame,
         confidence
@@ -12385,13 +12722,13 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         if (!shoulder || !elbow || !wrist) continue;
         const confidence = calculateMinConfidence([shoulder, elbow, wrist]);
         foundValidFrame = true;
-        const elbowAngle = calculateAngle(
+        const elbowAngle2 = calculateAngle(
           shoulder.position,
           elbow.position,
           wrist.position
         );
-        if (elbowAngle > maxExtension) {
-          maxExtension = elbowAngle;
+        if (elbowAngle2 > maxExtension) {
+          maxExtension = elbowAngle2;
           maxExtensionFrame = frameIndex;
           minConfidence = confidence;
         }
@@ -12500,12 +12837,12 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         validFrameCount++;
         const confidence = calculateMinConfidence([shoulder, elbow, wrist]);
         totalConfidence += confidence;
-        const elbowAngle = calculateAngle(
+        const elbowAngle2 = calculateAngle(
           shoulder.position,
           elbow.position,
           wrist.position
         );
-        if (elbowAngle >= ARM_EXTENDED_THRESHOLD) {
+        if (elbowAngle2 >= ARM_EXTENDED_THRESHOLD) {
           extendedFrameCount++;
         }
       }
@@ -12934,14 +13271,14 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       let lowestFrame = startFrame;
       let totalConfidence = 0;
       let validFrames = 0;
-      let shoulderWidth = 0.2;
+      let shoulderWidth2 = 0.2;
       for (let frameIndex = startFrame; frameIndex <= endFrame; frameIndex++) {
         const pose = getPoseAtFrame3(poseLandmarks, frameIndex);
         if (!pose) continue;
         const ballPos = inferBallCenter(pose);
         if (!ballPos) continue;
         if (validFrames === 0) {
-          shoulderWidth = getShoulderWidth(pose);
+          shoulderWidth2 = getShoulderWidth(pose);
         }
         if (initialY === null) {
           initialY = ballPos.position.y;
@@ -12963,7 +13300,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         return { value: value2 };
       }
       const dip = Math.max(0, lowestY - initialY);
-      const normalizedDip = dip / shoulderWidth;
+      const normalizedDip = dip / shoulderWidth2;
       const avgConfidence = totalConfidence / validFrames;
       const value = {
         value: Math.round(normalizedDip * 100) / 100,
@@ -12991,14 +13328,14 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       }
       const positions = [];
       let totalConfidence = 0;
-      let shoulderWidth = 0.2;
+      let shoulderWidth2 = 0.2;
       for (let frameIndex = startFrame; frameIndex <= endFrame; frameIndex++) {
         const pose = getPoseAtFrame3(poseLandmarks, frameIndex);
         if (!pose) continue;
         const ballPos = inferBallCenter(pose);
         if (!ballPos) continue;
         if (positions.length === 0) {
-          shoulderWidth = getShoulderWidth(pose);
+          shoulderWidth2 = getShoulderWidth(pose);
         }
         positions.push({
           x: ballPos.position.x,
@@ -13046,7 +13383,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         }
       }
       const avgDeviation = totalDeviation / (positions.length - 2);
-      const normalizedDeviation = avgDeviation / shoulderWidth;
+      const normalizedDeviation = avgDeviation / shoulderWidth2;
       const avgConfidence = totalConfidence / positions.length;
       const value = {
         value: Math.round(normalizedDeviation * 1e3) / 1e3,
@@ -13079,7 +13416,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       if (!nosePos) {
         return { error: "Nose landmark missing" };
       }
-      const shoulderWidth = getShoulderWidth(pose);
+      const shoulderWidth2 = getShoulderWidth(pose);
       let ballY;
       let confidence;
       if (ballPos) {
@@ -13097,7 +13434,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         confidence = wrist.visibility * BALL_CONFIDENCE_PENALTY;
       }
       const heightDiff = nosePos.y - ballY;
-      const normalizedHeight = heightDiff / shoulderWidth;
+      const normalizedHeight = heightDiff / shoulderWidth2;
       const value = {
         value: Math.round(normalizedHeight * 100) / 100,
         unit: this.unit,
@@ -13227,7 +13564,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       if (!nosePos) {
         return { error: "Nose landmark missing" };
       }
-      const shoulderWidth = getShoulderWidth(pose);
+      const shoulderWidth2 = getShoulderWidth(pose);
       const ballPos = inferBallCenter(pose);
       let releaseY;
       let confidence;
@@ -13244,7 +13581,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         confidence = wrist.visibility * BALL_CONFIDENCE_PENALTY;
       }
       const heightDiff = nosePos.y - releaseY;
-      const normalizedHeight = heightDiff / shoulderWidth;
+      const normalizedHeight = heightDiff / shoulderWidth2;
       const value = {
         value: Math.round(normalizedHeight * 100) / 100,
         unit: this.unit,
@@ -13310,7 +13647,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       let maxBehindFrame = startFrame;
       let totalConfidence = 0;
       let validFrames = 0;
-      let shoulderWidth = 0.2;
+      let shoulderWidth2 = 0.2;
       for (let frameIndex = startFrame; frameIndex <= endFrame; frameIndex++) {
         const pose = getPoseAtFrame3(poseLandmarks, frameIndex);
         if (!pose) continue;
@@ -13319,7 +13656,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         const nosePos = getNosePosition(pose);
         if (!nosePos) continue;
         if (validFrames === 0) {
-          shoulderWidth = getShoulderWidth(pose);
+          shoulderWidth2 = getShoulderWidth(pose);
         }
         const behindDistance = (ballPos.position.x - nosePos.x) * behindDirection;
         if (behindDistance > maxBehindDistance) {
@@ -13329,7 +13666,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         totalConfidence += ballPos.confidence;
         validFrames++;
       }
-      const normalizedDistance = maxBehindDistance / shoulderWidth;
+      const normalizedDistance = maxBehindDistance / shoulderWidth2;
       const clampedDistance = Math.max(0, normalizedDistance);
       const avgConfidence = validFrames > 0 ? totalConfidence / validFrames : 0.5;
       const value = {
@@ -13411,8 +13748,8 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       if (!initialLeftHip || !initialRightHip || !leftShoulder || !rightShoulder) {
         return { error: "Required landmarks missing for initial frame" };
       }
-      const shoulderWidth = getShoulderWidth2(leftShoulder, rightShoulder);
-      if (shoulderWidth === 0) {
+      const shoulderWidth2 = getShoulderWidth2(leftShoulder, rightShoulder);
+      if (shoulderWidth2 === 0) {
         return { error: "Cannot calculate shoulder width" };
       }
       let maxHipDrop = 0;
@@ -13439,7 +13776,7 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
       if (!foundValidFrame) {
         return { error: "No valid pose data in load phase" };
       }
-      const normalizedDrop = maxHipDrop / shoulderWidth;
+      const normalizedDrop = maxHipDrop / shoulderWidth2;
       const value = {
         value: Math.round(normalizedDrop * 100) / 100,
         // Round to 2 decimals
@@ -13805,8 +14142,8 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
         return { error: "Required shoulder landmarks missing" };
       }
       const deltaZ = rightShoulder.position.z - leftShoulder.position.z;
-      const shoulderWidth = rightShoulder.position.x - leftShoulder.position.x;
-      const rotationRadians = Math.atan2(deltaZ, shoulderWidth);
+      const shoulderWidth2 = rightShoulder.position.x - leftShoulder.position.x;
+      const rotationRadians = Math.atan2(deltaZ, shoulderWidth2);
       const rotationDegrees = rotationRadians * (180 / Math.PI);
       const confidence = calculateMinConfidence4([leftShoulder, rightShoulder]);
       const value = {
@@ -15888,6 +16225,795 @@ DEBUG findDipStart: upwardStartFrame=${upwardStartFrame}`);
     const analyzer = new ShotAnalyzer(config, options);
     await analyzer.initialize();
     return analyzer;
+  }
+
+  // src/metrics/v2/types.ts
+  var METRICS_SCHEMA_VERSION = 1;
+  var measurementSchema = external_exports.object({
+    value: external_exports.number(),
+    frames: external_exports.array(external_exports.number().int().nonnegative()),
+    reliable: external_exports.boolean(),
+    note: external_exports.string().optional()
+  });
+  function measure(value, frames) {
+    return { value, frames, reliable: true };
+  }
+  function unavailable(note, frames = []) {
+    return { value: NaN, frames, reliable: false, note };
+  }
+  var SEQUENCE_EVENT_KEYFRAMES = [
+    { id: "ball_low", keyframe: "ball_low_point", label: "Ball low point" },
+    { id: "ball_rise", keyframe: "ball_starts_upward", label: "Ball starts rising" },
+    { id: "leg_low", keyframe: "leg_bend_low_point", label: "Leg low point" },
+    { id: "legs_rise", keyframe: "legs_start_extending", label: "Legs start rising" },
+    { id: "set_point", keyframe: "set_point", label: "Set point reached" },
+    { id: "legs_extend", keyframe: "legs_fully_extended", label: "Legs extend" },
+    { id: "release", keyframe: "release", label: "Release" },
+    { id: "arm_extension", keyframe: "arms_fully_extended", label: "Arm extension" }
+  ];
+
+  // src/metrics/v2/normalize.ts
+  var MIN_VISIBILITY = 0.3;
+  function lm(frame, index) {
+    var _a2;
+    const l2 = (_a2 = frame.landmarks) == null ? void 0 : _a2[index];
+    if (!l2) return null;
+    if ((l2.visibility ?? 0) < MIN_VISIBILITY) return null;
+    return l2;
+  }
+  function avgY(a2, b2) {
+    if (a2 && b2) return (a2.y + b2.y) / 2;
+    return (a2 == null ? void 0 : a2.y) ?? (b2 == null ? void 0 : b2.y) ?? null;
+  }
+  function avgX(a2, b2) {
+    if (a2 && b2) return (a2.x + b2.x) / 2;
+    return (a2 == null ? void 0 : a2.x) ?? (b2 == null ? void 0 : b2.x) ?? null;
+  }
+  function normTime(frame, startFrame, endFrame) {
+    const span = endFrame - startFrame;
+    if (span <= 0) return 0;
+    return (frame - startFrame) / span;
+  }
+  function bodyScaleY(frame) {
+    const nose = lm(frame, LANDMARK_INDICES.NOSE);
+    const ankleY = avgY(
+      lm(frame, LANDMARK_INDICES.LEFT_ANKLE),
+      lm(frame, LANDMARK_INDICES.RIGHT_ANKLE)
+    );
+    if (!nose || ankleY === null) return null;
+    const span = Math.abs(ankleY - nose.y);
+    return span > 1e-3 ? span : null;
+  }
+  function centerOfFeetX(frame) {
+    return avgX(
+      lm(frame, LANDMARK_INDICES.LEFT_ANKLE),
+      lm(frame, LANDMARK_INDICES.RIGHT_ANKLE)
+    );
+  }
+  function ankleLineY(frame) {
+    return avgY(
+      lm(frame, LANDMARK_INDICES.LEFT_ANKLE),
+      lm(frame, LANDMARK_INDICES.RIGHT_ANKLE)
+    );
+  }
+  function isSideView(orientation) {
+    return orientation === "side-left" || orientation === "side-right";
+  }
+  function orientationSign(orientation) {
+    if (orientation === "side-right") return -1;
+    if (orientation === "side-left") return 1;
+    return 0;
+  }
+  function heightAboveFeet(frame, jointIndex) {
+    const joint = lm(frame, jointIndex);
+    const ankleY = avgY(
+      lm(frame, LANDMARK_INDICES.LEFT_ANKLE),
+      lm(frame, LANDMARK_INDICES.RIGHT_ANKLE)
+    );
+    const scale = bodyScaleY(frame);
+    if (!joint || ankleY === null || scale === null) return null;
+    return (ankleY - joint.y) / scale;
+  }
+
+  // src/metrics/v2/sequencing.ts
+  function computeSequencing(keyframes, startFrame, endFrame) {
+    const events = SEQUENCE_EVENT_KEYFRAMES.map((e2) => {
+      const frame = keyframes.get(e2.keyframe) ?? null;
+      return {
+        id: e2.id,
+        label: e2.label,
+        frame,
+        t: frame === null ? null : normTime(frame, startFrame, endFrame)
+      };
+    });
+    const gaps = [];
+    for (let i2 = 0; i2 + 1 < events.length; i2++) {
+      const from = events[i2];
+      const to2 = events[i2 + 1];
+      if (from.t === null || to2.t === null) {
+        const missing = from.t === null ? from.label : to2.label;
+        gaps.push({
+          from: from.id,
+          to: to2.id,
+          gap: unavailable(
+            `${missing} not detected`,
+            [from.frame, to2.frame].filter((f2) => f2 !== null)
+          )
+        });
+        continue;
+      }
+      gaps.push({
+        from: from.id,
+        to: to2.id,
+        gap: measure(to2.t - from.t, [from.frame, to2.frame])
+      });
+    }
+    const detected = events.filter((e2) => e2.frame !== null).length;
+    const coverage = events.length > 0 ? detected / events.length : 0;
+    return { events, gaps, coverage };
+  }
+
+  // src/metrics/v2/structure/geometry.ts
+  function pt2(frame, index) {
+    var _a2;
+    const l2 = (_a2 = frame.landmarks) == null ? void 0 : _a2[index];
+    if (!l2 || (l2.visibility ?? 0) < MIN_VISIBILITY) return null;
+    return l2;
+  }
+  function jointAngle(frame, aIdx, bIdx, cIdx) {
+    const a2 = pt2(frame, aIdx);
+    const b2 = pt2(frame, bIdx);
+    const c2 = pt2(frame, cIdx);
+    if (!a2 || !b2 || !c2) return null;
+    return calculateAngle(a2, b2, c2);
+  }
+  function shoulderWidth(frame) {
+    const l2 = pt2(frame, LANDMARK_INDICES.LEFT_SHOULDER);
+    const r2 = pt2(frame, LANDMARK_INDICES.RIGHT_SHOULDER);
+    if (!l2 || !r2) return null;
+    return Math.hypot(l2.x - r2.x, l2.y - r2.y);
+  }
+  function wristSeparation(frame) {
+    const l2 = pt2(frame, LANDMARK_INDICES.LEFT_WRIST);
+    const r2 = pt2(frame, LANDMARK_INDICES.RIGHT_WRIST);
+    if (!l2 || !r2) return null;
+    return Math.hypot(l2.x - r2.x, l2.y - r2.y);
+  }
+  function armIndices(hand) {
+    const right = {
+      shoulder: LANDMARK_INDICES.RIGHT_SHOULDER,
+      elbow: LANDMARK_INDICES.RIGHT_ELBOW,
+      wrist: LANDMARK_INDICES.RIGHT_WRIST,
+      index: LANDMARK_INDICES.RIGHT_INDEX
+    };
+    const left = {
+      shoulder: LANDMARK_INDICES.LEFT_SHOULDER,
+      elbow: LANDMARK_INDICES.LEFT_ELBOW,
+      wrist: LANDMARK_INDICES.LEFT_WRIST,
+      index: LANDMARK_INDICES.LEFT_INDEX
+    };
+    return hand === "right" ? { shooting: right, guide: left } : { shooting: left, guide: right };
+  }
+  function wristCockAngle(frame, arm) {
+    return jointAngle(frame, arm.elbow, arm.wrist, arm.index);
+  }
+  function elbowAngle(frame, arm) {
+    return jointAngle(frame, arm.shoulder, arm.elbow, arm.wrist);
+  }
+
+  // src/metrics/v2/structure/phases.ts
+  function range2(a2, b2) {
+    if (a2 === null || b2 === null || b2 < a2) return null;
+    return { start: a2, end: b2 };
+  }
+  function derivePhaseRanges(keyframes, startFrame, endFrame) {
+    const kf = (id) => keyframes.get(id) ?? null;
+    const legsBend = kf("legs_start_bending") ?? startFrame;
+    const legLow = kf("leg_bend_low_point");
+    const ballLow = kf("ball_low_point");
+    const setPoint = kf("set_point");
+    const armsExtended = kf("arms_fully_extended");
+    const release = kf("release");
+    const loadEnd = legLow ?? ballLow;
+    const riseStart = legLow ?? ballLow;
+    return {
+      gather: startFrame,
+      load: range2(legsBend, loadEnd),
+      rise: range2(riseStart, setPoint),
+      setPoint,
+      // The release action runs from the set point through full arm extension
+      // (fall back to the release snap, then the shot end).
+      release: range2(setPoint, armsExtended ?? release ?? endFrame),
+      // Follow-through from the release snap (fall back to arm extension) to end.
+      followThrough: range2(release ?? armsExtended, endFrame)
+    };
+  }
+
+  // src/metrics/v2/structure/posture.ts
+  var POSTURE_JOINTS = [
+    { id: "head", indices: [LANDMARK_INDICES.NOSE] },
+    {
+      id: "shoulders",
+      indices: [LANDMARK_INDICES.LEFT_SHOULDER, LANDMARK_INDICES.RIGHT_SHOULDER]
+    },
+    { id: "hips", indices: [LANDMARK_INDICES.LEFT_HIP, LANDMARK_INDICES.RIGHT_HIP] },
+    {
+      id: "knees",
+      indices: [LANDMARK_INDICES.LEFT_KNEE, LANDMARK_INDICES.RIGHT_KNEE]
+    },
+    {
+      id: "ankles",
+      indices: [LANDMARK_INDICES.LEFT_ANKLE, LANDMARK_INDICES.RIGHT_ANKLE]
+    }
+  ];
+  function jointForwardOffset(frame, indices, orientation) {
+    const xs2 = indices.map((i2) => pt2(frame, i2)).filter((l2) => l2 !== null).map((l2) => l2.x);
+    if (xs2.length === 0) return null;
+    const x2 = xs2.reduce((a2, b2) => a2 + b2, 0) / xs2.length;
+    const centerX = centerOfFeetX(frame);
+    const scale = bodyScaleY(frame);
+    const sign = orientationSign(orientation);
+    if (centerX === null || scale === null || sign === 0) return null;
+    return sign * (x2 - centerX) / scale;
+  }
+  function posturePhase(getFrame, range3, orientation) {
+    const out = {};
+    const startFrame = getFrame(range3.start);
+    const endFrame = getFrame(range3.end);
+    for (const joint of POSTURE_JOINTS) {
+      const s2 = startFrame && jointForwardOffset(startFrame, joint.indices, orientation);
+      const e2 = endFrame && jointForwardOffset(endFrame, joint.indices, orientation);
+      const sv = typeof s2 === "number" ? s2 : null;
+      const ev = typeof e2 === "number" ? e2 : null;
+      out[`${joint.id}_start`] = sv !== null ? measure(sv, [range3.start]) : unavailable("posture needs a side view", [range3.start]);
+      out[`${joint.id}_end`] = ev !== null ? measure(ev, [range3.end]) : unavailable("posture needs a side view", [range3.end]);
+      out[`${joint.id}_delta`] = sv !== null && ev !== null ? measure(ev - sv, [range3.start, range3.end]) : unavailable("posture needs a side view", [range3.start, range3.end]);
+    }
+    return out;
+  }
+  function postureSnapshot(getFrame, frameIndex, orientation) {
+    const out = {};
+    const frame = getFrame(frameIndex);
+    for (const joint of POSTURE_JOINTS) {
+      const v2 = frame && jointForwardOffset(frame, joint.indices, orientation);
+      out[joint.id] = typeof v2 === "number" ? measure(v2, [frameIndex]) : unavailable("posture needs a side view", [frameIndex]);
+    }
+    return out;
+  }
+
+  // src/metrics/v2/structure/index.ts
+  function midpoint(frame, i2, j2) {
+    const a2 = pt2(frame, i2);
+    const b2 = pt2(frame, j2);
+    if (!a2 || !b2) return null;
+    return { x: (a2.x + b2.x) / 2, y: (a2.y + b2.y) / 2 };
+  }
+  function ballHeight(frame) {
+    const mid = midpoint(frame, LANDMARK_INDICES.LEFT_WRIST, LANDMARK_INDICES.RIGHT_WRIST);
+    const ankleY = (() => {
+      const l2 = pt2(frame, LANDMARK_INDICES.LEFT_ANKLE);
+      const r2 = pt2(frame, LANDMARK_INDICES.RIGHT_ANKLE);
+      if (l2 && r2) return (l2.y + r2.y) / 2;
+      return (l2 == null ? void 0 : l2.y) ?? (r2 == null ? void 0 : r2.y) ?? null;
+    })();
+    const scale = bodyScaleY(frame);
+    if (!mid || ankleY === null || scale === null) return null;
+    return (ankleY - mid.y) / scale;
+  }
+  function heightAboveHead(frame, jointIndex) {
+    const joint = pt2(frame, jointIndex);
+    const head = pt2(frame, LANDMARK_INDICES.NOSE);
+    const scale = bodyScaleY(frame);
+    if (!joint || !head || scale === null) return null;
+    return (head.y - joint.y) / scale;
+  }
+  function distanceToBody(frame, jointIndex) {
+    const joint = pt2(frame, jointIndex);
+    const hip = midpoint(frame, LANDMARK_INDICES.LEFT_HIP, LANDMARK_INDICES.RIGHT_HIP);
+    const scale = bodyScaleY(frame);
+    if (!joint || !hip || scale === null) return null;
+    return Math.hypot(joint.x - hip.x, joint.y - hip.y) / scale;
+  }
+  function computeStructure(frames, keyframes, opts) {
+    const { startFrame, endFrame, cameraOrientation, shootingHand } = opts;
+    const byIndex = /* @__PURE__ */ new Map();
+    for (const f2 of frames) byIndex.set(f2.frameIndex, f2);
+    const getFrame = (i2) => byIndex.get(i2) ?? null;
+    const framesIn = (r2) => {
+      const out = [];
+      for (let i2 = r2.start; i2 <= r2.end; i2++) {
+        const f2 = byIndex.get(i2);
+        if (f2) out.push(f2);
+      }
+      return out;
+    };
+    const arm = armIndices(shootingHand);
+    const phases = derivePhaseRanges(keyframes, startFrame, endFrame);
+    const na2 = (why) => unavailable(why);
+    const result = {};
+    if (phases.gather !== null) {
+      const g2 = getFrame(phases.gather);
+      const bh = g2 ? ballHeight(g2) : null;
+      const gather = {
+        ...postureSnapshot(getFrame, phases.gather, cameraOrientation),
+        ball_height: bh !== null ? measure(bh, [phases.gather]) : na2("ball not tracked at gather")
+      };
+      result.gather = gather;
+    }
+    if (phases.load) {
+      const r2 = phases.load;
+      const load = {
+        ...posturePhase(getFrame, r2, cameraOrientation)
+      };
+      const hipStart = ((f2) => f2 ? heightAboveFeet(f2, LANDMARK_INDICES.LEFT_HIP) ?? heightAboveFeet(f2, LANDMARK_INDICES.RIGHT_HIP) : null)(getFrame(r2.start));
+      let hipMin = null;
+      let hipMinFrame = r2.start;
+      let ballMin = null;
+      let ballMinFrame = r2.start;
+      for (const f2 of framesIn(r2)) {
+        const hip = heightAboveFeet(f2, LANDMARK_INDICES.LEFT_HIP) ?? heightAboveFeet(f2, LANDMARK_INDICES.RIGHT_HIP);
+        if (hip !== null && (hipMin === null || hip < hipMin)) {
+          hipMin = hip;
+          hipMinFrame = f2.frameIndex;
+        }
+        const b2 = ballHeight(f2);
+        if (b2 !== null && (ballMin === null || b2 < ballMin)) {
+          ballMin = b2;
+          ballMinFrame = f2.frameIndex;
+        }
+      }
+      load.start_height = hipStart !== null ? measure(hipStart, [r2.start]) : na2("hip not tracked at load start");
+      load.hip_depth = hipMin !== null ? measure(hipMin, [hipMinFrame]) : na2("hip not tracked in load");
+      load.depth_drop = hipStart !== null && hipMin !== null ? measure(hipStart - hipMin, [r2.start, hipMinFrame]) : na2("hip depth not measurable");
+      load.ball_low_height = ballMin !== null ? measure(ballMin, [ballMinFrame]) : na2("ball not tracked in load");
+      addStartEndDelta(load, "wrist_cock", getFrame, r2, (f2) => wristCockAngle(f2, arm.shooting));
+      addStartEndDelta(load, "wrist_dist", getFrame, r2, (f2) => distanceToBody(f2, arm.shooting.wrist));
+      addStartEndDelta(load, "wrist_height", getFrame, r2, (f2) => heightAboveFeet(f2, arm.shooting.wrist));
+      result.load = load;
+    }
+    if (phases.rise) {
+      const r2 = phases.rise;
+      const rise = {
+        ...posturePhase(getFrame, r2, cameraOrientation)
+      };
+      const startCock = ((f2) => f2 ? wristCockAngle(f2, arm.shooting) : null)(getFrame(r2.start));
+      rise.wrist_cock_start = startCock !== null ? measure(startCock, [r2.start]) : na2("wrist landmarks not tracked");
+      let peakCock = null;
+      let peakFrame = r2.start;
+      for (const f2 of framesIn(r2)) {
+        const c2 = wristCockAngle(f2, arm.shooting);
+        if (c2 !== null && (peakCock === null || c2 < peakCock)) {
+          peakCock = c2;
+          peakFrame = f2.frameIndex;
+        }
+      }
+      rise.wrist_cock_peak = peakCock !== null ? measure(peakCock, [peakFrame]) : na2("wrist landmarks not tracked");
+      rise.wrist_cock_peak_t = peakCock !== null ? measure(normTime(peakFrame, startFrame, endFrame), [peakFrame]) : na2("wrist landmarks not tracked");
+      rise.wrist_path_deviation = wristPathDeviation(framesIn(r2), arm.shooting.wrist);
+      result.rise = rise;
+    }
+    if (phases.setPoint !== null) {
+      const sp = phases.setPoint;
+      const f2 = getFrame(sp);
+      const setPoint = {
+        ...postureSnapshot(getFrame, sp, cameraOrientation)
+      };
+      const wh = f2 ? heightAboveHead(f2, arm.shooting.wrist) : null;
+      setPoint.wrist_height_vs_head = wh !== null ? measure(wh, [sp]) : na2("wrist/head not tracked");
+      const cock = f2 ? wristCockAngle(f2, arm.shooting) : null;
+      setPoint.wrist_cock = cock !== null ? measure(cock, [sp]) : na2("wrist landmarks not tracked");
+      const ea2 = f2 ? elbowAngle(f2, arm.shooting) : null;
+      setPoint.elbow_angle = ea2 !== null ? measure(ea2, [sp]) : na2("elbow not tracked");
+      const flare = f2 ? (() => {
+        const a2 = pt2(f2, arm.shooting.shoulder);
+        if (!a2) return null;
+        const hipIdx = shootingHand === "right" ? LANDMARK_INDICES.RIGHT_HIP : LANDMARK_INDICES.LEFT_HIP;
+        const hip = pt2(f2, hipIdx);
+        const elbow = pt2(f2, arm.shooting.elbow);
+        if (!hip || !elbow) return null;
+        return calculateAngle(hip, a2, elbow);
+      })() : null;
+      setPoint.elbow_flare = flare !== null ? measure(flare, [sp]) : na2("elbow flare not measurable");
+      result.setPoint = setPoint;
+    }
+    if (phases.release) {
+      const r2 = phases.release;
+      const release = {
+        ...posturePhase(getFrame, r2, cameraOrientation)
+      };
+      let sepFrame = null;
+      for (const f2 of framesIn(r2)) {
+        const sep = wristSeparation(f2);
+        const sw = shoulderWidth(f2);
+        if (sep !== null && sw !== null && sep > sw) {
+          sepFrame = f2.frameIndex;
+          break;
+        }
+      }
+      release.guide_hand_duration = sepFrame !== null ? measure(normTime(sepFrame, startFrame, endFrame) - normTime(r2.start, startFrame, endFrame), [r2.start, sepFrame]) : na2("hands never clearly separate / not tracked");
+      let elbowHigh = null;
+      let elbowHighFrame = r2.start;
+      for (const f2 of framesIn(r2)) {
+        const h2 = heightAboveHead(f2, arm.shooting.elbow);
+        if (h2 !== null && (elbowHigh === null || h2 > elbowHigh)) {
+          elbowHigh = h2;
+          elbowHighFrame = f2.frameIndex;
+        }
+      }
+      release.elbow_height_vs_head = elbowHigh !== null ? measure(elbowHigh, [elbowHighFrame]) : na2("elbow/head not tracked");
+      result.release = release;
+    }
+    if (phases.followThrough) {
+      const r2 = phases.followThrough;
+      const followThrough = {};
+      let snap = null;
+      let snapFrame = r2.start;
+      let ext = null;
+      let extFrame = r2.start;
+      for (const f2 of framesIn(r2)) {
+        const c2 = wristCockAngle(f2, arm.shooting);
+        if (c2 !== null && (snap === null || c2 < snap)) {
+          snap = c2;
+          snapFrame = f2.frameIndex;
+        }
+        const e2 = elbowAngle(f2, arm.shooting);
+        if (e2 !== null && (ext === null || e2 > ext)) {
+          ext = e2;
+          extFrame = f2.frameIndex;
+        }
+      }
+      followThrough.wrist_snap_angle = snap !== null ? measure(snap, [snapFrame]) : na2("wrist landmarks not tracked");
+      followThrough.elbow_extension_angle = ext !== null ? measure(ext, [extFrame]) : na2("elbow not tracked");
+      result.followThrough = followThrough;
+    }
+    return result;
+  }
+  function addStartEndDelta(out, name, getFrame, r2, fn2) {
+    const s2 = ((f2) => f2 ? fn2(f2) : null)(getFrame(r2.start));
+    const e2 = ((f2) => f2 ? fn2(f2) : null)(getFrame(r2.end));
+    out[`${name}_start`] = s2 !== null ? measure(s2, [r2.start]) : unavailable("not tracked at phase start");
+    out[`${name}_end`] = e2 !== null ? measure(e2, [r2.end]) : unavailable("not tracked at phase end");
+    out[`${name}_delta`] = s2 !== null && e2 !== null ? measure(e2 - s2, [r2.start, r2.end]) : unavailable("not tracked across phase");
+  }
+  function wristPathDeviation(frames, wristIndex) {
+    const pts = [];
+    for (const f2 of frames) {
+      const w2 = pt2(f2, wristIndex);
+      const scale = bodyScaleY(f2);
+      if (w2 && scale !== null) pts.push({ i: f2.frameIndex, x: w2.x / scale, y: w2.y / scale });
+    }
+    if (pts.length < 3) return unavailable("wrist path not tracked");
+    const a2 = pts[0];
+    const b2 = pts[pts.length - 1];
+    const dx = b2.x - a2.x;
+    const dy = b2.y - a2.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) return unavailable("wrist path degenerate");
+    let maxDev = 0;
+    let devFrame = a2.i;
+    for (const p2 of pts) {
+      const dev = Math.abs((dx * (a2.y - p2.y) - (a2.x - p2.x) * dy) / len);
+      if (dev > maxDev) {
+        maxDev = dev;
+        devFrame = p2.i;
+      }
+    }
+    return measure(maxDev, [devFrame]);
+  }
+
+  // src/metrics/v2/extract.ts
+  var EMPTY_LANDMARKS = Array.from({ length: 33 }, () => ({
+    x: 0,
+    y: 0,
+    z: 0,
+    visibility: 0,
+    confidence: 0
+  }));
+  function toSequence(frames) {
+    return frames.map((f2) => ({
+      landmarks: f2.landmarks && f2.landmarks.length ? f2.landmarks.map((l2) => ({
+        x: l2.x,
+        y: l2.y,
+        z: l2.z,
+        visibility: l2.visibility,
+        confidence: l2.confidence ?? l2.visibility
+      })) : EMPTY_LANDMARKS,
+      poseConfidence: f2.poseConfidence ?? 0
+    }));
+  }
+  function meanConfidence(frames, start, end) {
+    var _a2;
+    let sum = 0;
+    let n2 = 0;
+    for (let i2 = start; i2 <= end && i2 < frames.length; i2++) {
+      const c2 = (_a2 = frames[i2]) == null ? void 0 : _a2.poseConfidence;
+      if (typeof c2 === "number") {
+        sum += c2;
+        n2++;
+      }
+    }
+    return n2 > 0 ? sum / n2 : 0;
+  }
+  function metricsForShot(frames, keyframes, shot, opts) {
+    const { startFrame, endFrame } = shot;
+    return {
+      schemaVersion: METRICS_SCHEMA_VERSION,
+      shot: {
+        startFrame,
+        endFrame,
+        fps: opts.fps,
+        cameraOrientation: opts.cameraOrientation
+      },
+      reliability: {
+        poseConfidence: opts.poseConfidence,
+        sideView: isSideView(opts.cameraOrientation)
+      },
+      sequencing: computeSequencing(keyframes, startFrame, endFrame),
+      structure: computeStructure(frames, keyframes, {
+        startFrame,
+        endFrame,
+        cameraOrientation: opts.cameraOrientation,
+        shootingHand: opts.shootingHand
+      })
+    };
+  }
+  function extractShotMetrics(poseData, opts = {}) {
+    const frames = poseData.frames;
+    const sequence = toSequence(frames);
+    const shots = createShotDetector().processFrames(sequence);
+    const kfFrames = poseLandmarksToFrames(sequence);
+    const shootingHand = opts.shootingHand ?? "right";
+    const detected = detectOrientation(poseData);
+    const cameraOrientation = opts.cameraOrientation ?? (detected === "unknown" ? "front" : detected);
+    const fps = poseData.fps ?? 30;
+    return shots.map((shot) => {
+      const start = shot.frameRange.start;
+      const end = shot.frameRange.end;
+      const keyframes = detectKeyframesFromFrames(kfFrames, start, end);
+      return metricsForShot(
+        kfFrames,
+        keyframes,
+        { startFrame: start, endFrame: end },
+        {
+          fps,
+          cameraOrientation,
+          shootingHand,
+          poseConfidence: meanConfidence(frames, start, end)
+        }
+      );
+    });
+  }
+
+  // src/metrics/v2/flatten.ts
+  function flattenMetrics(m2) {
+    const out = [];
+    const push = (id, meas) => {
+      out.push({
+        id,
+        value: meas.value,
+        reliable: meas.reliable,
+        frames: meas.frames,
+        ...meas.note !== void 0 ? { note: meas.note } : {}
+      });
+    };
+    for (const g2 of m2.sequencing.gaps) {
+      push(`seq.${g2.from}__${g2.to}`, g2.gap);
+    }
+    const structure = m2.structure ?? {};
+    for (const [phase, metrics] of Object.entries(structure)) {
+      if (!metrics) continue;
+      for (const [key, meas] of Object.entries(metrics)) {
+        push(`${phase}.${key}`, meas);
+      }
+    }
+    return out;
+  }
+
+  // src/metrics/v2/thresholds.ts
+  var THRESHOLDS_VERSION = 1;
+  function categoryOf(id) {
+    if (id.startsWith("seq.")) return "sequencing";
+    const dot = id.indexOf(".");
+    return dot > 0 ? id.slice(0, dot) : "other";
+  }
+  var CATEGORY_LABELS = {
+    sequencing: "Sequencing",
+    gather: "Gather",
+    load: "Load",
+    rise: "Rise",
+    setPoint: "Set Point",
+    release: "Release",
+    followThrough: "Follow-through"
+  };
+  function categoryLabel(category) {
+    return CATEGORY_LABELS[category] ?? category;
+  }
+  function labelFor(id) {
+    if (id.startsWith("seq.")) {
+      const [from, to2] = id.slice(4).split("__");
+      return `${pretty(from)} \u2192 ${pretty(to2)}`;
+    }
+    const dot = id.indexOf(".");
+    const key = dot > 0 ? id.slice(dot + 1) : id;
+    return pretty(key);
+  }
+  function pretty(s2) {
+    if (!s2) return "";
+    return s2.replace(/_/g, " ").replace(/\bvs\b/g, "vs").replace(/^\w/, (c2) => c2.toUpperCase());
+  }
+  function median(nums) {
+    const v2 = [...nums].sort((a2, b2) => a2 - b2);
+    const m2 = Math.floor(v2.length / 2);
+    return v2.length % 2 ? v2[m2] : (v2[m2 - 1] + v2[m2]) / 2;
+  }
+  function deriveThresholds(summaries, opts = {}) {
+    const reportOnlyTightness = opts.reportOnlyTightness ?? 0.25;
+    const minCoverage = opts.minCoverage ?? 0.5;
+    const iqrPad = opts.iqrPad ?? 0.5;
+    const totalPlayers = summaries.length;
+    const ids = /* @__PURE__ */ new Set();
+    for (const s2 of summaries) for (const id of Object.keys(s2.metrics)) ids.add(id);
+    const metrics = {};
+    for (const id of [...ids].sort()) {
+      const playerMedians = [];
+      const playerIqrs = [];
+      for (const s2 of summaries) {
+        const st2 = s2.metrics[id];
+        if (st2 && Number.isFinite(st2.median)) {
+          playerMedians.push(st2.median);
+          playerIqrs.push(Number.isFinite(st2.iqr) ? st2.iqr : 0);
+        }
+      }
+      if (playerMedians.length === 0) continue;
+      const coverage = playerMedians.length / Math.max(1, totalPlayers);
+      const lo2 = Math.min(...playerMedians);
+      const hi2 = Math.max(...playerMedians);
+      const betweenSpread = hi2 - lo2;
+      const pooledIqr = playerIqrs.length ? median(playerIqrs) : 0;
+      const tightness = pooledIqr + betweenSpread > 0 ? pooledIqr / (pooledIqr + betweenSpread) : 1;
+      const pad = iqrPad * pooledIqr;
+      const band = [lo2 - pad, hi2 + pad];
+      const reportedOnly = tightness < reportOnlyTightness || coverage < minCoverage;
+      const weight = reportedOnly ? 0 : tightness * coverage;
+      metrics[id] = {
+        band,
+        weight,
+        tightness,
+        coverage,
+        category: categoryOf(id),
+        label: labelFor(id),
+        reportedOnly
+      };
+    }
+    return {
+      version: THRESHOLDS_VERSION,
+      generatedFrom: summaries.map((s2) => s2.player),
+      metrics
+    };
+  }
+
+  // src/metrics/v2/reference.ts
+  function referenceOnFrame(ref, userFrame) {
+    const centerX = centerOfFeetX(userFrame);
+    const ankleY = ankleLineY(userFrame);
+    const scale = bodyScaleY(userFrame);
+    if (centerX === null || ankleY === null || scale === null) return null;
+    return ref.landmarks.map(
+      (l2) => l2 ? { x: centerX + l2.x * scale, y: ankleY + l2.y * scale, z: 0, visibility: 1 } : null
+    );
+  }
+
+  // src/scoring/v2/index.ts
+  var STRUCTURE_CATEGORIES = [
+    "gather",
+    "load",
+    "rise",
+    "setPoint",
+    "release",
+    "followThrough"
+  ];
+  var clamp = (x2, lo2, hi2) => Math.max(lo2, Math.min(hi2, x2));
+  var smoothstep = (x2) => x2 * x2 * (3 - 2 * x2);
+  function bandScore(value, band) {
+    const [lo2, hi2] = band;
+    const width = Math.max(hi2 - lo2, 1e-6);
+    if (value >= lo2 && value <= hi2) return 100;
+    const d2 = value < lo2 ? lo2 - value : value - hi2;
+    const K2 = 2;
+    const s2 = clamp(1 - d2 / (K2 * width), 0, 1);
+    return 100 * smoothstep(s2);
+  }
+  function violatesOrder(id, value, band) {
+    if (!id.startsWith("seq.")) return false;
+    const mid = (band[0] + band[1]) / 2;
+    if (mid > 0) return value <= 0;
+    if (mid < 0) return value >= 0;
+    return false;
+  }
+  function statusOf(score) {
+    if (score >= 75) return "good";
+    if (score >= 40) return "close";
+    return "off";
+  }
+  function scoreOne(id, th2, flat) {
+    const m2 = flat.get(id);
+    const base = {
+      id,
+      label: th2.label,
+      category: th2.category,
+      band: th2.band,
+      weight: th2.weight,
+      reportedOnly: th2.reportedOnly
+    };
+    if (!m2 || !m2.reliable || !Number.isFinite(m2.value)) {
+      return { ...base, value: null, status: "unmeasured", score: null, frame: null };
+    }
+    let score = bandScore(m2.value, th2.band);
+    if (violatesOrder(id, m2.value, th2.band)) score = Math.min(score, 10);
+    const frame = m2.frames.length ? m2.frames[m2.frames.length - 1] : null;
+    return {
+      ...base,
+      value: m2.value,
+      status: statusOf(score),
+      score,
+      frame
+    };
+  }
+  function weightedMean(metrics) {
+    let sum = 0;
+    let wsum = 0;
+    for (const m2 of metrics) {
+      if (m2.score === null || m2.weight <= 0) continue;
+      sum += m2.score * m2.weight;
+      wsum += m2.weight;
+    }
+    return wsum > 0 ? sum / wsum : null;
+  }
+  function measuredFraction(metrics) {
+    const scoreable = metrics.filter((m2) => m2.weight > 0);
+    if (scoreable.length === 0) return 1;
+    const measured = scoreable.filter((m2) => m2.score !== null).length;
+    return measured / scoreable.length;
+  }
+  function scoreShot(metrics, thresholds) {
+    const flat = /* @__PURE__ */ new Map();
+    for (const f2 of flattenMetrics(metrics)) flat.set(f2.id, f2);
+    const all = Object.entries(thresholds.metrics).map(
+      ([id, th2]) => scoreOne(id, th2, flat)
+    );
+    const seqMetrics = all.filter((m2) => m2.category === "sequencing");
+    const orderScored = seqMetrics.filter(
+      (m2) => m2.weight > 0 && m2.value !== null
+    );
+    const orderOk = orderScored.filter((m2) => !violatesOrder(m2.id, m2.value, m2.band)).length;
+    const orderScore = orderScored.length > 0 ? 100 * orderOk / orderScored.length : null;
+    const categories = [];
+    for (const cat of STRUCTURE_CATEGORIES) {
+      const catMetrics = all.filter((m2) => m2.category === cat);
+      if (catMetrics.length === 0) continue;
+      categories.push({
+        id: cat,
+        label: categoryLabel(cat),
+        score: weightedMean(catMetrics),
+        measuredFraction: measuredFraction(catMetrics),
+        metrics: catMetrics
+      });
+    }
+    const catScores = categories.map((c2) => c2.score).filter((s2) => s2 !== null);
+    const structureScore = catScores.length ? catScores.reduce((a2, b2) => a2 + b2, 0) / catScores.length : null;
+    return {
+      sequencing: {
+        score: weightedMean(seqMetrics),
+        orderScore,
+        measuredFraction: measuredFraction(seqMetrics),
+        metrics: seqMetrics
+      },
+      structure: {
+        score: structureScore,
+        measuredFraction: measuredFraction(all.filter((m2) => m2.category !== "sequencing")),
+        categories
+      }
+    };
   }
 
   // src/profiles/index.ts

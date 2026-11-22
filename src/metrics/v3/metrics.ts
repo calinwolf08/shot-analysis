@@ -24,6 +24,8 @@ import {
   timeAt,
   valueAt,
   detectEvents,
+  sampleAt,
+  type EventId,
   type PhaseWindows,
   type ShotEvents,
 } from "./events";
@@ -39,8 +41,10 @@ import {
  * Bumped when a metric's definition changes, so stored shots are recomputed
  * from their pose track on read. 3: head metrics measure head PITCH (ear →
  * nose from horizontal) instead of the neck angle against the spine.
+ * 4: torso lean / hip angle on the body's centre line, ball-close to the hip
+ * centre (no left/right width leaking in off a true side view).
  */
-export const METRICS_V3_SCHEMA_VERSION = 3 as const;
+export const METRICS_V3_SCHEMA_VERSION = 4 as const;
 
 export type MetricKind = "structure" | "timing" | "detail";
 export type MetricPhase = "load" | "rise" | "setPoint" | "release";
@@ -85,13 +89,44 @@ export const OCCLUDED_VIS = 0.5;
 
 type Fx = number | null; // fractional sample index
 
+export interface ShotMetricsOptions {
+  aspect: number;
+  shootingHand: Side;
+  nearSide?: Side;
+  /**
+   * Degrees off side-on, for reference (pro) footage only: horizontal
+   * distances are stretched back by 1 / cos(angle). Users are never corrected.
+   */
+  cameraAngle?: number;
+  /**
+   * Event frames (SOURCE frame indexes) that replace detection — e.g. a
+   * person's labelled key frames (see `labeledEventFrames`). Events not given
+   * are still detected.
+   */
+  events?: Partial<Record<EventId, number>>;
+}
+
 export function computeShotMetricsV3(
   frames: readonly SignalFrame[],
-  opts: { aspect: number; shootingHand: Side; nearSide?: Side },
+  opts: ShotMetricsOptions,
 ): ShotMetricsV3 {
   const sig = computeSignals(frames, opts);
-  const ev = detectEvents(sig);
+  const detected = detectEvents(sig);
+  const ev = opts.events ? overrideEvents(sig, detected, opts.events) : detected;
   return metricsFromSignals(sig, ev);
+}
+
+/** Detected events with some replaced by given source frames. */
+export function overrideEvents(
+  sig: ShotSignals,
+  detected: ShotEvents,
+  frames: Partial<Record<EventId, number>>,
+): ShotEvents {
+  const out: Record<string, number | null> = { ...detected };
+  for (const [id, f] of Object.entries(frames)) {
+    if (typeof f === "number" && Number.isFinite(f)) out[id] = sampleAt(sig, f);
+  }
+  return out as ShotEvents;
 }
 
 export function metricsFromSignals(
@@ -182,7 +217,9 @@ export function metricsFromSignals(
   put("load.ball_drop", "structure", "load", "torso", norm(above("wrist", "hip", low), seg.torso), [low]);
   put("load.elbow_angle", "structure", "load", "deg", at(sig.elbowAngle, low), [low]);
   put("load.elbow_change", "structure", "load", "deg", L ? diff(sig.elbowAngle, L.start, L.end) : null, L ? [L.start, L.end] : []);
-  const wx = at(P.wrist.x, low), wy = at(P.wrist.y, low), hx = at(P.hip.x, low), hy = at(P.hip.y, low);
+  // Wrist ↔ hip CENTRE (the shooting wrist and the near hip can be on
+  // opposite sides of the body; hip width would leak in off side-on).
+  const wx = at(P.wrist.x, low), wy = at(P.wrist.y, low), hx = at(P.hipCentre.x, low), hy = at(P.hipCentre.y, low);
   put(
     "load.ball_close",
     "structure",

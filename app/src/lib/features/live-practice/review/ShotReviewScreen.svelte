@@ -28,10 +28,10 @@
     loadFeedbackWording,
     EMPTY_FEEDBACK_WORDING,
     type FeedbackWording,
-    loadLiveTargetsV3,
     type MetricResultV3,
     type ScorecardV3,
   } from "$lib/features/scoring/v3";
+  import { loadScoringTargets } from "$lib/features/pros";
   import {
     drawGeometry,
     geometryFamily,
@@ -183,7 +183,7 @@
     const [s, p, targets, player, w] = await Promise.all([
       services.repos.shot.get(id),
       services.repos.shot.getPoses(id),
-      loadLiveTargetsV3(),
+      loadScoringTargets(services.repos.settings).then((x) => x.targets),
       services.repos.player.getFirst(),
       loadFeedbackWording(),
     ]);

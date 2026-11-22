@@ -52,5 +52,5 @@ export { scoreShot } from "./scoring/v2";
 // thresholds and the live deviation targets are keyed by.
 export { flattenMetrics, categoryOf, labelFor, categoryLabel, } from "./metrics/v2";
 // v3 (in progress): aspect-correct signals + sub-frame events / phase windows.
-export { computeSignals, detectEvents, phaseWindows, frameAt, timeAt, LABEL_FOR_EVENT, EVENT_PAD_BEFORE, EVENT_PAD_AFTER, isClippedStartLabel, computeShotMetricsV3, metricsFromSignals, flattenMetricsV3, METRICS_V3_SCHEMA_VERSION, DEFAULT_WORDING, wordingFor, buildTargetsV3, effectiveBand, LIVE_TARGETS_V3_VERSION, } from "./metrics/v3";
+export { computeSignals, detectEvents, phaseWindows, frameAt, timeAt, LABEL_FOR_EVENT, EVENT_PAD_BEFORE, EVENT_PAD_AFTER, isClippedStartLabel, computeShotMetricsV3, metricsFromSignals, flattenMetricsV3, METRICS_V3_SCHEMA_VERSION, DEFAULT_WORDING, wordingFor, buildTargetsV3, effectiveBand, scoreValue, NEGLIGIBLE_SCORE, LIVE_TARGETS_V3_VERSION, labeledEventFrames, sampleAt, overrideEvents, estimateCameraAngle, widthRatios, DEFAULT_FRONTAL, OPEN_DISAGREEMENT, estimateProportions, } from "./metrics/v3";
 //# sourceMappingURL=index.js.map

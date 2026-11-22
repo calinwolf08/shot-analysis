@@ -49,7 +49,7 @@ test("a pre-v3 shot is re-analyzed on read, saved, and shows the v3 scorecard + 
 
   // Live stored v3 with the shot.
   const live = await apiGet<ShotJson>(page, `/api/shots/${id}`);
-  expect(live.analysis.v3Metrics?.schemaVersion).toBe(3);
+  expect(live.analysis.v3Metrics?.schemaVersion).toBe(4);
 
   // Turn it into a shot saved before v3 (metrics schema 1).
   const { v3Metrics: _drop, ...v1 } = live.analysis;
@@ -76,7 +76,7 @@ test("a pre-v3 shot is re-analyzed on read, saved, and shows the v3 scorecard + 
         (await apiGet<ShotJson>(page, `/api/shots/${id}`)).analysis.v3Metrics
           ?.schemaVersion ?? null,
     )
-    .toBe(3);
+    .toBe(4);
 
   // Review shows the v3 scorecard, phases in order.
   await page.getByTestId(`shot-row-${id}`).click();

@@ -19,15 +19,46 @@
  *   GET  /api/validations      - Lists saved validations
  *   POST /api/save-poses       - Saves pose data to test-data/<video-name>/poses.json
  *   POST /api/save-labels      - Saves labels to test-data/<video-name>/labels.json
+ *
+ * Pro reference review (docs/pro-targets-plan.md, Phase 2):
+ *   GET  /pros                              - The review page
+ *   GET  /dist/pro-review.js                - Its bundle (npm run build:browser)
+ *   GET  /api/pros/library                  - Players → clips → attempts
+ *   GET  /api/pros/angle-trends             - Leftover angle error (last build)
+ *   POST /api/pros/players                  - Create / update a player
+ *   POST /api/pros/clips                    - Create a clip folder
+ *   GET  /api/pros/files/<player>/<clip>/<file>   - poses.json, labels.json, video
+ *   POST /api/pros/files/<player>/<clip>/<file>   - Save poses.json / labels.json
+ *                                                  (v2) / a video (raw body)
+ *   GET  /app-static/<path>                 - App targets + wording (read-only)
  */
 
 import * as http from "http";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { createWriteStream } from "fs";
+import { pipeline } from "stream/promises";
+import {
+  clipFile,
+  createClip,
+  listLibrary,
+  safeId,
+  writeLabels,
+  writePlayer,
+} from "./src/pro-reference/library";
 
 const PORT = parseInt(process.argv[2] || "3000", 10);
 const VALIDATIONS_DIR = path.join(process.cwd(), "validations");
 const TEST_DATA_DIR = path.join(process.cwd(), "test-data");
+const PROS_DIR =
+  process.env.PROS_DIR ??
+  path.join(process.cwd(), "reference-data", "players");
+const APP_STATIC_DIR = path.join(process.cwd(), "app", "static");
+/** App files the review page reads (targets, wording). */
+const APP_STATIC_FILES = new Set([
+  "reference/live-targets-v3.json",
+  "config/feedback-wording.json",
+]);
 
 // Ensure validations directory exists
 await fs.mkdir(VALIDATIONS_DIR, { recursive: true });
@@ -215,6 +246,151 @@ try {
 const htmlPath = path.join(process.cwd(), "validate-metrics.html");
 let htmlContent = await fs.readFile(htmlPath, "utf-8");
 
+const proBundlePath = path.join(process.cwd(), "dist", "pro-review.js");
+const proHtmlPath = path.join(process.cwd(), "pro-review.html");
+
+/** Pro reference routes; true when handled. */
+async function handlePros(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  url: URL,
+): Promise<boolean> {
+  const p = url.pathname;
+  if (req.method === "GET" && p === "/pros") {
+    // Read per request so edits show on reload.
+    const html = await fs.readFile(proHtmlPath, "utf-8");
+    res.writeHead(200, { "Content-Type": "text/html" });
+    res.end(html);
+    return true;
+  }
+  if (req.method === "GET" && (p === "/dist/pro-review.js" || p === "/dist/pro-review.js.map")) {
+    try {
+      const file = p.endsWith(".map") ? `${proBundlePath}.map` : proBundlePath;
+      const body = await fs.readFile(file, "utf-8");
+      res.writeHead(200, {
+        "Content-Type": p.endsWith(".map") ? "application/json" : "application/javascript",
+      });
+      res.end(body);
+    } catch {
+      sendError(res, "Bundle not built: run npm run build:browser", 404);
+    }
+    return true;
+  }
+  if (req.method === "GET" && p.startsWith("/app-static/")) {
+    const rel = p.slice("/app-static/".length);
+    if (!APP_STATIC_FILES.has(rel)) {
+      sendError(res, "Not found", 404);
+      return true;
+    }
+    const body = await fs.readFile(path.join(APP_STATIC_DIR, rel), "utf-8");
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(body);
+    return true;
+  }
+  if (req.method === "GET" && p === "/api/pros/angle-trends") {
+    // Written by npm run targets:build:pros ({} until then). Read BEFORE
+    // writing headers, so a missing file can still get its {} response.
+    let body = "{}";
+    try {
+      body = await fs.readFile(
+        path.join(PROS_DIR, "..", "out", "angle-trends.json"),
+        "utf-8",
+      );
+    } catch {
+      /* not built yet */
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(body);
+    return true;
+  }
+  if (req.method === "GET" && p === "/api/pros/library") {
+    sendJson(res, { players: await listLibrary(PROS_DIR) });
+    return true;
+  }
+  if (req.method === "POST" && p === "/api/pros/players") {
+    const body = JSON.parse(await readBody(req)) as {
+      id?: string;
+      name?: string;
+      shootingHand?: "left" | "right";
+      notes?: string;
+    };
+    const id = safeId(body.id || body.name || "");
+    if (!id) {
+      sendError(res, "A player id or name is required", 400);
+      return true;
+    }
+    const info = await writePlayer(PROS_DIR, id, {
+      ...(body.name ? { name: body.name } : {}),
+      ...(body.shootingHand ? { shootingHand: body.shootingHand } : {}),
+      ...(body.notes !== undefined ? { notes: body.notes } : {}),
+    });
+    sendJson(res, { id, ...info });
+    return true;
+  }
+  if (req.method === "POST" && p === "/api/pros/clips") {
+    const body = JSON.parse(await readBody(req)) as { player?: string; clip?: string };
+    const clip = safeId(body.clip ?? "");
+    if (!body.player || !clip) {
+      sendError(res, "player and clip are required", 400);
+      return true;
+    }
+    await createClip(PROS_DIR, body.player, clip);
+    sendJson(res, { player: body.player, clip });
+    return true;
+  }
+  if (p.startsWith("/api/pros/files/")) {
+    const parts = p.slice("/api/pros/files/".length).split("/").map(decodeURIComponent);
+    if (parts.length !== 3) {
+      sendError(res, "Not found", 404);
+      return true;
+    }
+    const [player, clip, file] = parts as [string, string, string];
+    let target: string;
+    try {
+      target = clipFile(PROS_DIR, player, clip, file);
+    } catch (e) {
+      sendError(res, (e as Error).message, 400);
+      return true;
+    }
+    if (req.method === "GET") {
+      try {
+        const content = await fs.readFile(target);
+        res.writeHead(200, {
+          "Content-Type":
+            CONTENT_TYPES[path.extname(file).toLowerCase()] ?? "application/octet-stream",
+        });
+        res.end(content);
+      } catch {
+        sendError(res, "Not found", 404);
+      }
+      return true;
+    }
+    if (req.method === "POST") {
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      if (file === "labels.json") {
+        const saved = await writeLabels(PROS_DIR, player, clip, JSON.parse(await readBody(req)));
+        sendJson(res, saved);
+      } else if (file === "poses.json") {
+        const body = await readBody(req);
+        JSON.parse(body); // validate
+        await fs.writeFile(target, body);
+        sendJson(res, { success: true });
+      } else {
+        // A video: stream the raw body to disk (one video per clip).
+        for (const f of await fs.readdir(path.dirname(target))) {
+          if (/\.(mp4|mov|webm)$/i.test(f) && f !== file) {
+            await fs.unlink(path.join(path.dirname(target), f));
+          }
+        }
+        await pipeline(req, createWriteStream(target));
+        sendJson(res, { success: true, file });
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 // Create HTTP server
 const server = http.createServer(async (req, res) => {
   // CORS headers for local development
@@ -263,6 +439,9 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
+
+    // ---- Pro reference review --------------------------------------------
+    if (await handlePros(req, res, url)) return;
 
     // Save validation
     if (req.method === "POST" && url.pathname === "/api/save-validation") {

@@ -56,6 +56,38 @@ async function build() {
     process.exit(1);
   }
 
+  // The pro reference review page (/pros): its own bundle.
+  const pro = await esbuild.build({
+    entryPoints: [path.join(process.cwd(), "tools/pro-review/main.ts")],
+    bundle: true,
+    minify: false,
+    sourcemap: true,
+    format: "iife",
+    outfile: path.join(process.cwd(), "dist/pro-review.js"),
+    platform: "browser",
+    target: ["es2020", "chrome90", "firefox88", "safari14"],
+    define: { "process.env.NODE_ENV": '"production"' },
+    plugins: [
+      {
+        name: "node-externals",
+        setup(build) {
+          build.onResolve({ filter: /^(fs|path|os|child_process)/ }, () => ({
+            path: "empty",
+            namespace: "node-empty",
+          }));
+          build.onLoad({ filter: /.*/, namespace: "node-empty" }, () => ({
+            contents: "export default {}",
+          }));
+        },
+      },
+    ],
+  });
+  if (pro.errors.length > 0) {
+    console.error("Build errors (pro-review):", pro.errors);
+    process.exit(1);
+  }
+  console.log("Pro review bundle created: dist/pro-review.js");
+
   console.log("Browser bundle created: dist/shot-analysis.browser.js");
   console.log(
     'Include in HTML: <script src="dist/shot-analysis.browser.js"></script>',
