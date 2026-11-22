@@ -11,6 +11,7 @@
  *   app/static/reference/live-targets-v3.json   (what the app scores against)
  *   app/static/reference/pro-profiles.json      (per-pro values)
  *   reference-data/out/report.md                (calibration + detection report)
+ *   reference-data/out/angle-trends.json        (leftover angle error per metric)
  * Each player's proportions are saved to their player.json.
  *
  * Config (optional): reference-data/targets-config.json — see BuildConfig.
@@ -163,6 +164,11 @@ async function main(): Promise<void> {
   });
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   fs.writeFileSync(reportPath, report);
+  // The fitted trends, for the review page's "at 0°" values.
+  fs.writeFileSync(
+    path.join(path.dirname(reportPath), "angle-trends.json"),
+    JSON.stringify(result.angleTrends, null, 2) + "\n",
+  );
   console.log(`Report: ${path.relative(process.cwd(), reportPath)}`);
 
   if (result.profiles.pros.length === 0) {

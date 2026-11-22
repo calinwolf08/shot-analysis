@@ -38,13 +38,29 @@ const fail = (msg: string): never => {
   throw new Error(msg);
 };
 
-const log = (m: string) => console.log(`[smoke] ${m}`);
+let stage = "starting";
+const log = (m: string) => {
+  stage = m;
+  console.log(`[smoke] ${m}`);
+};
+// Never hang silently: report the last step reached.
+const watchdog = setTimeout(() => {
+  console.error(`pro-review smoke: FAILED — timed out after "${stage}"`);
+  try {
+    process.kill(-server.pid!, "SIGKILL");
+  } catch {
+    /* gone */
+  }
+  process.exit(1);
+}, 120_000);
 async function main(): Promise<void> {
   // Wait for the server to list the temporary library.
   let ready = false;
   for (let i = 0; i < 60 && !ready; i++) {
     try {
-      const r = await fetch(`http://localhost:${PORT}/api/pros/library`);
+      const r = await fetch(`http://localhost:${PORT}/api/pros/library`, {
+        signal: AbortSignal.timeout(2000),
+      });
       const lib = (await r.json()) as { players: { id: string }[] };
       ready = lib.players.some((p) => p.id === "curry");
     } catch {
@@ -163,4 +179,5 @@ main()
       /* already gone */
     }
     fs.rmSync(root, { recursive: true, force: true });
+    clearTimeout(watchdog);
   });

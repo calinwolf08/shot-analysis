@@ -91,6 +91,8 @@ const S = {
   /** Player-wide values per attempt key ("clip#n") → outliers. */
   outliers: {} as Record<string, Set<string>>,
   playing: false,
+  /** Leftover angle error per metric (last target build). */
+  trends: {} as Record<string, { slope: number; significant: boolean }>,
 };
 
 const $ = <T extends HTMLElement>(id: string) =>
@@ -807,8 +809,15 @@ function metricHtml(r: MetricRow, outliers: Set<string>): string {
     <div class="top"><span class="score" data-band="${r.scored ? band(r.score) : "none"}">${r.scored ? scoreText(r.score) : "·"}</span>
       <span class="text">${esc(phrase(r))}</span>
       <button class="small" data-flag="${r.id}">${r.flag !== null ? "Unflag" : "Flag"}</button></div>
-    <div class="detail">${fmt(r.value, r.unit)} (target ${fmt(r.passMin, r.unit)} to ${fmt(r.passMax, r.unit)}) · uncorrected ${fmt(r.uncorrected, r.unit)} · from detection ${fmt(r.fromDetection, r.unit)}${r.note ? ` · ${esc(r.note)}` : ""}</div>
+    <div class="detail">${fmt(r.value, r.unit)} (target ${fmt(r.passMin, r.unit)} to ${fmt(r.passMax, r.unit)}) · uncorrected ${fmt(r.uncorrected, r.unit)} · from detection ${fmt(r.fromDetection, r.unit)}${atZero(r)}${r.note ? ` · ${esc(r.note)}` : ""}</div>
     ${badges.trim() ? `<div class="detail">${badges}</div>` : ""}</div>`;
+}
+
+/** The value brought to 0° by the last build's leftover-angle trend. */
+function atZero(r: MetricRow): string {
+  const t = S.trends[r.id];
+  if (!t?.significant || r.value === null || !S.measure) return "";
+  return ` · at 0° ${fmt(r.value - t.slope * Math.abs(S.measure.angle), r.unit)}`;
 }
 
 function renderDecision(a: AttemptLabel): void {
@@ -1069,6 +1078,9 @@ async function boot(): Promise<void> {
     api<Wording>("/app-static/config/feedback-wording.json").catch(() => null),
   ]);
   S.targets = targets;
+  S.trends = await api<typeof S.trends>("/api/pros/angle-trends").catch(
+    () => ({}),
+  );
   if (wording?.metrics)
     S.wording = {
       format: wording.format ?? S.wording.format,

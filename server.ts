@@ -24,6 +24,7 @@
  *   GET  /pros                              - The review page
  *   GET  /dist/pro-review.js                - Its bundle (npm run build:browser)
  *   GET  /api/pros/library                  - Players → clips → attempts
+ *   GET  /api/pros/angle-trends             - Leftover angle error (last build)
  *   POST /api/pros/players                  - Create / update a player
  *   POST /api/pros/clips                    - Create a clip folder
  *   GET  /api/pros/files/<player>/<clip>/<file>   - poses.json, labels.json, video
@@ -257,17 +258,19 @@ async function handlePros(
   const p = url.pathname;
   if (req.method === "GET" && p === "/pros") {
     // Read per request so edits show on reload.
+    const html = await fs.readFile(proHtmlPath, "utf-8");
     res.writeHead(200, { "Content-Type": "text/html" });
-    res.end(await fs.readFile(proHtmlPath, "utf-8"));
+    res.end(html);
     return true;
   }
   if (req.method === "GET" && (p === "/dist/pro-review.js" || p === "/dist/pro-review.js.map")) {
     try {
       const file = p.endsWith(".map") ? `${proBundlePath}.map` : proBundlePath;
+      const body = await fs.readFile(file, "utf-8");
       res.writeHead(200, {
         "Content-Type": p.endsWith(".map") ? "application/json" : "application/javascript",
       });
-      res.end(await fs.readFile(file, "utf-8"));
+      res.end(body);
     } catch {
       sendError(res, "Bundle not built: run npm run build:browser", 404);
     }
@@ -279,8 +282,25 @@ async function handlePros(
       sendError(res, "Not found", 404);
       return true;
     }
+    const body = await fs.readFile(path.join(APP_STATIC_DIR, rel), "utf-8");
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(await fs.readFile(path.join(APP_STATIC_DIR, rel), "utf-8"));
+    res.end(body);
+    return true;
+  }
+  if (req.method === "GET" && p === "/api/pros/angle-trends") {
+    // Written by npm run targets:build:pros ({} until then). Read BEFORE
+    // writing headers, so a missing file can still get its {} response.
+    let body = "{}";
+    try {
+      body = await fs.readFile(
+        path.join(PROS_DIR, "..", "out", "angle-trends.json"),
+        "utf-8",
+      );
+    } catch {
+      /* not built yet */
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(body);
     return true;
   }
   if (req.method === "GET" && p === "/api/pros/library") {

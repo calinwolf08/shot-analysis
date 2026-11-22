@@ -27,6 +27,14 @@ import {
   type MetricUnit,
   type TargetV3,
 } from "../metrics/v3";
+import {
+  DEFAULT_TREND_CONFIG,
+  applyAngleTrends,
+  fitAngleTrends,
+  suggestedLimit,
+  type AngleTrend,
+  type TrendConfig,
+} from "./angle-trend";
 
 export interface BuildConfig {
   /** Band percentiles per metric (default for all, then overrides). */
@@ -44,6 +52,8 @@ export interface BuildConfig {
   readonly includeFlagged: boolean;
   /** Per-metric camera-angle limits (deg), overriding the defaults. */
   readonly angleLimits: Readonly<Record<string, number>>;
+  /** Leftover angle error: fitted and removed when the data shows it. */
+  readonly angleTrend: TrendConfig;
 }
 
 export const DEFAULT_BUILD_CONFIG: BuildConfig = {
@@ -53,6 +63,7 @@ export const DEFAULT_BUILD_CONFIG: BuildConfig = {
   styleScored: false,
   includeFlagged: false,
   angleLimits: {},
+  angleTrend: DEFAULT_TREND_CONFIG,
 };
 
 /** Merges a (partial) config file over the defaults. */
@@ -66,6 +77,7 @@ export function buildConfig(raw: unknown): BuildConfig {
       ...(r.percentiles ?? {}),
     },
     angleLimits: { ...(r.angleLimits ?? {}) },
+    angleTrend: { ...DEFAULT_TREND_CONFIG, ...(r.angleTrend ?? {}) },
   };
 }
 
@@ -195,6 +207,8 @@ export interface BuildResult {
   readonly report: readonly MetricReport[];
   /** Players left out (too few usable attempts). */
   readonly droppedPlayers: readonly { id: string; shots: number }[];
+  /** Leftover camera-angle trends per metric (applied where significant). */
+  readonly angleTrends: Readonly<Record<string, AngleTrend>>;
 }
 
 export function buildProTargets(input: BuildInput): BuildResult {
@@ -211,6 +225,9 @@ export function buildProTargets(input: BuildInput): BuildResult {
       byPlayer.delete(p);
     }
   }
+  // Leftover camera-angle error: fit within players, bring values to 0°.
+  const trends = fitAngleTrends([...byPlayer.values()].flat(), cfg.angleTrend);
+  for (const [p, as] of byPlayer) byPlayer.set(p, applyAngleTrends(as, trends));
 
   // Per-player profiles.
   const ids = new Set<string>();
@@ -365,10 +382,37 @@ export function buildProTargets(input: BuildInput): BuildResult {
     },
     report,
     droppedPlayers,
+    angleTrends: trends,
   };
 }
 
 const pct = (q: number) => `${Math.round(q * 100)}th`;
+
+function trendSection(trends: Readonly<Record<string, AngleTrend>>): string[] {
+  const ts = Object.values(trends);
+  if (ts.length === 0) return [];
+  const timingBug = ts.filter((t) => t.significant && /\.t_/.test(t.id));
+  const bins = ts[0]!.residualByAngle.map((b) => `${b.from}–${b.to}°`);
+  return [
+    `## Leftover camera-angle error`,
+    "",
+    "Each metric's drift with the camera angle after the 1/cos correction, fitted within players (form doesn't depend on the camera, so a drift is measurement error). Significant slopes are removed: every value is brought to its 0° equivalent before the targets are built.",
+    "",
+    ...(timingBug.length
+      ? [
+          `**Check:** timing metrics shouldn't drift with the angle, but these do: ${timingBug.map((t) => t.id).join(", ")}.`,
+          "",
+        ]
+      : []),
+    `| Metric | Slope / 10° | ± | Applied | Residual spread ${bins.join(" / ")} | Suggested limit |`,
+    "|---|---|---|---|---|---|",
+    ...ts.map(
+      (t) =>
+        `| ${t.id} | ${(t.slope * 10).toFixed(3)} | ${Number.isFinite(t.standardError) ? (t.standardError * 10).toFixed(3) : "–"} | ${t.significant ? "yes" : `no (${t.reason})`} | ${t.residualByAngle.map((b) => (b.n ? `${b.spread.toFixed(2)} (${b.n})` : "–")).join(" / ")} | ${suggestedLimit(t) ?? "–"}${suggestedLimit(t) !== null ? "°" : ""} |`,
+    ),
+    "",
+  ];
+}
 
 /** The calibration report as Markdown. */
 export function reportMarkdown(
@@ -437,6 +481,7 @@ export function reportMarkdown(
           "",
         ]
       : []),
+    ...trendSection(r.angleTrends),
     `## App detection vs labelled key frames`,
     "",
     "Users are measured with detection, so large errors here need fixing in detection before the targets are trusted.",
