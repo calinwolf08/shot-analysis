@@ -10,8 +10,7 @@
  *             the angle should be); lean / pitch — the band from the vertical
  *             / horizontal reference,
  *  - "rect":  joint angles — a box where the JOINT itself (knee for knee bend,
- *             elbow for elbow angle) belongs across the band, plus a dashed
- *             ghost limb mid-band; lean / pitch — a box where the shoulder /
+ *             elbow for elbow angle) belongs across the band; lean / pitch — a box where the shoulder /
  *             nose belongs.
  * Offsets and heights are always a box (the band along x / y).
  * Change metrics (elbow change, spine change…) are relative: the target is the
@@ -46,8 +45,6 @@ export type Zone =
       readonly y: number;
       readonly w: number;
       readonly h: number;
-      /** A dashed "ghost" limb in the middle of the target range. */
-      readonly ghost?: readonly Pt[];
     };
 
 export interface ZoneMetric {
@@ -259,9 +256,9 @@ export function targetZone(m: ZoneMetric, o: ZoneInput): Zone | null {
         const bis = t1 + d / 2;
         const s = d < 0 ? -1 : 1;
         const radius = Math.max(
-          26,
+          40,
           Math.min(
-            64,
+            72,
             0.6 *
               Math.min(
                 Math.hypot(a.x - b.x, a.y - b.y),
@@ -288,9 +285,8 @@ export function targetZone(m: ZoneMetric, o: ZoneInput): Zone | null {
         const r = limbAt(anchor, b, end, lo + ((hi - lo) * i) / 12);
         if (r) pts.push(r.joint);
       }
-      const mid = limbAt(anchor, b, end, (lo + hi) / 2);
-      if (pts.length === 0 || !mid) return null;
-      return { ...bounds(pts), ghost: [anchor, mid.joint, mid.end] } as Zone;
+      if (pts.length === 0) return null;
+      return bounds(pts);
     }
     case "lean": {
       // Lean from vertical, + = toward facing (signals.ts spineLean).
@@ -333,7 +329,7 @@ export function targetZone(m: ZoneMetric, o: ZoneInput): Zone | null {
         Math.atan2(Math.sin(p * RAD), facing * Math.cos(p * RAD));
       const radius = Math.max(
         24,
-        Math.hypot(nose.x - ear.x, nose.y - ear.y) * 1.6,
+        Math.hypot(nose.x - ear.x, nose.y - ear.y) * 3,
       );
       return angular(
         style,
@@ -396,7 +392,7 @@ function interior(a: Pt, b: Pt, c: Pt): number {
   return (d * 180) / Math.PI;
 }
 
-/** Paints a zone: translucent fill + dashed outline. */
+/** Paints a zone: translucent fill + solid outline. */
 export function drawTargetZone(
   ctx: CanvasRenderingContext2D,
   z: Zone,
@@ -406,7 +402,6 @@ export function drawTargetZone(
   ctx.fillStyle = color;
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
-  ctx.setLineDash([6, 4]);
   ctx.beginPath();
   if (z.kind === "wedge") {
     for (const sec of z.sectors) {
@@ -425,13 +420,5 @@ export function drawTargetZone(
   ctx.fill();
   ctx.globalAlpha = 0.95;
   ctx.stroke();
-  if (z.kind === "rect" && z.ghost && z.ghost.length > 1) {
-    ctx.beginPath();
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = 0.8;
-    ctx.moveTo(z.ghost[0]!.x, z.ghost[0]!.y);
-    for (const p of z.ghost.slice(1)) ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-  }
   ctx.restore();
 }

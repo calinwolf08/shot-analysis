@@ -44,10 +44,10 @@ describe("targetZone", () => {
       [220, 225],
       [45, 50],
     ]);
-    expect(z.radius).toBeLessThanOrEqual(64);
+    expect(z.radius).toBeLessThanOrEqual(72);
   });
 
-  it("rect: a box where the KNEE belongs (feet planted), with a ghost leg", () => {
+  it("rect: a box where the KNEE belongs (feet planted)", () => {
     const z = targetZone(knee, { ...sides, project, lm, style: "rect" });
     expect(z?.kind).toBe("rect");
     if (z?.kind !== "rect") return;
@@ -57,7 +57,6 @@ describe("targetZone", () => {
     expect(z.x + z.w).toBeGreaterThan(29);
     expect(z.y).toBeLessThan(29);
     expect(z.y + z.h).toBeGreaterThan(29);
-    expect(z.ghost?.[0]).toEqual({ x: 100, y: 100 }); // the planted ankle
   });
 
   it("rect: a small change in bend keeps the box at the knee", () => {

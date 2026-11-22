@@ -455,38 +455,40 @@
       project,
     });
 
-    // The current phase's worst issues, drawn as what they measure.
-    // A metric clicked in the scorecard is drawn on its own (until the
-    // scrubber moves); otherwise the current phase's 2 worst issues.
+    // The current phase's worst issues (or the metric clicked in the
+    // scorecard, on its own until the scrubber moves): the measured body part
+    // highlighted, plus its target zone on the frame it was measured. Paths
+    // (no zone) still draw their trace.
     const issues = picked ? [picked] : phaseIssues.slice(0, 2);
     const drawn: string[] = [];
+    const zones: string[] = [];
     const v = v3;
-    // The picked metric's target zone, on the frame it was measured.
-    let zone = "";
-    if (v && picked && current === picked.frames.at(-1)) {
-      const first = picked.frames[0];
-      const z = targetZone(picked, {
-        shootingHand: hand,
-        nearSide: v.nearSide,
-        project,
-        lm,
-        firstLm:
-          poses!.frames.find((p) => p.frameIndex === first)?.landmarks ?? null,
-        facing: v.facing,
-      });
-      if (z) {
-        drawTargetZone(ctx, z);
-        zone = z.kind;
-      }
-    }
-    c.dataset.zone = zone;
     if (v) {
       for (const m of issues) {
+        if (current === m.frames.at(-1)) {
+          const first = m.frames[0];
+          const z = targetZone(m, {
+            shootingHand: hand,
+            nearSide: v.nearSide,
+            project,
+            lm,
+            firstLm:
+              poses!.frames.find((p) => p.frameIndex === first)?.landmarks ??
+              null,
+            facing: v.facing,
+          });
+          if (z) {
+            drawTargetZone(ctx, z);
+            zones.push(z.kind);
+          }
+        }
+        const family = geometryFamily(m.id);
         drawn.push(
           ...drawGeometry(ctx, geometryFor(m.id), lm, {
             shootingHand: hand,
             nearSide: v.nearSide,
             project,
+            highlightOnly: family !== "path",
             pathFrames: poses!.frames
               .filter(
                 (p) =>
@@ -504,6 +506,7 @@
         );
       }
     }
+    c.dataset.zone = zones.join(",");
     c.dataset.geometry = drawn.join(",");
   });
 </script>
