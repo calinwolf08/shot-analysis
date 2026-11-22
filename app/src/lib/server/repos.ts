@@ -1,17 +1,20 @@
 /**
  * User-scoped repositories for the server.
  *
- * `createServerRepos(db, userId)` returns the same {@link AppRepos} interfaces
+ * `createServerRepos(kdb, userId)` returns the same {@link AppRepos} interfaces
  * the app already uses, but every read is filtered to `userId` and every write
  * verifies ownership first — so one user can never see or mutate another user's
  * data, even with a guessed id. `players.user_id` is the ownership root;
  * `sessions`/`videos` carry `user_id` directly; deeper tables (shots, scores,
  * reps) are scoped by joining up to their owning session.
  *
+ * Queries go through Kysely, so they run unchanged on SQLite and Postgres
+ * (docs/database-abstraction-plan.md).
+ *
  * Server-only.
  */
 import type { ShotAnalysis } from "basketball-shot-analysis";
-import type { DatabaseAdapter } from "$lib/shared/db";
+import type { AppKysely } from "./database/kysely";
 import { fromBool, parseJson, toBool } from "$lib/shared/db/repo-base";
 import { systemClock, uuidIdGenerator, type Clock } from "$lib/shared/utils";
 import type { AppRepos } from "$lib/shared/config/services";
@@ -53,8 +56,8 @@ import { ForbiddenError } from "./errors";
 interface PlayerRow {
   id: string;
   name: string;
-  shooting_hand: ShootingHand;
-  level: PlayerLevel;
+  shooting_hand: string;
+  level: string;
   created_at: number;
   updated_at: number;
   user_id: string | null;
@@ -62,8 +65,8 @@ interface PlayerRow {
 const toPlayer = (r: PlayerRow): Player => ({
   id: r.id,
   name: r.name,
-  shootingHand: r.shooting_hand,
-  level: r.level,
+  shootingHand: r.shooting_hand as ShootingHand,
+  level: r.level as PlayerLevel,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -196,27 +199,48 @@ const toRep = (r: RepRow): RepRecord => ({
 // ---------------------------------------------------------------------------
 
 export function createServerRepos(
-  db: DatabaseAdapter,
+  kdb: AppKysely,
   userId: string,
   clock: Clock = systemClock,
   ids = uuidIdGenerator,
 ): AppRepos {
   // --- ownership guards ----------------------------------------------------
-  const owns = async (sql: string, params: (string | number)[]) =>
-    (await db.query(sql, params)).length > 0;
+  const exists = async (q: { executeTakeFirst(): Promise<unknown> }) =>
+    (await q.executeTakeFirst()) !== undefined;
 
   const playerOwned = (id: string) =>
-    owns("SELECT 1 FROM players WHERE id = ? AND user_id = ?", [id, userId]);
+    exists(
+      kdb
+        .selectFrom("players")
+        .select("id")
+        .where("id", "=", id)
+        .where("user_id", "=", userId),
+    );
   const sessionOwned = (id: string) =>
-    owns("SELECT 1 FROM sessions WHERE id = ? AND user_id = ?", [id, userId]);
+    exists(
+      kdb
+        .selectFrom("sessions")
+        .select("id")
+        .where("id", "=", id)
+        .where("user_id", "=", userId),
+    );
   const shotOwned = (id: string) =>
-    owns(
-      `SELECT 1 FROM shots s JOIN players p ON s.player_id = p.id
-       WHERE s.id = ? AND p.user_id = ?`,
-      [id, userId],
+    exists(
+      kdb
+        .selectFrom("shots as s")
+        .innerJoin("players as p", "s.player_id", "p.id")
+        .select("s.id")
+        .where("s.id", "=", id)
+        .where("p.user_id", "=", userId),
     );
   const videoOwned = (id: string) =>
-    owns("SELECT 1 FROM videos WHERE id = ? AND user_id = ?", [id, userId]);
+    exists(
+      kdb
+        .selectFrom("videos")
+        .select("id")
+        .where("id", "=", id)
+        .where("user_id", "=", userId),
+    );
   const refOwned = (scope: ScoreScope, refId: string) =>
     scope === "shot" ? shotOwned(refId) : sessionOwned(refId);
 
@@ -240,44 +264,54 @@ export function createServerRepos(
         createdAt: now,
         updatedAt: now,
       };
-      await db.run(
-        `INSERT INTO players (id, name, shooting_hand, level, created_at, updated_at, user_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          p.id,
-          p.name,
-          p.shootingHand,
-          p.level,
-          p.createdAt,
-          p.updatedAt,
-          userId,
-        ],
-      );
+      await kdb
+        .insertInto("players")
+        .values({
+          id: p.id,
+          name: p.name,
+          shooting_hand: p.shootingHand,
+          level: p.level,
+          created_at: p.createdAt,
+          updated_at: p.updatedAt,
+          user_id: userId,
+        })
+        .execute();
       return p;
     },
     async get(id) {
-      const rows = await db.query<PlayerRow>(
-        "SELECT * FROM players WHERE id = ? AND user_id = ?",
-        [id, userId],
-      );
-      return rows[0] ? toPlayer(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("players")
+        .selectAll()
+        .where("id", "=", id)
+        .where("user_id", "=", userId)
+        .executeTakeFirst();
+      return row ? toPlayer(row) : null;
     },
     async getFirst() {
-      const rows = await db.query<PlayerRow>(
-        "SELECT * FROM players WHERE user_id = ? ORDER BY created_at LIMIT 1",
-        [userId],
-      );
-      return rows[0] ? toPlayer(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("players")
+        .selectAll()
+        .where("user_id", "=", userId)
+        .orderBy("created_at")
+        .limit(1)
+        .executeTakeFirst();
+      return row ? toPlayer(row) : null;
     },
     async update(id, patch) {
       const existing = await this.get(id);
       if (!existing) return null; // not found or not owned
       const next: Player = { ...existing, ...patch, updatedAt: clock.now() };
-      await db.run(
-        `UPDATE players SET name = ?, shooting_hand = ?, level = ?, updated_at = ?
-         WHERE id = ? AND user_id = ?`,
-        [next.name, next.shootingHand, next.level, next.updatedAt, id, userId],
-      );
+      await kdb
+        .updateTable("players")
+        .set({
+          name: next.name,
+          shooting_hand: next.shootingHand,
+          level: next.level,
+          updated_at: next.updatedAt,
+        })
+        .where("id", "=", id)
+        .where("user_id", "=", userId)
+        .execute();
       return next;
     },
   };
@@ -297,30 +331,31 @@ export function createServerRepos(
         height: input.height ?? null,
         createdAt: clock.now(),
       };
-      await db.run(
-        `INSERT INTO videos (id, player_id, source, file_uri, duration_ms, fps, width, height, created_at, user_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          v.id,
-          v.playerId,
-          v.source,
-          v.fileUri,
-          v.durationMs,
-          v.fps,
-          v.width,
-          v.height,
-          v.createdAt,
-          userId,
-        ],
-      );
+      await kdb
+        .insertInto("videos")
+        .values({
+          id: v.id,
+          player_id: v.playerId,
+          source: v.source,
+          file_uri: v.fileUri,
+          duration_ms: v.durationMs,
+          fps: v.fps,
+          width: v.width,
+          height: v.height,
+          created_at: v.createdAt,
+          user_id: userId,
+        })
+        .execute();
       return v;
     },
     async get(id) {
-      const rows = await db.query<VideoRow>(
-        "SELECT * FROM videos WHERE id = ? AND user_id = ?",
-        [id, userId],
-      );
-      return rows[0] ? toVideo(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("videos")
+        .selectAll()
+        .where("id", "=", id)
+        .where("user_id", "=", userId)
+        .executeTakeFirst();
+      return row ? toVideo(row) : null;
     },
   };
 
@@ -339,60 +374,59 @@ export function createServerRepos(
         completedAt: null,
         notes: input.notes ?? null,
       };
-      await db.run(
-        `INSERT INTO sessions (id, player_id, type, status, plan_item_id, focus_metric, started_at, completed_at, notes, user_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          s.id,
-          s.playerId,
-          s.type,
-          s.status,
-          s.planItemId,
-          s.focusMetric,
-          s.startedAt,
-          s.completedAt,
-          s.notes,
-          userId,
-        ],
-      );
+      await kdb
+        .insertInto("sessions")
+        .values({
+          id: s.id,
+          player_id: s.playerId,
+          type: s.type,
+          status: s.status,
+          plan_item_id: s.planItemId,
+          focus_metric: s.focusMetric,
+          started_at: s.startedAt,
+          completed_at: s.completedAt,
+          notes: s.notes,
+          user_id: userId,
+        })
+        .execute();
       return s;
     },
     async get(id) {
-      const rows = await db.query<SessionRow>(
-        "SELECT * FROM sessions WHERE id = ? AND user_id = ?",
-        [id, userId],
-      );
-      return rows[0] ? toSession(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("sessions")
+        .selectAll()
+        .where("id", "=", id)
+        .where("user_id", "=", userId)
+        .executeTakeFirst();
+      return row ? toSession(row) : null;
     },
     async complete(id) {
       await assert(sessionOwned(id), "session");
-      await db.run(
-        "UPDATE sessions SET status = 'completed', completed_at = ? WHERE id = ? AND user_id = ?",
-        [clock.now(), id, userId],
-      );
+      await kdb
+        .updateTable("sessions")
+        .set({ status: "completed", completed_at: clock.now() })
+        .where("id", "=", id)
+        .where("user_id", "=", userId)
+        .execute();
     },
     async abort(id) {
       await assert(sessionOwned(id), "session");
-      await db.run(
-        "UPDATE sessions SET status = 'aborted', completed_at = ? WHERE id = ? AND user_id = ?",
-        [clock.now(), id, userId],
-      );
+      await kdb
+        .updateTable("sessions")
+        .set({ status: "aborted", completed_at: clock.now() })
+        .where("id", "=", id)
+        .where("user_id", "=", userId)
+        .execute();
     },
     async listByPlayer(playerId, filter = {}) {
-      const clauses = ["player_id = ?", "user_id = ?"];
-      const params: (string | number)[] = [playerId, userId];
-      if (filter.type) {
-        clauses.push("type = ?");
-        params.push(filter.type);
-      }
-      if (filter.status) {
-        clauses.push("status = ?");
-        params.push(filter.status);
-      }
-      const rows = await db.query<SessionRow>(
-        `SELECT * FROM sessions WHERE ${clauses.join(" AND ")} ORDER BY started_at DESC`,
-        params,
-      );
+      let q = kdb
+        .selectFrom("sessions")
+        .selectAll()
+        .where("player_id", "=", playerId)
+        .where("user_id", "=", userId);
+      if (filter.type) q = q.where("type", "=", filter.type);
+      if (filter.status) q = q.where("status", "=", filter.status);
+      const rows = await q.orderBy("started_at", "desc").execute();
       return rows.map(toSession);
     },
   };
@@ -410,11 +444,13 @@ export function createServerRepos(
       if (playerId) {
         await assert(playerOwned(playerId), "player");
       } else if (sessionId) {
-        const rows = await db.query<{ player_id: string }>(
-          "SELECT player_id FROM sessions WHERE id = ? AND user_id = ?",
-          [sessionId, userId],
-        );
-        playerId = rows[0]?.player_id ?? null;
+        const row = await kdb
+          .selectFrom("sessions")
+          .select("player_id")
+          .where("id", "=", sessionId)
+          .where("user_id", "=", userId)
+          .executeTakeFirst();
+        playerId = row?.player_id ?? null;
       }
       if (!playerId) throw new ForbiddenError("not your player");
 
@@ -433,120 +469,129 @@ export function createServerRepos(
         analysis,
         createdAt: clock.now(),
       };
-      await db.transaction(async (tx) => {
-        await tx.run(
-          `INSERT INTO shots (id, player_id, session_id, video_id, shot_index, orientation,
-             start_frame, end_frame, overall_confidence, excluded, analysis_json, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            rec.id,
-            rec.playerId,
-            rec.sessionId,
-            rec.videoId,
-            rec.shotIndex,
-            rec.orientation,
-            rec.startFrame,
-            rec.endFrame,
-            rec.overallConfidence,
-            fromBool(rec.excluded),
-            JSON.stringify(analysis),
-            rec.createdAt,
-          ],
-        );
+      await kdb.transaction().execute(async (trx) => {
+        await trx
+          .insertInto("shots")
+          .values({
+            id: rec.id,
+            player_id: rec.playerId,
+            session_id: rec.sessionId,
+            video_id: rec.videoId,
+            shot_index: rec.shotIndex,
+            orientation: rec.orientation,
+            start_frame: rec.startFrame,
+            end_frame: rec.endFrame,
+            overall_confidence: rec.overallConfidence,
+            excluded: fromBool(rec.excluded),
+            analysis_json: JSON.stringify(analysis),
+            created_at: rec.createdAt,
+          })
+          .execute();
         for (const [name, metric] of Object.entries(analysis.metrics)) {
           const isNumeric = typeof metric.value === "number";
-          await tx.run(
-            `INSERT INTO shot_metrics (shot_id, metric_name, value_num, value_text, unit, frame, confidence)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [
-              rec.id,
-              name,
-              isNumeric ? (metric.value as number) : null,
-              isNumeric ? null : String(metric.value),
-              metric.unit,
-              metric.frame,
-              metric.confidence,
-            ],
-          );
+          await trx
+            .insertInto("shot_metrics")
+            .values({
+              shot_id: rec.id,
+              metric_name: name,
+              value_num: isNumeric ? (metric.value as number) : null,
+              value_text: isNumeric ? null : String(metric.value),
+              unit: metric.unit ?? null,
+              frame: metric.frame ?? null,
+              confidence: metric.confidence ?? null,
+            })
+            .execute();
         }
         if (input.reviewPoses) {
-          await tx.run(
-            `INSERT INTO shot_poses (shot_id, poses_json) VALUES (?, ?)`,
-            [rec.id, JSON.stringify(input.reviewPoses)],
-          );
+          await trx
+            .insertInto("shot_poses")
+            .values({
+              shot_id: rec.id,
+              poses_json: JSON.stringify(input.reviewPoses),
+            })
+            .execute();
         }
       });
       return rec;
     },
     async getPoses(id) {
-      const rows = await db.query<{ poses_json: string }>(
-        `SELECT sp.poses_json FROM shot_poses sp
-         JOIN shots s ON sp.shot_id = s.id
-         JOIN players p ON s.player_id = p.id
-         WHERE sp.shot_id = ? AND p.user_id = ?`,
-        [id, userId],
-      );
-      return rows[0]
-        ? parseJson<ShotReviewPoses>(rows[0].poses_json, `shot_poses.${id}`)
+      const row = await kdb
+        .selectFrom("shot_poses as sp")
+        .innerJoin("shots as s", "sp.shot_id", "s.id")
+        .innerJoin("players as p", "s.player_id", "p.id")
+        .select("sp.poses_json")
+        .where("sp.shot_id", "=", id)
+        .where("p.user_id", "=", userId)
+        .executeTakeFirst();
+      return row
+        ? parseJson<ShotReviewPoses>(row.poses_json, `shot_poses.${id}`)
         : null;
     },
     async get(id) {
-      const rows = await db.query<ShotRow>(
-        `SELECT s.* FROM shots s JOIN players p ON s.player_id = p.id
-         WHERE s.id = ? AND p.user_id = ?`,
-        [id, userId],
-      );
-      return rows[0] ? toShot(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("shots as s")
+        .innerJoin("players as p", "s.player_id", "p.id")
+        .selectAll("s")
+        .where("s.id", "=", id)
+        .where("p.user_id", "=", userId)
+        .executeTakeFirst();
+      return row ? toShot(row) : null;
     },
     // Assessment/upload path only; the live flow uses listByPlayer.
     async listBySession(sessionId, opts = {}) {
-      const excl = opts.includeExcluded ? "" : "AND s.excluded = 0";
-      const rows = await db.query<ShotRow>(
-        `SELECT s.* FROM shots s JOIN sessions se ON s.session_id = se.id
-         WHERE s.session_id = ? AND se.user_id = ? ${excl} ORDER BY s.shot_index`,
-        [sessionId, userId],
-      );
+      let q = kdb
+        .selectFrom("shots as s")
+        .innerJoin("sessions as se", "s.session_id", "se.id")
+        .selectAll("s")
+        .where("s.session_id", "=", sessionId)
+        .where("se.user_id", "=", userId);
+      if (!opts.includeExcluded) q = q.where("s.excluded", "=", 0);
+      const rows = await q.orderBy("s.shot_index").execute();
       return rows.map(toShot);
     },
     async listByPlayer(playerId, opts = {}) {
-      const clauses = ["s.player_id = ?", "p.user_id = ?"];
-      const params: (string | number)[] = [playerId, userId];
-      if (!opts.includeExcluded) clauses.push("s.excluded = 0");
-      if (opts.since !== undefined) {
-        clauses.push("s.created_at >= ?");
-        params.push(opts.since);
-      }
-      let sql = `SELECT s.* FROM shots s JOIN players p ON s.player_id = p.id
-         WHERE ${clauses.join(" AND ")} ORDER BY s.created_at DESC, s.shot_index DESC`;
-      if (opts.limit !== undefined) {
-        sql += " LIMIT ?";
-        params.push(opts.limit);
-      }
-      const rows = await db.query<ShotRow>(sql, params);
+      let q = kdb
+        .selectFrom("shots as s")
+        .innerJoin("players as p", "s.player_id", "p.id")
+        .selectAll("s")
+        .where("s.player_id", "=", playerId)
+        .where("p.user_id", "=", userId);
+      if (!opts.includeExcluded) q = q.where("s.excluded", "=", 0);
+      if (opts.since !== undefined)
+        q = q.where("s.created_at", ">=", opts.since);
+      q = q.orderBy("s.created_at", "desc").orderBy("s.shot_index", "desc");
+      if (opts.limit !== undefined) q = q.limit(opts.limit);
+      const rows = await q.execute();
       return rows.map(toShot);
     },
     async setExcluded(id, excluded) {
       await assert(shotOwned(id), "shot");
-      await db.run("UPDATE shots SET excluded = ? WHERE id = ?", [
-        fromBool(excluded),
-        id,
-      ]);
+      await kdb
+        .updateTable("shots")
+        .set({ excluded: fromBool(excluded) })
+        .where("id", "=", id)
+        .execute();
     },
     async updateAnalysis(id, analysis) {
       await assert(shotOwned(id), "shot");
-      await db.run("UPDATE shots SET analysis_json = ? WHERE id = ?", [
-        JSON.stringify(analysis),
-        id,
-      ]);
+      await kdb
+        .updateTable("shots")
+        .set({ analysis_json: JSON.stringify(analysis) })
+        .where("id", "=", id)
+        .execute();
     },
   };
 
   // --- score ---------------------------------------------------------------
-  // Ownership subquery for a given scope: the set of ref ids this user owns.
-  const ownedRefsSubquery = (scope: ScoreScope) =>
+  // Ownership subquery for a given scope: the ref ids this user owns.
+  const ownedRefs = (scope: ScoreScope) =>
     scope === "shot"
-      ? `SELECT s.id FROM shots s JOIN players p ON s.player_id = p.id WHERE p.user_id = ?`
-      : `SELECT id FROM sessions WHERE user_id = ?`;
+      ? kdb
+          .selectFrom("shots as s")
+          .innerJoin("players as p", "s.player_id", "p.id")
+          .select("s.id")
+          .where("p.user_id", "=", userId)
+      : kdb.selectFrom("sessions").select("id").where("user_id", "=", userId);
 
   const score: ScoreRepo = {
     async insert(input: InsertScoreInput) {
@@ -564,54 +609,60 @@ export function createServerRepos(
         breakdown: input.breakdown,
         createdAt: clock.now(),
       };
-      await db.run(
-        `INSERT INTO scores (id, scope, ref_id, benchmark_id, scoring_version,
-           form_score, consistency_score, efficiency_score, overall_score, breakdown_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          rec.id,
-          rec.scope,
-          rec.refId,
-          rec.benchmarkId,
-          rec.scoringVersion,
-          rec.formScore,
-          rec.consistencyScore,
-          rec.efficiencyScore,
-          rec.overallScore,
-          JSON.stringify(rec.breakdown),
-          rec.createdAt,
-        ],
-      );
+      await kdb
+        .insertInto("scores")
+        .values({
+          id: rec.id,
+          scope: rec.scope,
+          ref_id: rec.refId,
+          benchmark_id: rec.benchmarkId,
+          scoring_version: rec.scoringVersion,
+          form_score: rec.formScore,
+          consistency_score: rec.consistencyScore,
+          efficiency_score: rec.efficiencyScore,
+          overall_score: rec.overallScore,
+          breakdown_json: JSON.stringify(rec.breakdown),
+          created_at: rec.createdAt,
+        })
+        .execute();
       return rec;
     },
     async latestForRef(scope, refId) {
-      const rows = await db.query<ScoreRow>(
-        `SELECT * FROM scores WHERE scope = ? AND ref_id = ?
-           AND ref_id IN (${ownedRefsSubquery(scope)})
-         ORDER BY created_at DESC, id DESC LIMIT 1`,
-        [scope, refId, userId],
-      );
-      return rows[0] ? toScore(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("scores")
+        .selectAll()
+        .where("scope", "=", scope)
+        .where("ref_id", "=", refId)
+        .where("ref_id", "in", ownedRefs(scope))
+        .orderBy("created_at", "desc")
+        .orderBy("id", "desc")
+        .limit(1)
+        .executeTakeFirst();
+      return row ? toScore(row) : null;
     },
     async listForRef(scope, refId) {
-      const rows = await db.query<ScoreRow>(
-        `SELECT * FROM scores WHERE scope = ? AND ref_id = ?
-           AND ref_id IN (${ownedRefsSubquery(scope)})
-         ORDER BY created_at`,
-        [scope, refId, userId],
-      );
+      const rows = await kdb
+        .selectFrom("scores")
+        .selectAll()
+        .where("scope", "=", scope)
+        .where("ref_id", "=", refId)
+        .where("ref_id", "in", ownedRefs(scope))
+        .orderBy("created_at")
+        .execute();
       return rows.map(toScore);
     },
     async latestForRefs(scope, refIds) {
       const result = new Map<string, ScoreRecord>();
       if (refIds.length === 0) return result;
-      const placeholders = refIds.map(() => "?").join(",");
-      const rows = await db.query<ScoreRow>(
-        `SELECT * FROM scores WHERE scope = ? AND ref_id IN (${placeholders})
-           AND ref_id IN (${ownedRefsSubquery(scope)})
-         ORDER BY created_at, id`,
-        [scope, ...refIds, userId],
-      );
+      const rows = await kdb
+        .selectFrom("scores")
+        .selectAll()
+        .where("scope", "=", scope)
+        .where("ref_id", "in", [...refIds])
+        .where("ref_id", "in", ownedRefs(scope))
+        .orderBy("created_at")
+        .orderBy("id")
+        .execute();
       for (const row of rows) result.set(row.ref_id, toScore(row));
       return result;
     },
@@ -631,28 +682,31 @@ export function createServerRepos(
         feedback: input.feedback ?? null,
         createdAt: clock.now(),
       };
-      await db.run(
-        `INSERT INTO reps (id, session_id, rep_index, shot_id, rep_score, primary_cue, feedback_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          rec.id,
-          rec.sessionId,
-          rec.repIndex,
-          rec.shotId,
-          rec.repScore,
-          rec.primaryCue,
-          rec.feedback === null ? null : JSON.stringify(rec.feedback),
-          rec.createdAt,
-        ],
-      );
+      await kdb
+        .insertInto("reps")
+        .values({
+          id: rec.id,
+          session_id: rec.sessionId,
+          rep_index: rec.repIndex,
+          shot_id: rec.shotId,
+          rep_score: rec.repScore,
+          primary_cue: rec.primaryCue,
+          feedback_json:
+            rec.feedback === null ? null : JSON.stringify(rec.feedback),
+          created_at: rec.createdAt,
+        })
+        .execute();
       return rec;
     },
     async listBySession(sessionId) {
-      const rows = await db.query<RepRow>(
-        `SELECT r.* FROM reps r JOIN sessions se ON r.session_id = se.id
-         WHERE r.session_id = ? AND se.user_id = ? ORDER BY r.rep_index`,
-        [sessionId, userId],
-      );
+      const rows = await kdb
+        .selectFrom("reps as r")
+        .innerJoin("sessions as se", "r.session_id", "se.id")
+        .selectAll("r")
+        .where("r.session_id", "=", sessionId)
+        .where("se.user_id", "=", userId)
+        .orderBy("r.rep_index")
+        .execute();
       return rows.map(toRep);
     },
   };
@@ -663,25 +717,29 @@ export function createServerRepos(
   const settings: SettingsRepo = {
     async get(key) {
       const spec = SETTINGS[key];
-      const rows = await db.query<{ value: string }>(
-        "SELECT value FROM user_settings WHERE user_id = ? AND key = ?",
-        [userId, key],
-      );
-      const raw = rows[0]?.value;
-      if (raw === undefined) return spec.default as never;
+      const row = await kdb
+        .selectFrom("user_settings")
+        .select("value")
+        .where("user_id", "=", userId)
+        .where("key", "=", key)
+        .executeTakeFirst();
+      if (row === undefined) return spec.default as never;
       try {
-        return spec.schema.parse(JSON.parse(raw)) as never;
+        return spec.schema.parse(JSON.parse(row.value)) as never;
       } catch {
         return spec.default as never;
       }
     },
     async set(key, value) {
       const spec = SETTINGS[key];
-      const parsed = spec.schema.parse(value);
-      await db.run(
-        "INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)",
-        [userId, key, JSON.stringify(parsed)],
-      );
+      const json = JSON.stringify(spec.schema.parse(value));
+      await kdb
+        .insertInto("user_settings")
+        .values({ user_id: userId, key, value: json })
+        .onConflict((oc) =>
+          oc.columns(["user_id", "key"]).doUpdateSet({ value: json }),
+        )
+        .execute();
     },
   };
 

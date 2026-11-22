@@ -150,12 +150,10 @@ isolation). Original plan items 2.1 (auth) and data-scoping are resolved.
 
 Minor polish that can happen anytime (non-blocking):
 
-- **Drop the dead sql.js static asset.** `static/sqljs/sql-wasm.wasm` (~640 KB)
-  is still copied into builds but is never fetched — the client no longer opens
-  a database (it's not in the client JS bundle either). It can be removed once
-  the `createDatabase`/sqljs-web driver **tests** (which still exercise the
-  driver) are updated or retired; the drivers themselves are retained for the
-  adapter-contract suite.
+- ~~**Drop the dead sql.js static asset.**~~ Done in
+  [database-abstraction-plan](./database-abstraction-plan.md) Phase 7: the
+  sql.js / Capacitor SQLite drivers, their tests, dependencies and the wasm
+  are gone.
 - **Pose payload size.** Assessments POST multi-MB pose JSON to
   `/api/analysis/*` (hence `BODY_SIZE_LIMIT=64M`). If payloads or concurrency
   grow, consider gzip on the request, trimming to keyframe windows, or a

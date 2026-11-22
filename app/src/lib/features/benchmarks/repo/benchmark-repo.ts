@@ -42,40 +42,45 @@ function toRow(r: DbRow): BenchmarkRow {
 }
 
 export function createBenchmarkRepo(ctx: RepoContext): BenchmarkRepo {
-  const { db, clock } = ctx;
+  const { kdb, clock } = ctx;
   return {
     async upsert(input) {
-      await db.run(
-        `INSERT INTO benchmarks (id, name, version, is_placeholder, data_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           name = excluded.name,
-           version = excluded.version,
-           is_placeholder = excluded.is_placeholder,
-           data_json = excluded.data_json`,
-        [
-          input.id,
-          input.name,
-          input.version,
-          fromBool(input.isPlaceholder),
-          JSON.stringify(input.data),
-          clock.now(),
-        ],
-      );
+      await kdb
+        .insertInto("benchmarks")
+        .values({
+          id: input.id,
+          name: input.name,
+          version: input.version,
+          is_placeholder: fromBool(input.isPlaceholder),
+          data_json: JSON.stringify(input.data),
+          created_at: clock.now(),
+        })
+        .onConflict((oc) =>
+          oc.column("id").doUpdateSet((eb) => ({
+            name: eb.ref("excluded.name"),
+            version: eb.ref("excluded.version"),
+            is_placeholder: eb.ref("excluded.is_placeholder"),
+            data_json: eb.ref("excluded.data_json"),
+          })),
+        )
+        .execute();
     },
 
     async get(id) {
-      const rows = await db.query<DbRow>(
-        "SELECT * FROM benchmarks WHERE id = ?",
-        [id],
-      );
-      return rows[0] ? toRow(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("benchmarks")
+        .selectAll()
+        .where("id", "=", id)
+        .executeTakeFirst();
+      return row ? toRow(row) : null;
     },
 
     async list() {
-      const rows = await db.query<DbRow>(
-        "SELECT * FROM benchmarks ORDER BY created_at",
-      );
+      const rows = await kdb
+        .selectFrom("benchmarks")
+        .selectAll()
+        .orderBy("created_at")
+        .execute();
       return rows.map(toRow);
     },
   };

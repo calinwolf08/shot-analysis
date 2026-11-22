@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getDb, resetDbSingletonForTests } from "$lib/server/db";
+import { getKysely, resetDbSingletonForTests } from "$lib/server/db";
 import { createFocusAreaRepo } from "$lib/features/diagnosis";
 import { systemClock, uuidIdGenerator } from "$lib/shared/utils";
 import { createApiClient, type ApiClient } from "../client";
@@ -28,9 +28,9 @@ function clientFor(user: SessionUser | null): ApiClient {
 }
 
 async function seedFocus(sessionId: string) {
-  const db = await getDb();
+  const { db: kdb } = await getKysely();
   const repo = createFocusAreaRepo({
-    db,
+    kdb,
     clock: systemClock,
     ids: uuidIdGenerator,
   });

@@ -3,10 +3,6 @@ import {
   createTestServices,
   type TestServices,
 } from "$lib/shared/config/test-services";
-import { createPlayerRepo } from "../player-repo";
-import { createRepRepo } from "../rep-repo";
-import { createSessionRepo } from "../session-repo";
-import { createVideoRepo } from "../video-repo";
 
 let services: TestServices;
 
@@ -16,7 +12,7 @@ beforeEach(async () => {
 
 describe("PlayerRepo", () => {
   it("creates and reads back a player", async () => {
-    const repo = createPlayerRepo(services);
+    const repo = services.repos.player;
     const created = await repo.create({
       name: "Ava",
       shootingHand: "right",
@@ -29,7 +25,7 @@ describe("PlayerRepo", () => {
   });
 
   it("getFirst returns null before onboarding, the player after", async () => {
-    const repo = createPlayerRepo(services);
+    const repo = services.repos.player;
     expect(await repo.getFirst()).toBeNull();
     const created = await repo.create({
       name: "Ben",
@@ -40,7 +36,7 @@ describe("PlayerRepo", () => {
   });
 
   it("updates fields and bumps updatedAt", async () => {
-    const repo = createPlayerRepo(services);
+    const repo = services.repos.player;
     const created = await repo.create({
       name: "Cam",
       shootingHand: "right",
@@ -54,66 +50,20 @@ describe("PlayerRepo", () => {
   });
 
   it("update returns null for a missing player", async () => {
-    const repo = createPlayerRepo(services);
+    const repo = services.repos.player;
     expect(await repo.update("nope", { name: "x" })).toBeNull();
-  });
-
-  it("scopes players per auth user once setCurrentUser is called", async () => {
-    const repo = createPlayerRepo(services);
-
-    repo.setCurrentUser("user-a");
-    const a = await repo.create({
-      name: "Ava",
-      shootingHand: "right",
-      level: "youth",
-    });
-    expect((await repo.getFirst())?.id).toBe(a.id);
-
-    // A second account on the same device sees no player until it onboards.
-    repo.setCurrentUser("user-b");
-    expect(await repo.getFirst()).toBeNull();
-    const b = await repo.create({
-      name: "Ben",
-      shootingHand: "left",
-      level: "advanced",
-    });
-    expect((await repo.getFirst())?.id).toBe(b.id);
-
-    // Switching back restores the first account's player.
-    repo.setCurrentUser("user-a");
-    expect((await repo.getFirst())?.id).toBe(a.id);
-  });
-
-  it("claimUnowned assigns pre-auth rows to the first signed-in user", async () => {
-    const repo = createPlayerRepo(services);
-    // Legacy row: created with no current user (pre-auth upgrade path).
-    const legacy = await repo.create({
-      name: "Old",
-      shootingHand: "right",
-      level: "youth",
-    });
-
-    repo.setCurrentUser("user-a");
-    expect(await repo.getFirst()).toBeNull();
-    await repo.claimUnowned("user-a");
-    expect((await repo.getFirst())?.id).toBe(legacy.id);
-
-    // Already-owned rows are not re-claimed by later accounts.
-    await repo.claimUnowned("user-b");
-    repo.setCurrentUser("user-b");
-    expect(await repo.getFirst()).toBeNull();
   });
 });
 
 describe("VideoRepo", () => {
   it("creates and reads a video with nullable fields", async () => {
-    const players = createPlayerRepo(services);
+    const players = services.repos.player;
     const player = await players.create({
       name: "A",
       shootingHand: "right",
       level: "youth",
     });
-    const repo = createVideoRepo(services);
+    const repo = services.repos.video;
     const video = await repo.create({
       playerId: player.id,
       source: "upload",
@@ -129,7 +79,7 @@ describe("VideoRepo", () => {
 
 describe("SessionRepo", () => {
   async function makePlayer() {
-    return createPlayerRepo(services).create({
+    return services.repos.player.create({
       name: "A",
       shootingHand: "right",
       level: "youth",
@@ -138,7 +88,7 @@ describe("SessionRepo", () => {
 
   it("creates in_progress sessions and completes them", async () => {
     const player = await makePlayer();
-    const repo = createSessionRepo(services);
+    const repo = services.repos.session;
     const session = await repo.create({
       playerId: player.id,
       type: "assessment",
@@ -153,7 +103,7 @@ describe("SessionRepo", () => {
 
   it("aborts sessions", async () => {
     const player = await makePlayer();
-    const repo = createSessionRepo(services);
+    const repo = services.repos.session;
     const session = await repo.create({
       playerId: player.id,
       type: "live_practice",
@@ -165,7 +115,7 @@ describe("SessionRepo", () => {
 
   it("lists by player with type/status filters, newest first", async () => {
     const player = await makePlayer();
-    const repo = createSessionRepo(services);
+    const repo = services.repos.session;
     const a = await repo.create({ playerId: player.id, type: "assessment" });
     services.clock.advance(1000);
     const b = await repo.create({
@@ -191,16 +141,16 @@ describe("SessionRepo", () => {
 
 describe("RepRepo", () => {
   it("creates reps with JSON feedback and lists in order", async () => {
-    const player = await createPlayerRepo(services).create({
+    const player = await services.repos.player.create({
       name: "A",
       shootingHand: "right",
       level: "youth",
     });
-    const session = await createSessionRepo(services).create({
+    const session = await services.repos.session.create({
       playerId: player.id,
       type: "live_practice",
     });
-    const repo = createRepRepo(services);
+    const repo = services.repos.rep;
     await repo.create({
       sessionId: session.id,
       repIndex: 1,

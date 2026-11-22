@@ -12,8 +12,6 @@ import type { BenchmarkService } from "$lib/features/benchmarks";
 import type { DiagnosisService, FocusArea } from "$lib/features/diagnosis";
 import type { ScoringService, SessionScore } from "$lib/features/scoring";
 import type { AppRepos } from "$lib/shared/config/services";
-import { flushDb } from "$lib/shared/db";
-import type { DatabaseAdapter } from "$lib/shared/db";
 import type { PlayerLevel, ShotRecord } from "$lib/shared/db/repos";
 
 export interface AssessmentVideoInput {
@@ -83,7 +81,6 @@ export interface AssessmentService {
 }
 
 export interface AssessmentServiceDeps {
-  db: DatabaseAdapter;
   repos: AppRepos;
   analysis: AnalysisService;
   scoring: ScoringService;
@@ -194,12 +191,10 @@ export function createAssessmentService(
         throwIfAborted(opts.signal, session.id);
         const outcome = await scoreAndDiagnose(session.id);
         await repos.session.complete(session.id);
-        await flushDb(deps.db);
         return outcome;
       } catch (err) {
         if (isAbort(err, opts.signal)) {
           await repos.session.abort(session.id);
-          await flushDb(deps.db);
           throw new AssessmentAbortedError(session.id);
         }
         if (!(err instanceof NoShotsDetectedError)) {
@@ -210,9 +205,7 @@ export function createAssessmentService(
     },
 
     async rescoreSession(sessionId) {
-      const outcome = await scoreAndDiagnose(sessionId);
-      await flushDb(deps.db);
-      return outcome;
+      return scoreAndDiagnose(sessionId);
     },
 
     setShotExcluded: (shotId, excluded) =>

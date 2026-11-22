@@ -80,3 +80,55 @@ jobs:
           name: playwright-report
           path: app/playwright-report
           retention-days: 7
+
+  postgres:
+    name: Postgres (DB suites + e2e on a real server)
+    # The same server code on Postgres instead of SQLite: the database suites
+    # (repos, migrations, auth, live pipeline) against a real server, then the
+    # prod-build e2e suite with DATABASE_URL. See
+    # docs/database-abstraction-plan.md (Phase 5).
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shotcoach
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/shotcoach
+      E2E_DATABASE_URL: postgres://postgres:postgres@localhost:5432/shotcoach_e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build library
+        run: npm run build
+      # One file at a time: each test empties the server's public schema.
+      - name: Database suites on Postgres
+        run: npm run test:db --workspace shotcoach
+      - name: Create the e2e database
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE shotcoach_e2e"
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: app
+      # The prod-build projects (the dev-server parity tier stays on SQLite).
+      - name: e2e on Postgres
+        run: npx playwright test --project=chromium --project=mobile-fakecam
+        working-directory: app
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-postgres
+          path: app/playwright-report
+          retention-days: 7

@@ -69,8 +69,10 @@ single origin and a single database, so a user's data is the same on any
 device they sign in from. Pose **extraction** stays on the client (it needs
 the camera and low latency), but the **stored, authoritative** analysis is
 always the server's — for both the upload and live paths — so results never
-depend on which client produced them. The client no longer bundles sql.js or
-opens an on-device database. See [deviations](../app/docs/deviations.md) for
+depend on which client produced them. The client has no on-device database
+(the sql.js / Capacitor SQLite drivers were removed). The server's database is
+SQLite or Postgres, chosen by env var, behind Kysely — see
+[database-abstraction-plan](./database-abstraction-plan.md). See [deviations](../app/docs/deviations.md) for
 history and [hosting-and-deployment](./hosting-and-deployment.md) for the
 build targets and env vars.
 

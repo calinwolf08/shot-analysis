@@ -8,8 +8,22 @@
  *
  * Data/analysis endpoints read `event.locals.user` to scope and authorize.
  */
-import type { Handle } from "@sveltejs/kit";
+import type { Handle, ServerInit } from "@sveltejs/kit";
+import { building } from "$app/environment";
 import { getAuth, ensureAuthMigrated, TRUSTED_ORIGINS } from "$lib/server/auth";
+import { getKysely } from "$lib/server/db";
+
+/**
+ * Open + migrate the database (app tables, then better-auth's) when the server
+ * starts — not on the first request — so a missing/invalid database config or
+ * a failed migration stops the server at startup instead of failing every
+ * request.
+ */
+export const init: ServerInit = async () => {
+  if (building) return;
+  await getKysely();
+  await ensureAuthMigrated();
+};
 
 function corsHeaders(origin: string | null): Record<string, string> {
   if (!origin || !TRUSTED_ORIGINS.includes(origin)) return {};

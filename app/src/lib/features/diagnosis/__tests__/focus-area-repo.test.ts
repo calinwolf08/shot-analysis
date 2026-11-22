@@ -3,8 +3,6 @@ import {
   createTestServices,
   type TestServices,
 } from "$lib/shared/config/test-services";
-import { createPlayerRepo } from "$lib/shared/db/repos/player-repo";
-import { createSessionRepo } from "$lib/shared/db/repos/session-repo";
 import { createFocusAreaRepo } from "../repo/focus-area-repo";
 
 let services: TestServices;
@@ -12,13 +10,13 @@ let sessionId: string;
 
 beforeEach(async () => {
   services = await createTestServices();
-  const player = await createPlayerRepo(services).create({
+  const player = await services.repos.player.create({
     name: "A",
     shootingHand: "right",
     level: "youth",
   });
   sessionId = (
-    await createSessionRepo(services).create({
+    await services.repos.session.create({
       playerId: player.id,
       type: "assessment",
     })

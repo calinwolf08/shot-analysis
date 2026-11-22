@@ -7,7 +7,7 @@ import {
 } from "$lib/features/diagnosis";
 import { createDrillService, type DrillService } from "$lib/features/drills";
 import type { RepoContext } from "$lib/shared/db/repo-base";
-import { createPlayerRepo, type PlayerRepo } from "$lib/shared/db/repos";
+import type { PlayerRepo } from "$lib/shared/db/repos";
 import {
   adaptFocusAreas,
   generatePlan,
@@ -57,7 +57,8 @@ export interface TrainingPlanServiceDeps {
   plans?: PlanRepo;
   drills?: DrillService;
   focusAreas?: FocusAreaRepo;
-  players?: PlayerRepo;
+  /** The player repo (user-scoped on the server; remote in the browser). */
+  players: PlayerRepo;
 }
 
 /** Focus payload persisted by the diagnosis service in focus_areas rows. */
@@ -83,12 +84,12 @@ function toPlanFocusArea(row: FocusAreaRow): PlanFocusArea | null {
 
 export function createTrainingPlanService(
   ctx: RepoContext,
-  deps: TrainingPlanServiceDeps = {},
+  deps: TrainingPlanServiceDeps,
 ): TrainingPlanService {
   const plans = deps.plans ?? createPlanRepo(ctx);
   const drills = deps.drills ?? createDrillService(ctx);
   const focusAreas = deps.focusAreas ?? createFocusAreaRepo(ctx);
-  const players = deps.players ?? createPlayerRepo(ctx);
+  const { players } = deps;
 
   async function withItems(plan: Plan | null): Promise<PlanWithItems | null> {
     if (!plan) return null;

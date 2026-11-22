@@ -61,11 +61,27 @@ export interface BetterSqliteOptions {
   path?: string;
 }
 
+/** Opens a better-sqlite3 connection with the app's pragmas (WAL, FKs on). */
+export function openBetterSqlite(path = ":memory:"): Database.Database {
+  const db = new Database(path);
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
+  return db;
+}
+
 export function createBetterSqliteAdapter(
   options: BetterSqliteOptions = {},
 ): DatabaseAdapter {
-  const db = new Database(options.path ?? ":memory:");
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
+  return new BetterSqliteAdapter(openBetterSqlite(options.path));
+}
+
+/**
+ * An adapter over an EXISTING connection — so the server's raw-SQL repos and
+ * its Kysely instance share one SQLite connection (and one transaction view)
+ * while the repos move to Kysely (docs/database-abstraction-plan.md).
+ */
+export function createBetterSqliteAdapterFor(
+  db: Database.Database,
+): DatabaseAdapter {
   return new BetterSqliteAdapter(db);
 }

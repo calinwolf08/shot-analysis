@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RequestEvent } from "@sveltejs/kit";
-import { getDb, resetDbSingletonForTests } from "$lib/server/db";
+import { getKysely, resetDbSingletonForTests } from "$lib/server/db";
 import { createFocusAreaRepo } from "$lib/features/diagnosis";
 import { systemClock, uuidIdGenerator } from "$lib/shared/utils";
 
@@ -61,9 +61,9 @@ async function call(h: Handler, opts: Parameters<typeof ev>[0]) {
 
 /** Seeds surfaced focus rows the way the diagnosis service does. */
 async function seedFocus(sessionId: string) {
-  const db = await getDb();
+  const { db: kdb } = await getKysely();
   const repo = createFocusAreaRepo({
-    db,
+    kdb,
     clock: systemClock,
     ids: uuidIdGenerator,
   });

@@ -16,6 +16,11 @@ const executablePath =
   process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ??
   (existsSync(containerChromium) ? containerChromium : undefined);
 
+/** The prod-build server's database: Postgres when E2E_DATABASE_URL is set. */
+const E2E_DB = process.env.E2E_DATABASE_URL
+  ? `DATABASE_URL=${process.env.E2E_DATABASE_URL}`
+  : "DATABASE_PATH=data/e2e.sqlite";
+
 export default defineConfig({
   testDir: "src-tests/e2e",
   globalSetup: "./src-tests/e2e/global-setup.ts",
@@ -84,8 +89,9 @@ export default defineConfig({
       // BODY_SIZE_LIMIT is raised well above adapter-node's 512K default:
       // assessment/live POST multi-MB pose payloads to /api/analysis/* (see
       // docs/hosting-and-deployment.md).
-      command:
-        "VITE_E2E=1 BUILD_TARGET=node npm run build && node scripts/copy-fixtures-to-build.mjs && AUTH_E2E=1 BODY_SIZE_LIMIT=64M DATABASE_PATH=data/e2e.sqlite AUTH_SECRET=e2e-secret-change-me-000000 ORIGIN=http://localhost:4173 AUTH_BASE_URL=http://localhost:4173 PORT=4173 node build",
+      // E2E_DATABASE_URL=postgres://… runs this (prod-build) server on
+      // Postgres instead of the SQLite file — the CI Postgres job does.
+      command: `VITE_E2E=1 BUILD_TARGET=node npm run build && node scripts/copy-fixtures-to-build.mjs && AUTH_E2E=1 BODY_SIZE_LIMIT=64M ${E2E_DB} AUTH_SECRET=e2e-secret-change-me-000000 ORIGIN=http://localhost:4173 AUTH_BASE_URL=http://localhost:4173 PORT=4173 node build`,
       url: "http://localhost:4173/api/health",
       reuseExistingServer: !process.env.CI,
       timeout: 300_000,

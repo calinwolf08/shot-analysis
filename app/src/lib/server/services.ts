@@ -14,8 +14,8 @@
  *
  * Server-only.
  */
-import type { DatabaseAdapter } from "$lib/shared/db";
 import type { RepoContext } from "$lib/shared/db/repo-base";
+import type { AppKysely } from "./database/kysely";
 import { systemClock, uuidIdGenerator } from "$lib/shared/utils";
 import { createDrillService } from "$lib/features/drills";
 import { createBenchmarkService } from "$lib/features/benchmarks";
@@ -40,12 +40,21 @@ export interface ServerDomain {
  * Cheap to build per request: the services are thin factories over the shared
  * DB handle.
  */
+/** The server's repo context: Kysely only (no raw-SQL adapter). */
+function serverContext(kdb: AppKysely): RepoContext {
+  return {
+    kdb,
+    clock: systemClock,
+    ids: uuidIdGenerator,
+  };
+}
+
 export function createServerDomain(
-  db: DatabaseAdapter,
+  kdb: AppKysely,
   userId: string,
 ): ServerDomain {
-  const ctx: RepoContext = { db, clock: systemClock, ids: uuidIdGenerator };
-  const repos = createServerRepos(db, userId);
+  const ctx = serverContext(kdb);
+  const repos = createServerRepos(kdb, userId);
 
   const benchmarks = createBenchmarkService(ctx, { settings: repos.settings });
   const scoring = createScoringService(ctx, {
@@ -69,11 +78,11 @@ export function createServerDomain(
  * data regardless of which user connects first. Uses a throwaway system user id
  * because the catalogs are not user-scoped.
  */
-export async function seedGlobals(db: DatabaseAdapter): Promise<void> {
-  const ctx: RepoContext = { db, clock: systemClock, ids: uuidIdGenerator };
+export async function seedGlobals(kdb: AppKysely): Promise<void> {
+  const ctx = serverContext(kdb);
   const benchmarks = createBenchmarkService(ctx, {
     // The settings repo is only read by getActive(); seed() never touches it.
-    settings: createServerRepos(db, "system").settings,
+    settings: createServerRepos(kdb, "system").settings,
   });
   const drills = createDrillService(ctx);
   await benchmarks.seed();
