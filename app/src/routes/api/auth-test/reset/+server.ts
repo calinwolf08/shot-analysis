@@ -5,11 +5,14 @@
  * parents so SQLite's foreign keys stay satisfied.
  */
 import { error, json } from "@sveltejs/kit";
-import { getDb } from "$lib/server/db";
+import { sql } from "kysely";
+import { getKysely } from "$lib/server/db";
 import type { RequestHandler } from "./$types";
 
 // Child → parent order. Global catalogs are intentionally preserved.
 const TABLES = [
+  "shot_poses",
+  "user_settings",
   "shot_metrics",
   "scores",
   "reps",
@@ -28,10 +31,11 @@ const TABLES = [
 
 export const POST: RequestHandler = async () => {
   if (process.env.AUTH_E2E !== "1") throw error(404, "Not found");
-  const db = await getDb();
+  const { db } = await getKysely();
   for (const table of TABLES) {
     try {
-      await db.run(`DELETE FROM ${table}`);
+      // sql.table quotes the name (`user` / `session` are reserved words).
+      await sql`DELETE FROM ${sql.table(table)}`.execute(db);
     } catch {
       // A table may not exist yet (e.g. before first auth migration) — skip.
     }

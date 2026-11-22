@@ -4,7 +4,11 @@
  */
 import type { AppServices } from "./services";
 import { createDomainServices, createRepos } from "./services";
-import { createBetterSqliteAdapter } from "../db/drivers/better-sqlite3";
+import {
+  createBetterSqliteAdapterFor,
+  openBetterSqlite,
+} from "../db/drivers/better-sqlite3";
+import { createSqliteKysely } from "$lib/server/database/kysely";
 import { migrate } from "../db";
 import {
   createFakeClock,
@@ -38,10 +42,14 @@ const analysisStub: AnalysisService = {
 export async function createTestServices(
   overrides: Partial<TestServices> = {},
 ): Promise<TestServices> {
-  const db = overrides.db ?? createBetterSqliteAdapter();
+  // One in-memory SQLite connection behind both the raw-SQL adapter (legacy
+  // shared repos) and Kysely (feature repos), so they see the same data.
+  const conn = openBetterSqlite(":memory:");
+  const db = overrides.db ?? createBetterSqliteAdapterFor(conn);
   await migrate(db);
   const ctx = {
     db,
+    kdb: overrides.kdb ?? createSqliteKysely(conn),
     clock: overrides.clock ?? createFakeClock(1_000_000),
     ids: overrides.ids ?? createFakeIdGenerator(),
   };

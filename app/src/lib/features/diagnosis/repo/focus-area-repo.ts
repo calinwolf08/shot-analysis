@@ -43,7 +43,7 @@ function toRow(r: DbRow): FocusAreaRow {
 }
 
 export function createFocusAreaRepo(ctx: RepoContext): FocusAreaRepo {
-  const { db, clock, ids } = ctx;
+  const { kdb, clock, ids } = ctx;
   return {
     async replaceForSession(sessionId, areas) {
       const now = clock.now();
@@ -53,34 +53,36 @@ export function createFocusAreaRepo(ctx: RepoContext): FocusAreaRepo {
         sessionId,
         createdAt: now,
       }));
-      await db.transaction(async (tx) => {
-        await tx.run("DELETE FROM focus_areas WHERE session_id = ?", [
-          sessionId,
-        ]);
+      await kdb.transaction().execute(async (trx) => {
+        await trx
+          .deleteFrom("focus_areas")
+          .where("session_id", "=", sessionId)
+          .execute();
         for (const row of rows) {
-          await tx.run(
-            `INSERT INTO focus_areas (id, session_id, rank, issue_group, severity, metrics_json, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [
-              row.id,
-              row.sessionId,
-              row.rank,
-              row.issueGroup,
-              row.severity,
-              JSON.stringify(row.metrics),
-              row.createdAt,
-            ],
-          );
+          await trx
+            .insertInto("focus_areas")
+            .values({
+              id: row.id,
+              session_id: row.sessionId,
+              rank: row.rank,
+              issue_group: row.issueGroup,
+              severity: row.severity,
+              metrics_json: JSON.stringify(row.metrics),
+              created_at: row.createdAt,
+            })
+            .execute();
         }
       });
       return rows;
     },
 
     async listBySession(sessionId) {
-      const rows = await db.query<DbRow>(
-        "SELECT * FROM focus_areas WHERE session_id = ? ORDER BY rank",
-        [sessionId],
-      );
+      const rows = await kdb
+        .selectFrom("focus_areas")
+        .selectAll()
+        .where("session_id", "=", sessionId)
+        .orderBy("rank")
+        .execute();
       return rows.map(toRow);
     },
   };

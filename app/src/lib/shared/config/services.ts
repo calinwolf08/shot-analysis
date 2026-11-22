@@ -38,7 +38,7 @@ import {
   type ScoringService,
 } from "$lib/features/scoring";
 import type { DatabaseAdapter } from "../db";
-import type { RepoContext } from "../db/repo-base";
+import { noDatabase, type RepoContext } from "../db/repo-base";
 import {
   createPlayerRepo,
   createRepRepo,
@@ -221,6 +221,7 @@ export async function createAppServices(): Promise<AppServices> {
   const api = createApiClient();
   const ctx: RepoContext = {
     db: createNoClientDb(),
+    kdb: noDatabase("the browser (all data goes through the API)"),
     clock: systemClock,
     ids: uuidIdGenerator,
   };

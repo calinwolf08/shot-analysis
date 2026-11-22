@@ -236,6 +236,49 @@ oc.columns([...]).doUpdateSet(...))`;
   - Rollback safety.
   - Typed insert/select and CHECK constraints on both.
 
+### Phase 3 (done)
+
+- **All server queries run on Kysely:**
+  - `lib/server/repos.ts` (all 7 user-scoped repos, with the same ownership
+    joins);
+  - the benchmark, drill, focus-area and plan repos;
+  - the progress service;
+  - `seedGlobals`;
+  - the request context's ownership checks (`context.ts`);
+  - the E2E reset route.
+- **Portable SQL:**
+  - `INSERT OR REPLACE` became `onConflict(...).doUpdateSet(...)`.
+  - Multi-statement writes use `kdb.transaction()`.
+  - Aggregates use Kysely's `fn.count / sum / avg`.
+  - The streak's day bucketing is `CAST(ms / 86400000 AS INTEGER)`, which
+    behaves the same on both databases.
+  - Postgres `numeric` (from `AVG`) is now parsed to a number alongside
+    int8.
+- **`RepoContext` gained `kdb`** (typed Kysely). Its `db` field (raw SQL)
+  remains only for the legacy SQLite repos in `shared/db/repos`, which only
+  unit tests use (removed in Phase 7).
+  - The browser context gets `noDatabase(...)`, a placeholder that throws if
+    used, so no Kysely runtime is bundled.
+  - On the server, `db` is a throwing stub.
+- **Schema types moved** to `shared/db/schema.ts` (types only), so shared
+  code can name them without importing a server module.
+- **Startup on Postgres:** `server/db.ts` opens Postgres when `DATABASE_URL`
+  is set, migrates it and seeds the global catalogs.
+  - Sign-in (better-auth) still opens the SQLite file. The startup hook now
+    also migrates auth, so a Postgres URL stops the server at startup with a
+    "Phase 4" message rather than failing at the first sign-in.
+- **Fixed along the way:** the E2E reset route never cleared `shot_poses` or
+  `user_settings`. With foreign keys on, deleting `shots` before
+  `shot_poses` failed silently.
+- **Tests on both SQLite and Postgres (PGlite):**
+  - The per-user isolation suite (8 tests).
+  - The server pipeline end to end through the API: live shot → saved →
+    read-time v3 migration → wrong-angle rejection. A `useDatabaseForTests`
+    hook injects PGlite into the server singleton.
+  - A new domain suite: catalog seeding and upserts, focus-area replace,
+    plan round-trip, and progress history, AVG trend and COUNT/SUM totals
+    as numbers.
+
 ## 4. Risks
 
 | Risk                                                                  | Mitigation                                                                                                   |

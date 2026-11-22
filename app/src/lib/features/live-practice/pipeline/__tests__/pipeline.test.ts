@@ -1,9 +1,20 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import type { PoseData } from "basketball-shot-analysis";
-import { resetDbSingletonForTests } from "$lib/server/db";
+import { resetDbSingletonForTests, useDatabaseForTests } from "$lib/server/db";
+import type { AppDatabase } from "$lib/server/database/kysely";
+import { migrateDatabase } from "$lib/server/database/migrate";
+import { createPgliteDatabase } from "$lib/server/database/__tests__/pglite";
 import { createApiClient } from "$lib/shared/api/client";
 import { createRemoteRepos } from "$lib/shared/api/remote-repos";
 import {
@@ -87,105 +98,121 @@ describe("createLocalPipeline (on-device analysis)", () => {
   });
 });
 
-describe("createServerPipeline (server analysis, end-to-end)", () => {
-  const dir = mkdtempSync(join(tmpdir(), "shotcoach-pipeline-"));
-  const userA: SessionUser = { id: "user-a", email: "a@ex.com", name: "A" };
+describe.each(["sqlite", "postgres"] as const)(
+  "createServerPipeline (server analysis, end-to-end) [%s]",
+  (kind) => {
+    const dir = mkdtempSync(join(tmpdir(), "shotcoach-pipeline-"));
+    const userA: SessionUser = { id: "user-a", email: "a@ex.com", name: "A" };
 
-  beforeAll(() => {
-    process.env.DATABASE_PATH = join(dir, "pipeline.sqlite");
-  });
-  afterAll(() => {
-    delete process.env.DATABASE_PATH;
-    resetDbSingletonForTests();
-    rmSync(dir, { recursive: true, force: true });
-  });
-  beforeEach(() => resetDbSingletonForTests());
+    beforeAll(() => {
+      process.env.DATABASE_PATH = join(dir, "pipeline.sqlite");
+    });
+    afterAll(() => {
+      delete process.env.DATABASE_PATH;
+      resetDbSingletonForTests();
+      rmSync(dir, { recursive: true, force: true });
+    });
+    // Postgres: an in-process PGlite injected into the server singleton.
+    let pg: AppDatabase | null = null;
+    beforeEach(async () => {
+      resetDbSingletonForTests();
+      if (kind === "postgres") {
+        pg = createPgliteDatabase();
+        await migrateDatabase(pg);
+        useDatabaseForTests(pg);
+      }
+    });
+    afterEach(async () => {
+      if (pg) await pg.db.destroy();
+      pg = null;
+    });
 
-  it("POSTs the window, analyzes + persists server-side, returns scorecards", async () => {
-    const api = createApiClient({
-      fetch: inProcessFetch(userA),
-      baseUrl: "http://localhost",
-    });
-    const repos = createRemoteRepos(api);
-    const player = await repos.player.create({
-      name: "A",
-      shootingHand: "right",
-      level: "high-school",
+    it("POSTs the window, analyzes + persists server-side, returns scorecards", async () => {
+      const api = createApiClient({
+        fetch: inProcessFetch(userA),
+        baseUrl: "http://localhost",
+      });
+      const repos = createRemoteRepos(api);
+      const player = await repos.player.create({
+        name: "A",
+        shootingHand: "right",
+        level: "high-school",
+      });
+
+      const pipeline = createServerPipeline({ api });
+      expect(pipeline.location).toBe("server");
+
+      const { shots: result } = await pipeline.process({
+        playerId: player.id,
+        poseData: pose,
+        opts, // ignored server-side (derived from the player there)
+      });
+      expect(result.length).toBeGreaterThanOrEqual(1);
+      expect(result[0]!.scorecard.phases).toHaveLength(4);
+
+      // Persisted player-rooted, with no session.
+      const shots = await repos.shot.listByPlayer(player.id);
+      expect(shots.length).toBe(result.length);
+      expect(shots[0]!.sessionId).toBeNull();
+      expect(shots[0]!.playerId).toBe(player.id);
     });
 
-    const pipeline = createServerPipeline({ api });
-    expect(pipeline.location).toBe("server");
+    it("read-time migration: a pre-v3 shot is recomputed from its pose track and saved", async () => {
+      const api = createApiClient({
+        fetch: inProcessFetch(userA),
+        baseUrl: "http://localhost",
+      });
+      const repos = createRemoteRepos(api);
+      const player = await repos.player.create({
+        name: "Old",
+        shootingHand: "right",
+        level: "high-school",
+      });
+      await createServerPipeline({ api }).process({
+        playerId: player.id,
+        poseData: pose,
+        opts,
+      });
+      const [live] = await repos.shot.listByPlayer(player.id);
+      const v3 = (live!.analysis as StoredShotAnalysis).v3Metrics!;
+      // Make it a schema-1 shot (as saved before v3), through the API.
+      const { v3Metrics: _drop, ...v1 } = live!.analysis as StoredShotAnalysis;
+      await repos.shot.updateAnalysis(live!.id, v1);
+      const old = (await repos.shot.get(live!.id))!;
+      expect((old.analysis as StoredShotAnalysis).v3Metrics).toBeUndefined();
 
-    const { shots: result } = await pipeline.process({
-      playerId: player.id,
-      poseData: pose,
-      opts, // ignored server-side (derived from the player there)
+      const scored = await scoreStoredShot(repos.shot, old, "right", targets);
+      expect(scored.card).not.toBeNull();
+      // Persisted: the next read is already v3 — and equals what live stored.
+      const after = (await repos.shot.get(live!.id))!;
+      const again = (after.analysis as StoredShotAnalysis).v3Metrics!;
+      expect(again).toBeDefined();
+      expect(again.metrics["setPoint.elbow_angle"]!.value).toBeCloseTo(
+        v3.metrics["setPoint.elbow_angle"]!.value,
+        6,
+      );
     });
-    expect(result.length).toBeGreaterThanOrEqual(1);
-    expect(result[0]!.scorecard.phases).toHaveLength(4);
 
-    // Persisted player-rooted, with no session.
-    const shots = await repos.shot.listByPlayer(player.id);
-    expect(shots.length).toBe(result.length);
-    expect(shots[0]!.sessionId).toBeNull();
-    expect(shots[0]!.playerId).toBe(player.id);
-  });
-
-  it("read-time migration: a pre-v3 shot is recomputed from its pose track and saved", async () => {
-    const api = createApiClient({
-      fetch: inProcessFetch(userA),
-      baseUrl: "http://localhost",
+    it("rejects wrong-angle shots server-side without storing them", async () => {
+      const api = createApiClient({
+        fetch: inProcessFetch(userA),
+        baseUrl: "http://localhost",
+      });
+      const repos = createRemoteRepos(api);
+      // Left-handed: the side-right fixture is the guide-arm side for them.
+      const player = await repos.player.create({
+        name: "L",
+        shootingHand: "left",
+        level: "high-school",
+      });
+      const { shots, rejected } = await createServerPipeline({ api }).process({
+        playerId: player.id,
+        poseData: pose,
+        opts,
+      });
+      expect(shots).toEqual([]);
+      expect(rejected.length).toBeGreaterThanOrEqual(1);
+      expect(await repos.shot.listByPlayer(player.id)).toEqual([]);
     });
-    const repos = createRemoteRepos(api);
-    const player = await repos.player.create({
-      name: "Old",
-      shootingHand: "right",
-      level: "high-school",
-    });
-    await createServerPipeline({ api }).process({
-      playerId: player.id,
-      poseData: pose,
-      opts,
-    });
-    const [live] = await repos.shot.listByPlayer(player.id);
-    const v3 = (live!.analysis as StoredShotAnalysis).v3Metrics!;
-    // Make it a schema-1 shot (as saved before v3), through the API.
-    const { v3Metrics: _drop, ...v1 } = live!.analysis as StoredShotAnalysis;
-    await repos.shot.updateAnalysis(live!.id, v1);
-    const old = (await repos.shot.get(live!.id))!;
-    expect((old.analysis as StoredShotAnalysis).v3Metrics).toBeUndefined();
-
-    const scored = await scoreStoredShot(repos.shot, old, "right", targets);
-    expect(scored.card).not.toBeNull();
-    // Persisted: the next read is already v3 — and equals what live stored.
-    const after = (await repos.shot.get(live!.id))!;
-    const again = (after.analysis as StoredShotAnalysis).v3Metrics!;
-    expect(again).toBeDefined();
-    expect(again.metrics["setPoint.elbow_angle"]!.value).toBeCloseTo(
-      v3.metrics["setPoint.elbow_angle"]!.value,
-      6,
-    );
-  });
-
-  it("rejects wrong-angle shots server-side without storing them", async () => {
-    const api = createApiClient({
-      fetch: inProcessFetch(userA),
-      baseUrl: "http://localhost",
-    });
-    const repos = createRemoteRepos(api);
-    // Left-handed: the side-right fixture is the guide-arm side for them.
-    const player = await repos.player.create({
-      name: "L",
-      shootingHand: "left",
-      level: "high-school",
-    });
-    const { shots, rejected } = await createServerPipeline({ api }).process({
-      playerId: player.id,
-      poseData: pose,
-      opts,
-    });
-    expect(shots).toEqual([]);
-    expect(rejected.length).toBeGreaterThanOrEqual(1);
-    expect(await repos.shot.listByPlayer(player.id)).toEqual([]);
-  });
-});
+  },
+);

@@ -6,12 +6,12 @@ import { PGlite } from "@electric-sql/pglite";
 import { Kysely } from "kysely";
 import { PGliteDialect } from "kysely-pglite-dialect";
 import type { AppDatabase } from "../kysely";
-import { PG_INT8_OID } from "../kysely";
+import { PG_NUMBER_OIDS, parsePgNumber } from "../kysely";
 import type { Database } from "../schema";
 
 export function createPgliteDatabase(): AppDatabase {
   const pg = new PGlite({
-    parsers: { [PG_INT8_OID]: (v: string) => Number(v) },
+    parsers: Object.fromEntries(PG_NUMBER_OIDS.map((o) => [o, parsePgNumber])),
   });
   return {
     kind: "postgres",

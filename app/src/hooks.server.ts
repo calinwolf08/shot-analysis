@@ -11,16 +11,18 @@
 import type { Handle, ServerInit } from "@sveltejs/kit";
 import { building } from "$app/environment";
 import { getAuth, ensureAuthMigrated, TRUSTED_ORIGINS } from "$lib/server/auth";
-import { getDb } from "$lib/server/db";
+import { getKysely } from "$lib/server/db";
 
 /**
- * Open + migrate the database when the server starts (not on the first
- * request), so a missing/invalid database config or a failed migration stops
- * the server at startup instead of failing every request.
+ * Open + migrate the database (app tables, then better-auth's) when the server
+ * starts — not on the first request — so a missing/invalid database config or
+ * a failed migration stops the server at startup instead of failing every
+ * request.
  */
 export const init: ServerInit = async () => {
   if (building) return;
-  await getDb();
+  await getKysely();
+  await ensureAuthMigrated();
 };
 
 function corsHeaders(origin: string | null): Record<string, string> {

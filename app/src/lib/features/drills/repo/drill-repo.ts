@@ -40,44 +40,53 @@ function toRow(r: DbRow): DrillRow {
 }
 
 export function createDrillRepo(ctx: RepoContext): DrillRepo {
-  const { db } = ctx;
+  const { kdb } = ctx;
   return {
     async upsert(input) {
-      await db.run(
-        `INSERT INTO drills (id, slug, version, is_placeholder, data_json)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           slug = excluded.slug,
-           version = excluded.version,
-           is_placeholder = excluded.is_placeholder,
-           data_json = excluded.data_json`,
-        [
-          input.id,
-          input.slug,
-          input.version,
-          fromBool(input.isPlaceholder),
-          JSON.stringify(input.data),
-        ],
-      );
+      await kdb
+        .insertInto("drills")
+        .values({
+          id: input.id,
+          slug: input.slug,
+          version: input.version,
+          is_placeholder: fromBool(input.isPlaceholder),
+          data_json: JSON.stringify(input.data),
+        })
+        .onConflict((oc) =>
+          oc.column("id").doUpdateSet((eb) => ({
+            slug: eb.ref("excluded.slug"),
+            version: eb.ref("excluded.version"),
+            is_placeholder: eb.ref("excluded.is_placeholder"),
+            data_json: eb.ref("excluded.data_json"),
+          })),
+        )
+        .execute();
     },
 
     async get(id) {
-      const rows = await db.query<DbRow>("SELECT * FROM drills WHERE id = ?", [
-        id,
-      ]);
-      return rows[0] ? toRow(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("drills")
+        .selectAll()
+        .where("id", "=", id)
+        .executeTakeFirst();
+      return row ? toRow(row) : null;
     },
 
     async getBySlug(slug) {
-      const rows = await db.query<DbRow>(
-        "SELECT * FROM drills WHERE slug = ?",
-        [slug],
-      );
-      return rows[0] ? toRow(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("drills")
+        .selectAll()
+        .where("slug", "=", slug)
+        .executeTakeFirst();
+      return row ? toRow(row) : null;
     },
 
     async list() {
-      const rows = await db.query<DbRow>("SELECT * FROM drills ORDER BY slug");
+      const rows = await kdb
+        .selectFrom("drills")
+        .selectAll()
+        .orderBy("slug")
+        .execute();
       return rows.map(toRow);
     },
   };

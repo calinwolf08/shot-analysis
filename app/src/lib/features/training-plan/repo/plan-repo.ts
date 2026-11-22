@@ -94,7 +94,7 @@ function toItem(r: ItemRowDb): PlanItem {
 }
 
 export function createPlanRepo(ctx: RepoContext): PlanRepo {
-  const { db, clock, ids } = ctx;
+  const { kdb, clock, ids } = ctx;
   return {
     async createWithItems(input) {
       const plan: Plan = {
@@ -105,84 +105,97 @@ export function createPlanRepo(ctx: RepoContext): PlanRepo {
         focus: input.focus,
         createdAt: clock.now(),
       };
-      await db.transaction(async (tx) => {
-        await tx.run(
-          `INSERT INTO plans (id, player_id, source_session_id, status, focus_json, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            plan.id,
-            plan.playerId,
-            plan.sourceSessionId,
-            plan.status,
-            JSON.stringify(plan.focus),
-            plan.createdAt,
-          ],
-        );
+      await kdb.transaction().execute(async (trx) => {
+        await trx
+          .insertInto("plans")
+          .values({
+            id: plan.id,
+            player_id: plan.playerId,
+            source_session_id: plan.sourceSessionId,
+            status: plan.status,
+            focus_json: JSON.stringify(plan.focus),
+            created_at: plan.createdAt,
+          })
+          .execute();
         for (const item of input.items) {
-          await tx.run(
-            `INSERT INTO plan_items (id, plan_id, day_index, position, type, drill_id, focus_metric, target_reps, status, completed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL)`,
-            [
-              ids.next(),
-              plan.id,
-              item.dayIndex,
-              item.position,
-              item.type,
-              item.drillId,
-              item.focusMetric,
-              item.targetReps,
-            ],
-          );
+          await trx
+            .insertInto("plan_items")
+            .values({
+              id: ids.next(),
+              plan_id: plan.id,
+              day_index: item.dayIndex,
+              position: item.position,
+              type: item.type,
+              drill_id: item.drillId,
+              focus_metric: item.focusMetric,
+              target_reps: item.targetReps,
+              status: "pending",
+              completed_at: null,
+            })
+            .execute();
         }
       });
       return plan;
     },
 
     async get(id) {
-      const rows = await db.query<PlanRowDb>(
-        "SELECT * FROM plans WHERE id = ?",
-        [id],
-      );
-      return rows[0] ? toPlan(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("plans")
+        .selectAll()
+        .where("id", "=", id)
+        .executeTakeFirst();
+      return row ? toPlan(row) : null;
     },
 
     async getActiveByPlayer(playerId) {
-      const rows = await db.query<PlanRowDb>(
-        `SELECT * FROM plans WHERE player_id = ? AND status = 'active'
-         ORDER BY created_at DESC LIMIT 1`,
-        [playerId],
-      );
-      return rows[0] ? toPlan(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("plans")
+        .selectAll()
+        .where("player_id", "=", playerId)
+        .where("status", "=", "active")
+        .orderBy("created_at", "desc")
+        .limit(1)
+        .executeTakeFirst();
+      return row ? toPlan(row) : null;
     },
 
     async getItems(planId) {
-      const rows = await db.query<ItemRowDb>(
-        "SELECT * FROM plan_items WHERE plan_id = ? ORDER BY day_index, position",
-        [planId],
-      );
+      const rows = await kdb
+        .selectFrom("plan_items")
+        .selectAll()
+        .where("plan_id", "=", planId)
+        .orderBy("day_index")
+        .orderBy("position")
+        .execute();
       return rows.map(toItem);
     },
 
     async getItem(itemId) {
-      const rows = await db.query<ItemRowDb>(
-        "SELECT * FROM plan_items WHERE id = ?",
-        [itemId],
-      );
-      return rows[0] ? toItem(rows[0]) : null;
+      const row = await kdb
+        .selectFrom("plan_items")
+        .selectAll()
+        .where("id", "=", itemId)
+        .executeTakeFirst();
+      return row ? toItem(row) : null;
     },
 
     async updateItemStatus(itemId, status) {
-      await db.run(
-        "UPDATE plan_items SET status = ?, completed_at = ? WHERE id = ?",
-        [status, status === "pending" ? null : clock.now(), itemId],
-      );
+      await kdb
+        .updateTable("plan_items")
+        .set({
+          status,
+          completed_at: status === "pending" ? null : clock.now(),
+        })
+        .where("id", "=", itemId)
+        .execute();
     },
 
     async setStatus(planId, status) {
-      await db.run("UPDATE plans SET status = ? WHERE id = ?", [
-        status,
-        planId,
-      ]);
+      await kdb
+        .updateTable("plans")
+        .set({ status })
+        .where("id", "=", planId)
+        .execute();
     },
   };
 }
