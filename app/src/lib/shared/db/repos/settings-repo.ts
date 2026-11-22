@@ -15,6 +15,8 @@ export const SETTINGS = {
   keepRepClips: { schema: z.boolean(), default: false },
   /** Live-lesson focus-area ids; [] = coach on everything. */
   liveFocusAreas: { schema: z.array(z.string()), default: [] as string[] },
+  /** Score against one pro (pro-profiles id) instead of all pros; null = all. */
+  scoreAgainstPro: { schema: z.string().nullable(), default: null },
 } as const;
 
 export type SettingKey = keyof typeof SETTINGS;

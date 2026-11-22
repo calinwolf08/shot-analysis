@@ -40,4 +40,5 @@ export { flattenMetrics, categoryOf, labelFor, categoryLabel, } from "./metrics/
 export type { FlatMetric } from "./metrics/v2";
 export { computeSignals, detectEvents, phaseWindows, frameAt, timeAt, LABEL_FOR_EVENT, EVENT_PAD_BEFORE, EVENT_PAD_AFTER, isClippedStartLabel, computeShotMetricsV3, metricsFromSignals, flattenMetricsV3, METRICS_V3_SCHEMA_VERSION, DEFAULT_WORDING, wordingFor, buildTargetsV3, effectiveBand, scoreValue, NEGLIGIBLE_SCORE, LIVE_TARGETS_V3_VERSION, labeledEventFrames, sampleAt, overrideEvents, estimateCameraAngle, widthRatios, DEFAULT_FRONTAL, OPEN_DISAGREEMENT, estimateProportions, } from "./metrics/v3";
 export type { ShotSignals, SignalFrame, ShotEvents, EventId, PhaseWindows, ShotMetricsV3, MetricV3, MetricKind, MetricPhase, MetricUnit, LiveTargetsV3, TargetV3, MetricWording, ShotMetricsOptions, CameraAngleEstimate, Proportions, } from "./metrics/v3";
+export type { ProProfiles, ProProfile, PlayerMetric, } from "./pro-reference/build";
 //# sourceMappingURL=index.d.ts.map

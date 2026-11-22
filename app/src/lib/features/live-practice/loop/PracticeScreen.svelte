@@ -1,4 +1,8 @@
 <script lang="ts">
+  import {
+    CAMERA_ANGLE_WARN,
+    createCameraAngleMonitor,
+  } from "../setup/camera-angle-check";
   /**
    * Continuous, session-less practice loop (live redesign — step 6). Renders a
    * LivePracticeStore: live preview + skeleton overlay, per-shot feedback (the
@@ -102,6 +106,9 @@
 
   let presence = $state<PresenceState>("none");
   let latestFrame = $state<LandmarkFrame | null>(null);
+  /** Estimated camera angle off side-on (null until measured). */
+  let cameraAngle = $state<number | null>(null);
+  const cameraMonitor = createCameraAngleMonitor();
 
   // In-loop positioning gate state (only meaningful when gateActive).
   let positioned = $state(false);
@@ -132,6 +139,9 @@
     const unsubscribe = session.onFrame((frame) => {
       presence = tracker.update(frame);
       latestFrame = frame;
+      const vw = videoEl?.videoWidth ?? 0;
+      const vh = videoEl?.videoHeight ?? 0;
+      if (vw && vh) cameraAngle = cameraMonitor.push(frame, vw / vh);
       if (gate) handleReadiness(gate.update(frame));
     });
     const decay = setInterval(() => (presence = tracker.evaluate()), 400);
@@ -409,6 +419,12 @@
       <div class="pose-badge">
         <span class="indicator-dot"></span>{badgeText}
       </div>
+      {#if cameraAngle !== null && cameraAngle > CAMERA_ANGLE_WARN && store.phase !== "analyzing"}
+        <div class="angle-hint" data-testid="camera-angle-warning">
+          Phone ~{Math.round(cameraAngle)}° off side-on — point it square at
+          your side for accurate metrics
+        </div>
+      {/if}
     {/if}
     <div class="hud-top">
       <button
@@ -728,6 +744,20 @@
   }
   .ready-debug dd {
     margin: 0;
+  }
+  .angle-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 64px;
+    transform: translateX(-50%);
+    max-width: 90%;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgb(120 53 15 / 85%);
+    color: #fde68a;
+    font-size: 12px;
+    text-align: center;
+    z-index: 3;
   }
   .pose-badge {
     position: absolute;

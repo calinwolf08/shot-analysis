@@ -35,9 +35,9 @@
   import { normalizeAreas } from "$lib/features/scoring";
   import {
     loadFeedbackWording,
-    loadLiveTargetsV3,
     type FeedbackWording,
   } from "$lib/features/scoring/v3";
+  import { loadScoringTargets } from "$lib/features/pros";
   import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { createApiClient } from "$lib/shared/api/client";
@@ -139,7 +139,7 @@
     playerId = player.id;
     shootingHand = player.shootingHand;
     requiredSide = requiredOrientation(shootingHand);
-    targets = await loadLiveTargetsV3();
+    targets = (await loadScoringTargets(services.repos.settings)).targets;
     const [loaded, fw] = await Promise.all([
       loadLiveTuning(),
       loadFeedbackWording(),

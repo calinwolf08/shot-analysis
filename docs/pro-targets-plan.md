@@ -11,6 +11,31 @@ Every step is reviewed by a person in the validator tool
 angle and any metric that looks wrong. The target build only uses what was
 approved there.
 
+## Status
+
+All five phases are implemented; what remains is data (reviewing pro clips).
+
+| Phase                  | Where                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Measurement fixes    | `src/metrics/v3` (centre-line torso, `camera-angle.ts`, `proportions.ts`, `cameraAngle` / `events` options); metrics schema 4                                 |
+| 2 Review tool          | `/pros` — `pro-review.html`, `tools/pro-review/`, `src/pro-reference/` (labels v2, angle limits, attempt measurement), `server.ts`; `npm run test:pro-review` |
+| 3 Target build         | `npm run targets:build:pros` — `src/pro-reference/build.ts`, `src/testing/build-pro-targets.ts`                                                               |
+| 4 Leftover angle error | `src/pro-reference/angle-trend.ts` (applied in the build once there's enough data)                                                                            |
+| 5 App                  | `app/src/lib/features/pros` (profiles, closest pros, score against a pro), Profile "Score against", Insights "Closest pros", live camera-angle hint           |
+
+Changes from the plan below, found while building:
+
+- The camera angle is estimated over the dip → set point, not the setup
+  frames: players are often still turning into the shot before the dip.
+- A player's frontal widths only replace the defaults when they were seen
+  close to front-on (a part-way turn inflated Curry's angles to ~50°).
+- `static/reference/pro-profiles.json` ships empty until the first build; the
+  app hides the pro features while it has no pros.
+- The live camera check is a soft on-screen hint, not a change to the
+  positioning gate.
+
+How to use it: `reference-data/README.md`.
+
 ## Background: what we found
 
 - **Curry's clip is ~35–40° off side-on.** Measured from apparent shoulder and

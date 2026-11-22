@@ -298,3 +298,10 @@ export type {
   CameraAngleEstimate,
   Proportions,
 } from "./metrics/v3";
+
+// Pro reference profiles (written by npm run targets:build:pros).
+export type {
+  ProProfiles,
+  ProProfile,
+  PlayerMetric,
+} from "./pro-reference/build";
