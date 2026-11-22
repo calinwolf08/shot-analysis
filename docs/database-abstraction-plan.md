@@ -279,6 +279,32 @@ oc.columns([...]).doUpdateSet(...))`;
     plan round-trip, and progress history, AVG trend and COUNT/SUM totals
     as numbers.
 
+### Phase 4 (done)
+
+- **better-auth uses the server's shared Kysely instance**
+  (`database: { db, type: "sqlite" | "postgres" }`). There is no longer a
+  separate better-sqlite3 handle, and SQLite and Postgres run with one
+  connection or pool.
+- **`server/db.ts` connects synchronously:**
+  - `connect()` creates the SQLite handle or the lazy Postgres pool.
+  - Migrating and seeding stay async (`getKysely()`).
+  - `getConnection()` hands the not-yet-migrated connection to better-auth,
+    which runs its own migrations (`ensureAuthMigrated`).
+  - `getAuth()` rebuilds if the connection changes (tests swap databases).
+- **Startup:** the `init` hook migrates the app tables, then the auth tables.
+  With `DATABASE_URL=postgres://…` the whole server now runs on Postgres.
+- **Existing SQLite files need no migration.** better-auth used the same
+  Kysely adapter internally when it opened the file itself, so its tables are
+  identical. A test signs up an account with the old setup and signs in with
+  the new one.
+- **Tests on both databases:**
+  - Sign up; sign in again, with any letter case in the email.
+  - Duplicate sign-up rejected (422).
+  - Wrong password rejected (401).
+  - Bearer session works; password reset revokes it, and the new password
+    signs in.
+  - Old-setup account compatibility.
+
 ## 4. Risks
 
 | Risk                                                                  | Mitigation                                                                                                   |

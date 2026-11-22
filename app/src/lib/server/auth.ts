@@ -3,19 +3,19 @@
  *
  * Email + password, with the **bearer plugin** so every client (web and
  * native) authenticates the same way — an `Authorization: Bearer <token>`
- * header, no cookies (see docs/server-migration-plan.md). It shares the one
- * server database file with the app repos (better-auth owns the `user`,
- * `session`, `account`, `verification` tables; the app owns the rest).
+ * header, no cookies (see docs/server-migration-plan.md). It runs on the SAME
+ * Kysely connection as the app repos — SQLite or Postgres, whichever the
+ * server is configured for (docs/database-abstraction-plan.md Phase 4).
+ * better-auth owns the `user`, `session`, `account`, `verification` tables;
+ * the app owns the rest.
  *
  * Server-only: never import from client code.
  */
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { bearer } from "better-auth/plugins";
 import { getMigrations } from "better-auth/db/migration";
-import { databasePath } from "./db";
+import { getConnection } from "./db";
+import type { AppDatabase } from "./database/kysely";
 
 /** Signing secret. Required outside dev; a fixed dev fallback keeps `npm run dev` frictionless. */
 function authSecret(): string {
@@ -56,11 +56,10 @@ export const TRUSTED_ORIGINS: readonly string[] = trustedOrigins();
  */
 export const resetUrls = new Map<string, string>();
 
-function createAuth() {
-  const path = databasePath();
-  if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
+function createAuth(conn: AppDatabase) {
   return betterAuth({
-    database: new Database(path),
+    // The server's shared Kysely instance (one connection / pool).
+    database: { db: conn.db, type: conn.kind },
     baseURL: baseURL(),
     basePath: "/api/auth",
     secret: authSecret(),
@@ -86,19 +85,26 @@ export type Auth = ReturnType<typeof createAuth>;
 // Lazily constructed so importing this module (e.g. during the SvelteKit build
 // analyse step) never opens the database — the handle is created on first use.
 let _auth: Auth | null = null;
+/** The connection `_auth` was built on (tests swap databases). */
+let _authConn: AppDatabase | null = null;
+let migrated: Promise<void> | null = null;
 
-/** The process-wide better-auth instance (created + DB opened on first call). */
+/** The process-wide better-auth instance (created on first call). */
 export function getAuth(): Auth {
-  if (!_auth) _auth = createAuth();
+  const conn = getConnection();
+  if (!_auth || _authConn !== conn) {
+    _auth = createAuth(conn);
+    _authConn = conn;
+    migrated = null;
+  }
   return _auth;
 }
 
-let migrated: Promise<void> | null = null;
-
-/** Creates/updates better-auth's tables in the shared DB file (once per process). */
+/** Creates/updates better-auth's tables on the shared connection (once per process). */
 export function ensureAuthMigrated(): Promise<void> {
+  const auth = getAuth(); // (re)builds for the current connection first
   if (!migrated) {
-    migrated = getMigrations(getAuth().options)
+    migrated = getMigrations(auth.options)
       .then(({ runMigrations }) => runMigrations())
       .catch((err) => {
         migrated = null;

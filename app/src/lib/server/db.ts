@@ -32,17 +32,12 @@ import {
 import { noRawSql } from "$lib/shared/db/repo-base";
 import { migrateDatabase } from "./database/migrate";
 
-/**
- * The SQLite file path (better-auth still opens it directly until it moves to
- * the shared connection — docs/database-abstraction-plan.md Phase 4).
- */
+/** The configured SQLite file path (tests inspect it; throws on Postgres). */
 export function databasePath(): string {
   const c = resolveDbConfig(process.env, { building });
   if (c.kind !== "sqlite") {
     throw new DatabaseConfigError(
-      "Sign-in (better-auth) doesn't run on Postgres yet — it moves onto the shared " +
-        "connection in database-abstraction-plan Phase 4. The app data layer is ready; " +
-        "use DATABASE_PATH until then.",
+      "databasePath() is SQLite-only; the server is configured for Postgres.",
     );
   }
   return c.path;
@@ -54,18 +49,22 @@ interface ServerDb {
   readonly kysely: AppDatabase;
 }
 
+/**
+ * The open connection (created synchronously — a SQLite file handle or a lazy
+ * Postgres pool), shared by the app repos AND better-auth (see ./auth).
+ */
+let connection: ServerDb | null = null;
+/** Migrated + seeded. */
 let dbPromise: Promise<ServerDb> | null = null;
 
-async function open(): Promise<ServerDb> {
+function connect(): ServerDb {
+  if (connection) return connection;
   const config: DbConfig = resolveDbConfig(process.env, { building });
-  let server: ServerDb;
   if (config.kind === "postgres") {
-    const kysely: AppDatabase = {
-      kind: "postgres",
-      db: createPostgresKysely(config.url),
+    connection = {
+      adapter: noRawSql("the Postgres server"),
+      kysely: { kind: "postgres", db: createPostgresKysely(config.url) },
     };
-    await migrateDatabase(kysely);
-    server = { adapter: noRawSql("the Postgres server"), kysely };
   } else {
     if (config.path !== ":memory:") {
       mkdirSync(dirname(config.path), { recursive: true });
@@ -73,16 +72,30 @@ async function open(): Promise<ServerDb> {
     // One connection, shared by Kysely and the raw-SQL adapter (the legacy
     // migration runner on an older file, and tests).
     const conn = openBetterSqlite(config.path);
-    const adapter = createBetterSqliteAdapterFor(conn);
-    const kysely: AppDatabase = {
-      kind: "sqlite",
-      db: createSqliteKysely(conn),
+    connection = {
+      adapter: createBetterSqliteAdapterFor(conn),
+      kysely: { kind: "sqlite", db: createSqliteKysely(conn) },
     };
-    await migrateDatabase(kysely, { legacy: adapter });
-    server = { adapter, kysely };
   }
+  console.info(`[db] ${describeDbConfig(config)}`);
+  return connection;
+}
+
+/**
+ * The shared database connection, NOT necessarily migrated yet — for
+ * better-auth, which runs its own migrations (ensureAuthMigrated).
+ */
+export function getConnection(): AppDatabase {
+  return connect().kysely;
+}
+
+async function open(): Promise<ServerDb> {
+  const server = connect();
+  await migrateDatabase(
+    server.kysely,
+    server.kysely.kind === "sqlite" ? { legacy: server.adapter } : {},
+  );
   await seedGlobals(server.kysely.db);
-  console.info(`[db] ${describeDbConfig(config)} ready`);
   return server;
 }
 
@@ -105,7 +118,7 @@ export async function getDb(): Promise<DatabaseAdapter> {
   return (await server()).adapter;
 }
 
-/** The same database through Kysely (typed; SQLite or Postgres). */
+/** The same database through Kysely (typed; SQLite or Postgres), migrated. */
 export async function getKysely(): Promise<AppDatabase> {
   return (await server()).kysely;
 }
@@ -116,6 +129,7 @@ export async function getKysely(): Promise<AppDatabase> {
  * need that should close it themselves.
  */
 export function resetDbSingletonForTests(): void {
+  connection = null;
   dbPromise = null;
 }
 
@@ -124,8 +138,6 @@ export function resetDbSingletonForTests(): void {
  * instead of resolving one from the environment. Seeds the global catalogs.
  */
 export function useDatabaseForTests(kysely: AppDatabase): void {
-  dbPromise = seedGlobals(kysely.db).then(() => ({
-    adapter: noRawSql(`the ${kysely.kind} test server`),
-    kysely,
-  }));
+  connection = { adapter: noRawSql(`the ${kysely.kind} test server`), kysely };
+  dbPromise = seedGlobals(kysely.db).then(() => connection!);
 }
