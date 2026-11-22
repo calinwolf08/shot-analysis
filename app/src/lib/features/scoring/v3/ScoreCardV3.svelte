@@ -1,28 +1,48 @@
 <script lang="ts">
   /**
    * v3 scorecard: the shot's phases in order (Load → Rise → Set point →
-   * Release), each with its 0–10+ score and plain-language rows ("Knee bend:
-   * too shallow by 12°", target band underneath). 0 = on target; the display
-   * caps at 10+. Details are measured but not scored.
+   * Release), each with its 0–10+ score and one short row per metric in the
+   * same words as the practice card ("Spine forward by 3", from the editable
+   * feedback wording) — no degrees or body-length amounts. 0 = on target;
+   * the display caps at 10+. Details are measured but not scored.
    */
   import {
-    describeResult,
     displayScore,
     scoreBand,
-    targetText,
     type MetricResultV3,
     type ScorecardV3,
   } from "./score";
+  import {
+    EMPTY_FEEDBACK_WORDING,
+    feedbackText,
+    type FeedbackWording,
+  } from "./feedback-wording";
 
   let {
     card,
     highlightPhase = null,
     onmetric = null,
+    wording = EMPTY_FEEDBACK_WORDING,
   }: {
     card: ScorecardV3;
     highlightPhase?: string | null;
     onmetric?: ((m: MetricResultV3) => void) | null;
+    wording?: FeedbackWording;
   } = $props();
+
+  /** "Spine forward by 3" · "Knee bend: on target" · "…: not measured". */
+  function rowText(m: MetricResultV3): string {
+    if (m.value === null) return `${m.label}: not measured`;
+    if (!m.direction) return `${m.label}: on target`;
+    if (m.scored && m.score !== null) return feedbackText(m, wording);
+    // Details carry no score: the direction alone.
+    return `${m.label}: ${m.phrase}`;
+  }
+
+  function noteText(m: MetricResultV3): string {
+    if (m.value === null) return m.note ?? "";
+    return m.note === "low resolution" ? "low frame-rate timing" : "";
+  }
 </script>
 
 {#snippet chip(score: number | null, testid?: string)}
@@ -39,13 +59,8 @@
   >
     <button class="row" disabled={!onmetric} onclick={() => onmetric?.(m)}>
       <span class="what">
-        <span class="text">{describeResult(m)}</span>
-        <span class="target"
-          >{m.value === null
-            ? (m.note ?? "")
-            : targetText(m)}{#if m.note === "low resolution"}
-            · low frame-rate timing{/if}</span
-        >
+        <span class="text">{rowText(m)}</span>
+        {#if noteText(m)}<span class="target">{noteText(m)}</span>{/if}
       </span>
       {#if m.scored}{@render chip(m.score)}{/if}
     </button>

@@ -571,7 +571,7 @@
       )}
       {#if entry}
         <div class="breakdown" data-testid="rep-breakdown">
-          <ScoreCardV3 card={entry.scorecard} />
+          <ScoreCardV3 card={entry.scorecard} wording={store.wording} />
         </div>
       {/if}
     {/if}

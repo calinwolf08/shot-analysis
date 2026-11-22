@@ -38,13 +38,15 @@ test("replayed shot: phase-ordered v3 scorecard, 0–10+ scale, 3 phase-named cu
     overall === "10+" || (Number(overall) >= 0 && Number(overall) < 10),
   ).toBe(true);
 
-  // Plain-language rows with targets.
+  // Short rows in the practice card's words — no degrees / body lengths.
   await expect(page.getByTestId("v3-row-load.knee_depth")).toContainText(
-    "Knee bend:",
+    /Knees (deep|shallow) by \d+|Knee bend: (on target|not measured)/,
   );
-  await expect(page.getByTestId("v3-row-load.knee_depth")).toContainText(
-    "target",
-  );
+  const rows = await card
+    .locator('[data-testid^="v3-row-"]')
+    .evaluateAll((els) => els.map((e) => e.textContent ?? ""));
+  for (const t of rows)
+    expect(t.replace("on target", "")).not.toMatch(/°|%|target|length/);
 
   // Spoken feedback: at most 3 cues, each group named by its phase, in order.
   const spoken =
