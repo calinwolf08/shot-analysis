@@ -9,6 +9,7 @@
  */
 import * as fs from "fs/promises";
 import * as path from "path";
+import { parseCalibration, type PlayerCalibration } from "./calibration";
 import {
   statusCounts,
   upgradeLabels,
@@ -26,6 +27,8 @@ export interface PlayerInfo {
   readonly notes?: string;
   /** Written by the target build (Phase 3). */
   readonly proportions?: unknown;
+  /** From calibration photos (front-on widths, side-on lengths). */
+  readonly calibration?: PlayerCalibration;
 }
 
 export interface LibraryAttempt {
@@ -97,6 +100,9 @@ function parsePlayer(raw: unknown, id: string): PlayerInfo {
     shootingHand: r.shootingHand === "left" ? "left" : "right",
     ...(typeof r.notes === "string" ? { notes: r.notes } : {}),
     ...(r.proportions !== undefined ? { proportions: r.proportions } : {}),
+    ...(parseCalibration(r.calibration)
+      ? { calibration: parseCalibration(r.calibration)! }
+      : {}),
   };
 }
 

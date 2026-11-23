@@ -49,6 +49,25 @@ proportions for the angle estimate).
 
     npm run test:pro-review       # smoke test of the review page
 
+## Calibrating a player (recommended)
+
+**Calibrate** (next to the player's name) measures the player's own body
+proportions from a photo or a few seconds of video of them standing
+straight, whole body in the picture, camera level at about chest height:
+
+- **Front-on** (camera square to the chest, arms slightly out): true shoulder
+  and hip width. The camera-angle estimate uses these instead of population
+  averages — the biggest accuracy gain (roughly ±5° → ±2–3°).
+- **Side-on** (camera square to the side, legs straight): true thigh, shin,
+  upper-arm and forearm length. Knee and elbow angles are then measured in 3D
+  wherever a limb looks clearly shorter than it is (tipped toward / away from
+  the camera: knees pushing out, elbow flaring). Elsewhere the normal
+  camera-angle correction applies. The review page shows the value "without
+  3D limbs" where this changed anything.
+
+Check the skeleton on the preview before saving; warnings flag a photo that
+doesn't look front-on / side-on.
+
 ## Building the app's targets
 
     npm run targets:build:pros            # writes the app's targets + profiles
@@ -70,7 +89,8 @@ It writes `app/static/reference/live-targets-v3.json`,
 `app/static/reference/pro-profiles.json` and each player's proportions (in
 `player.json`). Nothing is written while no pro has enough usable attempts.
 
-Optional `reference-data/targets-config.json` (all keys optional):
+Optional `reference-data/targets-config.json` (all keys optional;
+`perSegment: false` turns off the 3D knee / elbow angles):
 
 ```json
 {
@@ -82,6 +102,7 @@ Optional `reference-data/targets-config.json` (all keys optional):
   "styleRatio": 2,
   "styleScored": false,
   "includeFlagged": false,
-  "angleLimits": { "setPoint.elbow_angle": 20 }
+  "angleLimits": { "setPoint.elbow_angle": 20 },
+  "perSegment": true
 }
 ```

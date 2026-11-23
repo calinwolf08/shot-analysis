@@ -39,6 +39,11 @@ import * as path from "path";
 import { createWriteStream } from "fs";
 import { pipeline } from "stream/promises";
 import {
+  parseCalibration,
+  type PlayerCalibration,
+} from "./src/pro-reference/calibration";
+import {
+  readPlayer,
   clipFile,
   createClip,
   listLibrary,
@@ -249,6 +254,22 @@ let htmlContent = await fs.readFile(htmlPath, "utf-8");
 const proBundlePath = path.join(process.cwd(), "dist", "pro-review.js");
 const proHtmlPath = path.join(process.cwd(), "pro-review.html");
 
+/** A player's calibration with the views in `incoming` replaced. */
+async function mergedCalibration(
+  id: string,
+  incoming: unknown,
+): Promise<{ calibration?: PlayerCalibration }> {
+  const add = parseCalibration(incoming);
+  if (!add) return {};
+  let prev: PlayerCalibration | undefined;
+  try {
+    prev = (await readPlayer(PROS_DIR, id)).calibration;
+  } catch {
+    prev = undefined;
+  }
+  return { calibration: { ...(prev ?? {}), ...add } };
+}
+
 /** Pro reference routes; true when handled. */
 async function handlePros(
   req: http.IncomingMessage,
@@ -313,6 +334,8 @@ async function handlePros(
       name?: string;
       shootingHand?: "left" | "right";
       notes?: string;
+      /** Partial: a view given replaces that view only. */
+      calibration?: unknown;
     };
     const id = safeId(body.id || body.name || "");
     if (!id) {
@@ -323,6 +346,7 @@ async function handlePros(
       ...(body.name ? { name: body.name } : {}),
       ...(body.shootingHand ? { shootingHand: body.shootingHand } : {}),
       ...(body.notes !== undefined ? { notes: body.notes } : {}),
+      ...(await mergedCalibration(id, body.calibration)),
     });
     sendJson(res, { id, ...info });
     return true;

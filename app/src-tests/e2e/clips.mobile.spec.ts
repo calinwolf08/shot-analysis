@@ -93,6 +93,17 @@ test("each shot keeps a small, frame-synced, playable clip", async ({
     timeout: 15_000,
   });
   expect(Number(await scrubber.inputValue())).toBeGreaterThanOrEqual(max - 1);
+
+  // ?debug=video: the diagnostics panel, with the clip downloadable.
+  await page.goto(`${page.url().split("?")[0]}?debug=video`);
+  const dbg = page.getByTestId("review-video-debug");
+  await expect(dbg).toContainText("readyState", { timeout: 10_000 });
+  await expect(dbg).toContainText("clip: video/");
+  await expect(dbg).toContainText("loadedmetadata");
+  await expect(page.getByTestId("review-video-download")).toHaveAttribute(
+    "download",
+    /^shot-.+\.(webm|mp4)$/,
+  );
 });
 
 test("Profile 'No video' removes stored clips and stops recording", async ({

@@ -223,11 +223,14 @@
     videoReady = false;
     const clip = await clipStore.get(id).catch(() => null);
     clipInfo = null;
+    clipChecked = false;
+    mediaEvents = [];
     if (clip) {
       clipStartFrameTs = clip.startFrameTs;
       clipMeta = { mime: clip.mime || clip.blob.type, bytes: clip.blob.size };
       clipUrl = URL.createObjectURL(clip.blob);
     }
+    clipChecked = true;
   }
 
   /**
@@ -295,9 +298,95 @@
         (clipInfo.expectedEnd !== null &&
           clipInfo.duration + 0.5 < clipInfo.expectedEnd)),
   );
-  const showClipInfo = $derived(
-    clipProblem || page.url.searchParams.get("debug") === "video",
-  );
+  const debugVideo = $derived(page.url.searchParams.get("debug") === "video");
+  const showClipInfo = $derived(clipProblem || debugVideo);
+
+  // ---- ?debug=video: everything needed to diagnose playback on a device ----
+  /** Whether the clip store was checked, and found nothing. */
+  let clipChecked = $state(false);
+  let mediaEvents = $state<string[]>([]);
+  let mediaState = $state("");
+  const MEDIA_EVENTS = [
+    "loadstart",
+    "loadedmetadata",
+    "loadeddata",
+    "durationchange",
+    "canplay",
+    "canplaythrough",
+    "seeking",
+    "seeked",
+    "play",
+    "playing",
+    "pause",
+    "waiting",
+    "stalled",
+    "suspend",
+    "ended",
+    "error",
+    "emptied",
+  ] as const;
+  function readMediaState(v: HTMLVideoElement): string {
+    const range = (r: TimeRanges) =>
+      Array.from(
+        { length: r.length },
+        (_, i) => `${r.start(i).toFixed(2)}–${r.end(i).toFixed(2)}`,
+      ).join(",") || "none";
+    const q = v.getVideoPlaybackQuality?.();
+    return [
+      `readyState ${v.readyState}, networkState ${v.networkState}`,
+      `error ${v.error ? `${v.error.code} ${v.error.message || ""}` : "none"}`,
+      `size ${v.videoWidth}×${v.videoHeight}`,
+      `time ${v.currentTime.toFixed(2)} / ${isFinite(v.duration) ? v.duration.toFixed(2) : String(v.duration)}`,
+      `seekable ${range(v.seekable)}, buffered ${range(v.buffered)}`,
+      `frames decoded ${q ? `${q.totalVideoFrames} (dropped ${q.droppedVideoFrames})` : "n/a"}`,
+    ].join(" · ");
+  }
+  $effect(() => {
+    const v = videoEl;
+    if (!v || !debugVideo) return;
+    const on = (e: Event) => {
+      mediaEvents = [
+        ...mediaEvents.slice(-11),
+        `${(performance.now() / 1000).toFixed(2)}s ${e.type}`,
+      ];
+      mediaState = readMediaState(v);
+    };
+    for (const t of MEDIA_EVENTS) v.addEventListener(t, on);
+    mediaState = readMediaState(v);
+    const tick = setInterval(() => (mediaState = readMediaState(v)), 1000);
+    return () => {
+      for (const t of MEDIA_EVENTS) v.removeEventListener(t, on);
+      clearInterval(tick);
+    };
+  });
+  function debugText(): string {
+    return [
+      `ShotCoach video debug — shot ${shotId}`,
+      `browser: ${navigator.userAgent}`,
+      clipUrl
+        ? `clip: ${clipMeta?.mime || "?"}, ${clipMeta ? (clipMeta.bytes / 1e6).toFixed(2) : "?"} MB, startFrameTs ${clipStartFrameTs ?? "none"}`
+        : clipChecked
+          ? "clip: none stored for this shot on this device"
+          : "clip: not checked yet",
+      clipInfo
+        ? `prepared: duration ${fmtSec(clipInfo.duration)}, seekable to ${fmtSec(clipInfo.seekableEnd)}, shot ends at ${clipInfo.expectedEnd !== null ? fmtSec(clipInfo.expectedEnd) : "?"}`
+        : "prepared: no (metadata never loaded)",
+      `ready for scrubbing: ${videoReady}`,
+      `media: ${mediaState || "–"}`,
+      `events: ${mediaEvents.join(", ") || "none"}`,
+      `pose frames: ${poses?.frames.length ?? 0}, timed: ${poses?.frames.some((f) => typeof f.t === "number") ?? false}`,
+    ].join("\n");
+  }
+  let copied = $state(false);
+  async function copyDebug() {
+    try {
+      await navigator.clipboard.writeText(debugText());
+      copied = true;
+      setTimeout(() => (copied = false), 2000);
+    } catch {
+      /* clipboard blocked: the text is shown below */
+    }
+  }
   function fmtSec(n: number): string {
     return isFinite(n) ? `${n.toFixed(1)} s` : "unknown";
   }
@@ -690,6 +779,26 @@
               · {clipMeta.mime || "?"} · {(clipMeta.bytes / 1e6).toFixed(2)} MB{/if}
           </p>
         {/if}
+        {#if debugVideo}
+          <div class="video-debug" data-testid="review-video-debug">
+            <pre>{debugText()}</pre>
+            <div class="row">
+              {#if clipUrl}
+                <a
+                  class="dbg-btn"
+                  href={clipUrl}
+                  download="shot-{shotId}.{clipMeta?.mime.includes('mp4')
+                    ? 'mp4'
+                    : 'webm'}"
+                  data-testid="review-video-download">Download clip</a
+                >
+              {/if}
+              <button class="dbg-btn" onclick={() => void copyDebug()}
+                >{copied ? "Copied" : "Copy details"}</button
+              >
+            </div>
+          </div>
+        {/if}
       </div>
     {/if}
 
@@ -885,6 +994,29 @@
   }
   .scrubber input {
     width: 100%;
+  }
+  .video-debug {
+    margin-top: 0.5rem;
+    font-size: 11px;
+    color: var(--sc-text-dim);
+  }
+  .video-debug pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0 0 6px;
+  }
+  .video-debug .row {
+    display: flex;
+    gap: 8px;
+  }
+  .dbg-btn {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--sc-border);
+    background: var(--sc-card);
+    color: var(--sc-text);
+    text-decoration: none;
   }
   .clip-info {
     margin: 0.25rem 0 0;

@@ -12,10 +12,12 @@ function frame(i: number, deg: number): LandmarkFrame {
   const lm = Array.from({ length: 33 }, () => ({
     x: 0.5,
     y: 0.5,
+    z: 0,
     visibility: 0,
+    confidence: 0,
   }));
   const put = (j: number, x: number, y: number) =>
-    (lm[j] = { x, y, visibility: 0.9 });
+    (lm[j] = { x, y, z: 0, visibility: 0.9, confidence: 0.9 });
   // Shoulder width 0.8 × torso, hip width 0.5 × torso when front-on.
   put(11, 0.5 - 0.4 * torso * s, 0.3);
   put(12, 0.5 + 0.4 * torso * s, 0.3);

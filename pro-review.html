@@ -381,6 +381,20 @@
         font-size: 12px;
         color: var(--fair);
       }
+      dialog {
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        width: min(720px, 92vw);
+        padding: 16px;
+      }
+      dialog::backdrop {
+        background: rgb(0 0 0 / 60%);
+      }
+      dialog th {
+        width: 90px;
+      }
       kbd {
         background: var(--panel2);
         border: 1px solid var(--border);
@@ -478,6 +492,7 @@
         <div id="tabBody"></div>
       </section>
     </div>
+    <dialog id="calibrateDialog"></dialog>
     <script src="/dist/pro-review.js"></script>
   </body>
 </html>

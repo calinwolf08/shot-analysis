@@ -34,6 +34,7 @@ import {
   type Series,
   type ShotSignals,
   type SignalFrame,
+  type SegmentLengths,
   type Side,
 } from "./signals";
 
@@ -104,6 +105,11 @@ export interface ShotMetricsOptions {
    * are still detected.
    */
   events?: Partial<Record<EventId, number>>;
+  /**
+   * True limb lengths ÷ torso (calibration; pro data only): knee and elbow
+   * angles measured in 3D per frame (signals.ts `limbVector3d`).
+   */
+  segmentLengths?: SegmentLengths;
 }
 
 export function computeShotMetricsV3(

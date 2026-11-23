@@ -144,6 +144,32 @@ async function main(): Promise<void> {
   await page.waitForFunction(() =>
     document.getElementById("saveState")!.textContent!.startsWith("Saved"),
   );
+  // Calibration: the dialog opens; a saved front-on calibration shows ✓
+  // and is stored in player.json.
+  await page.locator('[data-calibrate="curry"]').click();
+  await page
+    .locator("#calibrateDialog")
+    .getByText("not calibrated")
+    .first()
+    .waitFor();
+  await page.locator("#calClose").click();
+  await page.evaluate(() =>
+    fetch("/api/pros/players", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "curry",
+        calibration: {
+          front: { shoulders: 0.7, hips: 0.45, frames: 3, at: "2026-01-01" },
+        },
+      }),
+    }),
+  );
+  await page.reload();
+  await page
+    .locator('[data-calibrate="curry"]', { hasText: "Calibrated" })
+    .waitFor();
+  log("calibration ok");
   await browser.close();
 
   const saved = JSON.parse(
@@ -163,6 +189,14 @@ async function main(): Promise<void> {
     fail("flag not saved");
   if (s.status !== "approved") fail(`status ${s.status}`);
   if (saved.shots[0].status !== "unreviewed") fail("other attempts changed");
+  const player = JSON.parse(
+    fs.readFileSync(path.join(root, "curry", "player.json"), "utf8"),
+  );
+  if (
+    player.calibration?.front?.shoulders !== 0.7 ||
+    player.name !== "Stephen Curry"
+  )
+    fail(`player.json ${JSON.stringify(player)}`);
   if (errors.length) fail(`page errors: ${errors.join("; ")}`);
   console.log("pro-review smoke: OK");
 }
