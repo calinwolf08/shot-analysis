@@ -29,6 +29,11 @@ import {
   type PoseFile,
 } from "../../src/pro-reference";
 import { detectShots } from "../../src/detection/pose-shot-detector";
+import {
+  frontalFor,
+  type PlayerCalibration,
+} from "../../src/pro-reference/calibration";
+import { openCalibration } from "./calibrate";
 import type { LiveTargetsV3 } from "../../src/metrics/v3";
 import {
   drawGeometry,
@@ -63,6 +68,7 @@ interface LibPlayer {
   id: string;
   name: string;
   shootingHand: "left" | "right";
+  calibration?: PlayerCalibration;
   clips: LibClip[];
   counts: Record<AttemptStatus, number>;
 }
@@ -176,7 +182,7 @@ function renderTree(): void {
   el.totals.textContent = `${S.library.length} players · ${all.length} attempts · ${c.approved} approved · ${c.flagged} flagged · ${c.excluded} excluded · ${c.unreviewed} unreviewed`;
   let html = "";
   for (const p of S.library) {
-    html += `<div class="player"><span>${esc(p.name)} <span class="counts">${p.shootingHand} · ${p.counts.approved}/${p.clips.reduce((n, c) => n + c.attempts.length, 0)} approved</span></span><button class="small" data-add-clip="${p.id}" title="Add a clip">+ Clip</button></div>`;
+    html += `<div class="player"><span>${esc(p.name)} <span class="counts">${p.shootingHand} · ${p.counts.approved}/${p.clips.reduce((n, c) => n + c.attempts.length, 0)} approved</span></span><span><button class="small" data-calibrate="${p.id}" title="Body proportions from a standing photo">${p.calibration?.front ? "Calibrated ✓" : "Calibrate"}</button> <button class="small" data-add-clip="${p.id}" title="Add a clip">+ Clip</button></span></div>`;
     for (const c of p.clips) {
       const active = S.player?.id === p.id && S.clip === c.id;
       html += `<div class="clip ${active ? "active" : ""}" data-player="${p.id}" data-clip="${c.id}"><span>${esc(c.id)}</span><span>${c.poses ? "" : "no poses · "}${c.video ? "" : "no video · "}${c.attempts.length}</span></div>`;
@@ -192,6 +198,24 @@ function renderTree(): void {
 
 el.tree.addEventListener("click", (e) => {
   const t = e.target as HTMLElement;
+  const cal = t.closest<HTMLElement>("[data-calibrate]");
+  if (cal) {
+    const p = S.library.find((x) => x.id === cal.dataset.calibrate);
+    if (p)
+      openCalibration(p, async (calibration) => {
+        const r = await postJson<{ calibration?: PlayerCalibration }>(
+          "/api/pros/players",
+          { id: p.id, calibration },
+        );
+        await loadLibrary();
+        if (S.player?.id === p.id) {
+          remeasure();
+          void computeOutliers();
+        }
+        return r.calibration;
+      });
+    return;
+  }
   const add = t.closest<HTMLElement>("[data-add-clip]");
   if (add) {
     void addClip(add.dataset.addClip!);
@@ -292,7 +316,7 @@ async function computeOutliers(): Promise<void> {
     if (!poses || !labels) continue;
     for (const s of labels.shots) {
       if (s.status === "excluded") continue;
-      const m = measureAttempt(poses, s, { shootingHand: p.shootingHand });
+      const m = measureAttempt(poses, s, measureOptions(p));
       const v: Record<string, number | null> = {};
       for (const id of Object.keys(S.targets.metrics)) {
         const x = m.primary.metrics[id];
@@ -303,6 +327,12 @@ async function computeOutliers(): Promise<void> {
   }
   S.outliers = playerOutliers(values);
   if (S.measure) renderPanel();
+}
+
+/** Measurement options for a player (front-on calibration when saved). */
+function measureOptions(p: LibPlayer) {
+  const f = frontalFor(p.calibration, null);
+  return { shootingHand: p.shootingHand, ...(f ? { frontal: f } : {}) };
 }
 
 function current(): AttemptLabel | null {
@@ -345,7 +375,7 @@ function remeasure(): void {
   const a = current();
   S.measure =
     a && S.poses && S.player
-      ? measureAttempt(S.poses, a, { shootingHand: S.player.shootingHand })
+      ? measureAttempt(S.poses, a, measureOptions(S.player))
       : null;
   S.rows =
     S.measure && a && S.targets ? metricRows(S.measure, a, S.targets) : [];
