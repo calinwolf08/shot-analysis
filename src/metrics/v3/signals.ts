@@ -54,6 +54,8 @@ export interface ShotSignals {
   readonly centreLine: boolean;
   /** Camera angle corrected for (deg off side-on; 0 = none). */
   readonly cameraAngle: number;
+  /** Knee / elbow angles measured per segment in 3D (true lengths given). */
+  readonly segments3d: boolean;
   /** Shooting wrist height (screen y, DOWN is +, units of frame height). */
   readonly wristY: Series;
   /** Near hip screen y. */
@@ -247,6 +249,11 @@ export function computeSignals(
     fps?: number;
     /** Degrees off side-on (pro data): stretch x by 1 / cos(angle). */
     cameraAngle?: number;
+    /**
+     * True limb lengths ÷ torso length (calibration; pro data only): knee and
+     * elbow angles are then measured in 3D per frame — see `limbVector3d`.
+     */
+    segmentLengths?: SegmentLengths;
   },
 ): ShotSignals {
   const cam = Math.min(MAX_CAMERA_ANGLE, Math.abs(opts.cameraAngle ?? 0));
@@ -301,6 +308,15 @@ export function computeSignals(
   const hipA: Series = [];
   const elbow: Series = [];
   const spine: Series = [];
+  const seg3d = opts.segmentLengths
+    ? perSegment3d(frames, opts.segmentLengths, {
+        aspect: opts.aspect,
+        cameraAngle: cam,
+        near,
+        shoot,
+        far,
+      })
+    : null;
   const seg: Record<SegmentName, number[]> = {
     thigh: [],
     shin: [],
@@ -324,14 +340,18 @@ export function computeSignals(
       ? mid(sn, pt(f, LM.shoulder[far], a, FAR_VIS))
       : sn;
     const base = centreLine ? mid(h, pt(f, LM.hip[far], a, FAR_VIS)) : h;
-    knee.push(h && k && an ? angleAt(h, k, an) : null);
+    knee.push(
+      seg3d ? seg3d.knee(f) : h && k && an ? angleAt(h, k, an) : null,
+    );
     // Hip angle: the torso direction, placed at the near hip, vs the thigh.
     hipA.push(
       top && base && h && k
         ? angleAt({ x: h.x + top.x - base.x, y: h.y + top.y - base.y }, h, k)
         : null,
     );
-    elbow.push(s && e && w ? angleAt(s, e, w) : null);
+    elbow.push(
+      seg3d ? seg3d.elbow(f) : s && e && w ? angleAt(s, e, w) : null,
+    );
     spine.push(
       top && base
         ? (Math.atan2(facingSign * (top.x - base.x), base.y - top.y) * 180) /
@@ -386,6 +406,7 @@ export function computeSignals(
     nearSide: near,
     centreLine,
     cameraAngle: cam,
+    segments3d: !!seg3d,
     wristY: prep(wristY),
     hipY: prep(hipY),
     kneeAngle: prepAngle(knee),
@@ -406,5 +427,156 @@ export function computeSignals(
       forearm: median(seg.forearm),
       upperArm: median(seg.upperArm),
     },
+  };
+}
+
+// ---- per-segment 3D (known limb lengths) ----------------------------------------
+
+/** True limb lengths ÷ torso length (mid-shoulders → mid-hips). */
+export interface SegmentLengths {
+  readonly thigh: number | null;
+  readonly shin: number | null;
+  readonly upperArm: number | null;
+  readonly forearm: number | null;
+}
+
+/** A limb counts as clearly tipped out of the picture below this share of its true length. */
+export const FORESHORTENED = 0.9;
+
+/**
+ * A limb's 3D direction from its 2D image vector (true-aspect x, y).
+ *
+ * The depth (toward / away from the camera) a single view loses comes from:
+ *  - its TRUE length, when the limb looks clearly short (|v| < 90% of L):
+ *    depth = √(L² − |v|²) — this catches limbs leaving the side-on plane
+ *    (elbow flaring, knees pushing out);
+ *  - otherwise the side-on default: a limb in the shooter's side-on plane,
+ *    seen `cameraAngle` off side-on, has depth = x × tan(angle). That is
+ *    exactly the 1/cos stretch used for every other metric, so the two
+ *    agree wherever the lengths say nothing.
+ *
+ * Which way the depth points is set by the limb's x direction (side-on
+ * geometry); the overall front-of / behind-the-shooter sign flips every limb
+ * together and so cancels out of joint angles. When x is too small to say
+ * (< 15% of L), the previous frame's sign is kept.
+ */
+export function limbVector3d(
+  v: { x: number; y: number },
+  trueLength: number | null,
+  tanAngle: number,
+  prevSign: 1 | -1,
+): { x: number; y: number; z: number; sign: 1 | -1 } {
+  const len = Math.hypot(v.x, v.y);
+  if (
+    trueLength !== null &&
+    trueLength > 0 &&
+    len < FORESHORTENED * trueLength
+  ) {
+    const depth = Math.sqrt(trueLength * trueLength - len * len);
+    const sign: 1 | -1 =
+      Math.abs(v.x) < 0.15 * trueLength ? prevSign : v.x >= 0 ? 1 : -1;
+    // Toward the side-on default's direction when the camera angle has one.
+    const dir = tanAngle >= 0 ? 1 : -1;
+    return { x: v.x, y: v.y, z: sign * dir * depth, sign };
+  }
+  const sign: 1 | -1 = v.x >= 0 ? 1 : -1;
+  return { x: v.x, y: v.y, z: v.x * tanAngle, sign };
+}
+
+/** Interior angle between two 3D vectors from a joint (deg). */
+export function angle3d(
+  a: { x: number; y: number; z: number },
+  b: { x: number; y: number; z: number },
+): number {
+  const d = Math.hypot(a.x, a.y, a.z) * Math.hypot(b.x, b.y, b.z);
+  if (d === 0) return NaN;
+  const c = (a.x * b.x + a.y * b.y + a.z * b.z) / d;
+  return (Math.acos(Math.max(-1, Math.min(1, c))) * 180) / Math.PI;
+}
+
+/** Knee (near side) and elbow (shooting side) angles per frame, in 3D. */
+function perSegment3d(
+  frames: readonly SignalFrame[],
+  lengths: SegmentLengths,
+  o: {
+    aspect: number;
+    cameraAngle: number;
+    near: Side;
+    shoot: Side;
+    far: Side;
+  },
+): {
+  knee(f: SignalFrame): number | null;
+  elbow(f: SignalFrame): number | null;
+} {
+  // Raw (un-stretched) true-aspect coordinates: depth is added explicitly.
+  const a = o.aspect;
+  const tan = Math.tan((o.cameraAngle * Math.PI) / 180);
+  // Torso length (mid-shoulders → mid-hips) over the window, in image units.
+  const torsos: number[] = [];
+  for (const f of frames) {
+    const sn = pt(f, LM.shoulder[o.near], a);
+    const sf = pt(f, LM.shoulder[o.far], a, FAR_VIS);
+    const hn = pt(f, LM.hip[o.near], a);
+    const hf = pt(f, LM.hip[o.far], a, FAR_VIS);
+    if (sn && hn) {
+      const top = sf ? { x: (sn.x + sf.x) / 2, y: (sn.y + sf.y) / 2 } : sn;
+      const base = hf ? { x: (hn.x + hf.x) / 2, y: (hn.y + hf.y) / 2 } : hn;
+      torsos.push(dist(top, base));
+    }
+  }
+  const torso = median(torsos) ?? 0;
+  const L = (r: number | null) => (r !== null && torso > 0 ? r * torso : null);
+  const signs = { thigh: 1, shin: 1, upper: 1, fore: 1 } as Record<
+    string,
+    1 | -1
+  >;
+  const joint = (
+    f: SignalFrame,
+    ids: [number, number, number],
+    l1: number | null,
+    l2: number | null,
+    k1: string,
+    k2: string,
+  ): number | null => {
+    const p = pt(f, ids[0], a);
+    const j = pt(f, ids[1], a);
+    const q = pt(f, ids[2], a);
+    if (!p || !j || !q) return null;
+    const v1 = limbVector3d(
+      { x: p.x - j.x, y: p.y - j.y },
+      l1,
+      tan,
+      signs[k1]!,
+    );
+    const v2 = limbVector3d(
+      { x: q.x - j.x, y: q.y - j.y },
+      l2,
+      tan,
+      signs[k2]!,
+    );
+    signs[k1] = v1.sign;
+    signs[k2] = v2.sign;
+    return angle3d(v1, v2);
+  };
+  return {
+    knee: (f) =>
+      joint(
+        f,
+        [LM.hip[o.near], LM.knee[o.near], LM.ankle[o.near]],
+        L(lengths.thigh),
+        L(lengths.shin),
+        "thigh",
+        "shin",
+      ),
+    elbow: (f) =>
+      joint(
+        f,
+        [LM.shoulder[o.shoot], LM.elbow[o.shoot], LM.wrist[o.shoot]],
+        L(lengths.upperArm),
+        L(lengths.forearm),
+        "upper",
+        "fore",
+      ),
   };
 }

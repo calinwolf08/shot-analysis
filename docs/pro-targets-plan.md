@@ -34,6 +34,18 @@ Changes from the plan below, found while building:
 - The live camera check is a soft on-screen hint, not a change to the
   positioning gate.
 
+Added after the plan:
+
+- **Calibration photos** (`src/pro-reference/calibration.ts`, review page →
+  Calibrate): front-on shoulder / hip widths for the camera-angle estimate,
+  side-on limb lengths for the per-segment correction; saved to
+  `player.json`.
+- **Per-segment 3D knee / elbow angles** (`signals.ts` `limbVector3d`): with
+  true limb lengths, a limb that looks < 90% of its length gets its depth from
+  the length; otherwise the side-on default (identical to the 1/cos stretch).
+  Front / behind ambiguity cancels out of joint angles. On by default in the
+  build for players with a side-on calibration (`perSegment` in the config).
+
 How to use it: `reference-data/README.md`.
 
 ## Background: what we found

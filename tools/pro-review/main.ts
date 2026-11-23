@@ -332,7 +332,12 @@ async function computeOutliers(): Promise<void> {
 /** Measurement options for a player (front-on calibration when saved). */
 function measureOptions(p: LibPlayer) {
   const f = frontalFor(p.calibration, null);
-  return { shootingHand: p.shootingHand, ...(f ? { frontal: f } : {}) };
+  const side = p.calibration?.side;
+  return {
+    shootingHand: p.shootingHand,
+    ...(f ? { frontal: f } : {}),
+    ...(side ? { segmentLengths: side } : {}),
+  };
 }
 
 function current(): AttemptLabel | null {
@@ -839,7 +844,7 @@ function metricHtml(r: MetricRow, outliers: Set<string>): string {
     <div class="top"><span class="score" data-band="${r.scored ? band(r.score) : "none"}">${r.scored ? scoreText(r.score) : "·"}</span>
       <span class="text">${esc(phrase(r))}</span>
       <button class="small" data-flag="${r.id}">${r.flag !== null ? "Unflag" : "Flag"}</button></div>
-    <div class="detail">${fmt(r.value, r.unit)} (target ${fmt(r.passMin, r.unit)} to ${fmt(r.passMax, r.unit)}) · uncorrected ${fmt(r.uncorrected, r.unit)} · from detection ${fmt(r.fromDetection, r.unit)}${atZero(r)}${r.note ? ` · ${esc(r.note)}` : ""}</div>
+    <div class="detail">${fmt(r.value, r.unit)} (target ${fmt(r.passMin, r.unit)} to ${fmt(r.passMax, r.unit)}) · uncorrected ${fmt(r.uncorrected, r.unit)} · from detection ${fmt(r.fromDetection, r.unit)}${atZero(r)}${r.planar !== null && r.value !== null && Math.abs(r.planar - r.value) > 0.05 ? ` · without 3D limbs ${fmt(r.planar, r.unit)}` : ""}${r.note ? ` · ${esc(r.note)}` : ""}</div>
     ${badges.trim() ? `<div class="detail">${badges}</div>` : ""}</div>`;
 }
 

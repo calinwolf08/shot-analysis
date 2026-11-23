@@ -54,6 +54,11 @@ export interface BuildConfig {
   readonly angleLimits: Readonly<Record<string, number>>;
   /** Leftover angle error: fitted and removed when the data shows it. */
   readonly angleTrend: TrendConfig;
+  /**
+   * Knee / elbow angles per segment in 3D for players with a side-on
+   * calibration (true limb lengths). Off = the camera-angle stretch only.
+   */
+  readonly perSegment: boolean;
 }
 
 export const DEFAULT_BUILD_CONFIG: BuildConfig = {
@@ -64,6 +69,7 @@ export const DEFAULT_BUILD_CONFIG: BuildConfig = {
   includeFlagged: false,
   angleLimits: {},
   angleTrend: DEFAULT_TREND_CONFIG,
+  perSegment: true,
 };
 
 /** Merges a (partial) config file over the defaults. */

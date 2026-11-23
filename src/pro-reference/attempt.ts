@@ -17,6 +17,7 @@ import {
   scoreValue,
   type CameraAngleEstimate,
   type LiveTargetsV3,
+  type SegmentLengths,
   type ShotMetricsV3,
   type SignalFrame,
 } from "../metrics/v3";
@@ -34,6 +35,11 @@ export interface MeasureOptions {
   readonly shootingHand: "left" | "right";
   /** The shooter's frontal widths (proportions), for the angle estimate. */
   readonly frontal?: { shoulders: number; hips: number };
+  /**
+   * True limb lengths ÷ torso (side-on calibration): knee and elbow angles
+   * are then measured per segment in 3D.
+   */
+  readonly segmentLengths?: SegmentLengths;
 }
 
 /** Frames of an attempt's window, padded for event search. */
@@ -55,6 +61,11 @@ export interface AttemptMeasurement {
   readonly uncorrected: ShotMetricsV3;
   /** Detected events + camera correction (labels vs detection). */
   readonly fromDetection: ShotMetricsV3;
+  /**
+   * Like `primary` but without the per-segment 3D knee / elbow angles
+   * (null when no limb lengths were given) — shows what that changed.
+   */
+  readonly planar: ShotMetricsV3 | null;
   /** Body-based estimate over the dip → set point. */
   readonly autoCamera: CameraAngleEstimate | null;
   /** The camera angle applied: confirmed/adjusted label, else the estimate. */
@@ -114,13 +125,23 @@ export function measureAttempt(
   });
   const usedLabels = Object.keys(labelled).length > 0;
   const events = usedLabels ? { events: labelled } : {};
+  const segs = o.segmentLengths ? { segmentLengths: o.segmentLengths } : {};
+  const planar = computeShotMetricsV3(win, {
+    ...base,
+    ...events,
+    cameraAngle: angle,
+  });
   return {
     app,
-    primary: computeShotMetricsV3(win, {
-      ...base,
-      ...events,
-      cameraAngle: angle,
-    }),
+    primary: o.segmentLengths
+      ? computeShotMetricsV3(win, {
+          ...base,
+          ...events,
+          ...segs,
+          cameraAngle: angle,
+        })
+      : planar,
+    planar: o.segmentLengths ? planar : null,
     uncorrected: computeShotMetricsV3(win, { ...base, ...events }),
     fromDetection: computeShotMetricsV3(win, { ...base, cameraAngle: angle }),
     autoCamera,
@@ -185,6 +206,8 @@ export interface MetricRow {
   readonly value: number | null;
   readonly uncorrected: number | null;
   readonly fromDetection: number | null;
+  /** Without per-segment 3D (null when not used or unchanged). */
+  readonly planar: number | null;
   readonly frames: readonly number[];
   readonly score: number | null;
   readonly direction: "low" | "high" | null;
@@ -224,6 +247,7 @@ export function metricRows(
       value,
       uncorrected: valueOf(m.uncorrected, id),
       fromDetection: valueOf(m.fromDetection, id),
+      planar: m.planar ? valueOf(m.planar, id) : null,
       frames: m.primary.metrics[id]?.frames ?? [],
       score: s?.score ?? null,
       direction: s?.direction ?? null,

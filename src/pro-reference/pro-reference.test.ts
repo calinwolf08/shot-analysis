@@ -161,6 +161,20 @@ describe("measuring an attempt", () => {
     );
   });
 
+  it("with true limb lengths, knee / elbow angles are measured in 3D", () => {
+    const seg = measureAttempt(poses, shot, {
+      shootingHand: "right",
+      segmentLengths: { thigh: 0.9, shin: 0.9, upperArm: 0.6, forearm: 0.5 },
+    });
+    expect(seg.planar).not.toBeNull();
+    expect(m.planar).toBeNull();
+    // Only knee / elbow-based metrics can change.
+    expect(seg.primary.metrics["load.ball_drop"]!.value).toBeCloseTo(
+      seg.planar!.metrics["load.ball_drop"]!.value,
+      9,
+    );
+  });
+
   it("compares labelled key frames with detection", () => {
     const checks = keyframeChecks(shot, m.app);
     const sp = checks.find((c) => c.key === "set_point")!;

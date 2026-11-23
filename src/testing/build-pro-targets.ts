@@ -86,6 +86,8 @@ async function main(): Promise<void> {
     if (!dryRun) await writePlayer(root, p.id, { proportions: props });
     // Front-on calibration photo first, else widths seen in the clips.
     const frontal = frontalFor(p.calibration, props);
+    // Side-on calibration photo: true limb lengths for 3D knee / elbow angles.
+    const segmentLengths = cfg.perSegment ? p.calibration?.side : undefined;
     for (const c of clips) {
       for (const s of c.labels.shots) {
         const where = `${p.id}/${c.id} shot ${s.shotNumber}`;
@@ -103,6 +105,7 @@ async function main(): Promise<void> {
         const m = measureAttempt(c.poses, s, {
           shootingHand: p.shootingHand,
           ...(frontal ? { frontal } : {}),
+          ...(segmentLengths ? { segmentLengths } : {}),
         });
         if (!s.camera?.confirmed) {
           dropped.push({
