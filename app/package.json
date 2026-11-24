@@ -20,7 +20,8 @@
     "check:size": "node scripts/check-bundle-size.mjs",
     "check:stripped": "node scripts/check-debug-stripped.mjs",
     "test:e2e": "playwright test",
-    "test:db": "vitest run --no-file-parallelism src/lib/server src/lib/features/live-practice/pipeline"
+    "test:db": "vitest run --no-file-parallelism src/lib/server src/lib/features/live-practice/pipeline",
+    "replay:capture": "vitest run src/lib/features/live-practice/debug/__tests__/live-capture.test.ts -t \"capture from a device\""
   },
   "dependencies": {
     "@capacitor-community/keep-awake": "^7.1.0",

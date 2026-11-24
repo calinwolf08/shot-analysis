@@ -7,6 +7,12 @@
    * and tracking; coming back reopens them without asking again.
    */
   import { onDestroy } from "svelte";
+  import {
+    createLiveCapture,
+    type LiveCapture,
+    type LiveCaptureFile,
+  } from "$lib/features/live-practice/debug/live-capture";
+  import LiveCapturePanel from "$lib/features/live-practice/debug/LiveCapturePanel.svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import type { LiveAnalysisSession } from "$lib/features/analysis";
@@ -92,6 +98,13 @@
     : liveVideoUrl
       ? createFileCaptureService(liveVideoUrl)
       : createBrowserCaptureService();
+
+  // `?debug=capture` (production too): record the last ~20 s of poses and
+  // the loop's decisions, exportable for diagnosis (live-capture.ts).
+  const liveCapture =
+    page.url.searchParams.get("debug") === "capture"
+      ? createLiveCapture()
+      : null;
 
   const liveDebug =
     import.meta.env.VITE_LIVE_DEBUG === "1" ||
@@ -208,6 +221,7 @@
     );
     const activeCoordinator = coordinator;
     session.onFrame((frame) => activeCoordinator.pushFrame(frame));
+    if (liveCapture) recordLoop(liveCapture, activeCoordinator, session);
 
     const shotStore = createRepoShotStore(services.repos.shot);
     const realPipeline = createLiveShotPipeline({
@@ -221,7 +235,7 @@
     const analysisDelay = devSurfaces
       ? Number(page.url.searchParams.get("analysisDelayMs") ?? 0) || 0
       : 0;
-    const pipeline =
+    const timedPipeline =
       analysisDelay > 0
         ? {
             ...realPipeline,
@@ -233,6 +247,40 @@
             },
           }
         : realPipeline;
+    const pipeline = liveCapture
+      ? {
+          ...timedPipeline,
+          async process(
+            input: Parameters<typeof timedPipeline.process>[0],
+          ): ReturnType<typeof timedPipeline.process> {
+            liveCapture.event("pipeline.start", {
+              frames: input.poseData.frames.length,
+              focusIndex: input.focusIndex,
+              size: [input.poseData.width, input.poseData.height],
+            });
+            try {
+              const r = await timedPipeline.process(input);
+              liveCapture.event("pipeline.result", {
+                shots: r.shots.map((x) => ({
+                  overall: x.scorecard.overall,
+                  frames: [
+                    x.shot.analysis.frameRange.start,
+                    x.shot.analysis.frameRange.end,
+                  ],
+                  orientation: x.shot.analysis.orientation,
+                })),
+                rejected: r.rejected,
+              });
+              return r;
+            } catch (e) {
+              liveCapture.event("pipeline.error", {
+                message: e instanceof Error ? e.message : String(e),
+              });
+              throw e;
+            }
+          },
+        }
+      : timedPipeline;
     store = new LivePracticeStore({
       coordinator,
       pipeline,
@@ -249,6 +297,72 @@
     // Already unlocked this page-load (came back from another tab): go.
     if (started) store.start();
     phase = "running";
+  }
+
+  /** Feeds the flight recorder: frames, coordinator decisions, velocity. */
+  function recordLoop(
+    cap: LiveCapture,
+    c: LiveRepCoordinator,
+    s: LiveAnalysisSession,
+  ): void {
+    s.onFrame((f) => cap.frame(f));
+    c.on("stateChanged", (e) => cap.event("state", e));
+    c.on("repStarted", (e) => cap.event("rep.started", e));
+    c.on("repAnalyzing", (e) => cap.event("rep.analyzing", e));
+    c.on("repResult", (e) =>
+      cap.event("rep.result", {
+        shots: e.analysis.shots.length,
+        window: [e.window.frames[0]?.timestamp, e.window.endedAt],
+        trigger: e.window.trigger,
+      }),
+    );
+    c.on("noShot", (e) =>
+      cap.event("rep.noShot", {
+        reason: e.reason,
+        frames: e.window.frames.length,
+        window: [e.window.frames[0]?.timestamp, e.window.endedAt],
+        trigger: e.window.trigger,
+      }),
+    );
+    c.on("nearTrigger", (e) => cap.event("rep.nearTrigger", e));
+    c.on("debug", (d) =>
+      cap.sample({
+        t: d.timestamp,
+        state: d.state,
+        posePresent: d.posePresent,
+        velocity: d.smoothedVelocity,
+        riseVelocity: d.riseVelocity,
+        settleVelocity: d.settleVelocity,
+        settledForMs: d.settledForMs,
+      }),
+    );
+    cap.setMeta({
+      userAgent: navigator.userAgent,
+      shootingHand,
+      requiredOrientation: requiredSide,
+      fps: s.fps,
+      tuning,
+      screen: [window.innerWidth, window.innerHeight, window.devicePixelRatio],
+    });
+  }
+
+  function exportCapture(): LiveCaptureFile {
+    const cap = liveCapture!;
+    const stats = session?.stats?.() ?? null;
+    cap.setMeta({
+      started,
+      armed: coordinator?.armed ?? null,
+      coordinatorState: coordinator?.state ?? null,
+      storePhase: store?.phase ?? null,
+      storeCycle: store?.cycle ?? null,
+      shotsThisSession: store?.shots.length ?? 0,
+      poseStats: stats,
+      frameSize: session?.frameSize?.() ?? null,
+    });
+    return cap.export({
+      fps: session?.fps ?? 30,
+      frameSize: session?.frameSize?.() ?? null,
+    });
   }
 
   /** The one-time tap: unlock audio inside the gesture, start detecting. */
@@ -356,9 +470,13 @@
     onfocuschange={persistFocus}
     {tuning}
     debug={liveDebug}
+    capture={liveCapture}
     needsStart={!started}
     onstart={handleStart}
   />
+  {#if liveCapture}
+    <LiveCapturePanel capture={liveCapture} exportFile={exportCapture} />
+  {/if}
   {#if liveDebug && coordinator}
     <LiveDebugHud {coordinator} {session} />
   {/if}
