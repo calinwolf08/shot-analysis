@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { LiveCapture } from "../debug/live-capture";
   import {
     CAMERA_ANGLE_WARN,
     createCameraAngleMonitor,
@@ -65,6 +66,7 @@
     onfocuschange = null,
     tuning = DEFAULT_LIVE_TUNING,
     debug = false,
+    capture = null,
     needsStart = false,
     onstart = () => {},
   }: {
@@ -83,6 +85,8 @@
     tuning?: LiveTuning;
     /** Show the readiness/cue debug panel (dev/E2E only). */
     debug?: boolean;
+    /** `?debug=capture` flight recorder: readiness + arming are logged. */
+    capture?: LiveCapture | null;
     /** Show the one-time "Tap to start" overlay (audio unlock). */
     needsStart?: boolean;
     onstart?: () => void;
@@ -156,7 +160,23 @@
    * banner follows the gate live; speech is paced (hold → cooldown → repeat
    * limit) so the player has time to move before hearing the next cue.
    */
+  let lastArmed: boolean | null = null;
+  /** Last readiness logged to the capture (log only changes). */
+  let lastLogged = "";
   function handleReadiness(s: ReadinessState): void {
+    if (capture) {
+      const key = `${s.positioned}|${s.cue}|${s.fullBodyOk}|${s.detected}|${Math.round(s.agreement * 10)}`;
+      if (key !== lastLogged) {
+        lastLogged = key;
+        capture.event("readiness", {
+          positioned: s.positioned,
+          cue: s.cue,
+          fullBodyOk: s.fullBodyOk,
+          detected: s.detected,
+          agreement: Math.round(s.agreement * 100) / 100,
+        });
+      }
+    }
     positioned = s.positioned;
     cue = s.cue;
     if (debug) readiness = s;
@@ -179,7 +199,12 @@
 
   // Shot detection only starts while positioned (no gate → always armed).
   $effect(() => {
-    store.setArmed(gateActive ? positioned : true);
+    const armed = gateActive ? positioned : true;
+    if (capture && armed !== lastArmed) {
+      lastArmed = armed;
+      capture.event("armed", { armed, gateActive });
+    }
+    store.setArmed(armed);
   });
 
   // Keep a clip rolling while the player is positioned and between shots, so a

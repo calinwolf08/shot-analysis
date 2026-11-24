@@ -39,6 +39,11 @@
   } from "$lib/features/reference/metric-geometry";
   import { scoreStoredShot } from "./scored-shots";
   import { phaseAtFrame, phaseMarks } from "./phase-timeline";
+  import {
+    extractClipFrames,
+    nearestFrame,
+    type ClipFrames,
+  } from "./clip-frames";
   import { REANALYSIS_UNAVAILABLE } from "./shot-list";
   import { phaseName } from "../loop/readback";
   import { Button } from "$lib/shared/ui";
@@ -79,6 +84,17 @@
   let clipUrl = $state<string | null>(null);
   /** The clip's first frame on the pose-frame clock (null: older clip). */
   let clipStartFrameTs = $state<number | null>(null);
+  /**
+   * The clip decoded once into a frame per pose frame (see clip-frames):
+   * scrubbing / playing draw these instead of seeking the <video>, which is
+   * slow when a recording has few keyframes (Android Firefox).
+   */
+  let clipFrames = $state.raw<ClipFrames | null>(null);
+  /** Pose frameIndex for each entry of clipFrames. */
+  let clipFrameIdx: number[] = [];
+  let framesProgress = $state<string | null>(null);
+  let clipCanvas = $state<HTMLCanvasElement | null>(null);
+  let frameToken = 0;
   /** Video is playing and driving the scrubber. */
   let playing = $state(false);
   let videoEl = $state<HTMLVideoElement | null>(null);
@@ -224,6 +240,9 @@
     const clip = await clipStore.get(id).catch(() => null);
     clipInfo = null;
     clipChecked = false;
+    clipFrames = null;
+    framesProgress = null;
+    frameToken++;
     mediaEvents = [];
     if (clip) {
       clipStartFrameTs = clip.startFrameTs;
@@ -269,6 +288,30 @@
     }
     readClipInfo(v);
     videoReady = true;
+    void buildClipFrames(v);
+  }
+
+  /** Decode the clip into one frame per pose frame (once per shot). */
+  async function buildClipFrames(v: HTMLVideoElement): Promise<void> {
+    const p = poses;
+    if (!p || p.frames.length === 0) return;
+    const idx = p.frames.map((f) => f.frameIndex);
+    const times = idx.map((i) => videoTimeFor(i));
+    if (times.some((t) => t === null)) return; // no timing: keep seeking
+    const token = ++frameToken;
+    framesProgress = `Preparing video… 0/${idx.length}`;
+    const frames = await extractClipFrames(v, times as number[], {
+      cancelled: () => token !== frameToken,
+      onProgress: (d, n) => {
+        if (token === frameToken) framesProgress = `Preparing video… ${d}/${n}`;
+      },
+    });
+    if (token !== frameToken) return;
+    framesProgress = null;
+    if (frames.some((f) => f !== null)) {
+      clipFrameIdx = idx;
+      clipFrames = frames;
+    }
   }
 
   /** Clip size/format and what the browser can seek in it (diagnostics). */
@@ -372,6 +415,7 @@
         ? `prepared: duration ${fmtSec(clipInfo.duration)}, seekable to ${fmtSec(clipInfo.seekableEnd)}, shot ends at ${clipInfo.expectedEnd !== null ? fmtSec(clipInfo.expectedEnd) : "?"}`
         : "prepared: no (metadata never loaded)",
       `ready for scrubbing: ${videoReady}`,
+      `frames decoded for review: ${clipFrames ? `${clipFrames.filter((f) => f).length}/${clipFrames.length}` : (framesProgress ?? "no")}`,
       `media: ${mediaState || "–"}`,
       `events: ${mediaEvents.join(", ") || "none"}`,
       `pose frames: ${poses?.frames.length ?? 0}, timed: ${poses?.frames.some((f) => typeof f.t === "number") ?? false}`,
@@ -396,7 +440,10 @@
     clipUrl = null;
   }
 
-  onDestroy(revokeClip);
+  onDestroy(() => {
+    frameToken++;
+    revokeClip();
+  });
 
   function markerLeft(startFrame: number): number {
     const span = Math.max(end - start, 1);
@@ -462,7 +509,9 @@
   $effect(() => {
     const v = videoEl;
     const c = current;
-    if (!v || !videoReady || playing) return;
+    // Not while frames are being decoded (it would disturb the decode) or
+    // once they're ready (they're drawn instead).
+    if (!v || !videoReady || playing || clipFrames || framesProgress) return;
     const t = videoTimeFor(c);
     if (t === null) return;
     try {
@@ -478,6 +527,10 @@
     if (playing) {
       v.pause();
       playing = false;
+      return;
+    }
+    if (clipFrames && poses) {
+      playFrames();
       return;
     }
     if (current >= end) current = start;
@@ -502,6 +555,52 @@
     };
     requestAnimationFrame(tick);
   }
+
+  /** Play by stepping through the decoded frames at the pose frames' times. */
+  function playFrames(): void {
+    const frs = poses!.frames;
+    if (current >= end) current = start;
+    let k = Math.max(
+      0,
+      frs.findIndex((f) => f.frameIndex === current),
+    );
+    const tOf = (i: number) => frs[i]!.t ?? (frs[i]!.frameIndex * 1000) / 30;
+    const t0 = tOf(k);
+    const s0 = performance.now();
+    playing = true;
+    const tick = () => {
+      if (!playing) return;
+      const target = t0 + (performance.now() - s0);
+      while (k < frs.length - 1 && tOf(k + 1) <= target) k++;
+      current = frs[k]!.frameIndex;
+      if (k >= frs.length - 1) {
+        playing = false;
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  // Draw the decoded frame for the shown pose frame.
+  $effect(() => {
+    const c = clipCanvas;
+    const frames = clipFrames;
+    const box = videoBox;
+    const cur = current;
+    if (!c || !frames || !box) return;
+    let k = clipFrameIdx.indexOf(cur);
+    if (k < 0) k = clipFrameIdx.findIndex((i) => i > cur) - 1;
+    const f = nearestFrame(frames, Math.max(0, k));
+    const dpr =
+      typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    c.width = Math.round(box.width * dpr);
+    c.height = Math.round(box.height * dpr);
+    const ctx = c.getContext("2d");
+    if (!ctx || !f) return;
+    ctx.drawImage(f.canvas, 0, 0, c.width, c.height);
+    c.dataset.frameVideoTime = f.time.toFixed(3);
+  });
 
   $effect(() => {
     const c = canvas;
@@ -644,6 +743,16 @@
             void prepareVideo(v);
           }}
         ></video>
+        {#if clipFrames}
+          <canvas
+            bind:this={clipCanvas}
+            class="clip"
+            data-testid="review-clip-frames"
+            style={videoBox
+              ? `left:${videoBox.left}px;top:${videoBox.top}px;width:${videoBox.width}px;height:${videoBox.height}px`
+              : ""}
+          ></canvas>
+        {/if}
       {/if}
       {#if poses && poses.frames.length > 0}
         <canvas
@@ -734,7 +843,7 @@
             class="play"
             data-testid="review-play"
             aria-label={playing ? "Pause video" : "Play video"}
-            disabled={!videoReady}
+            disabled={!videoReady || framesProgress !== null}
             onclick={() => void togglePlay()}
           >
             {playing ? "⏸" : "▶"}
@@ -764,6 +873,10 @@
         {/if}
         <div class="scrub-meta">
           <span>frame {current - start + 1} / {end - start + 1}</span>
+          {#if framesProgress}<span
+              class="frames-progress"
+              data-testid="review-frames-progress">{framesProgress}</span
+            >{/if}
           {#if currentPhase}<span class="phase-tag" data-testid="review-phase"
               >{phaseName(currentPhase)}</span
             >{/if}
@@ -854,6 +967,9 @@
     place-content: center;
   }
   /* Positioned + sized by the shot framing (same transform as the pose). */
+  .frames-progress {
+    color: var(--sc-text-dim);
+  }
   .clip {
     position: absolute;
     object-fit: fill;

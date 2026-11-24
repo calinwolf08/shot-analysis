@@ -59,8 +59,11 @@ test("each shot keeps a small, frame-synced, playable clip", async ({
   expect(size).toBeGreaterThan(1_000);
   expect(size).toBeLessThan(1_800_000);
 
-  // Frame-exact sync: scrubbing to a frame seeks the video to that frame's
-  // capture time relative to the clip start (same clock).
+  // The clip is decoded once into a frame per pose frame; scrubbing draws
+  // the frame grabbed at that pose frame's capture time relative to the clip
+  // start (same clock) — no seeking (slow with few keyframes).
+  const frames = page.getByTestId("review-clip-frames");
+  await expect(frames).toBeVisible({ timeout: 30_000 });
   const scrubber = page.getByTestId("review-scrubber");
   const canvas = page.getByTestId("review-skeleton");
   const min = Number(await scrubber.getAttribute("min"));
@@ -77,7 +80,9 @@ test("each shot keeps a small, frame-synced, playable clip", async ({
       `frame ${f} (t=${t}) vs clip start ${startTs}`,
     ).toBeGreaterThanOrEqual(0);
     await expect
-      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .poll(async () =>
+        Number(await frames.getAttribute("data-frame-video-time")),
+      )
       .toBeCloseTo(expected, 1);
   }
   await setRange(scrubber, Math.round((min + max) / 2));
