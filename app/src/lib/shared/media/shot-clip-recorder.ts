@@ -111,7 +111,12 @@ function defaultMakeRecorder(
   mime: string,
   bps: number,
 ): RecorderLike {
-  const opts: MediaRecorderOptions = { videoBitsPerSecond: bps };
+  // A keyframe every second where the browser supports asking for one
+  // (Chromium); others ignore it. Few keyframes make seeking slow — review
+  // decodes the clip into frames anyway (review/clip-frames.ts).
+  const opts: MediaRecorderOptions & {
+    videoKeyFrameIntervalDuration?: number;
+  } = { videoBitsPerSecond: bps, videoKeyFrameIntervalDuration: 1000 };
   if (mime) opts.mimeType = mime;
   return new MediaRecorder(stream, opts) as unknown as RecorderLike;
 }
