@@ -79,11 +79,15 @@ test("each shot keeps a small, frame-synced, playable clip", async ({
       expected,
       `frame ${f} (t=${t}) vs clip start ${startTs}`,
     ).toBeGreaterThanOrEqual(0);
+    // The decoded frame's own media time: the recorded frame nearest the
+    // pose frame — headless fake-camera recordings can hold only ~10 frames/s.
     await expect
       .poll(async () =>
-        Number(await frames.getAttribute("data-frame-video-time")),
+        Math.abs(
+          Number(await frames.getAttribute("data-frame-video-time")) - expected,
+        ),
       )
-      .toBeCloseTo(expected, 1);
+      .toBeLessThan(0.15);
   }
   await setRange(scrubber, Math.round((min + max) / 2));
   await page.screenshot({ path: screenPath("phase7", "1-review-with-video") });

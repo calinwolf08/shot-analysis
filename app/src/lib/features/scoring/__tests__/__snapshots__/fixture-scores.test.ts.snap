@@ -13,7 +13,7 @@ exports[`fixture rep scores vs placeholder benchmark > scores every fixture shot
     },
     {
       "excluded": 4,
-      "formScore": 30.06,
+      "formScore": 30.38,
     },
   ],
   "20190804_140654": [
@@ -27,19 +27,19 @@ exports[`fixture rep scores vs placeholder benchmark > scores every fixture shot
     },
     {
       "excluded": 9,
-      "formScore": 31.25,
-    },
-    {
-      "excluded": 10,
-      "formScore": 16.36,
-    },
-    {
-      "excluded": 6,
-      "formScore": 32.86,
+      "formScore": 33.06,
     },
     {
       "excluded": 11,
-      "formScore": 27.37,
+      "formScore": 15.79,
+    },
+    {
+      "excluded": 3,
+      "formScore": 34.15,
+    },
+    {
+      "excluded": 11,
+      "formScore": 28.56,
     },
     {
       "excluded": 9,

@@ -25,6 +25,7 @@ import {
   type ShotAnalysis,
   type ShotMetricsV2,
   type ShotMetricsV3,
+  type ShotDetectorConfig,
 } from "basketball-shot-analysis";
 import type { AnalyzeOptions, LandmarkFrame, ProgressCallback } from "../types";
 
@@ -153,6 +154,19 @@ function prepare(
   return { detection, metrics, source };
 }
 
+/**
+ * Shot detector settings for the app. The library's boundary detector wants
+ * the wrist rising >= 0.012 frame-heights PER FRAME, which at 30 fps (live
+ * shots are re-detected at full rate) is 0.36 frame-heights/s — a slow form
+ * shot from a player at half the frame height rises ~0.3/s and was missed.
+ * 0.0085 still finds it; over the labeled test recordings (51 shots) it
+ * detects exactly what 0.012 does (45 found, 2 extra) — from 0.0075 down a
+ * labeled shot is lost. See docs/live-frame-rate.md.
+ */
+export const APP_SHOT_DETECTOR: ShotDetectorConfig = {
+  boundaryConfig: { velocityThreshold: 0.0085 },
+};
+
 export interface ReplayRunOptions {
   fps: number;
   width?: number;
@@ -165,6 +179,8 @@ export interface ReplayRunOptions {
    * side-aware detector here (it tolerates the occluded far side); without
    * it the library's `detectOrientation` is used (hidden upload path).
    */
+  /** Shot boundary/phase detector settings (APP_SHOT_DETECTOR when omitted). */
+  detector?: ShotDetectorConfig;
   orientationOf?: (
     frames: readonly PoseDataFrame[],
   ) => ShotAnalysis["orientation"];
@@ -209,7 +225,7 @@ export function runReplayAnalysis(
     shotsDetected: 0,
     phase: "detecting",
   });
-  const detector = new ShotDetector();
+  const detector = new ShotDetector(run.detector ?? APP_SHOT_DETECTOR);
   const shots = detector.processFrames(prepared.detection);
 
   // Phase: extracting (per shot).
