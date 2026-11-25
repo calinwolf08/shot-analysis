@@ -13,6 +13,7 @@
     type LiveCaptureFile,
   } from "$lib/features/live-practice/debug/live-capture";
   import LiveCapturePanel from "$lib/features/live-practice/debug/LiveCapturePanel.svelte";
+  import { deviceDebugEnabled } from "$lib/shared/debug/debug-mode";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import type { LiveAnalysisSession } from "$lib/features/analysis";
@@ -103,12 +104,10 @@
       ? createFileCaptureService(liveVideoUrl)
       : createBrowserCaptureService();
 
-  // `?debug=capture` (production too): record the last ~20 s of poses and
-  // the loop's decisions, exportable for diagnosis (live-capture.ts).
-  const liveCapture =
-    page.url.searchParams.get("debug") === "capture"
-      ? createLiveCapture()
-      : null;
+  // Debug mode (`?debug=on`, remembered across pages; production too): record
+  // the last ~20 s of poses and the loop's decisions, exportable for
+  // diagnosis (live-capture.ts).
+  const liveCapture = deviceDebugEnabled(page.url) ? createLiveCapture() : null;
 
   const liveDebug =
     import.meta.env.VITE_LIVE_DEBUG === "1" ||
