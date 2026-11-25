@@ -496,3 +496,42 @@ describe("arming (positioning gate)", () => {
     await waitState(coordinator, "FEEDBACK");
   });
 });
+
+describe("slow / small-in-frame shots (overhead trigger)", () => {
+  // Synthetic pose: nose y 0.15, torso ≈ 0.28. 0.33 units/s is under the
+  // 0.35 screen-unit trigger but ≈ 1.2 torso lengths/s.
+  it("starts a rep when the wrist rises past the head, even at 10 fps", () => {
+    const { coordinator, events } = harness(async () => oneShot);
+    const cursor = makeCursor(10);
+    feed(coordinator, stillPose(cursor, 1000));
+    feed(coordinator, wristRise(cursor, 0.33, 1500)); // ends above the nose
+    expect(events.repStarted).toEqual([
+      expect.objectContaining({ cause: "overhead" }),
+    ]);
+  });
+
+  it("ignores the same slow rise when it stays below the head", () => {
+    const { coordinator, events } = harness(async () => oneShot);
+    const cursor = makeCursor(10);
+    feed(coordinator, stillPose(cursor, 1000));
+    feed(coordinator, wristRise(cursor, 0.33, 900)); // tops out at ~0.25
+    feed(coordinator, stillPose(cursor, 600));
+    expect(events.repStarted).toHaveLength(0);
+  });
+
+  it("smooths over the same time span at 10 and 30 fps", () => {
+    const peakAt = (fps: number) => {
+      const { coordinator } = harness(async () => oneShot);
+      let peak = 0;
+      coordinator.on(
+        "debug",
+        (d) => (peak = Math.max(peak, d.smoothedVelocity)),
+      );
+      const cursor = makeCursor(fps);
+      feed(coordinator, stillPose(cursor, 1000));
+      feed(coordinator, wristRise(cursor, 0.3, 400));
+      return peak;
+    };
+    expect(Math.abs(peakAt(10) - peakAt(30))).toBeLessThan(0.03);
+  });
+});

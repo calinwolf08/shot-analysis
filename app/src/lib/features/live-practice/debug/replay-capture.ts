@@ -100,10 +100,18 @@ export async function replayCapture(
   );
   let peak = 0;
   let rise = null as number | null;
+  // Only frames where a rep could start count (positioned, pose present):
+  // the junk frames as the player walks out of view can spike the velocity.
+  let frameArmed = true;
+  let peakTorso = 0;
   coordinator.on("debug", (d) => {
-    peak = Math.max(peak, d.smoothedVelocity);
     rise = d.riseVelocity;
+    if (!frameArmed || !d.posePresent || d.state !== "READY") return;
+    peak = Math.max(peak, d.smoothedVelocity);
+    if (d.wristOverhead) peakTorso = Math.max(peakTorso, d.torsoVelocity);
   });
+  const repCauses: string[] = [];
+  coordinator.on("repStarted", (e) => repCauses.push(e.cause));
   let near = 0;
   coordinator.on("nearTrigger", () => near++);
   coordinator.on("repResult", (e) => {
@@ -196,6 +204,7 @@ export async function replayCapture(
   for (const f of [...frames, ...pad]) {
     const armed = armedFn ? armedFn(f.timestamp) : true;
     if (armed && f.frameIndex <= (last?.frameIndex ?? 0)) armedFrames++;
+    frameArmed = armed;
     coordinator.setArmed(armed);
     coordinator.pushFrame(f);
     if (pending) {
@@ -229,10 +238,12 @@ export async function replayCapture(
       findings.push(
         `The player counted as positioned (side-on, whole body in frame) for only ${Math.round(armedShare * 100)}% of the capture — shots can't start while not positioned. See the "readiness" events for why (cue / detected orientation).`,
       );
-    if (rise !== null && peak < rise)
+    if (rise !== null && peak < rise && repCauses.length === 0)
       findings.push(
-        `Wrist never rose fast enough to start a rep: peak ${peak.toFixed(2)} vs trigger ${rise.toFixed(2)} (normalized units/s)${near ? `; ${near} near-miss(es)` : ""}.`,
+        `Wrist never rose fast enough to start a rep: peak ${peak.toFixed(2)} vs trigger ${rise.toFixed(2)} (normalized units/s); past the head ${peakTorso.toFixed(2)} torso/s${near ? `; ${near} near-miss(es)` : ""}.`,
       );
+    if (repCauses.length)
+      findings.push(`Rep starts here: ${repCauses.join(", ")}.`);
     const rej = reps.filter((r) => r.outcome === "rejected");
     if (rej.length)
       findings.push(

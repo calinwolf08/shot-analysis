@@ -4,7 +4,8 @@
  * Pure state machine over a LandmarkFrame stream (no camera, no MediaPipe):
  *
  *   IDLE → READY   pose present & stable for readyPoseMs
- *   READY → ACTIVE upward wrist velocity above riseVelocity (rep started)
+ *   READY → ACTIVE upward wrist velocity above riseVelocity, or the wrist
+ *                  rising past the head at overheadRiseTorso (rep started)
  *   ACTIVE → ANALYZING  wrist settled for settleMs, or maxRepDurationMs hit
  *   ANALYZING → FEEDBACK  analysis found a shot (repResult)
  *   ANALYZING → READY     no shot in the window (noShot)
@@ -42,8 +43,19 @@ export interface LiveRepConfig {
   riseVelocity: number;
   /** |velocity| below this counts as settled. */
   settleVelocity: number;
-  /** EMA factor for wrist velocity smoothing (0–1, higher = snappier). */
+  /**
+   * EMA factor for wrist velocity smoothing per 30 fps frame (0–1, higher =
+   * snappier). Scaled by the actual frame gap, so a phone delivering 10 pose
+   * frames/s smooths over the same time span as one delivering 30.
+   */
   velocitySmoothing: number;
+  /**
+   * Second trigger, independent of how big the player is in the frame: the
+   * wrist moving up past the head at this many torso lengths per second
+   * (smoothed). Catches slower / smaller-in-frame shots that stay under
+   * riseVelocity in screen units; dribbles and arm swings stay below the head.
+   */
+  overheadRiseTorso: number;
   /** Buffer time included before the rep trigger in the analysis window. */
   preRollMs: number;
   /**
@@ -65,6 +77,7 @@ export const DEFAULT_LIVE_REP_CONFIG: Omit<LiveRepConfig, "shootingHand"> = {
   riseVelocity: 0.35,
   settleVelocity: 0.08,
   velocitySmoothing: 0.4,
+  overheadRiseTorso: 1.0,
   preRollMs: 1500,
   disarmGraceMs: 750,
 };
@@ -82,7 +95,7 @@ export interface RepWindow {
 
 export interface CoordinatorEvents {
   stateChanged: { from: CoordinatorState; to: CoordinatorState };
-  repStarted: { timestamp: number };
+  repStarted: { timestamp: number; cause: "velocity" | "overhead" };
   repAnalyzing: { frameCount: number; trigger: RepTrigger };
   repResult: { analysis: AnalysisResult; window: RepWindow };
   noShot: { window: RepWindow; reason: "no-shot-detected" | "analysis-failed" };
@@ -98,6 +111,10 @@ export interface CoordinatorEvents {
     /** Smoothed upward wrist velocity (normalized units/s). */
     smoothedVelocity: number;
     riseVelocity: number;
+    /** Smoothed upward wrist velocity in torso lengths/s (0: no torso). */
+    torsoVelocity: number;
+    /** Wrist above the head on this frame. */
+    wristOverhead: boolean;
     settleVelocity: number;
     /** How long the wrist has been settled while ACTIVE (null otherwise). */
     settledForMs: number | null;
@@ -146,6 +163,37 @@ export interface LiveRepCoordinatorDeps {
 
 // MediaPipe pose landmark indexes.
 const WRIST_INDEX = { left: 15, right: 16 } as const;
+const NOSE = 0;
+const SHOULDERS = [11, 12] as const;
+const HIPS = [23, 24] as const;
+/** Frame gap the velocitySmoothing factor is defined for (30 fps). */
+const REF_FRAME_SEC = 1 / 30;
+
+type Landmarks = NonNullable<LandmarkFrame["landmarks"]>;
+
+/** Mid-shoulder → mid-hip length (normalized), or null when not tracked. */
+function torsoLength(l: Landmarks): number | null {
+  const s1 = l[SHOULDERS[0]];
+  const s2 = l[SHOULDERS[1]];
+  const h1 = l[HIPS[0]];
+  const h2 = l[HIPS[1]];
+  if (!s1 || !s2 || !h1 || !h2) return null;
+  const len = Math.hypot(
+    (s1.x + s2.x) / 2 - (h1.x + h2.x) / 2,
+    (s1.y + s2.y) / 2 - (h1.y + h2.y) / 2,
+  );
+  return len > 0.02 ? len : null;
+}
+
+/** Head height (screen y): the nose, else half a torso above the shoulders. */
+function headY(l: Landmarks, torso: number | null): number | null {
+  const nose = l[NOSE];
+  if (nose && nose.visibility >= 0.3) return nose.y;
+  const s1 = l[SHOULDERS[0]];
+  const s2 = l[SHOULDERS[1]];
+  if (!s1 || !s2 || torso === null) return null;
+  return (s1.y + s2.y) / 2 - 0.5 * torso;
+}
 
 /** Fraction of riseVelocity that counts as a near-miss worth reporting. */
 const NEAR_TRIGGER_RATIO = 0.6;
@@ -179,6 +227,8 @@ export function createLiveRepCoordinator(
   let lastPoseTs: number | null = null;
   let prevWrist: { y: number; timestamp: number } | null = null;
   let smoothedVelocity = 0;
+  let torsoVelocity = 0;
+  let wristOverhead = false;
   let repStartTs = 0;
   let settledSince: number | null = null;
   let lastRepEndTs = -Infinity;
@@ -206,6 +256,8 @@ export function createLiveRepCoordinator(
     lastPoseTs = null;
     prevWrist = null;
     smoothedVelocity = 0;
+    torsoVelocity = 0;
+    wristOverhead = false;
     settledSince = null;
     nearPeak = 0;
   }
@@ -245,18 +297,28 @@ export function createLiveRepCoordinator(
 
   /** Updates the smoothed upward wrist velocity (positive = rising). */
   function trackWrist(frame: LandmarkFrame) {
-    const wrist = frame.landmarks?.[wristIndex];
-    if (!wrist) return;
+    const l = frame.landmarks;
+    const wrist = l?.[wristIndex];
+    if (!l || !wrist) return;
+    const torso = torsoLength(l);
+    const head = headY(l, torso);
+    wristOverhead = head !== null && wrist.y < head;
     if (prevWrist) {
       const dtSec = (frame.timestamp - prevWrist.timestamp) / 1000;
       // A long gap (pose dropout) makes the derivative meaningless.
       if (dtSec > 0 && dtSec < 0.5) {
         const velocity = -(wrist.y - prevWrist.y) / dtSec; // screen y is down
-        smoothedVelocity =
-          cfg.velocitySmoothing * velocity +
-          (1 - cfg.velocitySmoothing) * smoothedVelocity;
+        // Same smoothing time span whatever the pose frame rate.
+        const a =
+          1 - Math.pow(1 - cfg.velocitySmoothing, dtSec / REF_FRAME_SEC);
+        smoothedVelocity = a * velocity + (1 - a) * smoothedVelocity;
+        torsoVelocity =
+          torso !== null
+            ? a * (velocity / torso) + (1 - a) * torsoVelocity
+            : 0;
       } else {
         smoothedVelocity = 0;
+        torsoVelocity = 0;
       }
     }
     prevWrist = { y: wrist.y, timestamp: frame.timestamp };
@@ -355,8 +417,14 @@ export function createLiveRepCoordinator(
             }
             break;
           }
+          const cause =
+            smoothedVelocity >= cfg.riseVelocity
+              ? "velocity"
+              : wristOverhead && torsoVelocity >= cfg.overheadRiseTorso
+                ? "overhead"
+                : null;
           if (
-            smoothedVelocity >= cfg.riseVelocity &&
+            cause !== null &&
             now - lastRepEndTs >= cfg.minRepGapMs &&
             mayStartRep(now)
           ) {
@@ -364,7 +432,7 @@ export function createLiveRepCoordinator(
             settledSince = null;
             nearPeak = 0; // triggered — not a near-miss
             setState("ACTIVE");
-            emit("repStarted", { timestamp: now });
+            emit("repStarted", { timestamp: now, cause });
             break;
           }
           trackNearTrigger(now);
@@ -409,6 +477,8 @@ export function createLiveRepCoordinator(
           posePresent: present,
           smoothedVelocity,
           riseVelocity: cfg.riseVelocity,
+          torsoVelocity,
+          wristOverhead,
           settleVelocity: cfg.settleVelocity,
           settledForMs:
             state === "ACTIVE" && settledSince !== null
