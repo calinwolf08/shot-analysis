@@ -196,4 +196,37 @@ describe("frame capture backpressure", () => {
     expect(frames.every((f) => typeof f.captureTs === "number")).toBe(true);
     handle?.stop();
   });
+
+  it("sends the next frame as soon as landmarks come back, not at the next tick", () => {
+    const frames: FrameData[] = [];
+    let busy = false;
+    let deliver: (() => void) | null = null;
+    const session = {
+      pushFrame: (f: FrameData) => {
+        frames.push(f);
+        busy = true;
+      },
+      isBusy: () => busy,
+      onFrame: (cb: (f: unknown) => void) => {
+        deliver = () => {
+          busy = false;
+          cb({});
+        };
+        return () => (deliver = null);
+      },
+    };
+    // 10 fps: ticks every 100 ms.
+    const handle = createLiveFrameCapture(makeVideo(), session, { fps: 10 });
+    expect(frames).toHaveLength(1);
+    vi.advanceTimersByTime(130); // detection takes 130 ms (tick at 100 skipped)
+    deliver!();
+    vi.advanceTimersByTime(1); // kick runs on the next task
+    expect(frames).toHaveLength(2); // at 131 ms, not 200 ms
+    // A result right after a grab doesn't resend the same camera frame.
+    deliver!();
+    vi.advanceTimersByTime(1);
+    expect(frames).toHaveLength(2);
+    handle?.stop();
+    expect(deliver).toBeNull(); // unsubscribed
+  });
 });

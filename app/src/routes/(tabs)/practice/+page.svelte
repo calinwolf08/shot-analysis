@@ -55,6 +55,10 @@
     createFileCaptureService,
   } from "$lib/shared/media/capture";
   import { getShotClipStore } from "$lib/shared/media/shot-clip-store";
+  import {
+    createFullRateRefiner,
+    type FullRateRefiner,
+  } from "$lib/features/live-practice/refine/full-rate";
   import { getVideoRetention } from "$lib/shared/media/video-retention";
   import { audioUnlockState } from "$lib/shared/audio/unlock-state";
 
@@ -115,6 +119,8 @@
   let session = $state<LiveAnalysisSession | null>(null);
   let store = $state<LivePracticeStore | null>(null);
   let coordinator = $state<LiveRepCoordinator | null>(null);
+  /** Re-detects each rep at full frame rate from its clip (null: replay). */
+  let refiner = $state.raw<FullRateRefiner | null>(null);
   let cameraStream = $state<MediaStream | null>(null);
   let errorMessage = $state<string | null>(null);
   let shootingHand: "left" | "right" = "right";
@@ -215,10 +221,23 @@
 
   function beginLoop() {
     if (!session || !targets) return;
+    // Every shot is scored from the rep re-detected at FULL frame rate from
+    // its clip (live tracking may only manage ~10 fps); needs a worker
+    // session (not replay) and clip recording.
+    refiner =
+      session.detectOffline && clipStore.cap > 0
+        ? createFullRateRefiner({ session })
+        : null;
+    const activeRefiner = refiner;
     coordinator = createLiveRepCoordinator(
-      { analyze: (frames) => session!.analyzeWindow(frames) },
+      {
+        analyze: (frames) => session!.analyzeWindow(frames),
+        ...(activeRefiner ? { refine: (w) => activeRefiner.refine(w) } : {}),
+      },
       { shootingHand },
     );
+    if (liveCapture && activeRefiner)
+      activeRefiner.onReport((r) => liveCapture.event("refine", r));
     const activeCoordinator = coordinator;
     session.onFrame((frame) => activeCoordinator.pushFrame(frame));
     if (liveCapture) recordLoop(liveCapture, activeCoordinator, session);
@@ -305,13 +324,27 @@
     c: LiveRepCoordinator,
     s: LiveAnalysisSession,
   ): void {
-    s.onFrame((f) => cap.frame(f));
+    s.onFrame((f) =>
+      cap.frame(
+        f,
+        f.captureTs !== undefined ? performance.now() - f.captureTs : undefined,
+      ),
+    );
     c.on("stateChanged", (e) => cap.event("state", e));
     c.on("repStarted", (e) => cap.event("rep.started", e));
     c.on("repAnalyzing", (e) => cap.event("rep.analyzing", e));
+    c.on("repRefining", (e) => cap.event("rep.refining", e));
+    c.on("repResult", (e) => {
+      if (e.window.fullRate) cap.refined(e.window.startedAt, e.window.frames);
+    });
+    c.on("noShot", (e) => {
+      if (e.window.fullRate) cap.refined(e.window.startedAt, e.window.frames);
+    });
     c.on("repResult", (e) =>
       cap.event("rep.result", {
         shots: e.analysis.shots.length,
+        frames: e.window.frames.length,
+        fullRate: e.window.fullRate ?? false,
         window: [e.window.frames[0]?.timestamp, e.window.endedAt],
         trigger: e.window.trigger,
       }),
@@ -320,6 +353,7 @@
       cap.event("rep.noShot", {
         reason: e.reason,
         frames: e.window.frames.length,
+        fullRate: e.window.fullRate ?? false,
         window: [e.window.frames[0]?.timestamp, e.window.endedAt],
         trigger: e.window.trigger,
       }),
@@ -466,6 +500,7 @@
     {audio}
     requiredOrientation={requiredSide}
     {clipStore}
+    {refiner}
     stream={cameraStream}
     onfocuschange={persistFocus}
     {tuning}

@@ -535,3 +535,73 @@ describe("slow / small-in-frame shots (overhead trigger)", () => {
     expect(Math.abs(peakAt(10) - peakAt(30))).toBeLessThan(0.03);
   });
 });
+
+describe("full-rate refinement", () => {
+  it("analyzes the refined frames and reports them in the result", async () => {
+    const seen: number[] = [];
+    let refinedFrames: LandmarkFrame[] = [];
+    const refining: { quickShots: number }[] = [];
+    const c2 = createLiveRepCoordinator(
+      {
+        analyze: async (frames) => {
+          seen.push(frames.length);
+          return frames === refinedFrames ? oneShot : noShots;
+        },
+        refine: async (w) => {
+          refinedFrames = w.frames.concat(w.frames);
+          return refinedFrames;
+        },
+      },
+      { shootingHand: "right" },
+    );
+    const results: { window: { fullRate?: boolean; frames: unknown[] } }[] = [];
+    c2.on("repRefining", (e) => refining.push(e));
+    c2.on("repResult", (e) => results.push(e));
+    c2.start();
+    const cursor = makeCursor();
+    feed(c2, stillPose(cursor, 1000));
+    feed(c2, shotArc(cursor));
+    feed(c2, stillPose(cursor, 1500));
+    await waitState(c2, "FEEDBACK");
+    // Quick pass on the live frames saw no shot; the full-rate pass did.
+    expect(refining).toEqual([{ quickShots: 0 }]);
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toBe(seen[0]! * 2);
+    expect(results[0]!.window.fullRate).toBe(true);
+    expect(results[0]!.window.frames).toBe(refinedFrames);
+  });
+
+  it("falls back to the live frames when refinement gives nothing", async () => {
+    const c = createLiveRepCoordinator(
+      { analyze: async () => oneShot, refine: async () => null },
+      { shootingHand: "right" },
+    );
+    const results: { window: { fullRate?: boolean } }[] = [];
+    c.on("repResult", (e) => results.push(e));
+    c.start();
+    const cursor = makeCursor();
+    feed(c, stillPose(cursor, 1000));
+    feed(c, shotArc(cursor));
+    feed(c, stillPose(cursor, 1500));
+    await waitState(c, "FEEDBACK");
+    expect(results[0]!.window.fullRate).toBeUndefined();
+  });
+
+  it("a refinement that throws is treated as no refinement", async () => {
+    const c = createLiveRepCoordinator(
+      {
+        analyze: async () => oneShot,
+        refine: async () => {
+          throw new Error("decode failed");
+        },
+      },
+      { shootingHand: "right" },
+    );
+    c.start();
+    const cursor = makeCursor();
+    feed(c, stillPose(cursor, 1000));
+    feed(c, shotArc(cursor));
+    feed(c, stillPose(cursor, 1500));
+    await waitState(c, "FEEDBACK");
+  });
+});

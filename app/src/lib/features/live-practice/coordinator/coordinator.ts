@@ -7,6 +7,9 @@
  *   READY → ACTIVE upward wrist velocity above riseVelocity, or the wrist
  *                  rising past the head at overheadRiseTorso (rep started)
  *   ACTIVE → ANALYZING  wrist settled for settleMs, or maxRepDurationMs hit
+ *                       (quick analysis of the live frames, then — when a
+ *                       refine dep is given — of the rep re-detected at full
+ *                       frame rate, which replaces the window's frames)
  *   ANALYZING → FEEDBACK  analysis found a shot (repResult)
  *   ANALYZING → READY     no shot in the window (noShot)
  *   FEEDBACK → READY      dismissFeedback() (UI auto-dismiss)
@@ -91,12 +94,20 @@ export interface RepWindow {
   /** Timestamp of the last frame in the window. */
   endedAt: number;
   trigger: RepTrigger;
+  /** The frames were re-detected at full frame rate (see deps.refine). */
+  fullRate?: boolean;
 }
 
 export interface CoordinatorEvents {
   stateChanged: { from: CoordinatorState; to: CoordinatorState };
   repStarted: { timestamp: number; cause: "velocity" | "overhead" };
   repAnalyzing: { frameCount: number; trigger: RepTrigger };
+  /**
+   * The quick analysis of the live frames is done and the full-rate
+   * re-detection has started. `quickShots`: shots the quick pass found (a
+   * hint; the full-rate pass decides).
+   */
+  repRefining: { quickShots: number };
   repResult: { analysis: AnalysisResult; window: RepWindow };
   noShot: { window: RepWindow; reason: "no-shot-detected" | "analysis-failed" };
   bufferStats: { frames: number; spanMs: number };
@@ -159,6 +170,12 @@ export interface LiveRepCoordinator {
 export interface LiveRepCoordinatorDeps {
   /** Full shot detection + metrics over the buffered rep window. */
   analyze(frames: readonly LandmarkFrame[]): Promise<AnalysisResult>;
+  /**
+   * Optional: re-detect the rep window at full frame rate (from its clip).
+   * Its frames, when returned, replace the live ones for the analysis and
+   * the result. Null = keep the live frames.
+   */
+  refine?(window: RepWindow): Promise<LandmarkFrame[] | null>;
 }
 
 // MediaPipe pose landmark indexes.
@@ -313,9 +330,7 @@ export function createLiveRepCoordinator(
           1 - Math.pow(1 - cfg.velocitySmoothing, dtSec / REF_FRAME_SEC);
         smoothedVelocity = a * velocity + (1 - a) * smoothedVelocity;
         torsoVelocity =
-          torso !== null
-            ? a * (velocity / torso) + (1 - a) * torsoVelocity
-            : 0;
+          torso !== null ? a * (velocity / torso) + (1 - a) * torsoVelocity : 0;
       } else {
         smoothedVelocity = 0;
         torsoVelocity = 0;
@@ -339,16 +354,30 @@ export function createLiveRepCoordinator(
     emit("repAnalyzing", { frameCount: frames.length, trigger });
 
     const myGeneration = generation;
-    void deps
-      .analyze(frames)
-      .then((analysis) => {
-        if (generation !== myGeneration || state !== "ANALYZING") return;
+    const stale = () => generation !== myGeneration || state !== "ANALYZING";
+    void (async () => {
+      let analysis = await deps.analyze(frames);
+      let final = window;
+      if (deps.refine && !stale()) {
+        emit("repRefining", { quickShots: analysis.shots.length });
+        const full = await deps.refine(window).catch(() => null);
+        if (stale()) return null;
+        if (full && full.length > 0) {
+          final = { ...window, frames: full, fullRate: true };
+          analysis = await deps.analyze(full);
+        }
+      }
+      return { analysis, final };
+    })()
+      .then((r) => {
+        if (!r || stale()) return;
+        const { analysis, final } = r;
         if (analysis.shots.length > 0) {
           setState("FEEDBACK");
-          emit("repResult", { analysis, window });
+          emit("repResult", { analysis, window: final });
         } else {
           setState("READY");
-          emit("noShot", { window, reason: "no-shot-detected" });
+          emit("noShot", { window: final, reason: "no-shot-detected" });
         }
       })
       .catch(() => {

@@ -95,6 +95,13 @@ export interface LiveAnalysisSession {
    * so the landmarks the player sees are never from a stale backlog.
    */
   isBusy?(): boolean;
+  /**
+   * A second pose detector, separate from the live one, for re-detecting a
+   * shot at full frame rate from its recorded clip (worker-backed sessions
+   * only). While it works, live detection pauses (isBusy is true), giving it
+   * the CPU — the player is waiting for that shot's score anyway.
+   */
+  detectOffline?(): OfflinePoseDetector;
   /** Live latency/model diagnostics (debug HUD + e2e). */
   stats?(): LiveSessionStats;
   /**
@@ -158,4 +165,20 @@ export interface LiveSessionStats {
   readonly maxInFlight: number;
   /** Times the session fell back to the lite model. */
   readonly fallbacks: number;
+}
+
+/** One batch of offline (full-rate) pose detection; see detectOffline. */
+export interface OfflinePoseDetector {
+  /** Queue a frame (its data buffer is transferred). Strictly increasing timestamps. */
+  push(frame: {
+    data: Uint8ClampedArray;
+    width: number;
+    height: number;
+    frameIndex: number;
+    timestamp: number;
+  }): void;
+  /** All pushed frames' landmarks, in order (resolves once every one is back). */
+  finish(): Promise<LandmarkFrame[]>;
+  /** Abandon the batch (results still in flight are dropped). */
+  cancel(): void;
 }

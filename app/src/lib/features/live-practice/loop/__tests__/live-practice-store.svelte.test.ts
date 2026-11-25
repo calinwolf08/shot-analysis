@@ -406,3 +406,48 @@ describe("LivePracticeStore — per-shot cycle", () => {
     expect(audio.isMuted()).toBe(true);
   });
 });
+
+describe("LivePracticeStore — full-rate refinement", () => {
+  it("announces when the quick pass sees a shot, scores only from the full-rate result", async () => {
+    const { store, emit, audio, pipeline } = makeStore([
+      [processed("s1", 2, ["Set point"])],
+    ]);
+    emit("repRefining", { quickShots: 1 });
+    await vi.waitFor(() => expect(store.cycle).toBe("analyzing"));
+    // Nothing scored or shown yet: the full-rate pass is still running.
+    expect(pipeline.process).not.toHaveBeenCalled();
+    expect(store.feedback).toBeNull();
+    const ev = repEvent();
+    emit("repResult", { ...ev, window: { ...ev.window, fullRate: true } });
+    await vi.waitFor(() => expect(store.cycle).toBe("tracking"));
+    // Announced once, then the readback.
+    expect(audio.sequence).toEqual([
+      "earcon:captured",
+      `speak:${CAPTURED_TEXT}`,
+      `speak:${ANALYZING_TEXT}`,
+      "speak:Set point: Fix set point.",
+      "earcon:ready",
+    ]);
+    expect(pipeline.process).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays quiet while re-checking a rep the quick pass saw no shot in", () => {
+    const { store, emit, audio } = makeStore([[]]);
+    emit("repRefining", { quickShots: 0 });
+    expect(audio.sequence).toEqual([]);
+    expect(store.cycle).toBe("tracking");
+  });
+
+  it("says 'not scored' when the full-rate pass finds no shot after 'captured'", async () => {
+    const { store, emit, audio } = makeStore([[]]);
+    emit("repRefining", { quickShots: 1 });
+    emit("noShot", {
+      window: { frames: [], startedAt: 0, endedAt: 1, trigger: "settled" },
+      reason: "no-shot-detected",
+    });
+    await vi.waitFor(() =>
+      expect(audio.sequence).toContain(`speak:${NOT_SCORED_TEXT}`),
+    );
+    await vi.waitFor(() => expect(store.cycle).toBe("tracking"));
+  });
+});

@@ -143,6 +143,13 @@ export class LivePracticeStore {
   readonly wording: FeedbackWording;
   /** Bumped by pause/stop so an in-flight cycle stops where it is. */
   private generation = 0;
+  /**
+   * "Shot captured / Analyzing", started while the shot is still being
+   * re-detected at full frame rate (the quick pass already saw a shot), so
+   * the player hears it straight away; the score only comes from the
+   * full-rate result.
+   */
+  private earlyAnnounce: { gen: number; done: Promise<void> } | null = null;
 
   constructor(private readonly deps: LivePracticeStoreDeps) {
     this.maxWorstSpoken = deps.maxWorstSpoken ?? FEEDBACK_COUNT;
@@ -190,6 +197,9 @@ export class LivePracticeStore {
         this.phase = to.toLowerCase() as LoopPhase;
       }),
       coordinator.on("repAnalyzing", () => this.onAnalyzing()),
+      coordinator.on("repRefining", ({ quickShots }) => {
+        if (quickShots > 0) this.announceEarly();
+      }),
       coordinator.on("repResult", (event) => {
         void this.runShotCycle(event);
       }),
@@ -204,9 +214,45 @@ export class LivePracticeStore {
     this.deps.audio.cancel();
   }
 
-  /** The motion wasn't a shot (nothing was announced): just a quiet flash. */
+  private announcement(gen: number): Promise<void> {
+    const { audio } = this.deps;
+    return (async () => {
+      await audio.playEarcon("captured");
+      await audio.speak(CAPTURED_TEXT);
+      if (this.isStale(gen)) return;
+      this.cycle = "analyzing";
+      await audio.speak(ANALYZING_TEXT);
+    })();
+  }
+
+  private announceEarly(): void {
+    const gen = this.generation;
+    this.cycle = "captured";
+    this.feedback = null;
+    this.error = null;
+    this.earlyAnnounce = { gen, done: this.announcement(gen) };
+  }
+
+  /**
+   * The motion wasn't a shot: a quiet flash — unless "Shot captured" was
+   * already said (the quick pass saw a shot the full-rate pass didn't).
+   */
   private onNoShot(): void {
-    this.flashNoShot();
+    const early = this.earlyAnnounce;
+    this.earlyAnnounce = null;
+    if (!early || early.gen !== this.generation) {
+      this.flashNoShot();
+      return;
+    }
+    const gen = this.generation;
+    void (async () => {
+      await early.done;
+      if (this.isStale(gen)) return;
+      this.flash("no-shot");
+      await this.deps.audio.speak(NOT_SCORED_TEXT);
+      if (this.isStale(gen)) return;
+      this.cycle = "tracking";
+    })();
   }
 
   private isStale(gen: number): boolean {
@@ -222,18 +268,17 @@ export class LivePracticeStore {
   ): Promise<void> {
     const gen = this.generation;
     const { pipeline, audio } = this.deps;
-    this.cycle = "captured";
-    this.feedback = null;
-    this.error = null;
+    const early =
+      this.earlyAnnounce?.gen === gen ? this.earlyAnnounce.done : null;
+    this.earlyAnnounce = null;
+    if (!early) {
+      this.cycle = "captured";
+      this.feedback = null;
+      this.error = null;
+    }
 
     // Announce while the pipeline scores in parallel.
-    const announce = (async () => {
-      await audio.playEarcon("captured");
-      await audio.speak(CAPTURED_TEXT);
-      if (this.isStale(gen)) return;
-      this.cycle = "analyzing";
-      await audio.speak(ANALYZING_TEXT);
-    })();
+    const announce = early ?? this.announcement(gen);
 
     let result: Awaited<ReturnType<LiveShotPipeline["process"]>> | null = null;
     try {
@@ -362,6 +407,7 @@ export class LivePracticeStore {
   /** Abandon any in-flight cycle (pause/stop). */
   private abortCycle(): void {
     this.generation += 1;
+    this.earlyAnnounce = null;
     this.cycle = "tracking";
     this.deps.audio.cancel();
   }

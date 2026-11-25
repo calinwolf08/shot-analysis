@@ -9,6 +9,7 @@ export type {
   LiveAnalysisSession,
   LiveSessionOptions,
   LiveSessionStats,
+  OfflinePoseDetector,
   ProgressCallback,
 } from "./types";
 export { isFixtureRef } from "./types";
