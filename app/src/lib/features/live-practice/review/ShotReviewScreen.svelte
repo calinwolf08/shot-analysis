@@ -41,7 +41,7 @@
   import { scoreStoredShot } from "./scored-shots";
   import { phaseAtFrame, phaseMarks } from "./phase-timeline";
   import {
-    extractClipFrames,
+    extractClipFramesFromUrl,
     nearestFrame,
     type ClipFrames,
   } from "./clip-frames";
@@ -289,19 +289,22 @@
     }
     readClipInfo(v);
     videoReady = true;
-    void buildClipFrames(v);
+    void buildClipFrames();
   }
 
   /** Decode the clip into one frame per pose frame (once per shot). */
-  async function buildClipFrames(v: HTMLVideoElement): Promise<void> {
+  async function buildClipFrames(): Promise<void> {
     const p = poses;
     if (!p || p.frames.length === 0) return;
     const idx = p.frames.map((f) => f.frameIndex);
     const times = idx.map((i) => videoTimeFor(i));
     if (times.some((t) => t === null)) return; // no timing: keep seeking
+    // Once per clip (the player's load events can fire again).
+    if (!clipUrl || clipFrames || framesProgress) return;
+    const url = clipUrl;
     const token = ++frameToken;
     framesProgress = `Preparing video… 0/${idx.length}`;
-    const frames = await extractClipFrames(v, times as number[], {
+    const frames = await extractClipFramesFromUrl(url, times as number[], {
       cancelled: () => token !== frameToken,
       onProgress: (d, n) => {
         if (token === frameToken) framesProgress = `Preparing video… ${d}/${n}`;

@@ -10,14 +10,14 @@
  * frozen. Playing the clip through once is a single linear decode; after that
  * every frame is instant and frame-exact, whatever the browser.
  *
- * Strategy: play muted from just before the first time, grabbing the shown
- * frame as each target time is passed; if playback won't start or stalls,
- * fall back to seeking to each remaining time in order.
- *
- * Android Firefox may never finish a seek on such a clip at all (`seeking`
- * fires, `seeked` doesn't) while plain playback works. So when the start
- * seek doesn't complete, the element is reloaded — that rewinds to 0 with no
- * seek — and played through from the beginning instead.
+ * Strategy (from Android Firefox reports — it can hang a seek forever, and
+ * a clip it seeked into "ends" the moment it's played, while playing from
+ * the start works): never seek first. Play from the start (muted, hidden,
+ * on its OWN <video> — see extractClipFramesFromUrl — so reloading it can't
+ * disturb the page's player), grabbing the shown frame as each target time
+ * is passed; only frames within `tolerance` of their time are kept. Anything
+ * missed → reload (back to 0, no seek) and play through again at 1x; still
+ * missing → seek to each, stopping at the first seek that doesn't finish.
  */
 
 export interface ClipFrame {
@@ -147,19 +147,13 @@ export async function extractClipFrames(
    * missing for the next pass instead of getting the wrong picture.
    */
   const playThrough = async (
-    from: "seek" | "reload",
+    from: "here" | "reload",
     rate: number,
   ): Promise<boolean> => {
     const todo = missing();
     if (todo.length === 0) return true;
     const ok =
-      from === "seek"
-        ? await seekTo(
-            video,
-            Math.max(0, order[todo[0]!]!.t - 0.05),
-            seekTimeoutMs,
-          )
-        : await rewindByReload(video, seekTimeoutMs);
+      from === "here" ? true : await rewindByReload(video, seekTimeoutMs);
     if (!ok || o.cancelled?.()) return ok;
     try {
       video.muted = true;
@@ -226,19 +220,20 @@ export async function extractClipFrames(
     return true;
   };
 
-  // 1) Seek near the first frame and play through.
-  const seekOk = await playThrough("seek", o.playbackRate ?? 2);
-  // 2) Anything missed (seek hung, clip jumped or ended early): reload —
-  //    back to time 0 without seeking — and play through from the start, at
-  //    normal speed this time (a busy phone can skip frames at 2x).
+  // 1) Play through from the start (a fresh element is at 0; anything else
+  //    is rewound by reloading — never by seeking).
+  await playThrough(
+    video.currentTime < 0.05 && !video.ended ? "here" : "reload",
+    o.playbackRate ?? 2,
+  );
+  // 2) Anything missed (stalled, clip jumped or ended early): reload and play
+  //    through again at normal speed (a busy phone can skip frames at 2x).
   if (missing().length > 0 && !o.cancelled?.()) await playThrough("reload", 1);
-  // 3) Still missing and seeking works: seek to each remaining time.
-  if (seekOk) {
-    for (const k of missing()) {
-      if (o.cancelled?.()) break;
-      if (await seekTo(video, order[k]!.t, seekTimeoutMs))
-        tryPut(k, video.currentTime);
-    }
+  // 3) Still missing: seek to each, giving up at the first hung seek.
+  for (const k of missing()) {
+    if (o.cancelled?.()) break;
+    if (!(await seekTo(video, order[k]!.t, seekTimeoutMs))) break;
+    tryPut(k, video.currentTime);
   }
   o.onProgress?.(order.length, order.length);
   return out;
@@ -255,4 +250,44 @@ export function nearestFrame(frames: ClipFrames, i: number): ClipFrame | null {
     if (f) return f;
   }
   return null;
+}
+
+/**
+ * extractClipFrames on a hidden <video> of its own (created here, removed
+ * after). Decoding reloads and plays the element; on the page's own player
+ * that re-fired its load handlers and restarted the decode endlessly.
+ */
+export async function extractClipFramesFromUrl(
+  url: string,
+  times: readonly number[],
+  o: ExtractOptions = {},
+): Promise<ClipFrames> {
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  video.style.cssText =
+    "position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none";
+  document.body.append(video);
+  try {
+    const loaded = new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => resolve(false), 10_000);
+      video.addEventListener(
+        "loadeddata",
+        () => {
+          clearTimeout(timer);
+          resolve(true);
+        },
+        { once: true },
+      );
+    });
+    video.src = url;
+    if (!(await loaded)) return times.map(() => null);
+    return await extractClipFrames(video, times, o);
+  } finally {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    video.remove();
+  }
 }

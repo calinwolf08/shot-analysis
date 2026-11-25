@@ -7,9 +7,9 @@
  * with `requestVideoFrameCallback` where available, which reports each
  * frame's exact media time; otherwise by polling `currentTime` every
  * animation frame. Playing is one linear decode, and it works where seeking a
- * phone recording doesn't finish (Android Firefox): to reach the start time
- * it first tries one seek, and if that hangs it reloads the clip (back to 0
- * without seeking) and fast-forwards by playing at a higher rate.
+ * phone recording doesn't (Android Firefox hangs seeks, or ends a clip it
+ * seeked into the moment it plays): the start time is reached by playing
+ * from 0 at a higher rate, never by seeking.
  */
 import { downsampleToImageData } from "./downsample";
 
@@ -24,8 +24,6 @@ export interface DecodedClipFrame {
 export interface DecodeClipOptions {
   /** Longest side of the frames handed out (default 256, like live). */
   readonly maxEdge?: number;
-  /** How long the one seek to the start may take (ms, default 1500). */
-  readonly seekTimeoutMs?: number;
   /** No new frame for this long → stop (ms, default 2500). */
   readonly stallMs?: number;
   /** Fast-forward rate when the start has to be reached by playing. */
@@ -35,7 +33,7 @@ export interface DecodeClipOptions {
 
 export interface DecodeClipStats {
   readonly frames: number;
-  /** How the start was reached. */
+  /** How the start was reached: already there, or played/fast-forwarded to. */
   readonly start: "at-start" | "seek" | "reload";
   readonly method: "rvfc" | "raf";
   readonly stopped: "end" | "ended" | "stall" | "cancelled" | "no-video";
@@ -76,7 +74,6 @@ export async function decodeClipRange(
   o: DecodeClipOptions = {},
 ): Promise<DecodeClipStats> {
   const maxEdge = o.maxEdge ?? 256;
-  const seekTimeoutMs = o.seekTimeoutMs ?? 1500;
   const stallMs = o.stallMs ?? 2500;
   const ffRate = o.fastForwardRate ?? 4;
   const video = document.createElement("video") as RvfcVideo;
@@ -108,25 +105,12 @@ export async function decodeClipRange(
     video.src = url;
     if (!(await loaded) || !video.videoWidth) return stats("no-video");
 
-    // Reach the start: one seek, else reload (time 0) + fast-forward.
-    const lead = Math.max(0, fromS - 0.2);
-    let fastForward = false;
-    if (lead > 0.05) {
-      const seeked = once(video, "seeked", seekTimeoutMs);
-      try {
-        video.currentTime = lead;
-      } catch {
-        /* handled as a hung seek */
-      }
-      if (await seeked) start = "seek";
-      else {
-        start = "reload";
-        const reloaded = once(video, "loadeddata", 5000);
-        video.load();
-        await reloaded;
-        fastForward = true;
-      }
-    }
+    // Reach the start by PLAYING from 0 (fast-forward), never by seeking:
+    // Android Firefox can hang a seek, or "end" a clip it seeked into as soon
+    // as it's played.
+    const fastForward0 = fromS > 0.25;
+    let fastForward = fastForward0;
+    if (fastForward0) start = "reload";
     if (o.cancelled?.()) return stats("cancelled");
     video.playbackRate = fastForward ? ffRate : 1;
 
