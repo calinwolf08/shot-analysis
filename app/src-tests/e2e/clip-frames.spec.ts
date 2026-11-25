@@ -10,10 +10,7 @@ import { expect, test } from "@playwright/test";
  */
 const FIXTURE = "src-tests/fixtures/video/few-keyframes.webm";
 
-test("a clip with one keyframe decodes into every requested frame", async ({
-  page,
-}) => {
-  test.setTimeout(60_000);
+async function serveFixture(page: import("@playwright/test").Page) {
   const bundle = buildSync({
     entryPoints: ["src/lib/features/live-practice/review/clip-frames.ts"],
     bundle: true,
@@ -35,6 +32,13 @@ test("a clip with one keyframe decodes into every requested frame", async ({
       body: '<!doctype html><video id="v" src="clip.webm" muted playsinline preload="auto"></video><script src="cf.js"></script>',
     });
   });
+}
+
+test("a clip with one keyframe decodes into every requested frame", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await serveFixture(page);
   await page.goto("http://clip-frames.test/");
   const r = await page.evaluate(async () => {
     const v = document.getElementById("v") as HTMLVideoElement;
@@ -80,4 +84,54 @@ test("a clip with one keyframe decodes into every requested frame", async ({
   expect(r.distinct).toBe(39);
   expect(r.paused).toBe(true);
   expect(r.nearest).not.toBeNull();
+});
+
+test("decodes by playing from the start when seeks never finish (Android Firefox)", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  // Seeks are swallowed: setting currentTime does nothing and no "seeked"
+  // ever fires — what Android Firefox did on a phone recording.
+  await page.addInitScript(() => {
+    const d = Object.getOwnPropertyDescriptor(
+      HTMLMediaElement.prototype,
+      "currentTime",
+    )!;
+    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
+      get: d.get,
+      set() {},
+      configurable: true,
+    });
+  });
+  await serveFixture(page);
+  await page.goto("http://clip-frames.test/");
+  const r = await page.evaluate(async () => {
+    const v = document.getElementById("v") as HTMLVideoElement;
+    await new Promise((res) =>
+      v.readyState >= 1
+        ? res(null)
+        : v.addEventListener("loadedmetadata", res, { once: true }),
+    );
+    const times = Array.from({ length: 40 }, (_, i) => 0.2 + i * 0.14);
+    const cf = (
+      window as unknown as {
+        ClipFrames: typeof import("../../src/lib/features/live-practice/review/clip-frames");
+      }
+    ).ClipFrames;
+    const t0 = performance.now();
+    const frames = await cf.extractClipFrames(v, times, {
+      seekTimeoutMs: 1000,
+    });
+    return {
+      got: frames.filter((f) => f).length,
+      maxErr: Math.max(
+        ...frames.map((f, i) => (f ? Math.abs(f.time - times[i]!) : 99)),
+      ),
+      ms: performance.now() - t0,
+    };
+  });
+  expect(r.got).toBe(40);
+  expect(r.maxErr).toBeLessThan(0.07);
+  // One timed-out seek + a 2× play-through, not a timeout per frame.
+  expect(r.ms).toBeLessThan(10_000);
 });

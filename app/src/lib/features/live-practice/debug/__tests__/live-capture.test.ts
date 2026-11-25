@@ -3,7 +3,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { LiveTargetsV3, PoseData } from "basketball-shot-analysis";
 import { poseDataToLandmarkFrames } from "$lib/features/analysis/replay/replay-pipeline";
-import { createLiveCapture, type LiveCaptureFile } from "../live-capture";
+import {
+  captureTiming,
+  createLiveCapture,
+  type LiveCaptureFile,
+} from "../live-capture";
 import { replayCapture } from "../replay-capture";
 
 const targets = JSON.parse(
@@ -85,6 +89,29 @@ describe("live capture", () => {
   });
 });
 
+describe("capture timing", () => {
+  it("reports pose rate, latency and gaps while tracked", () => {
+    const cap = createLiveCapture(60_000);
+    const lm = frames.find((f) => f.landmarks)!.landmarks;
+    for (let i = 0; i < 20; i++)
+      cap.frame(
+        {
+          frameIndex: i,
+          timestamp: i * 100,
+          poseConfidence: 0.9,
+          landmarks: i < 15 ? lm : null,
+        },
+        i < 15 ? 70 : 40,
+      );
+    const t = cap.export().meta.timing as ReturnType<typeof captureTiming>;
+    expect(t.posedFps).toBeCloseTo(10, 5);
+    expect(t.latencyP50Ms).toBe(70);
+    expect(t.emptyLatencyP50Ms).toBe(40);
+    expect(t.gapP50Ms).toBe(100);
+    expect((cap.export().poses.frames[0] as { lat?: number }).lat).toBe(70);
+  });
+});
+
 describe("replaying a capture", () => {
   it("finds the shot the fixture holds, through the live coordinator + scoring", async () => {
     const r = await replayCapture(captured(), targets);
@@ -118,6 +145,7 @@ describe.skipIf(!CAPTURE)("capture from a device", () => {
       `Device: ${JSON.stringify((file.meta as { userAgent?: string }).userAgent)}`,
       `Positioned (armed): ${r.armedShare === null ? "not logged" : `${Math.round(r.armedShare * 100)}%`}`,
       `Wrist rise: peak ${r.peakVelocity?.toFixed(2)} vs trigger ${r.riseVelocity?.toFixed(2)}; near misses ${r.nearTriggers}`,
+      `Pose timing while tracked: ${JSON.stringify(captureTiming(file.poses.frames as Parameters<typeof captureTiming>[0]))}`,
       `Reps recorded on the phone: ${r.recordedReps}`,
       `Replayed reps: ${r.reps.map((x) => `${(x.startedAt / 1000).toFixed(1)}s ${x.outcome} — ${x.detail}`).join(" | ") || "none"}`,
       `Replayed ignoring positioning: ${free.reps.map((x) => `${(x.startedAt / 1000).toFixed(1)}s ${x.outcome} — ${x.detail}`).join(" | ") || "none"}`,

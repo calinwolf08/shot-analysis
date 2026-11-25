@@ -23,6 +23,12 @@ export interface FrameCaptureHandle {
   stop(): void;
   /** True while capture is running. */
   readonly running: boolean;
+  /**
+   * Grab a frame now instead of at the next tick (the detector just became
+   * free). Ignored within half a tick of the previous grab, so the same
+   * camera frame isn't sent twice.
+   */
+  kick(): void;
 }
 
 export interface FrameCaptureOptions {
@@ -68,6 +74,7 @@ export function startFrameCapture(
 
   let frameIndex = 0;
   let running = true;
+  let lastGrab = -Infinity;
   let intervalId: ReturnType<typeof setInterval> | null = null;
 
   // `downsampleToImageData` owns its own (reused) canvas internally, so
@@ -86,6 +93,7 @@ export function startFrameCapture(
 
     try {
       const captureTs = performance.now();
+      lastGrab = captureTs;
       const imageData = downsampleToImageData(video, vw, vh, maxEdge);
       const timestamp = captureTs - startTime;
 
@@ -124,6 +132,9 @@ export function startFrameCapture(
     get running() {
       return running;
     },
+    kick() {
+      if (performance.now() - lastGrab >= intervalMs / 2) captureFrame();
+    },
   };
 }
 
@@ -133,7 +144,11 @@ export function startFrameCapture(
  */
 export function createLiveFrameCapture(
   video: HTMLVideoElement,
-  session: { pushFrame?(frame: FrameData): void; isBusy?(): boolean },
+  session: {
+    pushFrame?(frame: FrameData): void;
+    isBusy?(): boolean;
+    onFrame?(cb: (frame: unknown) => void): () => void;
+  },
   options?: FrameCaptureOptions,
 ): FrameCaptureHandle | null {
   if (!session.pushFrame) {
@@ -143,8 +158,25 @@ export function createLiveFrameCapture(
 
   const pushFrame = session.pushFrame.bind(session);
   const isBusy = session.isBusy?.bind(session);
-  return startFrameCapture(video, pushFrame, {
+  const handle = startFrameCapture(video, pushFrame, {
     ...options,
     ...(isBusy ? { shouldSkip: isBusy } : {}),
   });
+  // Result-driven: the moment a frame's landmarks are back the detector is
+  // free, so send the next frame then rather than waiting up to a tick (on a
+  // phone needing ~70 ms per frame that wait cost a third of the frame rate).
+  // Deferred a task so the landmarks' own subscribers run first.
+  const off = session.onFrame?.(() => {
+    setTimeout(() => handle.kick(), 0);
+  });
+  return {
+    get running() {
+      return handle.running;
+    },
+    kick: () => handle.kick(),
+    stop() {
+      off?.();
+      handle.stop();
+    },
+  };
 }

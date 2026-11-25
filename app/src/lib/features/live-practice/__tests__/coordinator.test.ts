@@ -496,3 +496,112 @@ describe("arming (positioning gate)", () => {
     await waitState(coordinator, "FEEDBACK");
   });
 });
+
+describe("slow / small-in-frame shots (overhead trigger)", () => {
+  // Synthetic pose: nose y 0.15, torso ≈ 0.28. 0.33 units/s is under the
+  // 0.35 screen-unit trigger but ≈ 1.2 torso lengths/s.
+  it("starts a rep when the wrist rises past the head, even at 10 fps", () => {
+    const { coordinator, events } = harness(async () => oneShot);
+    const cursor = makeCursor(10);
+    feed(coordinator, stillPose(cursor, 1000));
+    feed(coordinator, wristRise(cursor, 0.33, 1500)); // ends above the nose
+    expect(events.repStarted).toEqual([
+      expect.objectContaining({ cause: "overhead" }),
+    ]);
+  });
+
+  it("ignores the same slow rise when it stays below the head", () => {
+    const { coordinator, events } = harness(async () => oneShot);
+    const cursor = makeCursor(10);
+    feed(coordinator, stillPose(cursor, 1000));
+    feed(coordinator, wristRise(cursor, 0.33, 900)); // tops out at ~0.25
+    feed(coordinator, stillPose(cursor, 600));
+    expect(events.repStarted).toHaveLength(0);
+  });
+
+  it("smooths over the same time span at 10 and 30 fps", () => {
+    const peakAt = (fps: number) => {
+      const { coordinator } = harness(async () => oneShot);
+      let peak = 0;
+      coordinator.on(
+        "debug",
+        (d) => (peak = Math.max(peak, d.smoothedVelocity)),
+      );
+      const cursor = makeCursor(fps);
+      feed(coordinator, stillPose(cursor, 1000));
+      feed(coordinator, wristRise(cursor, 0.3, 400));
+      return peak;
+    };
+    expect(Math.abs(peakAt(10) - peakAt(30))).toBeLessThan(0.03);
+  });
+});
+
+describe("full-rate refinement", () => {
+  it("analyzes the refined frames and reports them in the result", async () => {
+    const seen: number[] = [];
+    let refinedFrames: LandmarkFrame[] = [];
+    const refining: { quickShots: number }[] = [];
+    const c2 = createLiveRepCoordinator(
+      {
+        analyze: async (frames) => {
+          seen.push(frames.length);
+          return frames === refinedFrames ? oneShot : noShots;
+        },
+        refine: async (w) => {
+          refinedFrames = w.frames.concat(w.frames);
+          return refinedFrames;
+        },
+      },
+      { shootingHand: "right" },
+    );
+    const results: { window: { fullRate?: boolean; frames: unknown[] } }[] = [];
+    c2.on("repRefining", (e) => refining.push(e));
+    c2.on("repResult", (e) => results.push(e));
+    c2.start();
+    const cursor = makeCursor();
+    feed(c2, stillPose(cursor, 1000));
+    feed(c2, shotArc(cursor));
+    feed(c2, stillPose(cursor, 1500));
+    await waitState(c2, "FEEDBACK");
+    // Quick pass on the live frames saw no shot; the full-rate pass did.
+    expect(refining).toEqual([{ quickShots: 0 }]);
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toBe(seen[0]! * 2);
+    expect(results[0]!.window.fullRate).toBe(true);
+    expect(results[0]!.window.frames).toBe(refinedFrames);
+  });
+
+  it("falls back to the live frames when refinement gives nothing", async () => {
+    const c = createLiveRepCoordinator(
+      { analyze: async () => oneShot, refine: async () => null },
+      { shootingHand: "right" },
+    );
+    const results: { window: { fullRate?: boolean } }[] = [];
+    c.on("repResult", (e) => results.push(e));
+    c.start();
+    const cursor = makeCursor();
+    feed(c, stillPose(cursor, 1000));
+    feed(c, shotArc(cursor));
+    feed(c, stillPose(cursor, 1500));
+    await waitState(c, "FEEDBACK");
+    expect(results[0]!.window.fullRate).toBeUndefined();
+  });
+
+  it("a refinement that throws is treated as no refinement", async () => {
+    const c = createLiveRepCoordinator(
+      {
+        analyze: async () => oneShot,
+        refine: async () => {
+          throw new Error("decode failed");
+        },
+      },
+      { shootingHand: "right" },
+    );
+    c.start();
+    const cursor = makeCursor();
+    feed(c, stillPose(cursor, 1000));
+    feed(c, shotArc(cursor));
+    feed(c, stillPose(cursor, 1500));
+    await waitState(c, "FEEDBACK");
+  });
+});

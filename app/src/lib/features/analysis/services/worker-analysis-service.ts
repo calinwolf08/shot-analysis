@@ -19,6 +19,7 @@ import type {
   LiveAnalysisSession,
   LiveSessionOptions,
   LiveSessionStats,
+  OfflinePoseDetector,
   ProgressCallback,
 } from "../types";
 import {
@@ -366,13 +367,51 @@ export function createWorkerAnalysisService(
       /** A frame that never comes back (worker error) must not wedge capture. */
       const STALL_MS = 2000;
       const busy = (): boolean => {
-        if (swapping) return true;
+        if (swapping || offlineBusy) return true;
         if (inFlight > 0 && performance.now() - sentAt > STALL_MS) {
           inFlight = 0;
         }
         return inFlight > 0;
       };
       let swapping = false;
+
+      // Offline (full-rate) detector: its own worker + MediaPipe instance, so
+      // the live detector's VIDEO-mode tracking and timestamps are untouched.
+      // Created on first use and kept for the session.
+      let offline: WorkerHandle | null = null;
+      let offlineReady: Promise<void> | null = null;
+      let offlineBusy = false;
+      let offlineCb: ((f: LandmarkFrame) => void) | null = null;
+      /** Last timestamp given to the offline detector (must increase). */
+      let offlineLastTs = -Infinity;
+      function ensureOffline(): Promise<void> {
+        if (offlineReady) return offlineReady;
+        const h = wrapWorker(makeWorker());
+        offline = h;
+        h.onLandmarks((f) => offlineCb?.(f));
+        const ready = h.waitReady();
+        h.send({
+          type: "init",
+          opts: { shootingHand: opts.shootingHand, profile: opts.profile },
+          mode: "live",
+          fps,
+          // Always the full model: this is the accurate pass.
+          assets: {
+            wasmBasePath: assets.wasmBasePath,
+            modelPath: assets.modelPath,
+          },
+          ...(live.debugDetectDelayMs > 0
+            ? { debugDetectDelayMs: live.debugDetectDelayMs }
+            : {}),
+        });
+        offlineReady = ready.catch((err) => {
+          offlineReady = null;
+          offline?.terminate();
+          offline = null;
+          throw err;
+        });
+        return offlineReady;
+      }
       let model: PoseModel = live.model === "lite" ? "lite" : "full";
       const latency = createLatencyTracker(live.windowFrames);
       let delivered = 0;
@@ -441,6 +480,11 @@ export function createWorkerAnalysisService(
               : {}),
           });
           await ready;
+          // Load the offline (full-rate) detector in the background once the
+          // live one is running, so the first shot doesn't wait for it.
+          setTimeout(() => {
+            if (handle) void ensureOffline().catch(() => undefined);
+          }, 3000);
         },
 
         // Called once per capture tick; a busy answer is a skipped tick.
@@ -475,6 +519,86 @@ export function createWorkerAnalysisService(
           return lastSize;
         },
 
+        detectOffline(): OfflinePoseDetector {
+          offlineBusy = true;
+          const out: LandmarkFrame[] = [];
+          const queued: {
+            data: Uint8ClampedArray;
+            width: number;
+            height: number;
+            frameIndex: number;
+            timestamp: number;
+          }[] = [];
+          let pushed = 0;
+          let cancelled = false;
+          let finishResolve: ((f: LandmarkFrame[]) => void) | null = null;
+          let finishReject: ((e: Error) => void) | null = null;
+          // VIDEO mode needs strictly increasing timestamps across batches:
+          // shift this batch past the last one, then shift results back.
+          let shift = 0;
+          let shiftSet = false;
+          const settle = () => {
+            if (finishResolve && out.length >= pushed) {
+              offlineBusy = false;
+              offlineCb = null;
+              finishResolve(out);
+              finishResolve = null;
+            }
+          };
+          const ready = ensureOffline();
+          const send = (f: (typeof queued)[number]) => {
+            if (!shiftSet) {
+              shift = Math.max(0, offlineLastTs + 1 - f.timestamp);
+              shiftSet = true;
+            }
+            const ts = f.timestamp + shift;
+            offlineLastTs = Math.max(offlineLastTs, ts);
+            offline!.send(
+              { type: "frames", frames: [{ ...f, timestamp: ts }] },
+              [f.data.buffer as ArrayBuffer],
+            );
+          };
+          void ready.then(
+            () => {
+              if (cancelled) return;
+              offlineCb = (f) => {
+                if (cancelled) return;
+                out.push({ ...f, timestamp: f.timestamp - shift });
+                settle();
+              };
+              for (const f of queued.splice(0)) send(f);
+            },
+            (err: unknown) => {
+              offlineBusy = false;
+              finishReject?.(
+                err instanceof Error ? err : new Error(String(err)),
+              );
+            },
+          );
+          return {
+            push(frame) {
+              if (cancelled) return;
+              pushed += 1;
+              if (offlineCb) send(frame);
+              else queued.push(frame);
+            },
+            finish() {
+              return new Promise<LandmarkFrame[]>((resolve, reject) => {
+                finishResolve = resolve;
+                finishReject = reject;
+                settle();
+              });
+            },
+            cancel() {
+              cancelled = true;
+              offlineBusy = false;
+              offlineCb = null;
+              finishResolve?.(out);
+              finishResolve = null;
+            },
+          };
+        },
+
         stats(): LiveSessionStats {
           return {
             model,
@@ -494,6 +618,10 @@ export function createWorkerAnalysisService(
         async stop() {
           handle?.terminate();
           handle = null;
+          offline?.terminate();
+          offline = null;
+          offlineReady = null;
+          offlineBusy = false;
           inFlight = 0;
         },
       } as LiveAnalysisSession & { pushFrame(frame: FramePayload): void };

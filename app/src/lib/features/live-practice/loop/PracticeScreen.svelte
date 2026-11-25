@@ -22,6 +22,7 @@
   } from "$lib/shared/media/frame-capture";
   import type { AudioFeedbackService } from "$lib/shared/audio";
   import type { ShotClipStore } from "$lib/shared/media/shot-clip-store";
+  import type { FullRateRefiner } from "../refine/full-rate";
   import {
     createShotClipRecorder,
     type ShotClipRecorder,
@@ -63,6 +64,7 @@
     audio = null,
     requiredOrientation = null,
     clipStore = null,
+    refiner = null,
     onfocuschange = null,
     tuning = DEFAULT_LIVE_TUNING,
     debug = false,
@@ -79,6 +81,8 @@
     requiredOrientation?: SideOrientation | null;
     /** Where per-shot clips are stored (null disables recording). */
     clipStore?: ShotClipStore | null;
+    /** Full-rate re-detection from the clip (takes the clip itself). */
+    refiner?: FullRateRefiner | null;
     /** Persist a focus change made from the in-loop picker. */
     onfocuschange?: ((ids: string[]) => void) | null;
     /** Cue pacing + readiness thresholds (static/config/live-tuning.json). */
@@ -257,8 +261,24 @@
    * with its start on the pose-frame clock, so review seeks frame-exactly.
    */
   async function saveClip(entry: (typeof store.shots)[number]): Promise<void> {
-    if (!clipStore || !recorder || !recorder.recording) return;
+    if (!clipStore) return;
     const cap = entry.capture;
+    // Full-rate refinement already took this shot's clip (and restarted the
+    // recorder); store that one.
+    const taken = cap ? (refiner?.takeClip(cap.repStartTs) ?? null) : null;
+    if (taken) {
+      try {
+        await clipStore.save(entry.shotId, {
+          blob: taken.blob,
+          mime: taken.mime,
+          startFrameTs: taken.startTs - cap!.frameToWall,
+        });
+      } catch {
+        /* local storage best-effort */
+      }
+      return;
+    }
+    if (!recorder || !recorder.recording) return;
     const fromWall = cap
       ? // The whole rep window (it holds the stored pose track), else a
         // fixed lead-in before the trigger.
@@ -335,12 +355,19 @@
       // Cap 0 ("keep video for 0 shots") = don't record at all.
       if (clipStore && clipStore.cap > 0 && !recorder) {
         recorder = createShotClipRecorder(stream);
+        // Roll again right after the refiner takes a shot's clip, so a quick
+        // next shot still has its lead-in (the discard timer handles leaving).
+        const r = recorder;
+        refiner?.setRecorder(r, () => {
+          if (gateActive && store.running) r?.start();
+        });
       }
     }
     return () => {
       frameCapture?.stop();
       if (discardTimer) clearTimeout(discardTimer);
       recorder?.discard();
+      refiner?.setRecorder(null);
     };
   });
 

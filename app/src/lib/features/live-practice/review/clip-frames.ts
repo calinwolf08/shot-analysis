@@ -13,6 +13,11 @@
  * Strategy: play muted from just before the first time, grabbing the shown
  * frame as each target time is passed; if playback won't start or stalls,
  * fall back to seeking to each remaining time in order.
+ *
+ * Android Firefox may never finish a seek on such a clip at all (`seeking`
+ * fires, `seeked` doesn't) while plain playback works. So when the start
+ * seek doesn't complete, the element is reloaded — that rewinds to 0 with no
+ * seek — and played through from the beginning instead.
  */
 
 export interface ClipFrame {
@@ -53,6 +58,28 @@ function grab(
   if (!ctx) return null;
   ctx.drawImage(video, 0, 0, c.width, c.height);
   return c;
+}
+
+/** Reload the source (back to time 0 without seeking); false on timeout. */
+function rewindByReload(
+  video: HTMLVideoElement,
+  timeoutMs: number,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const done = (ok: boolean) => {
+      clearTimeout(timer);
+      video.removeEventListener("loadeddata", onReady);
+      resolve(ok);
+    };
+    const onReady = () => done(true);
+    const timer = setTimeout(() => done(video.readyState >= 2), timeoutMs);
+    video.addEventListener("loadeddata", onReady);
+    try {
+      video.load();
+    } catch {
+      done(false);
+    }
+  });
 }
 
 function seekTo(
@@ -108,8 +135,11 @@ export async function extractClipFrames(
     Math.max(0, order[0]!.t - 0.05),
     seekTimeoutMs,
   );
+  // Seeks hanging (Android Firefox): start from 0 by reloading instead.
+  const canPlay = startOk || (await rewindByReload(video, seekTimeoutMs));
   let played = false;
-  if (startOk && !o.cancelled?.()) {
+  if (canPlay && !o.cancelled?.()) {
+    video.muted = true;
     try {
       video.playbackRate = o.playbackRate ?? 2;
       await video.play();
@@ -148,7 +178,12 @@ export async function extractClipFrames(
   for (; next < order.length; next++) {
     if (o.cancelled?.()) break;
     if (await seekTo(video, order[next]!.t, seekTimeoutMs)) put(next);
-    else {
+    else if (!startOk) {
+      // Seeking is broken on this clip: don't wait out every timeout.
+      done = order.length;
+      o.onProgress?.(done, order.length);
+      break;
+    } else {
       done++;
       o.onProgress?.(done, order.length);
     }

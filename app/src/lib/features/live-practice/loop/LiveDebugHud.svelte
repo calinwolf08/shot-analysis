@@ -32,14 +32,18 @@
     if (!session?.stats) return;
     const s = session;
     let lastModel: string | null = null;
+    // Counted, not just compared: a fallback can land before the first poll.
+    let lastFallbacks = 0;
     const id = setInterval(() => {
       stats = s.stats!();
-      if (stats.model !== lastModel) {
-        if (lastModel !== null) {
-          push(snap?.timestamp ?? 0, `pose model → ${stats.model}`);
-        }
-        lastModel = stats.model;
+      if (
+        stats.fallbacks > lastFallbacks ||
+        (lastModel !== null && stats.model !== lastModel)
+      ) {
+        push(snap?.timestamp ?? 0, `pose model → ${stats.model}`);
       }
+      lastFallbacks = stats.fallbacks;
+      lastModel = stats.model;
     }, 500);
     return () => clearInterval(id);
   });
