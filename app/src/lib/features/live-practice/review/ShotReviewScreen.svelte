@@ -11,6 +11,7 @@
    * every device). A retained on-device clip renders behind this same overlay
    * once per-shot video capture lands.
    */
+  import { deviceDebugEnabled } from "$lib/shared/debug/debug-mode";
   import { onDestroy } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
@@ -341,7 +342,8 @@
         (clipInfo.expectedEnd !== null &&
           clipInfo.duration + 0.5 < clipInfo.expectedEnd)),
   );
-  const debugVideo = $derived(page.url.searchParams.get("debug") === "video");
+  // Debug mode (`?debug=on`, remembered across pages): the video panel.
+  const debugVideo = $derived(deviceDebugEnabled(page.url));
   const showClipInfo = $derived(clipProblem || debugVideo);
 
   // ---- ?debug=video: everything needed to diagnose playback on a device ----
@@ -388,10 +390,14 @@
     const v = videoEl;
     if (!v || !debugVideo) return;
     const on = (e: Event) => {
-      mediaEvents = [
-        ...mediaEvents.slice(-11),
+      // The first events (how the clip loaded) and the latest (what it's
+      // doing now); decoding fires many in between.
+      const all = [
+        ...mediaEvents.filter((x) => x !== "…"),
         `${(performance.now() / 1000).toFixed(2)}s ${e.type}`,
       ];
+      mediaEvents =
+        all.length > 32 ? [...all.slice(0, 8), "…", ...all.slice(-23)] : all;
       mediaState = readMediaState(v);
     };
     for (const t of MEDIA_EVENTS) v.addEventListener(t, on);
