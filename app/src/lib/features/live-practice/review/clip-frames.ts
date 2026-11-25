@@ -36,6 +36,12 @@ export interface ExtractOptions {
   readonly stallMs?: number;
   /** Per-seek timeout in the fallback (ms). */
   readonly seekTimeoutMs?: number;
+  /**
+   * A grabbed frame may be this far (s) from its target time (default 0.25:
+   * a sparse recording only has frames every ~0.2 s; a jump to the clip end
+   * is seconds off).
+   */
+  readonly tolerance?: number;
   /** Play-through speed (higher = sooner, but frames may be skipped). */
   readonly playbackRate?: number;
 }
@@ -119,75 +125,122 @@ export async function extractClipFrames(
   const out: ClipFrames = times.map(() => null);
   const order = times.map((t, i) => ({ t, i })).sort((a, b) => a.t - b.t);
   if (order.length === 0) return out;
-  let done = 0;
-  const put = (k: number) => {
+  const tol = o.tolerance ?? 0.25;
+  let filled = 0;
+  const missing = () =>
+    order.map((_, k) => k).filter((k) => out[order[k]!.i] === null);
+  /** Keep a frame only if the video is really at (about) its time. */
+  const tryPut = (k: number, t: number) => {
+    if (out[order[k]!.i] || Math.abs(t - order[k]!.t) > tol) return;
     const c = grab(video, maxSize);
-    if (c) out[order[k]!.i] = { canvas: c, time: video.currentTime };
-    done++;
-    o.onProgress?.(done, order.length);
+    if (!c) return;
+    out[order[k]!.i] = { canvas: c, time: t };
+    filled++;
+    o.onProgress?.(filled, order.length);
   };
-
-  // 1) Play through once (one linear decode).
-  let next = 0;
   video.muted = true;
-  const startOk = await seekTo(
-    video,
-    Math.max(0, order[0]!.t - 0.05),
-    seekTimeoutMs,
-  );
-  // Seeks hanging (Android Firefox): start from 0 by reloading instead.
-  const canPlay = startOk || (await rewindByReload(video, seekTimeoutMs));
-  let played = false;
-  if (canPlay && !o.cancelled?.()) {
-    video.muted = true;
+
+  /**
+   * Play through once (one linear decode), grabbing each still-missing frame
+   * as its time is passed. A frame whose time was skipped (the clip jumped,
+   * or ended at once — seen on Android Firefox right after a seek) stays
+   * missing for the next pass instead of getting the wrong picture.
+   */
+  const playThrough = async (
+    from: "seek" | "reload",
+    rate: number,
+  ): Promise<boolean> => {
+    const todo = missing();
+    if (todo.length === 0) return true;
+    const ok =
+      from === "seek"
+        ? await seekTo(
+            video,
+            Math.max(0, order[todo[0]!]!.t - 0.05),
+            seekTimeoutMs,
+          )
+        : await rewindByReload(video, seekTimeoutMs);
+    if (!ok || o.cancelled?.()) return ok;
     try {
-      video.playbackRate = o.playbackRate ?? 2;
+      video.muted = true;
+      video.playbackRate = rate;
       await video.play();
-      played = true;
     } catch {
-      played = false;
+      return ok;
     }
-  }
-  if (played) {
+    const rvfc = (
+      video as HTMLVideoElement & {
+        requestVideoFrameCallback?: (
+          cb: (n: number, m: { mediaTime: number }) => void,
+        ) => number;
+      }
+    ).requestVideoFrameCallback?.bind(video);
     await new Promise<void>((resolve) => {
+      let next = 0;
       let lastProgress = performance.now();
-      let lastTime = video.currentTime;
-      const tick = () => {
-        if (o.cancelled?.()) return resolve();
-        const ct = video.currentTime;
-        if (ct !== lastTime) {
-          lastTime = ct;
+      let lastTime = -1;
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        clearInterval(watch);
+        resolve();
+      };
+      const handle = (t: number) => {
+        if (t !== lastTime) {
+          lastTime = t;
           lastProgress = performance.now();
         }
-        while (next < order.length && order[next]!.t <= ct + 0.008) {
-          put(next);
+        while (next < todo.length && order[todo[next]!]!.t <= t + 0.008) {
+          tryPut(todo[next]!, t);
           next++;
         }
-        if (next >= order.length || video.ended) return resolve();
-        if (performance.now() - lastProgress > stallMs) return resolve();
-        requestAnimationFrame(tick);
+        if (next >= todo.length) finish();
       };
-      requestAnimationFrame(tick);
+      const watch = setInterval(() => {
+        if (
+          o.cancelled?.() ||
+          video.ended ||
+          performance.now() - lastProgress > stallMs
+        )
+          finish();
+      }, 100);
+      if (rvfc) {
+        const tick = (_n: number, m: { mediaTime: number }) => {
+          if (finished) return;
+          handle(m.mediaTime);
+          if (!finished) rvfc(tick);
+        };
+        rvfc(tick);
+      } else {
+        const tick = () => {
+          if (finished) return;
+          handle(video.currentTime);
+          if (!finished) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
     });
     video.pause();
     video.playbackRate = 1;
-  }
+    return true;
+  };
 
-  // 2) Whatever is left (playback refused or stalled, or the clip ended
-  //    early): seek to each remaining time in order.
-  for (; next < order.length; next++) {
-    if (o.cancelled?.()) break;
-    if (await seekTo(video, order[next]!.t, seekTimeoutMs)) put(next);
-    else if (!startOk) {
-      // Seeking is broken on this clip: don't wait out every timeout.
-      done = order.length;
-      o.onProgress?.(done, order.length);
-      break;
-    } else {
-      done++;
-      o.onProgress?.(done, order.length);
+  // 1) Seek near the first frame and play through.
+  const seekOk = await playThrough("seek", o.playbackRate ?? 2);
+  // 2) Anything missed (seek hung, clip jumped or ended early): reload —
+  //    back to time 0 without seeking — and play through from the start, at
+  //    normal speed this time (a busy phone can skip frames at 2x).
+  if (missing().length > 0 && !o.cancelled?.()) await playThrough("reload", 1);
+  // 3) Still missing and seeking works: seek to each remaining time.
+  if (seekOk) {
+    for (const k of missing()) {
+      if (o.cancelled?.()) break;
+      if (await seekTo(video, order[k]!.t, seekTimeoutMs))
+        tryPut(k, video.currentTime);
     }
   }
+  o.onProgress?.(order.length, order.length);
   return out;
 }
 

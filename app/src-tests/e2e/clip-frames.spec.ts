@@ -135,3 +135,47 @@ test("decodes by playing from the start when seeks never finish (Android Firefox
   // One timed-out seek + a 2× play-through, not a timeout per frame.
   expect(r.ms).toBeLessThan(10_000);
 });
+
+test("frames stay accurate when the clip jumps to its end on play (Android Firefox)", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  // The first play() lands at the end and fires "ended" — as seen in a
+  // ?debug=video report (seeked, play, playing, pause, ended in 40 ms).
+  await page.addInitScript(() => {
+    const play = HTMLMediaElement.prototype.play;
+    let first = true;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      if (first) {
+        first = false;
+        this.currentTime = this.duration;
+      }
+      return play.call(this);
+    };
+  });
+  await serveFixture(page);
+  await page.goto("http://clip-frames.test/");
+  const r = await page.evaluate(async () => {
+    const v = document.getElementById("v") as HTMLVideoElement;
+    await new Promise((res) =>
+      v.readyState >= 1
+        ? res(null)
+        : v.addEventListener("loadedmetadata", res, { once: true }),
+    );
+    const times = Array.from({ length: 40 }, (_, i) => 0.2 + i * 0.14);
+    const cf = (
+      window as unknown as {
+        ClipFrames: typeof import("../../src/lib/features/live-practice/review/clip-frames");
+      }
+    ).ClipFrames;
+    const frames = await cf.extractClipFrames(v, times);
+    return {
+      got: frames.filter((f) => f).length,
+      maxErr: Math.max(
+        ...frames.map((f, i) => (f ? Math.abs(f.time - times[i]!) : 99)),
+      ),
+    };
+  });
+  expect(r.got).toBe(40);
+  expect(r.maxErr).toBeLessThan(0.07);
+});
