@@ -30,6 +30,31 @@ test("shots are scored from frames re-detected at full rate", async ({
     (u) => u.pathname === "/__livevideo",
     (route) => route.fulfill({ contentType: "video/webm", body: bytes }),
   );
+  if (process.env.SIMULATE_FIREFOX) {
+    // Android Firefox (from ?debug=video logs): once a clip has been seeked,
+    // play() ends it at once.
+    await page.addInitScript(() => {
+      const d = Object.getOwnPropertyDescriptor(
+        HTMLMediaElement.prototype,
+        "currentTime",
+      )!;
+      const seeked = new WeakSet<HTMLMediaElement>();
+      Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
+        get: d.get,
+        set(this: HTMLMediaElement, v: number) {
+          seeked.add(this);
+          d.set!.call(this, v);
+        },
+        configurable: true,
+      });
+      const play = HTMLMediaElement.prototype.play;
+      HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+        if (seeked.has(this) && isFinite(this.duration))
+          d.set!.call(this, this.duration);
+        return play.call(this);
+      };
+    });
+  }
   await onboard(page, "?e2e=device", "FullRate");
   await page.goto(
     `/practice?e2e=device&debug=capture&liveVideo=/__livevideo${DELAY ? `&detectDelayMs=${DELAY}` : ""}`,

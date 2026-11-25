@@ -179,3 +179,57 @@ test("frames stay accurate when the clip jumps to its end on play (Android Firef
   expect(r.got).toBe(40);
   expect(r.maxErr).toBeLessThan(0.07);
 });
+
+test("never relies on seeking: a clip that ends on play after a seek still decodes (Android Firefox)", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  // Once the element has been seeked, play() lands at the end and "ends" —
+  // the ?debug=video log: seeking, seeked, play, playing, pause, ended.
+  await page.addInitScript(() => {
+    const d = Object.getOwnPropertyDescriptor(
+      HTMLMediaElement.prototype,
+      "currentTime",
+    )!;
+    const seeked = new WeakSet<HTMLMediaElement>();
+    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
+      get: d.get,
+      set(this: HTMLMediaElement, v: number) {
+        seeked.add(this);
+        d.set!.call(this, v);
+      },
+      configurable: true,
+    });
+    const load = HTMLMediaElement.prototype.load;
+    HTMLMediaElement.prototype.load = function (this: HTMLMediaElement) {
+      seeked.delete(this);
+      return load.call(this);
+    };
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      if (seeked.has(this)) d.set!.call(this, this.duration);
+      return play.call(this);
+    };
+  });
+  await serveFixture(page);
+  await page.goto("http://clip-frames.test/");
+  const r = await page.evaluate(async () => {
+    const times = Array.from({ length: 40 }, (_, i) => 0.2 + i * 0.14);
+    const cf = (
+      window as unknown as {
+        ClipFrames: typeof import("../../src/lib/features/live-practice/review/clip-frames");
+      }
+    ).ClipFrames;
+    const frames = await cf.extractClipFramesFromUrl("clip.webm", times);
+    return {
+      got: frames.filter((f) => f).length,
+      maxErr: Math.max(
+        ...frames.map((f, i) => (f ? Math.abs(f.time - times[i]!) : 99)),
+      ),
+      leftovers: document.querySelectorAll("video").length,
+    };
+  });
+  expect(r.got).toBe(40);
+  expect(r.maxErr).toBeLessThan(0.07);
+  expect(r.leftovers).toBe(1); // only the page's own <video>
+});
