@@ -58,6 +58,7 @@
   import {
     createFullRateRefiner,
     keyframeSpan,
+    keyframeRelease,
     type FullRateRefiner,
   } from "$lib/features/live-practice/refine/full-rate";
   import { getVideoRetention } from "$lib/shared/media/video-retention";
@@ -254,6 +255,19 @@
               },
             }
           : {}),
+        // End the rep just after the release, not once the wrist settles.
+        // Dev/E2E: `?settleEnd=1` waits for the wrist to settle (A/B).
+        ...(devSurfaces && page.url.searchParams.has("settleEnd")
+          ? {}
+          : {
+              releaseAt: keyframeRelease({
+                shootingHand,
+                aspect: () => {
+                  const f = session?.frameSize?.();
+                  return f && f.height > 0 ? f.width / f.height : null;
+                },
+              }),
+            }),
       },
       { shootingHand },
     );

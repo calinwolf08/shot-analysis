@@ -67,6 +67,14 @@ export interface LiveRepConfig {
    * this keeps that flicker from swallowing a real shot.
    */
   disarmGraceMs: number;
+  /**
+   * With `deps.releaseAt`: the rep ends this long after the detected release
+   * (the scoring needs a few frames past it), instead of waiting for the
+   * wrist to settle.
+   */
+  releaseTailMs: number;
+  /** How often (frame time) the release is looked for while ACTIVE. */
+  releaseCheckMs: number;
 }
 
 export const DEFAULT_LIVE_REP_CONFIG: Omit<LiveRepConfig, "shootingHand"> = {
@@ -83,9 +91,11 @@ export const DEFAULT_LIVE_REP_CONFIG: Omit<LiveRepConfig, "shootingHand"> = {
   overheadRiseTorso: 1.0,
   preRollMs: 1500,
   disarmGraceMs: 750,
+  releaseTailMs: 200,
+  releaseCheckMs: 100,
 };
 
-export type RepTrigger = "settled" | "max-duration";
+export type RepTrigger = "settled" | "max-duration" | "released";
 
 export interface RepWindow {
   frames: LandmarkFrame[];
@@ -183,6 +193,13 @@ export interface LiveRepCoordinatorDeps {
    * the result. Null = keep the live frames.
    */
   refine?(window: RepWindow): Promise<LandmarkFrame[] | null>;
+  /**
+   * Optional: the shot's release time (pose clock) in the frames so far, or
+   * null. When given, a rep ends `releaseTailMs` after the release instead
+   * of waiting for the wrist to settle (which stays the fallback: pump
+   * fakes, passes, a messy track).
+   */
+  releaseAt?(frames: readonly LandmarkFrame[]): number | null;
 }
 
 // MediaPipe pose landmark indexes.
@@ -255,6 +272,7 @@ export function createLiveRepCoordinator(
   let wristOverhead = false;
   let repStartTs = 0;
   let settledSince: number | null = null;
+  let lastReleaseCheck = -Infinity;
   let lastRepEndTs = -Infinity;
   let nearPeak = 0;
   let nearPeakTs = 0;
@@ -488,6 +506,17 @@ export function createLiveRepCoordinator(
           if (now - repStartTs >= cfg.maxRepDurationMs) {
             beginAnalysis("max-duration", now);
             break;
+          }
+          if (deps.releaseAt && now - lastReleaseCheck >= cfg.releaseCheckMs) {
+            lastReleaseCheck = now;
+            const from = repStartTs - cfg.preRollMs;
+            const r = deps.releaseAt(buffer.filter((f) => f.timestamp >= from));
+            // Still extending, the estimate tracks the newest frames; only a
+            // release that has stayed put this long is the release.
+            if (r !== null && r > from && now - r >= cfg.releaseTailMs) {
+              beginAnalysis("released", now);
+              break;
+            }
           }
           if (Math.abs(smoothedVelocity) < cfg.settleVelocity) {
             settledSince ??= now;

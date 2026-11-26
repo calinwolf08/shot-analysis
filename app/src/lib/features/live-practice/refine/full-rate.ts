@@ -66,46 +66,75 @@ export type KeyframeSpan = (
   frames: readonly LandmarkFrame[],
 ) => { readonly fromTs: number; readonly toTs: number } | null;
 
+interface LiveKeyframeOpts {
+  shootingHand: "left" | "right";
+  /** Frame width ÷ height (null = not known yet → no guess). */
+  aspect: () => number | null;
+}
+
+/** Setup / Load / Release on the pose clock, from (live) frames. */
+function keyframeTimes(
+  frames: readonly LandmarkFrame[],
+  opts: LiveKeyframeOpts,
+): {
+  setup: number | null;
+  load: number | null;
+  release: number | null;
+} | null {
+  const aspect = opts.aspect();
+  const posed = frames.filter((f) => f.landmarks && f.landmarks.length > 0);
+  if (!aspect || posed.length < 8) return null;
+  const kf = computeShotKeyframes(
+    posed.map((f, i) => ({
+      frameIndex: i,
+      timestamp: f.timestamp,
+      landmarks: f.landmarks,
+    })),
+    { aspect, shootingHand: opts.shootingHand },
+  );
+  // Fractional frame index → pose-clock time.
+  const at = (x: number | null) => {
+    if (x === null) return null;
+    const i = Math.max(0, Math.min(posed.length - 1, Math.floor(x)));
+    const j = Math.min(posed.length - 1, i + 1);
+    return (
+      posed[i]!.timestamp +
+      (x - i) * (posed[j]!.timestamp - posed[i]!.timestamp)
+    );
+  };
+  return {
+    setup: at(kf.keyframes.setup),
+    load: at(kf.keyframes.load),
+    release: at(kf.keyframes.release),
+  };
+}
+
 /**
  * The keyframe span guess the practice loop uses: the keyframe checks'
  * detection run on the (live) frames; Setup → Release on the pose clock.
  */
-export function keyframeSpan(opts: {
-  shootingHand: "left" | "right";
-  /** Frame width ÷ height (null = not known yet → no guess). */
-  aspect: () => number | null;
-}): KeyframeSpan {
+export function keyframeSpan(opts: LiveKeyframeOpts): KeyframeSpan {
   return (frames) => {
-    const aspect = opts.aspect();
-    const posed = frames.filter((f) => f.landmarks && f.landmarks.length > 0);
-    if (!aspect || posed.length < 8) return null;
-    const kf = computeShotKeyframes(
-      posed.map((f, i) => ({
-        frameIndex: i,
-        timestamp: f.timestamp,
-        landmarks: f.landmarks,
-      })),
-      { aspect, shootingHand: opts.shootingHand },
-    );
-    const load = kf.keyframes.load;
-    const setup = kf.keyframes.setup ?? load;
-    const r = kf.keyframes.release;
+    const k = keyframeTimes(frames, opts);
+    if (!k) return null;
+    const setup = k.setup ?? k.load;
+    const r = k.release;
     if (setup === null || r === null || !(r > setup)) return null;
-    // Fractional frame index → pose-clock time.
-    const at = (x: number) => {
-      const i = Math.max(0, Math.min(posed.length - 1, Math.floor(x)));
-      const j = Math.min(posed.length - 1, i + 1);
-      return (
-        posed[i]!.timestamp +
-        (x - i) * (posed[j]!.timestamp - posed[i]!.timestamp)
-      );
-    };
     const from =
-      load !== null
-        ? Math.min(at(setup), at(load) - SETUP_LOOKBACK_MS)
-        : at(setup);
-    return { fromTs: from, toTs: at(r) };
+      k.load !== null ? Math.min(setup, k.load - SETUP_LOOKBACK_MS) : setup;
+    return { fromTs: from, toTs: r };
   };
+}
+
+/**
+ * The shot's release (pose clock) in the live frames so far, for ending a
+ * rep at the release (LiveRepCoordinatorDeps.releaseAt): the same keyframe
+ * detection the scoring uses, so the two can't disagree about the moment.
+ */
+export function keyframeRelease(
+  opts: LiveKeyframeOpts,
+): (frames: readonly LandmarkFrame[]) => number | null {
+  return (frames) => keyframeTimes(frames, opts)?.release ?? null;
 }
 
 export interface RefineReport {

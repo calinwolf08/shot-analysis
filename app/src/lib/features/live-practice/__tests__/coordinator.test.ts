@@ -605,3 +605,71 @@ describe("full-rate refinement", () => {
     await waitState(c, "FEEDBACK");
   });
 });
+
+describe("ending a rep at the release (deps.releaseAt)", () => {
+  function withRelease(
+    releaseAt: (
+      frames: readonly LandmarkFrame[],
+      startedAt: number | null,
+    ) => number | null,
+  ) {
+    let startedAt: number | null = null;
+    let lastSeen = 0;
+    let endedAt: number | null = null;
+    const analyzing: { trigger: string; frameCount: number }[] = [];
+    const coordinator = createLiveRepCoordinator(
+      {
+        analyze: async () => oneShot,
+        releaseAt: (frames) => {
+          lastSeen = frames.at(-1)!.timestamp;
+          return releaseAt(frames, startedAt);
+        },
+      },
+      { shootingHand: "right" },
+    );
+    coordinator.on("repStarted", ({ timestamp }) => (startedAt = timestamp));
+    coordinator.on("repAnalyzing", (e) => {
+      analyzing.push(e);
+      endedAt ??= lastSeen;
+    });
+    coordinator.start();
+    return {
+      coordinator,
+      analyzing,
+      started: () => startedAt,
+      ended: () => endedAt,
+    };
+  }
+
+  it("ends releaseTailMs after a release that stays put", async () => {
+    const r = withRelease((_f, s) => (s === null ? null : s + 300));
+    const cursor = makeCursor();
+    feed(r.coordinator, stillPose(cursor, 1000));
+    feed(r.coordinator, shotArc(cursor));
+    feed(r.coordinator, stillPose(cursor, 2000));
+    const endedAt = r.ended();
+    await waitState(r.coordinator, "FEEDBACK");
+    expect(r.analyzing[0]!.trigger).toBe("released");
+    // Release + tail (+ at most one check interval), well before settling.
+    const release = r.started()! + 300;
+    expect(endedAt! - release).toBeGreaterThanOrEqual(
+      DEFAULT_LIVE_REP_CONFIG.releaseTailMs,
+    );
+    expect(endedAt! - release).toBeLessThan(DEFAULT_LIVE_REP_CONFIG.settleMs);
+  });
+
+  it("waits for the wrist to settle while the release keeps moving (or isn't found)", async () => {
+    for (const fn of [
+      (f: readonly LandmarkFrame[]) => f.at(-1)!.timestamp, // still extending
+      () => null, // no release (pump fake, pass)
+    ]) {
+      const r = withRelease(fn);
+      const cursor = makeCursor();
+      feed(r.coordinator, stillPose(cursor, 1000));
+      feed(r.coordinator, shotArc(cursor));
+      feed(r.coordinator, stillPose(cursor, 2000));
+      await waitState(r.coordinator, "FEEDBACK");
+      expect(r.analyzing[0]!.trigger).toBe("settled");
+    }
+  });
+});
