@@ -154,6 +154,36 @@ describe("keyframe detection (Curry reference shots)", () => {
   });
 });
 
+describe("keyframe stability (same motion, sampled differently)", () => {
+  const kfOf = (k: ShotKeyframes) => KEYFRAMES.map((x) => k.keyframes[x]);
+  it("is deterministic: the same pose data gives the same keyframes", () => {
+    for (const s of L.shots) {
+      const w = windowOf(s);
+      expect(measure(w)).toEqual(measure(w.map((f) => ({ ...f }))));
+    }
+  });
+
+  it("a dropped frame almost never moves a keyframe by more than a frame", () => {
+    const shifts: number[] = [];
+    for (const [i, s] of L.shots.entries()) {
+      const w = windowOf(s);
+      const ref = kfOf(shots[i]!);
+      for (let d = 5; d < w.length - 5; d++) {
+        const got = kfOf(measure(w.filter((_, j) => j !== d)));
+        got.forEach((x, k) => {
+          // Never appears or disappears.
+          expect(x === null, `shot ${i} drop ${d} ${KEYFRAMES[k]}`).toBe(
+            ref[k] === null,
+          );
+          if (x !== null) shifts.push(Math.abs(x - ref[k]!));
+        });
+      }
+    }
+    const within = shifts.filter((x) => x <= 1).length / shifts.length;
+    expect(within).toBeGreaterThanOrEqual(0.95);
+  });
+});
+
 describe("keyframe targets", () => {
   const targets = buildKeyframeTargets(shots, {
     builtFrom: "test",

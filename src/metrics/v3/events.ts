@@ -52,6 +52,12 @@ export const ONSET_FRACTION = 0.2;
 export const REBEND_DEPTH = 0.3;
 /** Fraction of the excursion that counts as "straight" for completions. */
 export const COMPLETE_FRACTION = 0.9;
+/**
+ * The ball's rise starts where the hand's upward speed has been below 10 % of
+ * its peak for at least this long (s): a one-sample stall in a noisy wrist
+ * track (fast motion, small frames) is part of the rise, not its start.
+ */
+export const RISE_ONSET_HOLD_S = 0.08;
 
 // ---- sub-frame primitives ---------------------------------------------------
 
@@ -108,6 +114,12 @@ export function onsetBefore(
    * evenly spaced samples.
    */
   t?: readonly number[],
+  /**
+   * Only stop walking back once the velocity has stayed below the threshold
+   * for this long (s with `t`, else samples); shorter dips are noise inside
+   * the movement. 0 = stop at the first sample below (the default).
+   */
+  hold = 0,
 ): number | null {
   const p = Math.round(peak);
   const a = Math.max(0, Math.floor(lo));
@@ -118,7 +130,11 @@ export function onsetBefore(
     const y = s[i + 1];
     const dt = t ? t[i + 1]! - t[i]! : 1;
     v.push(
-      x === null || x === undefined || y === null || y === undefined || !(dt > 0)
+      x === null ||
+        x === undefined ||
+        y === null ||
+        y === undefined ||
+        !(dt > 0)
         ? null
         : (dir * (y - x)) / dt,
     );
@@ -135,8 +151,20 @@ export function onsetBefore(
   }
   if (vmax <= 0) return null;
   const thr = frac * vmax;
+  // Time of v[k] (between samples a+k and a+k+1).
+  const at = (k: number) => (t ? (t[a + k]! + t[a + k + 1]!) / 2 : a + k + 0.5);
   let i = iMax;
-  while (i >= 0 && v[i] !== null && v[i]! >= thr) i--;
+  let above = iMax; // earliest velocity ≥ thr so far
+  for (;;) {
+    while (i >= 0 && v[i] !== null && v[i]! >= thr) above = i--;
+    if (i < 0 || v[i] === null || hold <= 0) break;
+    // Below the threshold at i: is it a sustained stop, or a dip?
+    let j = i;
+    while (j >= 0 && v[j] !== null && v[j]! < thr) j--;
+    if (j < 0 || v[j] === null || at(above) - at(j) > hold) break;
+    i = j; // a short dip: keep walking back
+  }
+  i = above - 1;
   if (i < 0 || v[i] === null) return a + i + 1.5; // moving from the window start
   // Crossing between v[i] (< thr) at a+i+0.5 and v[i+1] (≥ thr) at a+i+1.5.
   const lo2 = v[i]!;
@@ -163,7 +191,8 @@ export function reachFraction(
   for (let i = Math.floor(from); i < Math.ceil(to); i++) {
     const x = s[i];
     const y = s[i + 1];
-    if (x === null || x === undefined || y === null || y === undefined) continue;
+    if (x === null || x === undefined || y === null || y === undefined)
+      continue;
     if (sign * (y - target) >= 0 && sign * (x - target) < 0) {
       return i + (target - x) / (y - x);
     }
@@ -226,7 +255,13 @@ export function previousExtremum(
   while (i > 0) {
     const cur = s[i];
     const prev = s[i - 1];
-    if (prev === null || prev === undefined || cur === null || cur === undefined) break;
+    if (
+      prev === null ||
+      prev === undefined ||
+      cur === null ||
+      cur === undefined
+    )
+      break;
     if (sgn * (prev - (s[best] ?? prev)) > 0) best = i - 1;
     // Stop once we've clearly come back down from the extremum.
     if (sgn * ((s[best] ?? prev) - prev) > tol) break;
@@ -253,7 +288,13 @@ export function nextExtremum(
   while (i < s.length - 1) {
     const cur = s[i];
     const next = s[i + 1];
-    if (next === null || next === undefined || cur === null || cur === undefined) break;
+    if (
+      next === null ||
+      next === undefined ||
+      cur === null ||
+      cur === undefined
+    )
+      break;
     if (sgn * (next - (s[best] ?? next)) > 0) best = i + 1;
     if (sgn * ((s[best] ?? next) - next) > tol) break;
     i++;
@@ -283,6 +324,40 @@ export function firstArrival(
   return global;
 }
 
+/**
+ * The top of the signal's biggest climb toward `kind` (for the hand's
+ * height: the shot — by far its largest rise from a dip). Its first arrival
+ * near that top, like `firstArrival`, so a held follow-through doesn't move
+ * it. Unlike the global extreme, an earlier moment with the hand held high
+ * (a catch overhead, a raised ball) can't take the shot's place.
+ */
+export function biggestClimb(
+  s: Series,
+  kind: "min" | "max",
+  tol: number,
+): number | null {
+  const sgn = kind === "min" ? -1 : 1;
+  const back = kind === "min" ? "max" : "min";
+  let best: { from: number; top: number; amp: number } | null = null;
+  for (let i = 1; i < s.length; i++) {
+    const v = s[i];
+    if (v === null || v === undefined) continue;
+    const from = previousExtremum(s, i, back, tol);
+    if (from === null) continue;
+    const f = valueAt(s, from);
+    if (f === null) continue;
+    const amp = sgn * (v - f);
+    if (amp > (best?.amp ?? 0) + 1e-12) best = { from, top: v, amp };
+  }
+  if (!best) return firstArrival(s, kind, tol);
+  for (let i = Math.ceil(best.from); i < s.length; i++) {
+    const v = s[i];
+    if (v === null || v === undefined) continue;
+    if (sgn * (v - best.top) >= -tol) return nextExtremum(s, i, kind, tol);
+  }
+  return null;
+}
+
 /** Robust noise scale: 5 % of the series' range. */
 function tolOf(s: Series): number {
   let lo = Infinity;
@@ -305,7 +380,7 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
   // The hand's first arrival at (near) its highest point anchors the shot —
   // the release. The absolute highest frame can come later (a held follow-
   // through), and anchoring there would let the landing dip pose as the load.
-  const peak = firstArrival(sig.wristY, "min", tolOf(sig.wristY));
+  const peak = biggestClimb(sig.wristY, "min", tolOf(sig.wristY));
   const none: ShotEvents = {
     ballDropStart: null,
     ballLowest: null,
@@ -329,13 +404,23 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
     tolOf(sig.wristY),
   );
   const ballDropStart =
-    ballLowest !== null ? onsetBefore(sig.wristY, ballLowest, 1, 0, ONSET_FRACTION, sig.t) : null;
+    ballLowest !== null
+      ? onsetBefore(sig.wristY, ballLowest, 1, 0, ONSET_FRACTION, sig.t)
+      : null;
   // Rise start: the hand's upward speed reaches 10 % of its peak (on the
   // labeled corpus this tracks "ball starts upward" best; the turning point
   // itself is often a flat stretch).
   const ballRiseStart =
     ballLowest !== null
-      ? onsetBefore(sig.wristY, peak, -1, ballLowest, 0.1, sig.t)
+      ? onsetBefore(
+          sig.wristY,
+          peak,
+          -1,
+          ballLowest,
+          0.1,
+          sig.t,
+          RISE_ONSET_HOLD_S,
+        )
       : null;
 
   // The elbow can be nearly straight at the ball's lowest point (arm hanging
@@ -379,7 +464,14 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
       : null;
   const setPoint =
     elbowMax !== null && elbowMin !== null
-      ? (onsetBefore(sig.elbowAngle, elbowMax, 1, elbowMin, ONSET_FRACTION, sig.t) ?? elbowMin)
+      ? (onsetBefore(
+          sig.elbowAngle,
+          elbowMax,
+          1,
+          elbowMin,
+          ONSET_FRACTION,
+          sig.t,
+        ) ?? elbowMin)
       : null;
   const armExtended =
     setPoint !== null && elbowMax !== null && elbowMin !== null
@@ -393,7 +485,9 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
   const legHi = setPoint ?? peak;
   const hipLowest = extremum(sig.hipY, legLo, legHi, "max");
   const hipDropStart =
-    hipLowest !== null ? onsetBefore(sig.hipY, hipLowest, 1, 0, ONSET_FRACTION, sig.t) : null;
+    hipLowest !== null
+      ? onsetBefore(sig.hipY, hipLowest, 1, 0, ONSET_FRACTION, sig.t)
+      : null;
 
   // The deepest knee bend belongs with the hips' low point (an earlier bend —
   // a catch or dribble — must not be picked).
@@ -435,7 +529,14 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
     // Knees START straightening: onset of extension after the deepest bend.
     kneesStartStraightening:
       kneeMin !== null && kneeMax !== null
-        ? (onsetBefore(sig.kneeAngle, kneeMax, 1, kneeMin, ONSET_FRACTION, sig.t) ?? kneeMin)
+        ? (onsetBefore(
+            sig.kneeAngle,
+            kneeMax,
+            1,
+            kneeMin,
+            ONSET_FRACTION,
+            sig.t,
+          ) ?? kneeMin)
         : kneeMin,
     kneesStraight,
     elbowBendStart,
