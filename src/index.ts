@@ -299,6 +299,43 @@ export type {
   Proportions,
 } from "./metrics/v3";
 
+// Keyframe checks (docs/keyframe-review-plan.md): positions at five keyframes.
+export {
+  KEYFRAMES,
+  CHECKS,
+  BODY_PARTS,
+  CHECK_DEFS,
+  KEYFRAME_NAME,
+  KEYFRAME_LEAD_IN,
+  BODY_PART_NAME,
+  ALL_CHECK_KEYS,
+  checkKey,
+  parseCheckKey,
+  computeShotKeyframes,
+  keyframesFromSignals,
+  keyframeSamples,
+  setPointReached,
+  KEYFRAME_SCHEMA_VERSION,
+  ARRIVAL_SPEED_FRACTION,
+  buildKeyframeTargets,
+  scoreCheck,
+  KEYFRAME_TARGETS_VERSION,
+  MIN_RAMP,
+} from "./metrics/keyframes";
+export type {
+  Keyframe,
+  CheckId,
+  CheckUnit,
+  BodyPart,
+  CheckDef,
+  KeyframeCheck,
+  ShotKeyframes,
+  KeyframeOptions,
+  KeyframeTarget,
+  KeyframeTargets,
+  CheckScore,
+} from "./metrics/keyframes";
+
 // Pro reference profiles (written by npm run targets:build:pros).
 export type {
   ProProfiles,

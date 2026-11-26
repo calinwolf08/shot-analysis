@@ -11,28 +11,28 @@ https://claude.ai/artifact/Q5P8N2WmQZKsSQv9W3TsuY
 
 ### Keyframes
 
-| Phase | Keyframe | Detection |
-|---|---|---|
-| Setup | Moment before the ball starts dropping | `ballDropStart` (existing event) |
-| Load | Moment before the wrists and ball start rising | `ballRiseStart` (existing event) |
-| Rise | The ball reaches set point | **new** `setPointReached`: after the most-bent elbow of the rise, where the wrist's upward speed first drops below a fraction of its rise peak; never after `setPoint` |
-| Set point | Last frame before the release starts | `setPoint` (existing: onset of elbow extension) |
-| Release | The arm finishes extending | `armExtended` (existing event) |
+| Phase     | Keyframe                                       | Detection                                                                                                                                                              |
+| --------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Setup     | Moment before the ball starts dropping         | `ballDropStart` (existing event)                                                                                                                                       |
+| Load      | Moment before the wrists and ball start rising | `ballRiseStart` (existing event)                                                                                                                                       |
+| Rise      | The ball reaches set point                     | **new** `setPointReached`: after the most-bent elbow of the rise, where the wrist's upward speed first drops below a fraction of its rise peak; never after `setPoint` |
+| Set point | Last frame before the release starts           | `setPoint` (existing: onset of elbow extension)                                                                                                                        |
+| Release   | The arm finishes extending                     | `armExtended` (existing event)                                                                                                                                         |
 
 Follow-through has no checks and no icon; the scrubber still plays through it.
 
 ### Checks
 
-| Check (id) | Setup | Load | Rise | Set point | Release | Unit |
-|---|---|---|---|---|---|---|
-| Hand height (`hand_height`) | vs hip centre | vs hip centre | vs head | vs head | vs head | torso |
-| Ball close to body (`ball_close`) | ✓ | ✓ | | | | torso (horizontal, toward facing) |
-| Wrist hinge (`wrist_hinge`) | ✓ | ✓ | ✓ | ✓ | ✓ | deg |
-| Hold at set point (`hold`) | | | | ✓ (Rise → Set point) | | s |
-| Elbow bend (`elbow_bend`) | ✓ | ✓ | ✓ | ✓ | ✓ | deg |
-| Knee bend (`knee_bend`) | ✓ | ✓ | ✓ | ✓ | ✓ | deg |
-| Back posture (`back`) | ✓ | ✓ | ✓ | ✓ | ✓ | deg, + = leaning forward |
-| Hips over knees (`hips_over_knees`) | ✓ | ✓ | ✓ | ✓ | ✓ | thigh, + = hips ahead |
+| Check (id)                          | Setup         | Load          | Rise    | Set point            | Release | Unit                              |
+| ----------------------------------- | ------------- | ------------- | ------- | -------------------- | ------- | --------------------------------- |
+| Hand height (`hand_height`)         | vs hip centre | vs hip centre | vs head | vs head              | vs head | torso                             |
+| Ball close to body (`ball_close`)   | ✓             | ✓             |         |                      |         | torso (horizontal, toward facing) |
+| Wrist hinge (`wrist_hinge`)         | ✓             | ✓             | ✓       | ✓                    | ✓       | deg                               |
+| Hold at set point (`hold`)          |               |               |         | ✓ (Rise → Set point) |         | s                                 |
+| Elbow bend (`elbow_bend`)           | ✓             | ✓             | ✓       | ✓                    | ✓       | deg                               |
+| Knee bend (`knee_bend`)             | ✓             | ✓             | ✓       | ✓                    | ✓       | deg                               |
+| Back posture (`back`)               | ✓             | ✓             | ✓       | ✓                    | ✓       | deg, + = leaning forward          |
+| Hips over knees (`hips_over_knees`) | ✓             | ✓             | ✓       | ✓                    | ✓       | thigh, + = hips ahead             |
 
 33 checks. Ids are `<keyframe>.<check>` (e.g. `rise.knee_bend`). All positions
 are absolute (no deltas between phases).
@@ -51,16 +51,16 @@ hinge, hold), Elbow, Knees, Back, Hips.
 
 One phrase per direction, always "<part> too <direction>", followed by "by N":
 
-| Check | Below band | Above band |
-|---|---|---|
-| Hand height | Hands too low | Hands too high |
-| Ball close to body | Ball too close to body | Ball too far from body |
-| Wrist hinge | Wrist too bent | Wrist too flat |
-| Hold at set point | Hold too short | Hold too long |
-| Elbow bend | Elbow too bent | Elbow too straight |
-| Knee bend | Knees too bent | Knees too straight |
-| Back posture | Leaning too far back | Leaning too far forward |
-| Hips over knees | Hips too far back | Hips too far forward |
+| Check              | Below band             | Above band              |
+| ------------------ | ---------------------- | ----------------------- |
+| Hand height        | Hands too low          | Hands too high          |
+| Ball close to body | Ball too close to body | Ball too far from body  |
+| Wrist hinge        | Wrist too bent         | Wrist too flat          |
+| Hold at set point  | Hold too short         | Hold too long           |
+| Elbow bend         | Elbow too bent         | Elbow too straight      |
+| Knee bend          | Knees too bent         | Knees too straight      |
+| Back posture       | Leaning too far back   | Leaning too far forward |
+| Hips over knees    | Hips too far back      | Hips too far forward    |
 
 - Screen: "Knees too bent by 5" (the phase is shown by the selected icon).
 - Voice: the same words with a phase lead-in, no coaching cue: "At release:
@@ -115,22 +115,38 @@ One phrase per direction, always "<part> too <direction>", followed by "by N":
 Each phase lands as its own commit(s) with tests passing; nothing user-visible
 breaks between phases (v3 keeps working until phase 2 switches the app over).
 
-### Phase 1: analysis library (keyframe catalog)
+### Phase 1: analysis library (keyframe catalog) — done
 
 `src/metrics/keyframes/` (alongside v3, reusing its signals and event primitives):
-- `setPointReached` event + keyframe resolution (`keyframesFrom(events)`).
-- `computeShotKeyframes(frames, opts)` → `ShotKeyframes`: schema version,
-  keyframe frames, the 33 checks (`value`, `reliable`, `frame`, `unit`,
-  `keyframe`, `check`) and the landmark-derived reference points the UI needs
-  (facing, near side).
-- Wording table (phrases above) and check/part metadata.
-- Targets: `buildKeyframeTargets()` (same statistics and hand-edit preservation
-  as v3) and `scoreKeyframeValue()`; build script `targets:build:keyframes`
-  writing `app/static/reference/live-targets-keyframes.json` from the Curry
-  reference shots; the pro builder gains the same output.
-- Tests: event detection on synthetic signals and against the labelled Curry
-  set-point frames, every check measured on the fixtures, wording covers every
-  check × direction, targets round-trip and keep hand edits.
+
+- `catalog.ts`: keyframes, the 8 checks (name, body part, unit, keyframes,
+  help text, below/above phrases), lead-ins, ids (`checkKey` / `parseCheckKey`,
+  `ALL_CHECK_KEYS`).
+- `measure.ts`: `setPointReached` (after the most-bent elbow of the rise, where
+  the wrist's upward speed falls below 35 % of its fastest rise; never after
+  set point), `keyframeSamples`, and `computeShotKeyframes(frames, opts)` →
+  `ShotKeyframes` (schema version, keyframe frames, the 33 checks with
+  `value` / `reliable` / `frame`, facing, near and shooting side).
+- `targets.ts`: `buildKeyframeTargets()` (v3 statistics, overrides survive
+  rebuilds, spread floored per unit so a check every reference shot does the
+  same way can't turn a tiny difference into 10+) and `scoreCheck()` (the shared
+  v3 scoring rule; v3's band/score helpers now take any target shape).
+- `npm run targets:build:keyframes` writes
+  `app/static/reference/live-targets-keyframes.json` from the Curry reference
+  shots. Keyframes are **detected**, not taken from the labels: two Curry
+  release labels sit 1–3 frames before the arm is straight (elbow 66° and
+  117°), while detection places every shot the same way, as it will on a
+  user's shot. 31 of 33 checks are scored; Setup elbow bend and wrist hinge
+  have one reference value (the shooting arm is hidden behind the ball at
+  Setup in 6 of 7 shots).
+- Tests (`keyframes.test.ts`): catalog completeness and id parsing; all five
+  keyframes found in order on every reference shot; agreement with the set
+  point and arm-extension labels (±2 / ±3 frames) and the v3 bar for ball
+  rise; checks measured and plausible; canvas size/aspect invariance; targets
+  scoring, ramp floor and override preservation.
+
+Checked on a real user clip: detection picks frames 141 / 155 / 163 / 166 /
+171, the same keyframes chosen by hand for the mock.
 
 ### Phase 2: app scoring and data
 
@@ -140,6 +156,10 @@ breaks between phases (v3 keeps working until phase 2 switches the app over).
   version; older shots recomputed from their pose track on read (existing
   `ensureV3` mechanism, generalised).
 - `feedbackChecks` setting + presets + migration from `liveFocusAreas`.
+- Targets loading: `live-targets-keyframes.json`, plus the pro builder
+  (`targets:build:pros`) and pro profiles ("Score against") moved over to the
+  keyframe checks (moved here from phase 1: the pro library is empty today and
+  the profile re-centring lives with app scoring).
 - Switch shot list, insights/progress, practice post-shot card and voice to the
   new scorecard. Unit tests for each.
 
