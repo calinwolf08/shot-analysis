@@ -7,8 +7,8 @@
   /**
    * Continuous, session-less practice loop (live redesign — step 6). Renders a
    * LivePracticeStore: live preview + skeleton overlay, per-shot feedback (the
-   * overall 0–10+ score, the 3 worst issues by phase, and the full v3
-   * scorecard on demand), and a running history. No "End / summary" — you practice until you
+   * overall 0–10+ score, the 3 worst checks in shot order, and the full
+   * keyframe scorecard on demand), and a running history. No "End / summary" — you practice until you
    * leave, and every shot is already persisted.
    */
   import { onMount, untrack } from "svelte";
@@ -33,12 +33,12 @@
     type SkeletonLandmark,
   } from "$lib/shared/ui/pose-skeleton";
   import { FocusSheet, focusSummary } from "$lib/features/scoring";
+  import { displayScore } from "$lib/features/scoring/v3";
   import {
-    ScoreCardV3,
-    displayScore,
-    feedbackText,
-    scoreBand,
-  } from "$lib/features/scoring/v3";
+    KeyframeScoreCard,
+    checkText,
+    severity,
+  } from "$lib/features/scoring/keyframes";
   import type { SideOrientation } from "../setup/angle-gate";
   import { createPresenceTracker, type PresenceState } from "./presence";
   import { phaseName } from "./readback";
@@ -557,7 +557,7 @@
       <div class="feedback" data-testid="rep-feedback">
         <p
           class="score sc-numeral"
-          data-band={scoreBand(fb.overall) ?? "none"}
+          data-band={severity(fb.overall) ?? "none"}
           data-testid="rep-feedback-score"
         >
           {fmt(fb.overall)}
@@ -568,7 +568,7 @@
               {#each fb.worst as m (m.id)}
                 <span class="chip" data-testid="feedback-item"
                   ><b class="chip-phase">{phaseName(m.phase)}</b>
-                  {feedbackText(m, store.wording)}</span
+                  {checkText(m)}</span
                 >
               {/each}
             </div>
@@ -639,7 +639,7 @@
       )}
       {#if entry}
         <div class="breakdown" data-testid="rep-breakdown">
-          <ScoreCardV3 card={entry.scorecard} wording={store.wording} />
+          <KeyframeScoreCard card={entry.scorecard} />
         </div>
       {/if}
     {/if}
@@ -939,13 +939,10 @@
   .score[data-band="good"] {
     color: #34d399;
   }
-  .score[data-band="fair"] {
+  .score[data-band="warn"] {
     color: #fde047;
   }
-  .score[data-band="off"] {
-    color: #fb923c;
-  }
-  .score[data-band="far"] {
+  .score[data-band="bad"] {
     color: #f87171;
   }
   .fb-body {

@@ -8,12 +8,12 @@
     shotIssue,
     timeLabel,
   } from "$lib/features/live-practice/review/shot-list";
+  import { displayScore } from "$lib/features/scoring/v3";
   import {
-    displayScore,
-    loadFeedbackWording,
-    scoreBand,
-  } from "$lib/features/scoring/v3";
-  import { loadScoringTargets } from "$lib/features/pros";
+    loadEnabledChecks,
+    loadKeyframeTargets,
+    severity,
+  } from "$lib/features/scoring/keyframes";
   import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
   import { EmptyState } from "$lib/shared/ui";
 
@@ -35,11 +35,10 @@
       loading = false;
       return;
     }
-    const [targets, w] = await Promise.all([
-      loadScoringTargets(services.repos.settings).then((x) => x.targets),
-      loadFeedbackWording(),
+    const [targets, enabled] = await Promise.all([
+      loadKeyframeTargets(),
+      loadEnabledChecks(services.repos.settings),
     ]);
-    const wording = w.wording;
     const rows = await services.repos.shot.listByPlayer(player.id, {
       limit: 50,
     });
@@ -48,13 +47,14 @@
       rows,
       player.shootingHand,
       targets,
+      enabled,
     );
     shots = scored.map((x) => x.record);
     const m: Record<string, number | null> = {};
     const iss: Record<string, string | null> = {};
     for (const { record, card } of scored) {
       m[record.id] = card?.overall ?? null;
-      iss[record.id] = shotIssue(card, wording);
+      iss[record.id] = shotIssue(card);
     }
     overall = m;
     issue = iss;
@@ -65,15 +65,14 @@
     void goto(`/shots/${id}${page.url.search}`);
   }
 
-  const BAND_COLOR = {
+  const SEVERITY_COLOR = {
     good: "#34d399",
-    fair: "#fde047",
-    off: "#fb923c",
-    far: "#f87171",
+    warn: "#fde047",
+    bad: "#f87171",
   } as const;
   function color(n: number | null): string {
-    const b = scoreBand(n);
-    return b ? BAND_COLOR[b] : "#6b7280";
+    const b = severity(n);
+    return b ? SEVERITY_COLOR[b] : "#6b7280";
   }
   const fmt = displayScore;
 </script>

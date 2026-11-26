@@ -4,11 +4,12 @@
   "builtFrom": "stephen-curry-1 (7 labeled shots)",
   "shootingHand": "right",
   "shots": 7,
-  "generatedAt": "2026-11-26T00:49:27.263Z",
+  "generatedAt": "2026-11-26T01:02:30.776Z",
   "notes": [
     "Band = the reference shots' observed range at that keyframe: inside it scores 0.",
     "Outside, the score climbs 1 point per rampSd (the reference spread, floored per unit). Display caps at 10+.",
-    "Set `override` ({ passMin, passMax, scored }) to hand-tune a check; rebuilds keep it."
+    "Set `override` ({ passMin, passMax, scored }) to hand-tune a check; rebuilds keep it.",
+    "Placeholder targets (Curry reference shots) until the pro videos are in; setPoint.hold is overridden to 0–2 frames at 30 fps."
   ],
   "checks": {
     "load.back": {
@@ -297,7 +298,11 @@
       "passMin": 0,
       "passMax": 0.03929662247918975,
       "rampSd": 0.05,
-      "n": 7
+      "n": 7,
+      "override": {
+        "passMin": 0,
+        "passMax": 0.0667
+      }
     },
     "setPoint.knee_bend": {
       "keyframe": "setPoint",

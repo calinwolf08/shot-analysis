@@ -69,6 +69,13 @@ export interface KeyframeTargets {
   readonly checks: Readonly<Record<string, KeyframeTarget>>;
 }
 
+/** Notes every build writes; hand-added notes are kept after them. */
+const DEFAULT_NOTES: readonly string[] = [
+  "Band = the reference shots' observed range at that keyframe: inside it scores 0.",
+  "Outside, the score climbs 1 point per rampSd (the reference spread, floored per unit). Display caps at 10+.",
+  "Set `override` ({ passMin, passMax, scored }) to hand-tune a check; rebuilds keep it.",
+];
+
 export function buildKeyframeTargets(
   shots: readonly ShotKeyframes[],
   meta: {
@@ -76,7 +83,9 @@ export function buildKeyframeTargets(
     shootingHand: "left" | "right";
     generatedAt?: string;
   },
-  previous?: Pick<KeyframeTargets, "checks"> | null,
+  previous?:
+    | (Pick<KeyframeTargets, "checks"> & { notes?: readonly string[] })
+    | null,
 ): KeyframeTargets {
   const ids = new Set(shots.flatMap((s) => Object.keys(s.checks)));
   const checks: Record<string, KeyframeTarget> = {};
@@ -119,9 +128,8 @@ export function buildKeyframeTargets(
     shots: shots.length,
     generatedAt: meta.generatedAt ?? new Date().toISOString(),
     notes: [
-      "Band = the reference shots' observed range at that keyframe: inside it scores 0.",
-      "Outside, the score climbs 1 point per rampSd (the reference spread, floored per unit). Display caps at 10+.",
-      "Set `override` ({ passMin, passMax, scored }) to hand-tune a check; rebuilds keep it.",
+      ...DEFAULT_NOTES,
+      ...(previous?.notes ?? []).filter((n) => !DEFAULT_NOTES.includes(n)),
     ],
     checks,
   };

@@ -25,6 +25,7 @@ import {
   type ShotAnalysis,
   type ShotMetricsV2,
   type ShotMetricsV3,
+  type ShotKeyframes,
   type ShotDetectorConfig,
 } from "basketball-shot-analysis";
 import type { AnalyzeOptions, LandmarkFrame, ProgressCallback } from "../types";
@@ -315,6 +316,12 @@ export type StoredShotAnalysis = ShotAnalysis & {
    * analyzed before it existed (recomputed from the pose track on read).
    */
   v3Metrics?: ShotMetricsV3;
+  /**
+   * Keyframe checks (Setup / Load / Rise / Set point / Release), computed from
+   * the same stored review pose track — what scoring, feedback and review use.
+   * Absent on older shots (recomputed from the pose track on read).
+   */
+  keyframes?: ShotKeyframes;
 };
 
 /**

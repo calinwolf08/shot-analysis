@@ -11,6 +11,7 @@
 /** Shot phases in the order they happen (feedback is reported in this order). */
 export const PHASE_ORDER = [
   "gather",
+  "setup",
   "load",
   "rise",
   "setPoint",
@@ -21,6 +22,7 @@ export const PHASE_ORDER = [
 /** Spoken / shown phase names. */
 export const PHASE_NAME: Record<string, string> = {
   gather: "Gather",
+  setup: "Setup",
   load: "Load",
   rise: "Rise",
   setPoint: "Set point",

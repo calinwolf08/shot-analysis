@@ -6,7 +6,7 @@
  *
  *   CAPTURE=path/to/shotcoach-capture.json npm run replay:capture
  */
-import type { LiveTargetsV3 } from "basketball-shot-analysis";
+import type { KeyframeTargets } from "basketball-shot-analysis";
 import type { LandmarkFrame } from "$lib/features/analysis";
 import { landmarkFramesToPoseData } from "$lib/features/analysis/replay/replay-pipeline";
 import { createLiveRepCoordinator } from "../coordinator/coordinator";
@@ -75,7 +75,7 @@ function fmtEvent(e: CaptureEvent, t0: number): string {
 
 export async function replayCapture(
   file: LiveCaptureFile,
-  targets: LiveTargetsV3,
+  targets: KeyframeTargets,
   opts: { ignoreArming?: boolean } = {},
 ): Promise<CaptureReport> {
   const frames = toFrames(file);

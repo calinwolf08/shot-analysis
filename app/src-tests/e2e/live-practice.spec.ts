@@ -22,22 +22,22 @@ test("live practice: replayed reps score and persist to the Shots tab", async ({
   await expect(page.getByTestId("rep-feedback-score")).toHaveText(
     /^\s*(\d|10\+)\s*$/,
   );
-  // Each item: "<phase> <label>: <how it's off> by <whole score>" — no
+  // Each item: "<keyframe> <part> too <direction> by <whole score>" — no
   // degrees or limb percentages on the card.
   for (const t of await page.getByTestId("feedback-item").allTextContents()) {
-    // "<phase> <body part> <fault> by <n>", e.g. "Load Spine forward by 3".
+    // e.g. "Rise Knees too bent by 5".
     expect(t.trim()).toMatch(
-      /^(Load|Rise|Set point|Release)\s+[A-Z][^:]* by (\d|10\+)$/,
+      /^(Setup|Load|Rise|Set point|Release)\s+[A-Z][^:]* too [^:]+ by (\d|10\+)$/,
     );
     expect(t).not.toMatch(/°|%/);
   }
 
-  // Feedback: at most the 3 worst issues, each labelled with its phase, in
-  // shot order (Load → Rise → Set point → Release).
+  // Feedback: at most the 3 worst checks, each labelled with its keyframe, in
+  // shot order (Setup → Load → Rise → Set point → Release).
   const items = page.getByTestId("feedback-item");
   const n = await items.count();
   expect(n).toBeLessThanOrEqual(3);
-  const order = ["Load", "Rise", "Set point", "Release"];
+  const order = ["Setup", "Load", "Rise", "Set point", "Release"];
   const phases = await page
     .locator('[data-testid="feedback-item"] .chip-phase')
     .allTextContents();
@@ -60,35 +60,27 @@ test("live practice: replayed reps score and persist to the Shots tab", async ({
   await expect(page.getByTestId("v3-phase-release")).toBeVisible();
 });
 
-test("feedback wording comes from the editable config file (card + voice)", async ({
+test("the voice says the card's words, with each keyframe's lead-in", async ({
   page,
 }) => {
   test.setTimeout(90_000);
-  // Serve an edited wording file: every phrase becomes "ZZ <id>" and the
-  // format changes — the card and the spoken readback must follow it.
-  await page.route("**/config/feedback-wording.json", async (route) => {
-    const res = await route.fetch();
-    const json = (await res.json()) as {
-      metrics: Record<string, { low: string; high: string }>;
-    };
-    for (const [id, m] of Object.entries(json.metrics)) {
-      m.low = `ZZ ${id} low`;
-      m.high = `ZZ ${id} high`;
-    }
-    await route.fulfill({
-      json: { ...json, format: "{phrase} score {n}" },
-    });
-  });
   await onboard(page, "?e2e=replay", "Wording");
   await startLiveLoop(page);
   await expect(page.getByTestId("rep-feedback")).toBeVisible({
     timeout: 60_000,
   });
-  const items = await page.getByTestId("feedback-item").allTextContents();
-  expect(items.length).toBeGreaterThan(0);
-  for (const t of items) {
-    expect(t).toMatch(/ZZ \S+ (low|high) score (\d|10\+)$/);
-  }
+  // Card chip text minus its keyframe label: "Knees too bent by 5".
+  const texts = (
+    await page
+      .locator('[data-testid="feedback-item"]')
+      .evaluateAll((els) =>
+        els.map((el) =>
+          (el.textContent ?? "")
+            .replace(el.querySelector(".chip-phase")?.textContent ?? "", "")
+            .trim(),
+        ),
+      )
+  ).filter((t) => t.length > 0);
   await expect
     .poll(async () => {
       const log = await page.evaluate(
@@ -99,9 +91,24 @@ test("feedback wording comes from the editable config file (card + voice)", asyn
             }
           ).__scAudioLog ?? [],
       );
-      const said = log.filter((h) => h.kind === "speak").map((h) => h.text);
-      const i = said.lastIndexOf("Analyzing");
-      return i >= 0 ? (said[i + 1] ?? "") : "";
+      const spoken = log.filter((h) => h.kind === "speak").map((h) => h.text);
+      const i = spoken.lastIndexOf("Analyzing");
+      return i >= 0 ? (spoken[i + 1] ?? "") : "";
     })
-    .toMatch(/^(Load|Rise|Set point|Release): ZZ .+ score (\d|10\+)\./);
+    .toMatch(
+      /^(At setup|In the load|When the ball reaches set point|At set point|At release|On target)/,
+    );
+  const log = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __scAudioLog?: { kind: string; text?: string }[];
+        }
+      ).__scAudioLog ?? [],
+  );
+  const spoken = log.filter((h) => h.kind === "speak").map((h) => h.text ?? "");
+  const readback = spoken[spoken.lastIndexOf("Analyzing") + 1] ?? "";
+  for (const t of texts) {
+    expect(readback).toContain(t.charAt(0).toLowerCase() + t.slice(1));
+  }
 });

@@ -38,13 +38,13 @@
     simulatedSpeechMs,
     withAudioProbe,
   } from "$lib/shared/audio/audio-probe";
-  import type { LiveTargetsV3 } from "basketball-shot-analysis";
+  import type { KeyframeTargets } from "basketball-shot-analysis";
   import { normalizeAreas } from "$lib/features/scoring";
   import {
-    loadFeedbackWording,
-    type FeedbackWording,
-  } from "$lib/features/scoring/v3";
-  import { loadScoringTargets } from "$lib/features/pros";
+    checksForAreas,
+    loadEnabledChecks,
+    loadKeyframeTargets,
+  } from "$lib/features/scoring/keyframes";
   import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { createApiClient } from "$lib/shared/api/client";
@@ -125,8 +125,9 @@
   let shootingHand: "left" | "right" = "right";
   let requiredSide = $state<SideOrientation>("side-left");
   let playerId = "";
-  let targets: LiveTargetsV3 | null = null;
-  let feedbackWording: FeedbackWording | undefined;
+  let targets: KeyframeTargets | null = null;
+  /** Feedback filter (enabled check ids; null = every check). */
+  let enabled: ReadonlySet<string> | null = null;
   let captureHandle: CaptureHandle | null = null;
   let focusAreas: string[] = [];
   let tuning = $state<LiveTuning>(DEFAULT_LIVE_TUNING);
@@ -140,6 +141,14 @@
   function persistFocus(ids: string[]) {
     focusAreas = ids;
     void services.repos.settings.set("liveFocusAreas", ids);
+    // The focus chip drives the shared feedback filter until the Feedback
+    // sheet replaces it (docs/keyframe-review-plan.md, phase 4).
+    const checks = checksForAreas(ids);
+    enabled = checks.length > 0 ? new Set(checks) : null;
+    void services.repos.settings.set(
+      "feedbackChecks",
+      checks.length > 0 ? checks : null,
+    );
   }
 
   $effect(() => {
@@ -157,13 +166,11 @@
     playerId = player.id;
     shootingHand = player.shootingHand;
     requiredSide = requiredOrientation(shootingHand);
-    targets = (await loadScoringTargets(services.repos.settings)).targets;
-    const [loaded, fw] = await Promise.all([
-      loadLiveTuning(),
-      loadFeedbackWording(),
+    [targets, enabled] = await Promise.all([
+      loadKeyframeTargets(),
+      loadEnabledChecks(services.repos.settings),
     ]);
-    feedbackWording = fw.wording;
-    for (const w of fw.warnings) console.warn("[feedback-wording]", w);
+    const loaded = await loadLiveTuning();
     tuning = loaded.tuning;
     for (const w of loaded.warnings) console.warn("[live-tuning]", w);
     focusAreas = normalizeAreas(
@@ -172,7 +179,7 @@
     // Profile → "Voice feedback" off = practice starts muted (the speaker
     // button still unmutes for this session).
     audio.setMuted(!(await services.repos.settings.get("voiceFeedback")));
-    initialShots = await loadTodaysShots(player.id, targets);
+    initialShots = await loadTodaysShots(player.id, targets, enabled);
     await clipStore.setCap(getVideoRetention()).catch(() => undefined);
     if (destroyed) return;
 
@@ -307,7 +314,8 @@
       playerId,
       opts: { shootingHand, profile: "pro-form" },
       fps: session.fps,
-      ...(feedbackWording ? { wording: feedbackWording } : {}),
+      targets,
+      enabled,
       frameSize: () => session?.frameSize?.() ?? null,
       focusAreas,
       initialShots,
@@ -412,7 +420,8 @@
    */
   async function loadTodaysShots(
     id: string,
-    t: LiveTargetsV3,
+    t: KeyframeTargets,
+    on: ReadonlySet<string> | null,
   ): Promise<ShotEntry[]> {
     // Local midnight (plain timestamp math; no reactive Date needed).
     const now = Date.now();
@@ -431,6 +440,7 @@
         sorted,
         shootingHand,
         t,
+        on,
       );
       // Shots that can't be re-analyzed are left out of today's count.
       return scored

@@ -1,13 +1,11 @@
 <script lang="ts">
   import { useAppServices } from "$lib/shared/config/services-context";
-  import { displayScore, scoreBand } from "$lib/features/scoring/v3";
+  import { displayScore } from "$lib/features/scoring/v3";
   import {
-    closestPros,
-    loadProProfiles,
-    loadScoringTargets,
-    userAverages,
-    type ProMatch,
-  } from "$lib/features/pros";
+    loadEnabledChecks,
+    loadKeyframeTargets,
+    severity,
+  } from "$lib/features/scoring/keyframes";
   import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
   import { phaseName } from "$lib/features/live-practice/loop/readback";
   import {
@@ -26,10 +24,6 @@
   let windowKey = $state<InsightsWindow>("7d");
   let summary = $state<InsightsSummary | null>(null);
   let loading = $state(true);
-  /** The pros the user's form is closest to (none until pros are built). */
-  let matches = $state<ProMatch[]>([]);
-  /** Metric id → label, for the match highlights. */
-  let labels = $state<Record<string, string>>({});
 
   $effect(() => {
     void load(windowKey);
@@ -43,35 +37,28 @@
       loading = false;
       return;
     }
-    const { targets } = await loadScoringTargets(services.repos.settings);
+    const [targets, enabled] = await Promise.all([
+      loadKeyframeTargets(),
+      loadEnabledChecks(services.repos.settings),
+    ]);
     const since = windowStart(key, Date.now());
     const shots = await services.repos.shot.listByPlayer(player.id, {
       ...(since > 0 ? { since } : {}),
       limit: 500,
     });
-    // Shots that can't be re-analyzed on the v3 metrics are left out.
+    // Shots that can't be re-analyzed on the keyframe checks are left out.
     const scored: ScoredShotAt[] = (
       await scoreStoredShots(
         services.repos.shot,
         shots,
         player.shootingHand,
         targets,
+        enabled,
       )
     )
       .filter((x) => x.card !== null)
       .map((x) => ({ createdAt: x.record.createdAt, scorecard: x.card! }));
     summary = summarizeInsights(scored, { window: key });
-    const profiles = await loadProProfiles();
-    matches = profiles
-      ? closestPros(
-          userAverages(scored.map((s) => s.scorecard)),
-          profiles,
-          targets,
-        )
-      : [];
-    labels = Object.fromEntries(
-      Object.entries(targets.metrics).map(([id, t]) => [id, t.label]),
-    );
     loading = false;
   }
 
@@ -81,15 +68,14 @@
       .filter((n): n is number => n !== null),
   );
 
-  const BAND_COLOR = {
+  const SEVERITY_COLOR = {
     good: "#34d399",
-    fair: "#fde047",
-    off: "#fb923c",
-    far: "#f87171",
+    warn: "#fde047",
+    bad: "#f87171",
   } as const;
   function color(n: number | null): string {
-    const b = scoreBand(n);
-    return b ? BAND_COLOR[b] : "#6b7280";
+    const b = severity(n);
+    return b ? SEVERITY_COLOR[b] : "#6b7280";
   }
   const fmt = displayScore;
   const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -152,7 +138,7 @@
               <span class="meta">
                 <span class="label"
                   ><b class="phase">{phaseLabel(issue.phase)}:</b>
-                  {issue.label}{issue.phrase ? ` — ${issue.phrase}` : ""}</span
+                  {issue.phrase ?? issue.label}</span
                 >
                 <span class="freq">
                   off in {issue.occurrences} of {summary.shotCount}
@@ -164,36 +150,6 @@
         </ul>
       {/if}
     </section>
-
-    {#if matches.length > 0}
-      <section class="pros" data-testid="insights-pros">
-        <h2>Closest pros</h2>
-        <ul>
-          {#each matches as m (m.pro.id)}
-            <li data-testid="pro-match-{m.pro.id}">
-              <span class="sim">{m.similarity}%</span>
-              <span class="meta">
-                <b>{m.pro.name}</b>
-                <span class="freq"
-                  >Closest: {m.best
-                    .map((id) => labels[id] ?? id)
-                    .join(", ")}</span
-                >
-                <span class="freq"
-                  >Furthest: {m.worst
-                    .map((id) => labels[id] ?? id)
-                    .join(", ")}</span
-                >
-              </span>
-            </li>
-          {/each}
-        </ul>
-        <p class="dim small">
-          Similarity over {matches[0]?.compared ?? 0} metrics, each measured against
-          that pro's own shot-to-shot spread.
-        </p>
-      </section>
-    {/if}
   {/if}
 </main>
 
@@ -236,32 +192,6 @@
   }
   .dim {
     color: var(--sc-text-dim);
-  }
-  .small {
-    font-size: 12px;
-  }
-  .pros ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--sc-space-2);
-  }
-  .pros li {
-    display: flex;
-    gap: var(--sc-space-3);
-    align-items: center;
-  }
-  .pros .sim {
-    min-width: 48px;
-    text-align: center;
-    font-weight: 700;
-    color: var(--sc-primary);
-  }
-  .pros .meta {
-    display: flex;
-    flex-direction: column;
   }
   .overview {
     display: flex;

@@ -148,20 +148,31 @@ breaks between phases (v3 keeps working until phase 2 switches the app over).
 Checked on a real user clip: detection picks frames 141 / 155 / 163 / 166 /
 171, the same keyframes chosen by hand for the mock.
 
-### Phase 2: app scoring and data
+### Phase 2: app scoring and data — done
 
-- `scoring/keyframes`: scorecard (per check, per phase, overall, worst),
-  enabled-check filtering, screen text and spoken readback builders.
-- Stored shots: `keyframes` added to the stored analysis with its schema
-  version; older shots recomputed from their pose track on read (existing
-  `ensureV3` mechanism, generalised).
-- `feedbackChecks` setting + presets + migration from `liveFocusAreas`.
-- Targets loading: `live-targets-keyframes.json`, plus the pro builder
-  (`targets:build:pros`) and pro profiles ("Score against") moved over to the
-  keyframe checks (moved here from phase 1: the pro library is empty today and
-  the profile re-centring lives with app scoring).
-- Switch shot list, insights/progress, practice post-shot card and voice to the
-  new scorecard. Unit tests for each.
+- Targets: the Curry-built `live-targets-keyframes.json` is the placeholder
+  until the pro videos are in (no pro target building yet). Hand override:
+  hold at set point 0–2 frames (0–0.067 s at 30 fps). "Score against [pro]"
+  is hidden (`PRO_TARGETS_READY = false`) and the insights "Closest pros"
+  section is gone; pro work comes back when pro targets exist for the
+  keyframe checks.
+- `scoring/keyframes` (app): `scoreShotKeyframes(checks, targets, enabled)`
+  (per check, per keyframe, overall, worst; coverage gate), 3-color
+  `severity`, `checkText` ("Knees too bent by 5"), `headlineIssue`
+  ("Rise: Knees too bent by 5"), `feedbackChecks` (worst 3, one per body
+  part, in shot order), `spokenReadback` (same words, one lead-in per
+  keyframe), `KeyframeScoreCard.svelte`, client/server targets loaders.
+- Stored shots: `keyframes` in the stored analysis (schema-versioned);
+  `scoreStoredShot(s)` migrates both the keyframe checks and v3 from the pose
+  track in one write. The review screen still uses v3 via
+  `scoreStoredShotV3` until phase 3.
+- Feedback filter: `feedbackChecks` setting (null = never chosen), presets,
+  `resolveEnabled` (saved filter → legacy focus areas mapped onto the
+  checks at those keyframes → everything). Until phase 4 the practice focus
+  chip writes the mapped checks to `feedbackChecks`.
+- Switched to keyframe scoring with the filter: live pipeline (device and
+  server), practice store (score, card, voice), practice breakdown, shot
+  list, insights, debug replay page.
 
 ### Phase 3: review screen
 

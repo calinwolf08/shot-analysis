@@ -95,5 +95,5 @@ test("focus on Rise: the feedback and voice coach only the rise", async ({
       const i = said.lastIndexOf("Analyzing");
       return i >= 0 ? (said[i + 1] ?? null) : null;
     })
-    .toMatch(/^(Rise: [^:]+|Focus on target)$/);
+    .toMatch(/^(When the ball reaches set point: [^:]+|Focus on target)$/);
 });

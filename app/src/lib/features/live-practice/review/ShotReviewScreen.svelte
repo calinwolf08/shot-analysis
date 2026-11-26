@@ -38,7 +38,7 @@
     geometryFamily,
     geometryFor,
   } from "$lib/features/reference/metric-geometry";
-  import { scoreStoredShot } from "./scored-shots";
+  import { scoreStoredShotV3 } from "./scored-shots";
   import { phaseAtFrame, phaseMarks } from "./phase-timeline";
   import {
     extractClipFramesFromUrl,
@@ -211,7 +211,7 @@
     }
     if (player) hand = player.shootingHand;
     // Pre-v3 shots are re-analyzed from this pose track (and saved) here.
-    const scored = await scoreStoredShot(
+    const scored = await scoreStoredShotV3(
       services.repos.shot,
       s,
       hand,

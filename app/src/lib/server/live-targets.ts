@@ -10,7 +10,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { LiveTargetsV3 } from "basketball-shot-analysis";
+import type { KeyframeTargets, LiveTargetsV3 } from "basketball-shot-analysis";
 
 let cachedV3: LiveTargetsV3 | null = null;
 
@@ -24,7 +24,23 @@ export function readLiveTargetsV3(): LiveTargetsV3 {
   return cachedV3;
 }
 
+let cachedKeyframes: KeyframeTargets | null = null;
+
+/**
+ * The keyframe targets (static/reference/live-targets-keyframes.json);
+ * `LIVE_TARGETS_KEYFRAMES_PATH` overrides the location.
+ */
+export function readKeyframeTargets(): KeyframeTargets {
+  if (cachedKeyframes) return cachedKeyframes;
+  const path =
+    process.env.LIVE_TARGETS_KEYFRAMES_PATH ??
+    join(process.cwd(), "static", "reference", "live-targets-keyframes.json");
+  cachedKeyframes = JSON.parse(readFileSync(path, "utf8")) as KeyframeTargets;
+  return cachedKeyframes;
+}
+
 /** Test seam: drop the cache. */
 export function resetLiveTargetsCacheServer(): void {
   cachedV3 = null;
+  cachedKeyframes = null;
 }

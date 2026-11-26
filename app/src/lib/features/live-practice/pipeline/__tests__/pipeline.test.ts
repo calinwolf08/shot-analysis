@@ -26,7 +26,7 @@ import {
 import { profileForLevel } from "$lib/features/assessment";
 import type { AnalyzeOptions } from "$lib/features/analysis";
 import type { StoredShotAnalysis } from "$lib/features/analysis";
-import type { LiveTargetsV3 } from "basketball-shot-analysis";
+import type { KeyframeTargets } from "basketball-shot-analysis";
 import { scoreStoredShot } from "../../review/scored-shots";
 import type { ShotRecord } from "$lib/shared/db/repos";
 import {
@@ -37,10 +37,10 @@ import {
 
 const targets = JSON.parse(
   readFileSync(
-    join(process.cwd(), "static", "reference", "live-targets-v3.json"),
+    join(process.cwd(), "static", "reference", "live-targets-keyframes.json"),
     "utf8",
   ),
-) as LiveTargetsV3;
+) as KeyframeTargets;
 const pose = JSON.parse(
   readFileSync(
     join(
@@ -95,7 +95,8 @@ describe("createLocalPipeline (on-device analysis)", () => {
     expect(saved.length).toBe(result.length); // one persist per detected shot
     expect(result[0]!.shot.playerId).toBe("p1");
     expect(result[0]!.shot.sessionId).toBeNull();
-    expect(result[0]!.scorecard.phases).toHaveLength(4);
+    expect(result[0]!.scorecard.keyframes).toHaveLength(5);
+    expect(saved[0]!.keyframes).toBeDefined();
     expect(saved[0]!.v3Metrics).toBeDefined();
   });
 });
@@ -155,7 +156,7 @@ describe.each(CASES)(
         opts, // ignored server-side (derived from the player there)
       });
       expect(result.length).toBeGreaterThanOrEqual(1);
-      expect(result[0]!.scorecard.phases).toHaveLength(4);
+      expect(result[0]!.scorecard.keyframes).toHaveLength(5);
 
       // Persisted player-rooted, with no session.
       const shots = await repos.shot.listByPlayer(player.id);
@@ -164,7 +165,7 @@ describe.each(CASES)(
       expect(shots[0]!.playerId).toBe(player.id);
     });
 
-    it("read-time migration: a pre-v3 shot is recomputed from its pose track and saved", async () => {
+    it("read-time migration: an older shot is recomputed from its pose track and saved", async () => {
       const api = createApiClient({
         fetch: inProcessFetch(userA),
         baseUrl: "http://localhost",
@@ -181,21 +182,26 @@ describe.each(CASES)(
         opts,
       });
       const [live] = await repos.shot.listByPlayer(player.id);
-      const v3 = (live!.analysis as StoredShotAnalysis).v3Metrics!;
-      // Make it a schema-1 shot (as saved before v3), through the API.
-      const { v3Metrics: _drop, ...v1 } = live!.analysis as StoredShotAnalysis;
+      const kf = (live!.analysis as StoredShotAnalysis).keyframes!;
+      // Make it a shot saved before keyframe checks and v3, through the API.
+      const {
+        keyframes: _k,
+        v3Metrics: _v3,
+        ...v1
+      } = live!.analysis as StoredShotAnalysis;
       await repos.shot.updateAnalysis(live!.id, v1);
       const old = (await repos.shot.get(live!.id))!;
-      expect((old.analysis as StoredShotAnalysis).v3Metrics).toBeUndefined();
+      expect((old.analysis as StoredShotAnalysis).keyframes).toBeUndefined();
 
       const scored = await scoreStoredShot(repos.shot, old, "right", targets);
       expect(scored.card).not.toBeNull();
-      // Persisted: the next read is already v3 — and equals what live stored.
+      // Persisted: the next read already has both — equal to what live stored.
       const after = (await repos.shot.get(live!.id))!;
-      const again = (after.analysis as StoredShotAnalysis).v3Metrics!;
+      const again = (after.analysis as StoredShotAnalysis).keyframes!;
       expect(again).toBeDefined();
-      expect(again.metrics["setPoint.elbow_angle"]!.value).toBeCloseTo(
-        v3.metrics["setPoint.elbow_angle"]!.value,
+      expect((after.analysis as StoredShotAnalysis).v3Metrics).toBeDefined();
+      expect(again.checks["setPoint.elbow_bend"]!.value).toBeCloseTo(
+        kf.checks["setPoint.elbow_bend"]!.value,
         6,
       );
     });

@@ -10,8 +10,9 @@
  *
  *   captured  — "captured" earcon + "Shot captured"
  *   analyzing — "Analyzing" (the pipeline scores in parallel)
- *   readback  — the 3 worst as cues, in phase order (or "On target"); the
- *               card shows the same items as measurements
+ *   readback  — the 3 worst enabled checks (one per body part), in shot
+ *               order, in the same words as the card ("At release: hands too
+ *               low by 1.") — or "On target"
  *   tracking  — "ready" earcon, then shot detection resumes
  *
  * Each step waits for the previous sound to FINISH, and the coordinator stays
@@ -27,20 +28,23 @@
 import type { AnalyzeOptions } from "$lib/features/analysis";
 import { landmarkFramesToPoseData } from "$lib/features/analysis/replay/replay-pipeline";
 import type { AudioFeedbackService } from "$lib/shared/audio";
-import { selectFocusWorst } from "$lib/features/scoring/focus";
-import type { MetricResultV3, ScorecardV3 } from "$lib/features/scoring/v3";
+import type { KeyframeTargets } from "basketball-shot-analysis";
+import {
+  checksForAreas,
+  feedbackChecks,
+  scoreShotKeyframes,
+  spokenReadback,
+  type CheckResult,
+  type KeyframeScorecard,
+} from "$lib/features/scoring/keyframes";
+import type { StoredShotAnalysis } from "$lib/features/analysis/replay/replay-pipeline";
 import type {
   CoordinatorEvents,
   LiveRepCoordinator,
 } from "../coordinator/coordinator";
 import type { LiveShotPipeline } from "../pipeline";
 import type { ShotStore } from "../pipeline";
-import { FEEDBACK_COUNT, feedbackItems } from "./readback";
-import {
-  EMPTY_FEEDBACK_WORDING,
-  feedbackReadback,
-  type FeedbackWording,
-} from "$lib/features/scoring/v3/feedback-wording";
+import { FEEDBACK_COUNT } from "./readback";
 
 /** Spoken when a detected shot is rejected for the camera angle. */
 export const WRONG_ANGLE_TEXT = "Wrong angle, shot not counted";
@@ -68,9 +72,10 @@ export interface ShotEntry {
   shotId: string;
   /** Overall score (0 = on target … 10+), or null when not enough measured. */
   overall: number | null;
-  /** Off-target metrics (within the focus, if any), worst first. */
-  worst: readonly MetricResultV3[];
-  scorecard: ScorecardV3;
+  /** Off-target enabled checks, worst first. */
+  worst: readonly CheckResult[];
+  /** Scored with the player's feedback filter (turned-off checks left out). */
+  scorecard: KeyframeScorecard;
   excluded: boolean;
   /**
    * When the rep started (pose-frame clock, ms) and the offset from that clock
@@ -88,8 +93,8 @@ export interface ShotEntry {
 export interface ShotFeedback {
   index: number;
   overall: number | null;
-  /** The items fed back: the worst N, in phase order. */
-  worst: readonly MetricResultV3[];
+  /** The items fed back: the worst N (one per body part), in shot order. */
+  worst: readonly CheckResult[];
   /** The text spoken for this shot (empty when nothing was off-target). */
   spoken: string;
 }
@@ -107,12 +112,14 @@ export interface LivePracticeStoreDeps {
   fps: number;
   /** Pixel size of the pose frames (stored with each shot for review). */
   frameSize?: () => { width: number; height: number } | null;
-  /** Max worst metrics fed back (default 3). */
+  /** Max checks fed back (default 3). */
   maxWorstSpoken?: number;
-  /** Live focus-area ids; [] = coach on everything (the default). */
+  /** Keyframe targets (to score each shot with the feedback filter). */
+  targets: KeyframeTargets;
+  /** Feedback filter: enabled check ids; null = every check (the default). */
+  enabled?: ReadonlySet<string> | null;
+  /** Legacy focus-area ids behind the in-loop focus chip (until phase 4). */
   focusAreas?: string[];
-  /** Short feedback wording (static/config/feedback-wording.json). */
-  wording?: FeedbackWording;
   /** Shots already recorded today (continues the counter/average). */
   initialShots?: ShotEntry[];
 }
@@ -134,13 +141,13 @@ export class LivePracticeStore {
   error = $state<string | null>(null);
   /** Coaching focus (ids); [] = everything. Changeable mid-session. */
   focusAreas = $state<string[]>([]);
+  /** Feedback filter (enabled check ids; null = all). Changeable mid-session. */
+  enabled = $state.raw<ReadonlySet<string> | null>(null);
 
   private started = false;
   private unsubscribes: (() => void)[] = [];
   private flashTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly maxWorstSpoken: number;
-  /** Short feedback wording, used for the voice and the feedback card. */
-  readonly wording: FeedbackWording;
   /** Bumped by pause/stop so an in-flight cycle stops where it is. */
   private generation = 0;
   /**
@@ -153,9 +160,9 @@ export class LivePracticeStore {
 
   constructor(private readonly deps: LivePracticeStoreDeps) {
     this.maxWorstSpoken = deps.maxWorstSpoken ?? FEEDBACK_COUNT;
-    this.wording = deps.wording ?? EMPTY_FEEDBACK_WORDING;
     this.muted = deps.audio.isMuted();
     this.focusAreas = deps.focusAreas ?? [];
+    this.enabled = deps.enabled ?? null;
     this.shots = deps.initialShots ?? [];
   }
 
@@ -167,9 +174,21 @@ export class LivePracticeStore {
     this.deps.coordinator.setArmed(armed);
   }
 
-  /** Change the coaching focus (applies to the next scored shot). */
+  /**
+   * Change the coaching focus from the in-loop chip (applies to the next
+   * scored shot): the areas' keyframes become the feedback filter.
+   */
   setFocusAreas(ids: string[]): void {
     this.focusAreas = ids;
+    const checks = checksForAreas(ids);
+    // Replaced as a whole, never mutated (held in $state.raw).
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    this.enabled = checks.length > 0 ? new Set(checks) : null;
+  }
+
+  /** Change the feedback filter (applies to the next scored shot). */
+  setEnabled(enabled: ReadonlySet<string> | null): void {
+    this.enabled = enabled;
   }
 
   /** Mean overall score across included shots (0 = on target), or null. */
@@ -317,19 +336,20 @@ export class LivePracticeStore {
     }
 
     const first = result.shots[0]!;
-    // Focus steers coaching only: when areas are selected, surface the worst
-    // WITHIN them (even if not globally worst); the overall score is untouched.
-    const focused =
-      selectFocusWorst(first.scorecard.worst, this.focusAreas, Infinity) ??
-      first.scorecard.worst;
+    // The feedback filter applies to everything: turned-off checks are left
+    // out of the score, the card and the voice.
+    const checks = (first.shot.analysis as StoredShotAnalysis).keyframes;
+    const card = checks
+      ? scoreShotKeyframes(checks, this.deps.targets, this.enabled)
+      : first.scorecard;
 
     const last = event.window.frames.at(-1);
     const entry: ShotEntry = {
       index: this.shots.length + 1,
       shotId: first.shot.id,
-      overall: first.scorecard.overall,
-      worst: focused,
-      scorecard: first.scorecard,
+      overall: card.overall,
+      worst: card.worst,
+      scorecard: card,
       excluded: false,
       capture: {
         repStartTs: event.window.startedAt,
@@ -340,16 +360,16 @@ export class LivePracticeStore {
     };
     this.shots = [...this.shots, entry];
 
-    const items = feedbackItems(focused, this.maxWorstSpoken);
-    let spoken = feedbackReadback(items, this.wording);
+    const items = feedbackChecks(card, this.maxWorstSpoken);
+    let spoken = spokenReadback(items);
     // Audio-first: never fall silent after "Analyzing".
     if (!spoken) {
-      spoken = this.focusAreas.length > 0 ? "Focus on target" : ON_TARGET_TEXT;
+      spoken = this.enabled ? "Focus on target" : ON_TARGET_TEXT;
     }
     this.feedback = {
       index: entry.index,
       overall: entry.overall,
-      // The same items that were spoken: worst N, in phase order.
+      // The same items that were spoken: worst N, in shot order.
       worst: items,
       spoken,
     };

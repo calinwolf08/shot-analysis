@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { MetricResultV3, ScorecardV3 } from "$lib/features/scoring/v3";
+import type {
+  CheckResult,
+  KeyframeScorecard,
+} from "$lib/features/scoring/keyframes";
 import {
   REANALYSIS_UNAVAILABLE,
   dayLabel,
@@ -55,34 +58,25 @@ describe("groupByDay", () => {
 describe("shotIssue", () => {
   const card = (
     overall: number | null,
-    worst: Partial<MetricResultV3>[],
-  ): ScorecardV3 =>
+    worst: Partial<CheckResult>[],
+  ): KeyframeScorecard =>
     ({
       overall,
-      worst: worst as MetricResultV3[],
-    }) as unknown as ScorecardV3;
+      worst: worst as CheckResult[],
+    }) as unknown as KeyframeScorecard;
 
-  it("names the worst metric with its phase, in the short wording", () => {
-    const w = {
-      format: "{phrase} by {n}",
-      metrics: {
-        "load.knee_depth": { low: "Knees deep", high: "Knees shallow" },
-      },
-    };
+  it("names the worst check with its phase, in the screen's words", () => {
     const worst = {
-      id: "load.knee_depth",
-      label: "Knee bend",
-      phrase: "too shallow",
-      phase: "load",
-      direction: "high",
-      score: 3.2,
-      value: 150,
-    } as Partial<MetricResultV3>;
-    expect(shotIssue(card(3.2, [worst]), w)).toBe("Load: Knees shallow by 4");
-    // Without configured wording: the scorecard text.
-    expect(shotIssue(card(3.2, [worst]))).toBe(
-      "Load: Knee bend: too shallow by 4",
-    );
+      id: "rise.knee_bend",
+      keyframe: "rise",
+      phase: "rise",
+      name: "Knee bend",
+      phrase: "Knees too bent",
+      direction: "low",
+      score: 4.2,
+      value: 132,
+    } as Partial<CheckResult>;
+    expect(shotIssue(card(3.2, [worst]))).toBe("Rise: Knees too bent by 5");
   });
   it("says on target when nothing is off", () => {
     expect(shotIssue(card(1, []))).toBe("On target");
@@ -90,7 +84,7 @@ describe("shotIssue", () => {
   it("is null when too little was measured to score it", () => {
     expect(shotIssue(card(null, []))).toBeNull();
   });
-  it("flags a pre-v3 shot that can't be re-analyzed", () => {
+  it("flags an old shot that can't be re-analyzed", () => {
     expect(shotIssue(null)).toBe(REANALYSIS_UNAVAILABLE);
   });
 });

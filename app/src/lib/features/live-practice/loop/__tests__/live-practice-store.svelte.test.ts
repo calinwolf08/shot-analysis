@@ -1,6 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { createFakeAudio } from "$lib/shared/audio";
-import type { MetricResultV3, ScorecardV3 } from "$lib/features/scoring/v3";
+import {
+  ALL_CHECK_KEYS,
+  CHECK_DEFS,
+  parseCheckKey,
+  type KeyframeTarget,
+  type KeyframeTargets,
+  type ShotKeyframes,
+} from "basketball-shot-analysis";
+import type {
+  CheckResult,
+  KeyframeScorecard,
+} from "$lib/features/scoring/keyframes";
 import type { ShotRecord } from "$lib/shared/db/repos";
 import type { AnalyzeOptions } from "$lib/features/analysis";
 import type {
@@ -63,48 +74,119 @@ function shotRecord(id: string): ShotRecord {
   };
 }
 
-function worst(label: string, phase = "setPoint"): MetricResultV3 {
+/** An off-target check ("setPoint.elbow_bend"), below its band by `score`. */
+function worst(id: string, score = 3): CheckResult {
+  const k = parseCheckKey(id)!;
+  const def = CHECK_DEFS[k.check];
   return {
-    id: `${phase}.${label.toLowerCase().replace(/ /g, "_")}`,
-    phase: phase as MetricResultV3["phase"],
-    kind: "structure",
-    label,
-    unit: "deg",
-    value: 100,
+    id,
+    keyframe: k.keyframe,
+    phase: k.keyframe,
+    check: k.check,
+    part: def.part,
+    name: def.name,
+    label: def.name,
+    unit: def.unit,
+    value: -score,
     note: null,
     scored: true,
-    score: 3,
-    direction: "high",
-    magnitude: 6,
-    passMin: 85,
-    passMax: 95,
-    ideal: 90,
-    phrase: "too high",
-    cue: `Fix ${label.toLowerCase()}`,
-    frames: [],
+    score,
+    direction: "low",
+    magnitude: score,
+    passMin: 0,
+    passMax: 10,
+    phrase: def.low,
+    frame: null,
   };
 }
 
-function scorecard(overall: number, worstList: MetricResultV3[]): ScorecardV3 {
+function scorecard(
+  overall: number,
+  worstList: CheckResult[],
+): KeyframeScorecard {
   return {
     overall,
-    phases: [],
-    details: [],
+    keyframes: [],
+    checks: worstList,
     worst: worstList,
     measuredFraction: 1,
     belowCoverageGate: false,
   };
 }
 
+/** Every check: band 0..10, spread 1 (a value of −n scores n). */
+const targets: KeyframeTargets = {
+  version: 1,
+  catalog: "keyframes",
+  builtFrom: "test",
+  shootingHand: "right",
+  shots: 7,
+  generatedAt: "x",
+  notes: [],
+  checks: Object.fromEntries(
+    ALL_CHECK_KEYS.map((id) => {
+      const k = parseCheckKey(id)!;
+      const t: KeyframeTarget = {
+        keyframe: k.keyframe,
+        check: k.check,
+        unit: "deg",
+        scored: true,
+        ideal: 5,
+        sd: 1,
+        passMin: 0,
+        passMax: 10,
+        rampSd: 1,
+        n: 7,
+      };
+      return [id, t];
+    }),
+  ),
+};
+
+/** Stored keyframe checks: every check in range except `offs` (score 3 each). */
+function keyframes(offs: readonly string[]): ShotKeyframes {
+  return {
+    schemaVersion: 1,
+    keyframes: { setup: 1, load: 2, rise: 3, setPoint: 4, release: 5 },
+    checks: Object.fromEntries(
+      ALL_CHECK_KEYS.map((id) => {
+        const k = parseCheckKey(id)!;
+        const c = {
+          keyframe: k.keyframe,
+          check: k.check,
+          unit: CHECK_DEFS[k.check].unit,
+          value: offs.includes(id) ? -3 : 5,
+          reliable: true,
+          frame: 1,
+        };
+        return [id, c];
+      }),
+    ),
+    facing: 1,
+    nearSide: "right",
+    shootingSide: "right",
+  };
+}
+
+/**
+ * A processed shot whose scorecard has `overall` and `offs` off target. With
+ * `stored`, the shot also carries its keyframe checks, so the store re-scores
+ * it with the feedback filter.
+ */
 function processed(
   id: string,
   overall: number,
-  labels: (string | [string, string])[],
+  offs: string[],
+  stored = false,
 ): ProcessedShot {
-  const w = labels.map((l) =>
-    typeof l === "string" ? worst(l) : worst(l[0], l[1]),
-  );
-  return { shot: shotRecord(id), scorecard: scorecard(overall, w), worst: w };
+  const w = offs.map((o) => worst(o));
+  const shot = shotRecord(id);
+  if (stored) {
+    shot.analysis = {
+      keyframes: keyframes(offs),
+    } as unknown as ShotRecord["analysis"];
+  }
+  return { shot, scorecard: scorecard(overall, w), worst: w };
 }
 
 type Outcome =
@@ -151,6 +233,7 @@ function makeStore(
     playerId: "p1",
     opts,
     fps: 30,
+    targets,
   });
   store.start();
   return { store, emit, audio, pipeline, shotStore, excluded, coordinator };
@@ -168,7 +251,7 @@ function repEvent(): CoordinatorEvents["repResult"] {
 describe("LivePracticeStore — per-shot cycle", () => {
   it("captured → analyzing → readback → ready, strictly in order", async () => {
     const { store, emit, audio, coordinator } = makeStore([
-      [processed("s1", 3.4, ["Elbow flare", "Set point"])],
+      [processed("s1", 3.4, ["setPoint.elbow_bend", "setPoint.hand_height"])],
     ]);
     emit("repResult", repEvent());
     await vi.waitFor(() => expect(store.cycle).toBe("tracking"));
@@ -177,7 +260,7 @@ describe("LivePracticeStore — per-shot cycle", () => {
       "earcon:captured",
       `speak:${CAPTURED_TEXT}`,
       `speak:${ANALYZING_TEXT}`,
-      "speak:Set point: Fix elbow flare. Fix set point.",
+      "speak:At set point: hands too low by 3, elbow too bent by 3.",
       "earcon:ready",
     ]);
     expect(store.shots).toHaveLength(1);
@@ -187,40 +270,56 @@ describe("LivePracticeStore — per-shot cycle", () => {
     expect(coordinator.dismissFeedback).toHaveBeenCalledTimes(1);
   });
 
-  it("speaks the 3 worst in shot order, and only the focus when one is set", async () => {
-    const shot = () =>
-      processed("s1", 4, [
-        ["Wrist snap", "release"],
-        ["Rise timing", "rise"],
-        ["Knee bend", "load"],
-        ["Set height", "setPoint"],
-      ]);
-    const all = makeStore([[shot()]]);
-    all.emit("repResult", repEvent());
-    await vi.waitFor(() => expect(all.store.cycle).toBe("tracking"));
-    // Worst 3 (wrist snap, rise timing, knee bend), reordered by phase.
-    expect(all.audio.sequence).toContain(
-      "speak:Load: Fix knee bend. Rise: Fix rise timing. Release: Fix wrist snap.",
-    );
-    expect(all.store.feedback?.worst.map((m) => m.phase)).toEqual([
-      "load",
-      "rise",
-      "release",
+  it("speaks the 3 worst (one per body part) in shot order, in the screen's words", async () => {
+    const shot = processed("s1", 4, [
+      "release.wrist_hinge",
+      "rise.knee_bend",
+      "load.knee_bend", // knees again: one per body part
+      "load.back",
+      "setPoint.elbow_bend", // 4th body part: past the 3
     ]);
+    const { store, emit, audio } = makeStore([[shot]]);
+    emit("repResult", repEvent());
+    await vi.waitFor(() => expect(store.cycle).toBe("tracking"));
+    expect(audio.sequence).toContain(
+      "speak:In the load: leaning too far back by 3. When the ball reaches set point: knees too bent by 3. At release: wrist too bent by 3.",
+    );
+    expect(store.feedback?.worst.map((m) => m.id)).toEqual([
+      "load.back",
+      "rise.knee_bend",
+      "release.wrist_hinge",
+    ]);
+  });
 
-    const focused = makeStore([[shot()]]);
+  it("applies the feedback filter to the score, the card and the voice", async () => {
+    const offs = ["load.back", "setPoint.hand_height", "release.elbow_bend"];
+    const focused = makeStore([[processed("s1", 4, offs, true)]]);
     focused.store.setFocusAreas(["set-point"]);
     focused.emit("repResult", repEvent());
     await vi.waitFor(() => expect(focused.store.cycle).toBe("tracking"));
-    // The set-point issue is coached even though it isn't in the global top 3.
+    // Only set-point checks: the hands issue is coached, the others aren't.
     expect(focused.audio.sequence).toContain(
-      "speak:Set point: Fix set height.",
+      "speak:At set point: hands too low by 3.",
     );
+    expect(focused.store.feedback?.worst.map((m) => m.id)).toEqual([
+      "setPoint.hand_height",
+    ]);
+    const entry = focused.store.shots[0]!;
+    expect(entry.scorecard.checks.every((c) => c.keyframe === "setPoint")).toBe(
+      true,
+    );
+    // One of 7 set-point checks at 3 → the set-point (and overall) score is 3/7.
+    expect(entry.overall).toBeCloseTo(3 / 7, 6);
+
+    const unfiltered = makeStore([[processed("s1", 4, offs, true)]]);
+    unfiltered.emit("repResult", repEvent());
+    await vi.waitFor(() => expect(unfiltered.store.cycle).toBe("tracking"));
+    expect(unfiltered.store.feedback?.worst).toHaveLength(3);
   });
 
   it("holds shot detection until the readback has FINISHED", async () => {
     const { store, emit, audio, coordinator } = makeStore(
-      [[processed("s1", 2, ["Set point"])]],
+      [[processed("s1", 2, ["setPoint.hand_height"])]],
       { holdSpeech: true },
     );
     emit("repResult", repEvent());
@@ -313,7 +412,7 @@ describe("LivePracticeStore — per-shot cycle", () => {
 
   it("pausing mid-cycle abandons it without resuming tracking", async () => {
     const { store, emit, audio, coordinator } = makeStore(
-      [[processed("s1", 2, ["Set point"])]],
+      [[processed("s1", 2, ["setPoint.hand_height"])]],
       { holdSpeech: true },
     );
     emit("repResult", repEvent());
@@ -330,7 +429,7 @@ describe("LivePracticeStore — per-shot cycle", () => {
 
   it("'Not a shot?' excludes, re-averages, and cuts its readback short", async () => {
     const { store, emit, audio, excluded } = makeStore(
-      [[processed("s1", 4, ["Elbow flare"])]],
+      [[processed("s1", 4, ["setPoint.elbow_bend"])]],
       { holdSpeech: true },
     );
     emit("repResult", repEvent());
@@ -369,7 +468,7 @@ describe("LivePracticeStore — per-shot cycle", () => {
 
   it("continues today's shots (counter + average) and numbers new ones after them", async () => {
     const { coordinator } = fakeCoordinator();
-    const earlier = processed("old", 5, ["Set point"]);
+    const earlier = processed("old", 5, ["setPoint.hand_height"]);
     const store = new LivePracticeStore({
       coordinator,
       pipeline: fakePipeline([[processed("s2", 3, [])]]),
@@ -378,6 +477,7 @@ describe("LivePracticeStore — per-shot cycle", () => {
       playerId: "p1",
       opts,
       fps: 30,
+      targets,
       initialShots: [
         {
           index: 1,
@@ -410,7 +510,7 @@ describe("LivePracticeStore — per-shot cycle", () => {
 describe("LivePracticeStore — full-rate refinement", () => {
   it("announces when the quick pass sees a shot, scores only from the full-rate result", async () => {
     const { store, emit, audio, pipeline } = makeStore([
-      [processed("s1", 2, ["Set point"])],
+      [processed("s1", 2, ["setPoint.hand_height"])],
     ]);
     emit("repRefining", { quickShots: 1 });
     await vi.waitFor(() => expect(store.cycle).toBe("analyzing"));
@@ -425,7 +525,7 @@ describe("LivePracticeStore — full-rate refinement", () => {
       "earcon:captured",
       `speak:${CAPTURED_TEXT}`,
       `speak:${ANALYZING_TEXT}`,
-      "speak:Set point: Fix set point.",
+      "speak:At set point: hands too low by 3.",
       "earcon:ready",
     ]);
     expect(pipeline.process).toHaveBeenCalledTimes(1);

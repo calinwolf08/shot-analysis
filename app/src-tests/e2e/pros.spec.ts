@@ -1,10 +1,10 @@
 import { expect, test } from "./fixtures";
-import { onboard, startLiveLoop } from "./helpers";
+import { onboard } from "./helpers";
 
 /**
- * Pro profiles (docs/pro-targets-plan.md Phase 5): hidden until a pro build
- * exists; then Profile → "Score against" picks a pro, the choice is saved per
- * user, and scoring still works against that pro's targets.
+ * Pro profiles (docs/pro-targets-plan.md Phase 5): "Score against" stays
+ * hidden until pro targets exist for the keyframe checks
+ * (docs/keyframe-review-plan.md) — even when a pro build is served.
  */
 
 const PROFILES = {
@@ -23,38 +23,12 @@ const PROFILES = {
   ],
 };
 
-test("no pro build: no 'Score against' setting", async ({ page }) => {
-  // The shipped file until the first pro build: no pros.
+test("no 'Score against' setting, even with pros served", async ({ page }) => {
   await page.route("**/reference/pro-profiles.json", (r) =>
-    r.fulfill({ json: { ...PROFILES, pros: [] } }),
+    r.fulfill({ json: PROFILES }),
   );
   await onboard(page, "?e2e=replay", "NoPros");
   await page.getByTestId("tab-profile").click();
   await expect(page.getByTestId("voice-toggle")).toBeVisible();
   await expect(page.getByTestId("score-against")).toHaveCount(0);
-});
-
-test("score against a pro: saved, and shots still score", async ({ page }) => {
-  test.setTimeout(120_000);
-  await page.route("**/reference/pro-profiles.json", (r) =>
-    r.fulfill({ json: PROFILES }),
-  );
-  await onboard(page, "?e2e=replay", "ProFan");
-  await page.getByTestId("tab-profile").click();
-  const select = page.getByTestId("score-against");
-  await expect(select).toBeVisible();
-  await select.selectOption("curry");
-  await page.reload();
-  await expect(page.getByTestId("score-against")).toHaveValue("curry");
-
-  // Practice + review score against Curry's targets.
-  await page.getByTestId("tab-practice").click();
-  await startLiveLoop(page);
-  await expect(page.getByTestId("rep-feedback")).toBeVisible({
-    timeout: 60_000,
-  });
-  await page.getByTestId("tab-shots").click();
-  await page.locator('[data-testid^="shot-row-"]').first().click();
-  await expect(page.getByTestId("scorecard-v3")).toBeVisible();
-  await expect(page.getByTestId("v3-row-load.knee_depth")).toBeVisible();
 });

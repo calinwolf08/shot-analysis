@@ -4,8 +4,9 @@
  * Runs the SAME isomorphic analysis pipeline the client replay and server paths
  * already share (`runReplayAnalysis`, depends only on `basketball-shot-analysis`)
  * over a pose window to detect each shot, then measures it with the v3 metric
- * catalog (from the shot's padded pose track) and scores it on the 0–10+
- * scale against the v3 live targets. Identical output whether invoked in the browser
+ * catalog and the keyframe checks (both from the shot's padded pose track) and
+ * scores the keyframe checks on the 0–10+ scale against the keyframe targets
+ * (v3 metrics are still stored for the review screen until it moves over). Identical output whether invoked in the browser
  * (on-device analysis) or on the server — the only thing that changes between
  * those is who calls this and where the result is persisted.
  *
@@ -21,16 +22,19 @@ import {
   type StoredShotAnalysis,
 } from "$lib/features/analysis/replay/replay-pipeline";
 import type { AnalyzeOptions } from "$lib/features/analysis";
-import type { LiveTargetsV3 } from "basketball-shot-analysis";
+import type { KeyframeTargets } from "basketball-shot-analysis";
 import {
   POSE_PAD_AFTER,
   POSE_PAD_BEFORE,
-  scoreShotV3,
-  scorecardV3ForShot,
   v3ForPoses,
-  type MetricResultV3,
-  type ScorecardV3,
 } from "$lib/features/scoring/v3";
+import {
+  keyframesForPoses,
+  scoreShotKeyframes,
+  scorecardForStoredShot,
+  type CheckResult,
+  type KeyframeScorecard,
+} from "$lib/features/scoring/keyframes";
 import type { ReviewPoseFrame, ShotReviewPoses } from "$lib/shared/db/repos";
 import type { LandmarkFrame } from "$lib/features/analysis";
 import { requiredOrientation } from "../setup/angle-gate";
@@ -66,10 +70,11 @@ export interface AnalyzeAndScoreResult {
 }
 
 export interface ScoredShot {
-  /** The full analysis for one detected shot (incl. v3 metrics). */
+  /** The full analysis for one detected shot (incl. keyframe checks). */
   readonly analysis: StoredShotAnalysis;
-  readonly scorecard: ScorecardV3;
-  readonly worst: readonly MetricResultV3[];
+  /** Every check (the player's feedback filter is applied by the caller). */
+  readonly scorecard: KeyframeScorecard;
+  readonly worst: readonly CheckResult[];
   /**
    * Analysis-aligned 2D skeleton track for the shot (for scrub review), with
    * POSE_PAD_BEFORE / _AFTER frames of context so v3 can be recomputed from
@@ -118,7 +123,7 @@ function filteredReviewFrames(pose: PoseData): ReviewPoseFrame[] {
 export function analyzeAndScore(
   pose: PoseData,
   opts: AnalyzeOptions,
-  targets: LiveTargetsV3,
+  targets: KeyframeTargets,
   gate: { maxSideSeparation: number } = {
     maxSideSeparation: DEFAULT_LIVE_TUNING.readiness.maxSideSeparation,
   },
@@ -172,8 +177,9 @@ export function analyzeAndScore(
     const analysis: StoredShotAnalysis = {
       ...(a as StoredShotAnalysis),
       v3Metrics: v3ForPoses(reviewPoses, opts.shootingHand),
+      keyframes: keyframesForPoses(reviewPoses, opts.shootingHand),
     };
-    const scorecard = scoreShotV3(analysis.v3Metrics!.metrics, targets);
+    const scorecard = scoreShotKeyframes(analysis.keyframes!, targets);
     return { analysis, scorecard, worst: scorecard.worst, reviewPoses };
   });
   return { shots, rejected };
@@ -198,13 +204,14 @@ function nearestShot<T extends { frameRange: { start: number; end: number } }>(
 }
 
 /**
- * A stored shot's v3 scorecard against the current targets (scores are
- * recomputed on read, never stored), or null when the shot has no v3 metrics
- * yet (see `ensureV3` to recompute them from the pose track).
+ * A stored shot's keyframe scorecard against the current targets (scores are
+ * recomputed on read, never stored), or null when the shot has no keyframe
+ * checks yet (see `ensureKeyframes` to recompute them from the pose track).
  */
 export function scorecardForShot(
   analysis: ShotAnalysis,
-  targets: LiveTargetsV3,
-): ScorecardV3 | null {
-  return scorecardV3ForShot(analysis, targets);
+  targets: KeyframeTargets,
+  enabled?: ReadonlySet<string> | null,
+): KeyframeScorecard | null {
+  return scorecardForStoredShot(analysis, targets, enabled);
 }
