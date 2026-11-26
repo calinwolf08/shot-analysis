@@ -102,7 +102,7 @@
     </div>
     {#if current && fb}
       {#if fb.spoken}
-        <p class="readback" data-testid="replay-readback-v3">
+        <p class="readback" data-testid="replay-readback">
           🔊 “{fb.spoken}”
         </p>
       {:else}
