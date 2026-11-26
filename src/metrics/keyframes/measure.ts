@@ -55,9 +55,10 @@ import {
  * stored shots are recomputed. 2: body lengths, x scale and centre-line flag
  * stored for drawing the target zones. 3: every check measured from the
  * smoothed joint positions at the keyframe, which are stored (`points`) so
- * the review draws exactly what was measured.
+ * the review draws exactly what was measured. 4: set point / release found
+ * past a hitch on the way up (a deep re-bend of the elbow), not at it.
  */
-export const KEYFRAME_SCHEMA_VERSION = 3 as const;
+export const KEYFRAME_SCHEMA_VERSION = 4 as const;
 
 /** Joints a keyframe's checks are measured from (stored per keyframe). */
 export const KEYFRAME_JOINTS = [

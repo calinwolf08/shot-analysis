@@ -146,7 +146,7 @@ const targets: KeyframeTargets = {
 /** Stored keyframe checks: every check in range except `offs` (score 3 each). */
 function keyframes(offs: readonly string[]): ShotKeyframes {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     keyframes: { setup: 1, load: 2, rise: 3, setPoint: 4, release: 5 },
     checks: Object.fromEntries(
       ALL_CHECK_KEYS.map((id) => {

@@ -44,6 +44,12 @@ export interface PhaseWindows {
 
 /** Fraction of peak velocity that counts as "moving" for onsets. */
 export const ONSET_FRACTION = 0.2;
+/**
+ * A later bend of the elbow on the way up counts as the set point (a hitch)
+ * only if it comes back within this share of the extension range of the
+ * most-bent angle.
+ */
+export const REBEND_DEPTH = 0.3;
 /** Fraction of the excursion that counts as "straight" for completions. */
 export const COMPLETE_FRACTION = 0.9;
 
@@ -323,11 +329,41 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
   // The elbow can be nearly straight at the ball's lowest point (arm hanging
   // with the ball), so: most-bent elbow during the rise first, then the
   // extension that follows it.
+  //
+  // A hitch on the way up — bend, open a little, bend DEEP again, then extend
+  // — must not let the small opening pose as the extension. So look back from
+  // the straightest elbow (up to just past the hand's peak) for the last bend
+  // before it; if that bend is nearly as deep as the most-bent one, the
+  // extension starts from there. A shallow wobble near full extension (a
+  // straight arm flexing a little) is not a bend and changes nothing.
   const riseFrom = ballRiseStart ?? ballLowest ?? 0;
-  const elbowMin = extremum(sig.elbowAngle, riseFrom, peak, "min");
+  const tolE = tolOf(sig.elbowAngle);
+  const mostBent = extremum(sig.elbowAngle, riseFrom, peak, "min");
+  const straightest =
+    mostBent !== null
+      ? extremum(sig.elbowAngle, mostBent, peak + 3, "max")
+      : null;
+  const lastBend =
+    straightest !== null
+      ? previousExtremum(sig.elbowAngle, straightest, "min", tolE)
+      : null;
+  const angle = (x: number | null) =>
+    x === null ? null : valueAt(sig.elbowAngle, x);
+  const aMin = angle(mostBent);
+  const aMax = angle(straightest);
+  const aLast = angle(lastBend);
+  const deepRebend =
+    lastBend !== null &&
+    mostBent !== null &&
+    lastBend > mostBent &&
+    aMin !== null &&
+    aMax !== null &&
+    aLast !== null &&
+    aLast <= aMin + REBEND_DEPTH * (aMax - aMin);
+  const elbowMin = deepRebend ? lastBend : mostBent;
   const elbowMax =
     elbowMin !== null
-      ? nextExtremum(sig.elbowAngle, elbowMin, "max", tolOf(sig.elbowAngle))
+      ? nextExtremum(sig.elbowAngle, elbowMin, "max", tolE)
       : null;
   const setPoint =
     elbowMax !== null && elbowMin !== null

@@ -52,7 +52,7 @@ test("an older shot gets its keyframe checks on read, saved, and shows them in r
 
   // Live stored the keyframe checks with the shot.
   const live = await apiGet<ShotJson>(page, `/api/shots/${id}`);
-  expect(live.analysis.keyframes?.schemaVersion).toBe(3);
+  expect(live.analysis.keyframes?.schemaVersion).toBe(4);
 
   // Turn it into a shot saved before the keyframe checks (and before v3).
   const { keyframes: _k, v3Metrics: _v3, ...old } = live.analysis;
@@ -82,7 +82,7 @@ test("an older shot gets its keyframe checks on read, saved, and shows them in r
         (await apiGet<ShotJson>(page, `/api/shots/${id}`)).analysis.keyframes
           ?.schemaVersion ?? null,
     )
-    .toBe(3);
+    .toBe(4);
 
   // Review draws the checks at each keyframe.
   await page.getByTestId(`shot-row-${id}`).click();
