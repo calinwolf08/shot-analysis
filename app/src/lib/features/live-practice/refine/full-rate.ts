@@ -204,12 +204,19 @@ export function createFullRateRefiner(
       // Pose clock → performance.now() (the recorder's clock).
       const frameToWall =
         last.captureTs !== undefined ? last.captureTs - last.timestamp : 0;
-      const take = await recorder.takeCovering(first.timestamp + frameToWall);
+      // From where the window should start: live tracking may have been
+      // paused for part of the pre-roll (the previous rep's re-check), but the
+      // recording kept going.
+      const wantFrom = Math.min(first.timestamp, window.fromTs ?? Infinity);
+      const take = await recorder.takeCovering(wantFrom + frameToWall);
       restart?.();
       if (!take) return fail("no clip");
       stash = { repStartTs: window.startedAt, take };
       const clipStartPose = take.startTs - frameToWall;
-      const winFrom = first.timestamp;
+      const winFrom = Math.min(
+        first.timestamp,
+        Math.max(wantFrom, clipStartPose),
+      );
       const winTo = window.endedAt;
 
       let decodeStats: DecodeClipStats | undefined;

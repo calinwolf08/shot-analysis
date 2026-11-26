@@ -33,6 +33,8 @@ export interface ProcessInput {
   readonly opts: AnalyzeOptions;
   /** Posed-frame index of the rep trigger (keeps only that rep's shot). */
   readonly focusIndex?: number;
+  /** Ms of the rep's pre-roll with no frames (see analyzeAndScore). */
+  readonly missedStartMs?: number;
 }
 
 export interface ProcessedShot {
@@ -64,13 +66,14 @@ export function createLocalPipeline(deps: {
 }): LiveShotPipeline {
   return {
     location: "device",
-    async process({ playerId, poseData, opts, focusIndex }) {
+    async process({ playerId, poseData, opts, focusIndex, missedStartMs }) {
       const { shots: scored, rejected } = analyzeAndScore(
         poseData,
         opts,
         deps.targets,
         undefined,
         focusIndex,
+        missedStartMs,
       );
       const out: ProcessedShot[] = [];
       for (const s of scored) {
@@ -92,13 +95,14 @@ export function createServerPipeline(deps: {
 }): LiveShotPipeline {
   return {
     location: "server",
-    async process({ playerId, poseData, focusIndex }) {
+    async process({ playerId, poseData, focusIndex, missedStartMs }) {
       const res = await deps.api.send<ProcessResult>(
         "/api/analysis/live-shot",
         {
           playerId,
           poseData,
           ...(focusIndex !== undefined ? { focusIndex } : {}),
+          ...(missedStartMs ? { missedStartMs } : {}),
         },
       );
       return { shots: res.shots, rejected: res.rejected ?? [] };

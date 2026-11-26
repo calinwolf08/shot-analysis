@@ -91,6 +91,13 @@ export interface RepWindow {
   frames: LandmarkFrame[];
   /** Timestamp of the rep trigger (ACTIVE entry). */
   startedAt: number;
+  /**
+   * Where the window should start (trigger − pre-roll). Later than the first
+   * frame's time when live tracking was paused (a re-check of the previous rep
+   * holds the pose model): the full-rate re-check decodes that stretch from
+   * the recording.
+   */
+  fromTs?: number;
   /** Timestamp of the last frame in the window. */
   endedAt: number;
   trigger: RepTrigger;
@@ -345,6 +352,7 @@ export function createLiveRepCoordinator(
     const window: RepWindow = {
       frames,
       startedAt: repStartTs,
+      fromTs: windowStart,
       endedAt: frames.at(-1)?.timestamp ?? now,
       trigger,
     };

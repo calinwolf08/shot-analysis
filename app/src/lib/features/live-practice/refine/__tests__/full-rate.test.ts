@@ -219,6 +219,24 @@ describe("full-rate refiner", () => {
     expect(decode30.mock.calls[0]![2]).toBeCloseTo(2.5);
   });
 
+  it("re-detects the pre-roll live tracking missed, from the recording", async () => {
+    decode30.mockClear();
+    const r = createFullRateRefiner({ session: session(), decode: decode30 });
+    const rec = recorder(200);
+    r.setRecorder(rec);
+    // Live frames only from 1000 ms (tracking was paused), but the window
+    // should start at 400 ms.
+    const out = (await r.refine({ ...liveWindow(), fromTs: 400 }))!;
+    expect(rec.takeCovering).toHaveBeenCalledWith(400);
+    expect(decode30.mock.calls[0]![1]).toBeCloseTo(0.2);
+    expect(out[0]!.timestamp).toBeLessThan(450);
+    // Not before the recording started.
+    decode30.mockClear();
+    r.setRecorder(recorder(700));
+    await r.refine({ ...liveWindow(), fromTs: 400 });
+    expect(decode30.mock.calls[0]![1]).toBeCloseTo(0);
+  });
+
   it("falls back without a recording", async () => {
     const r = createFullRateRefiner({ session: session(), decode: decode30 });
     expect(await r.refine(liveWindow())).toBeNull();

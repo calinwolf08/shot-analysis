@@ -293,11 +293,19 @@ export class LivePracticeStore {
       const focusIndex = event.window.frames.filter(
         (f) => f.landmarks !== null && f.timestamp < event.window.startedAt,
       ).length;
+      // Pre-roll with no frames: live tracking paused and the re-check
+      // couldn't fill it from the recording.
+      const first = event.window.frames[0]?.timestamp;
+      const missedStartMs =
+        first !== undefined && event.window.fromTs !== undefined
+          ? Math.max(0, first - event.window.fromTs)
+          : 0;
       result = await pipeline.process({
         playerId: this.deps.playerId,
         poseData,
         opts: this.deps.opts,
         focusIndex,
+        missedStartMs,
       });
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
