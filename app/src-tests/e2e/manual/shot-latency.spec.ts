@@ -11,7 +11,7 @@
  * Skips without LIVE_VIDEO (no real footage is committed). Absolute numbers
  * depend on the machine; compare runs on the same one.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { onboard, startLiveLoop } from "../helpers";
 
@@ -80,7 +80,10 @@ test("captured → spoken score latency", async ({ page }) => {
   // Re-check times from the debug capture.
   const dl = page.waitForEvent("download");
   await page.getByTestId("live-capture-download").click();
-  const file = JSON.parse(readFileSync((await (await dl).path())!, "utf8")) as {
+  const raw = readFileSync((await (await dl).path())!, "utf8");
+  // Keep the capture (the scored frames of the last reps) for comparing runs.
+  if (process.env.CAPTURE_OUT) writeFileSync(process.env.CAPTURE_OUT, raw);
+  const file = JSON.parse(raw) as {
     events: {
       kind: string;
       data?: { ok?: boolean; ms?: number; frames?: number };
