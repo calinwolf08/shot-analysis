@@ -31,7 +31,9 @@ import {
   type ShotEvents,
 } from "../v3/events";
 import {
+  angleAt,
   computeSignals,
+  type PosJoint,
   type Series,
   type ShotSignals,
   type SignalFrame,
@@ -51,9 +53,31 @@ import {
 /**
  * Bumped when a check's definition (or what's stored with it) changes, so
  * stored shots are recomputed. 2: body lengths, x scale and centre-line flag
- * stored for drawing the target zones.
+ * stored for drawing the target zones. 3: every check measured from the
+ * smoothed joint positions at the keyframe, which are stored (`points`) so
+ * the review draws exactly what was measured.
  */
-export const KEYFRAME_SCHEMA_VERSION = 2 as const;
+export const KEYFRAME_SCHEMA_VERSION = 3 as const;
+
+/** Joints a keyframe's checks are measured from (stored per keyframe). */
+export const KEYFRAME_JOINTS = [
+  "wrist",
+  "elbow",
+  "shoulder",
+  "index",
+  "hip",
+  "knee",
+  "ankle",
+  "head",
+  "hipCentre",
+  "shoulderCentre",
+] as const satisfies readonly PosJoint[];
+export type KeyframeJoint = (typeof KEYFRAME_JOINTS)[number];
+
+/** A joint at a keyframe: x times `xScale`, y in frame heights; null = not tracked. */
+export type KeyframePoints = Readonly<
+  Record<KeyframeJoint, { readonly x: number; readonly y: number } | null>
+>;
 
 /**
  * The ball has "reached" set point once the wrist's upward speed falls below
@@ -92,6 +116,8 @@ export interface ShotKeyframes {
   readonly xScale: number;
   readonly lengths: Readonly<{ torso: number | null; thigh: number | null }>;
   readonly centreLine: boolean;
+  /** The smoothed joints each keyframe's checks were measured from. */
+  readonly points: Readonly<Record<Keyframe, KeyframePoints | null>>;
 }
 
 export interface KeyframeOptions {
@@ -203,6 +229,20 @@ export function keyframesFromSignals(
     return ax === null || bx === null ? null : f * (ax - bx);
   };
 
+  /** A smoothed joint at sample x (null when not tracked there). */
+  const joint = (j: PosJoint, x: number) => {
+    const px = at(P[j].x, x);
+    const py = at(P[j].y, x);
+    return px === null || py === null ? null : { x: px, y: py };
+  };
+  /** Angle a-b-c of the smoothed joints at x (degrees). */
+  const ang = (a: PosJoint, b: PosJoint, c: PosJoint, x: number) => {
+    const A = joint(a, x);
+    const B = joint(b, x);
+    const C = joint(c, x);
+    return A && B && C ? angleAt(A, B, C) : null;
+  };
+
   const measureAt = (k: Keyframe, c: CheckId, x: number): number | null => {
     switch (c) {
       case "hand_height":
@@ -212,17 +252,27 @@ export function keyframesFromSignals(
       case "ball_close":
         return norm(fwd("wrist", "hipCentre", x), seg.torso);
       case "wrist_hinge":
-        return at(sig.wristAngle, x);
+        return ang("elbow", "wrist", "index", x);
       case "hold": {
         const r = kf.rise;
         return r === null ? null : timeAt(sig, x) - timeAt(sig, r);
       }
+      // Reference footage with true limb lengths measures these in 3D.
       case "elbow_bend":
-        return at(sig.elbowAngle, x);
+        return sig.segments3d
+          ? at(sig.elbowAngle, x)
+          : ang("shoulder", "elbow", "wrist", x);
       case "knee_bend":
-        return at(sig.kneeAngle, x);
-      case "back":
-        return at(sig.spineLean, x);
+        return sig.segments3d
+          ? at(sig.kneeAngle, x)
+          : ang("hip", "knee", "ankle", x);
+      case "back": {
+        const top = joint("shoulderCentre", x);
+        const base = joint("hipCentre", x);
+        return top && base
+          ? (Math.atan2(f * (top.x - base.x), base.y - top.y) * 180) / Math.PI
+          : null;
+      }
       case "hips_over_knees":
         return norm(fwd("hip", "knee", x), seg.thigh);
     }
@@ -271,6 +321,16 @@ export function keyframesFromSignals(
     xScale: sig.aspect,
     lengths: { torso: seg.torso, thigh: seg.thigh },
     centreLine: sig.centreLine,
+    points: Object.fromEntries(
+      KEYFRAMES.map((k) => {
+        const x = kf[k];
+        if (x === null) return [k, null];
+        return [
+          k,
+          Object.fromEntries(KEYFRAME_JOINTS.map((j) => [j, joint(j, x)])),
+        ];
+      }),
+    ) as Record<Keyframe, KeyframePoints | null>,
   };
 }
 

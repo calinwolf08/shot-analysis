@@ -142,20 +142,66 @@ describe("checkGeometry", () => {
     expect(g.limbs).toHaveLength(3);
   });
 
-  it("hand height + ball close share one box at Setup/Load", () => {
+  it("hand height and ball close each get their own box at the wrist", () => {
     const hc = { x: 0.48, y: 0.55 };
     const height = (hc.y - lm[16]!.y) / 0.25;
     const close = (lm[16]!.x - hc.x) / 0.25;
     const gs = checkGeometry(lm, shot, [
       check("load.hand_height", height - 0.1, height + 0.1),
-      check("load.ball_close", close - 0.1, close + 0.1),
+      check("load.ball_close", close + 0.3, close + 0.5), // ball too close
     ]);
-    expect(gs["load.hand_height"]!.zone).toEqual(gs["load.ball_close"]!.zone);
+    // Hand height in range: its box holds the wrist, whatever ball close says.
     expect(inside(gs["load.hand_height"]!.zone!, lm[16]!)).toBe(true);
+    // Ball close out of range: its box is further forward, level with the wrist.
+    const bc = gs["load.ball_close"]!.zone!;
+    expect(inside(bc, lm[16]!)).toBe(false);
+    if (bc.kind === "box") {
+      expect(bc.x).toBeGreaterThan(lm[16]!.x);
+      expect(bc.y).toBeLessThan(lm[16]!.y);
+      expect(bc.y + bc.h).toBeGreaterThan(lm[16]!.y);
+    }
     const low = checkGeometry(lm, shot, [
       check("load.hand_height", height + 0.3, height + 0.5),
     ]);
     expect(inside(low["load.hand_height"]!.zone!, lm[16]!)).toBe(false);
+  });
+
+  it("a tiny band is padded away from an out-of-range joint, never over it", () => {
+    // Knee just outside a 1° band: the padded box must not swallow it.
+    const g = checkGeometry(lm, shot, [
+      check("rise.knee_bend", raw.knee + 1.5, raw.knee + 2.5),
+    ])["rise.knee_bend"]!;
+    expect(inside(g.zone!, g.dot!)).toBe(false);
+  });
+
+  it("draws the stored measured joints when the shot has them", () => {
+    const pts = {
+      wrist: { x: 0.7, y: 0.3 },
+      elbow: { x: 0.6, y: 0.4 },
+      shoulder: { x: 0.5, y: 0.3 },
+      index: { x: 0.72, y: 0.27 },
+      hip: { x: 0.48, y: 0.55 },
+      knee: { x: 0.56, y: 0.7 },
+      ankle: { x: 0.5, y: 0.85 },
+      head: { x: 0.52, y: 0.2 },
+      hipCentre: { x: 0.48, y: 0.55 },
+      shoulderCentre: { x: 0.5, y: 0.3 },
+    };
+    const g = checkGeometry(
+      lm,
+      {
+        ...shot,
+        points: {
+          setup: null,
+          load: null,
+          rise: pts,
+          setPoint: null,
+          release: null,
+        },
+      },
+      [check("rise.hand_height", 0, 0.1)],
+    )["rise.hand_height"]!;
+    expect(g.dot).toEqual({ x: 0.7, y: 0.3 });
   });
 
   it("back: a wedge from the hip centre; hips: a band down to the ground", () => {
