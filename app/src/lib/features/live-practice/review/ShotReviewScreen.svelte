@@ -36,6 +36,7 @@
   import {
     FeedbackSheet,
     checkText,
+    displayScore,
     filterLabel,
     loadEnabledChecks,
     loadKeyframeTargets,
@@ -45,7 +46,6 @@
     spokenReadback,
     type CheckResult,
   } from "$lib/features/scoring/keyframes";
-  import { displayScore } from "$lib/features/scoring/v3";
   import { scoreStoredShot } from "./scored-shots";
   import {
     checkGeometry,

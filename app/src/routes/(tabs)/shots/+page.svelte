@@ -8,8 +8,8 @@
     shotIssue,
     timeLabel,
   } from "$lib/features/live-practice/review/shot-list";
-  import { displayScore } from "$lib/features/scoring/v3";
   import {
+    displayScore,
     loadEnabledChecks,
     loadKeyframeTargets,
     severity,

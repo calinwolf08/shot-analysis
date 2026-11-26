@@ -97,7 +97,6 @@ describe("createLocalPipeline (on-device analysis)", () => {
     expect(result[0]!.shot.sessionId).toBeNull();
     expect(result[0]!.scorecard.keyframes).toHaveLength(5);
     expect(saved[0]!.keyframes).toBeDefined();
-    expect(saved[0]!.v3Metrics).toBeDefined();
   });
 });
 
@@ -183,23 +182,18 @@ describe.each(CASES)(
       });
       const [live] = await repos.shot.listByPlayer(player.id);
       const kf = (live!.analysis as StoredShotAnalysis).keyframes!;
-      // Make it a shot saved before keyframe checks and v3, through the API.
-      const {
-        keyframes: _k,
-        v3Metrics: _v3,
-        ...v1
-      } = live!.analysis as StoredShotAnalysis;
+      // Make it a shot saved before the keyframe checks, through the API.
+      const { keyframes: _k, ...v1 } = live!.analysis as StoredShotAnalysis;
       await repos.shot.updateAnalysis(live!.id, v1);
       const old = (await repos.shot.get(live!.id))!;
       expect((old.analysis as StoredShotAnalysis).keyframes).toBeUndefined();
 
       const scored = await scoreStoredShot(repos.shot, old, "right", targets);
       expect(scored.card).not.toBeNull();
-      // Persisted: the next read already has both — equal to what live stored.
+      // Persisted: the next read already has them — equal to what live stored.
       const after = (await repos.shot.get(live!.id))!;
       const again = (after.analysis as StoredShotAnalysis).keyframes!;
       expect(again).toBeDefined();
-      expect((after.analysis as StoredShotAnalysis).v3Metrics).toBeDefined();
       expect(again.checks["setPoint.elbow_bend"]!.value).toBeCloseTo(
         kf.checks["setPoint.elbow_bend"]!.value,
         6,

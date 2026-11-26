@@ -3,10 +3,9 @@
  *
  * Runs the SAME isomorphic analysis pipeline the client replay and server paths
  * already share (`runReplayAnalysis`, depends only on `basketball-shot-analysis`)
- * over a pose window to detect each shot, then measures it with the v3 metric
- * catalog and the keyframe checks (both from the shot's padded pose track) and
- * scores the keyframe checks on the 0–10+ scale against the keyframe targets
- * (v3 metrics are still stored for the review screen until it moves over). Identical output whether invoked in the browser
+ * over a pose window to detect each shot, then measures the keyframe checks
+ * (from the shot's padded pose track) and scores them on the 0–10+ scale
+ * against the keyframe targets. Identical output whether invoked in the browser
  * (on-device analysis) or on the server — the only thing that changes between
  * those is who calls this and where the result is persisted.
  *
@@ -26,9 +25,6 @@ import type { KeyframeTargets } from "basketball-shot-analysis";
 import {
   POSE_PAD_AFTER,
   POSE_PAD_BEFORE,
-  v3ForPoses,
-} from "$lib/features/scoring/v3";
-import {
   keyframesForPoses,
   scoreShotKeyframes,
   scorecardForStoredShot,
@@ -176,7 +172,6 @@ export function analyzeAndScore(
     };
     const analysis: StoredShotAnalysis = {
       ...(a as StoredShotAnalysis),
-      v3Metrics: v3ForPoses(reviewPoses, opts.shootingHand),
       keyframes: keyframesForPoses(reviewPoses, opts.shootingHand),
     };
     const scorecard = scoreShotKeyframes(analysis.keyframes!, targets);

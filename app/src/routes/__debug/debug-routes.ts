@@ -8,16 +8,10 @@ export const DEBUG_ROUTES: readonly {
   readonly about: string;
 }[] = [
   {
-    path: "/__debug/reference",
-    title: "Curry model viewer",
-    about:
-      "The reference shots behind the live targets: pose overlay with each metric's geometry, per-shot metric table vs the band, and a phase-aligned compare with your own shots.",
-  },
-  {
     path: "/__debug/replay",
     title: "Replay scoring",
     about:
-      "Load a poses.json and run it through the live analysis + scoring core (scorecard + voice readback).",
+      "Load a poses.json and run it through the live analysis + keyframe scoring core (scorecard + voice readback).",
   },
   {
     path: "/__debug/scorecard",

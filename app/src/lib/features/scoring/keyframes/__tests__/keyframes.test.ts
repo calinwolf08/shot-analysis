@@ -12,6 +12,7 @@ import {
   activePreset,
   checkText,
   checksForAreas,
+  displayScore,
   ensureKeyframes,
   feedbackChecks,
   filterLabel,
@@ -142,6 +143,16 @@ describe("keyframe scorecard", () => {
     expect(checkText(byId["release.hand_height"]!)).toBe("Hands too high by 1");
     expect(checkText(byId["load.back"]!)).toBe("Back posture: in range");
     expect(headlineIssue(card)).toBe("Rise: Knees too bent by 5");
+  });
+
+  it("shows whole numbers rounded up, capped at 10+", () => {
+    expect(displayScore(0)).toBe("0");
+    expect(displayScore(0.04)).toBe("1");
+    expect(displayScore(2.1)).toBe("3");
+    expect(displayScore(3)).toBe("3");
+    expect(displayScore(9.5)).toBe("10+");
+    expect(displayScore(42)).toBe("10+");
+    expect(displayScore(null)).toBe("–");
   });
 
   it("colors 0 green, 1–3 yellow, 4+ red", () => {

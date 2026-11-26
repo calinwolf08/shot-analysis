@@ -30,6 +30,7 @@ import { landmarkFramesToPoseData } from "$lib/features/analysis/replay/replay-p
 import type { AudioFeedbackService } from "$lib/shared/audio";
 import type { KeyframeTargets } from "basketball-shot-analysis";
 import {
+  FEEDBACK_COUNT,
   feedbackChecks,
   scoreShotKeyframes,
   spokenReadback,
@@ -43,7 +44,6 @@ import type {
 } from "../coordinator/coordinator";
 import type { LiveShotPipeline } from "../pipeline";
 import type { ShotStore } from "../pipeline";
-import { FEEDBACK_COUNT } from "./readback";
 
 /** Spoken when a detected shot is rejected for the camera angle. */
 export const WRONG_ANGLE_TEXT = "Wrong angle, shot not counted";

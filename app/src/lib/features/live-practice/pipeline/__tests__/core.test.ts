@@ -8,10 +8,6 @@ import type { KeyframeTargets } from "basketball-shot-analysis";
 import {
   POSE_PAD_AFTER,
   POSE_PAD_BEFORE,
-  ensureV3,
-  v3ForPoses,
-} from "$lib/features/scoring/v3";
-import {
   ensureKeyframes,
   keyframesForPoses,
   scoreShotKeyframes,
@@ -73,11 +69,9 @@ describe("analyzeAndScore (isomorphic core)", () => {
     for (let i = 1; i < worst.length; i++) {
       expect(worst[i - 1]!.score!).toBeGreaterThanOrEqual(worst[i]!.score!);
     }
-    // The shot's keyframes were found; keyframe checks and v3 (still used by
-    // the review screen) travel with the analysis.
+    // The shot's keyframes were found; the checks travel with the analysis.
     expect(analysis.keyframes).toBeDefined();
     expect(Object.values(analysis.keyframes!.keyframes)).not.toContain(null);
-    expect(analysis.v3Metrics).toBeDefined();
     expect(scorecard.overall).not.toBeNull();
 
     // Review poses: the shot's frame range plus context on each side (as far
@@ -131,13 +125,6 @@ describe("analyzeAndScore (isomorphic core)", () => {
     expect(ensureKeyframes(analysis, null, "right")!.recomputed).toBe(false);
     expect(ensureKeyframes(old, null, "right")).toBeNull();
     expect(scorecardForShot(old, targets)).toBeNull();
-    // v3 (review screen) still recomputes the same way.
-    const { v3Metrics: _v3, ...noV3 } = analysis;
-    expect(ensureV3(noV3, stored, "right")!.recomputed).toBe(true);
-    const v3Again = v3ForPoses(stored, "right");
-    expect(Object.keys(v3Again.metrics).sort()).toEqual(
-      Object.keys(analysis.v3Metrics!.metrics).sort(),
-    );
   });
 
   it("scores with the feedback filter when given one", () => {

@@ -5,9 +5,9 @@
    * as the practice card and the voice ("Knees too bent by 5"). 0 = in range
    * (green), 1–3 yellow, 4+ red; the display caps at 10+.
    */
-  import { displayScore } from "../v3/score";
   import {
     checkText,
+    displayScore,
     severity,
     type CheckResult,
     type KeyframeScorecard,

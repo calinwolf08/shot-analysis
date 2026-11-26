@@ -207,10 +207,29 @@ Checked on a real user clip: detection picks frames 141 / 155 / 163 / 166 /
   Leg drive limits card and voice to knees/hips), per-user filter, phone
   layout of the pill.
 
-### Phase 5: cleanup
+### Phase 5: cleanup — done
 
-- Remove the v3 catalog consumers, `live-targets-v3.json`, `ScoreCardV3`,
-  focus areas, timing-band UI; update docs (`metrics-by-phase.md`).
+Removed from the app (the library's `src/metrics/v3/` stays: its signals and
+events are what the keyframe checks are measured on, and the pro tooling
+still uses it):
+
+- `scoring/v3` (scorecard, wording file + loader, v3 targets loader, v3
+  stored-shot migration); live no longer computes or stores `v3Metrics`.
+  Display helpers (`displayScore`, `wholeScore`) and the pose padding /
+  aspect helpers moved to `scoring/keyframes`.
+- Focus areas (`focus.ts`, `FocusSheet`); the legacy area ids are only read
+  once into the feedback filter (`filter.ts`).
+- The Curry model viewer debug page and `features/reference` (v3 metric
+  geometry / alignment); a keyframe-based target audit tool comes with the
+  pro targets.
+- Pro "score against" / "closest pros" (v3-based); `pros.ts` keeps profile
+  loading for the hidden setting.
+- `loop/readback.ts`, `review/phase-timeline.ts`,
+  `static/config/feedback-wording.json`.
+
+Kept: `static/reference/live-targets-v3.json` (written and read by the
+library's pro tooling, `targets:build:pros` / pro review), and
+`docs/metrics-by-phase.md` (marked superseded).
 
 ## Open risks
 

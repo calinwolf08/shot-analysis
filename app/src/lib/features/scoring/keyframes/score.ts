@@ -30,7 +30,25 @@ import {
   type KeyframeTargets,
   type ShotKeyframes,
 } from "basketball-shot-analysis";
-import { displayScore, wholeScore } from "../v3/score";
+
+/** Display cap ("10+"). */
+export const SCORE_CAP = 10;
+
+/**
+ * Whole-number display score: rounded UP, so anything off target shows at
+ * least 1 and only a truly on-target value shows 0 (2.1 → 3). Capped at
+ * 10+; the stored score keeps its decimals.
+ */
+export function wholeScore(score: number): number {
+  return Math.min(SCORE_CAP, Math.ceil(score - 1e-9));
+}
+
+/** "0" … "9", "10+" ("–" when not scored). */
+export function displayScore(score: number | null): string {
+  if (score === null) return "–";
+  const w = wholeScore(score);
+  return w >= SCORE_CAP ? "10+" : String(w);
+}
 
 /** Below this share of measurable enabled checks the overall is withheld. */
 export const COVERAGE_GATE = 0.5;

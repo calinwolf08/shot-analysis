@@ -1,13 +1,13 @@
 <script lang="ts">
   import { useAppServices } from "$lib/shared/config/services-context";
-  import { displayScore } from "$lib/features/scoring/v3";
+  import { KEYFRAME_NAME, type Keyframe } from "basketball-shot-analysis";
   import {
+    displayScore,
     loadEnabledChecks,
     loadKeyframeTargets,
     severity,
   } from "$lib/features/scoring/keyframes";
   import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
-  import { phaseName } from "$lib/features/live-practice/loop/readback";
   import {
     INSIGHTS_WINDOWS,
     summarizeInsights,
@@ -79,7 +79,7 @@
   }
   const fmt = displayScore;
   const pct = (n: number) => `${Math.round(n * 100)}%`;
-  const phaseLabel = phaseName;
+  const phaseLabel = (k: string) => KEYFRAME_NAME[k as Keyframe] ?? k;
 </script>
 
 <main class="insights" data-testid="insights">

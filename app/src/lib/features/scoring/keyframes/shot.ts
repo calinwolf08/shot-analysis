@@ -6,6 +6,8 @@
  * Pure.
  */
 import {
+  EVENT_PAD_AFTER,
+  EVENT_PAD_BEFORE,
   KEYFRAME_SCHEMA_VERSION,
   computeShotKeyframes,
   type KeyframeTargets,
@@ -15,8 +17,23 @@ import {
 } from "basketball-shot-analysis";
 import type { StoredShotAnalysis } from "$lib/features/analysis/replay/replay-pipeline";
 import type { ShotReviewPoses } from "$lib/shared/db/repos";
-import { poseAspect } from "../v3/shot";
+import { estimateAspect } from "$lib/features/live-practice/review/framing";
 import { scoreShotKeyframes, type KeyframeScorecard } from "./score";
+
+/**
+ * Frames of context stored around a shot's detected range, so the keyframes
+ * can be found before the detected start (the dip) and after it (the arm
+ * extension).
+ */
+export const POSE_PAD_BEFORE = EVENT_PAD_BEFORE;
+export const POSE_PAD_AFTER = EVENT_PAD_AFTER;
+
+/** Source aspect (width ÷ height) of a stored pose track. */
+export function poseAspect(poses: ShotReviewPoses): number {
+  return poses.width && poses.height
+    ? poses.width / poses.height
+    : (estimateAspect(poses.frames) ?? 16 / 9);
+}
 
 /** Keyframe checks from a stored review pose track. */
 export function keyframesForPoses(

@@ -157,16 +157,18 @@ builds):
 
 - **Curry model viewer:** the reference shots behind the live targets,
   per-metric geometry, and a phase-aligned compare with your own shots.
-- **Replay scoring:** load a `poses.json` and see the v3 scorecard and the
-  spoken cues.
+- **Replay scoring:** load a `poses.json` and see the keyframe scorecard and
+  the spoken readback.
 - **Scorecard preview, replay analysis, drill catalog.**
 
 **Live tuning** without a rebuild: `static/config/live-tuning.json` holds the
 positioning-cue pacing, readiness thresholds and pose-latency fallback.
-The short feedback wording ("Spine forward by 3") lives in
-`static/config/feedback-wording.json` (edit + reload). Scoring targets and the
-scorecard wording live in `static/reference/live-targets-v3.json`
-(see [`../docs/metrics-by-phase.md`](../docs/metrics-by-phase.md)).
+Shots are scored on the keyframe checks
+([`../docs/keyframe-review-plan.md`](../docs/keyframe-review-plan.md)):
+their wording ("Knees too bent by 5") lives with the catalog in
+`src/metrics/keyframes/catalog.ts`, and the scoring targets in
+`static/reference/live-targets-keyframes.json` (hand `override`s survive
+`npm run targets:build:keyframes`).
 
 - Chromium is expected preinstalled via `PLAYWRIGHT_BROWSERS_PATH`. If the
   revision mismatches, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to a compatible
@@ -184,14 +186,14 @@ there for CocoaPods). Manual device checks: `docs/device-testing.md`.
 
 ## Content needed before real users (placeholder inventory)
 
-| Placeholder                              | Where                                        | Replace with                                        |
-| ---------------------------------------- | -------------------------------------------- | --------------------------------------------------- |
-| Live targets from one reference shooter  | `static/reference/live-targets-v3.json`      | Bands from several elite shooters (side-on, 60 fps) |
-| Benchmark profile `elite-placeholder-v1` | `src/lib/features/benchmarks/data/`          | Real elite-shooter metric distributions             |
-| 12 drill entries (copy + coaching cues)  | `src/lib/features/drills/data/drills.json`   | Coach-reviewed drill programming                    |
-| Drill video `placeholder.webm`           | `static/drills/`                             | Real per-drill footage                              |
-| App icon / splash                        | `assets/`, `android/`, `ios/`                | Brand design                                        |
-| "Why it matters" issue copy              | `src/lib/features/diagnosis/issue-groups.ts` | Coach-reviewed copy                                 |
+| Placeholder                              | Where                                          | Replace with                                        |
+| ---------------------------------------- | ---------------------------------------------- | --------------------------------------------------- |
+| Live targets from one reference shooter  | `static/reference/live-targets-keyframes.json` | Bands from several elite shooters (side-on, 60 fps) |
+| Benchmark profile `elite-placeholder-v1` | `src/lib/features/benchmarks/data/`            | Real elite-shooter metric distributions             |
+| 12 drill entries (copy + coaching cues)  | `src/lib/features/drills/data/drills.json`     | Coach-reviewed drill programming                    |
+| Drill video `placeholder.webm`           | `static/drills/`                               | Real per-drill footage                              |
+| App icon / splash                        | `assets/`, `android/`, `ios/`                  | Brand design                                        |
+| "Why it matters" issue copy              | `src/lib/features/diagnosis/issue-groups.ts`   | Coach-reviewed copy                                 |
 
 Everything placeholder-derived renders with a `PlaceholderBadge` in the UI.
 

@@ -17,7 +17,23 @@ import {
   type Keyframe,
 } from "basketball-shot-analysis";
 import type { SettingsRepo } from "$lib/shared/db/repos";
-import { normalizeAreas } from "../focus";
+
+/**
+ * The old live focus areas (one per v3 phase, plus rhythm), kept only to read
+ * a selection saved before the feedback filter; older ids map onto them.
+ */
+const LEGACY_AREAS = ["load", "rise", "set-point", "release", "rhythm"];
+const LEGACY_AREA_IDS: Readonly<Record<string, string>> = {
+  "base-balance": "load",
+  "load-depth": "load",
+  elbow: "set-point",
+  head: "set-point",
+  "follow-through": "release",
+};
+function normalizeAreas(ids: readonly string[]): string[] {
+  const set = new Set(ids.map((id) => LEGACY_AREA_IDS[id] ?? id));
+  return LEGACY_AREAS.filter((a) => set.has(a));
+}
 
 export interface FeedbackPreset {
   readonly id: string;

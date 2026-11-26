@@ -32,9 +32,10 @@
     drawSkeleton,
     type SkeletonLandmark,
   } from "$lib/shared/ui/pose-skeleton";
-  import { displayScore } from "$lib/features/scoring/v3";
+  import { KEYFRAME_NAME } from "basketball-shot-analysis";
   import {
     FeedbackSheet,
+    displayScore,
     KeyframeScoreCard,
     checkText,
     filterLabel,
@@ -42,7 +43,6 @@
   } from "$lib/features/scoring/keyframes";
   import type { SideOrientation } from "../setup/angle-gate";
   import { createPresenceTracker, type PresenceState } from "./presence";
-  import { phaseName } from "./readback";
   import {
     CUE_TEXT,
     READY_TEXT,
@@ -584,7 +584,7 @@
             <div class="chips">
               {#each fb.worst as m (m.id)}
                 <span class="chip" data-testid="feedback-item"
-                  ><b class="chip-phase">{phaseName(m.phase)}</b>
+                  ><b class="chip-phase">{KEYFRAME_NAME[m.keyframe]}</b>
                   {checkText(m)}</span
                 >
               {/each}
