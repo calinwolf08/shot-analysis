@@ -94,6 +94,15 @@ test("captured → spoken score latency", async ({ page }) => {
     .filter((e) => e.kind === "refine")
     .map((e) => e.data);
   const ms = done.map((c) => Math.round(c.spokeAt - c.capturedAt));
+  // From the shot's start (rep trigger: the wrist's fast rise, just before
+  // the release) to the score being spoken — what the player waits.
+  const repStarts = await page.evaluate(() =>
+    performance.getEntriesByName("sc:rep-start").map((m) => m.startTime),
+  );
+  const fromShot = done.map((c) => {
+    const s = repStarts.filter((t) => t <= c.capturedAt).at(-1);
+    return s === undefined ? null : Math.round(c.spokeAt - s);
+  });
   // What was heard after each "captured" earcon (ms after it).
   const marks = await page.evaluate(() =>
     performance
@@ -117,6 +126,7 @@ test("captured → spoken score latency", async ({ page }) => {
         medianMs: [...ms].sort((a, b) => a - b)[Math.floor(ms.length / 2)],
         refine: refines,
         liveTiming: file.meta.timing,
+        repStartToReadbackMs: fromShot,
         readback: done.map((c) => c.text),
         timelines,
       },

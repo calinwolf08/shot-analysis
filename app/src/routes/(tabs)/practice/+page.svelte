@@ -274,6 +274,8 @@
     if (liveCapture && activeRefiner)
       activeRefiner.onReport((r) => liveCapture.event("refine", r));
     const activeCoordinator = coordinator;
+    // Timeline mark for the latency benchmark (the shot's start).
+    activeCoordinator.on("repStarted", () => performance.mark("sc:rep-start"));
     session.onFrame((frame) => activeCoordinator.pushFrame(frame));
     if (liveCapture) recordLoop(liveCapture, activeCoordinator, session);
 
