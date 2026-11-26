@@ -83,8 +83,9 @@ export interface ShotSignals {
   readonly facing: 1 | -1;
   /**
    * Raw joint positions (aspect-scaled x, frame-height units; smoothed) for
-   * positional metrics: shooting wrist/elbow, near hip/knee/ankle, head (near
-   * ear, else nose), guide wrist.
+   * positional metrics: shooting wrist/elbow/shoulder/index fingertip, near
+   * hip/knee/ankle, head (near ear, else nose), guide wrist, and the torso
+   * line's ends (`hipCentre`, `shoulderCentre`).
    */
   readonly pos: Readonly<Record<PosJoint, { x: Series; y: Series }>>;
   /** Per-sample visibility (unsmoothed) of joints that are often occluded. */
@@ -102,8 +103,13 @@ export type PosJoint =
   | "ankle"
   | "head"
   | "guideWrist"
+  /** Shooting shoulder / index fingertip. */
+  | "shoulder"
+  | "index"
   /** Mid-hips when the centre line is used, else the near hip. */
-  | "hipCentre";
+  | "hipCentre"
+  /** Mid-shoulders when the centre line is used, else the near shoulder. */
+  | "shoulderCentre";
 
 const LM = {
   nose: 0,
@@ -298,7 +304,10 @@ export function computeSignals(
     ankle: { x: [], y: [] },
     head: { x: [], y: [] },
     guideWrist: { x: [], y: [] },
+    shoulder: { x: [], y: [] },
+    index: { x: [], y: [] },
     hipCentre: { x: [], y: [] },
+    shoulderCentre: { x: [], y: [] },
   };
   const visGuide: Series = [];
   const visIndex: Series = [];
@@ -384,7 +393,10 @@ export function computeSignals(
     put("ankle", an);
     put("head", ear);
     put("guideWrist", g);
+    put("shoulder", s);
+    put("index", idx);
     put("hipCentre", base);
+    put("shoulderCentre", top);
     visGuide.push(f.landmarks?.[LM.wrist[guide]]?.visibility ?? null);
     visIndex.push(f.landmarks?.[LM.index[shoot]]?.visibility ?? null);
     if (h && k) seg.thigh.push(dist(h, k));

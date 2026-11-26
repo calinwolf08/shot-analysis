@@ -71,7 +71,7 @@ function shot(values: Record<string, number> = {}): ShotKeyframes {
     };
   }
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     keyframes: { setup: 1, load: 2, rise: 3, setPoint: 4, release: 5 },
     checks,
     facing: 1,
@@ -80,6 +80,13 @@ function shot(values: Record<string, number> = {}): ShotKeyframes {
     xScale: 0.5625,
     lengths: { torso: 0.3, thigh: 0.2 },
     centreLine: true,
+    points: {
+      setup: null,
+      load: null,
+      rise: null,
+      setPoint: null,
+      release: null,
+    },
   };
 }
 

@@ -10,7 +10,8 @@
  * it with the same transform as the video / skeleton.
  *
  * Targets per check:
- *  - hand height / ball close: a box (the height band × the horizontal band);
+ *  - hand height: a box at the wrist spanning the height band;
+ *  - ball close: a box at the wrist spanning the distance-in-front band;
  *  - wrist hinge: a box where the fingertip should point (forearm held);
  *  - elbow / knee bend: a box where the joint would be at the target angle
  *    with both limb ends held (knee: ankle planted, hip on the ankle→hip line;
@@ -108,15 +109,35 @@ const cross = (a: Pt, b: Pt) => a.x * b.y - a.y * b.x;
 const clampDeg = (d: number) => Math.max(1, Math.min(179.5, d));
 
 /** Bounding box of points as a zone (padded to `MIN_HALF`). */
-function boxOf(pts: readonly Pt[], kind: "box" | "band" = "box"): Zone {
-  let x0 = Math.min(...pts.map((p) => p.x));
-  let x1 = Math.max(...pts.map((p) => p.x));
-  let y0 = Math.min(...pts.map((p) => p.y));
-  let y1 = Math.max(...pts.map((p) => p.y));
-  if (x1 - x0 < 2 * MIN_HALF)
-    [x0, x1] = [(x0 + x1) / 2 - MIN_HALF, (x0 + x1) / 2 + MIN_HALF];
-  if (y1 - y0 < 2 * MIN_HALF)
-    [y0, y1] = [(y0 + y1) / 2 - MIN_HALF, (y0 + y1) / 2 + MIN_HALF];
+/**
+ * Widens [lo, hi] to at least 2 × MIN_HALF. The extra goes on the side away
+ * from `v` (the joint), so padding never swallows a joint that is outside
+ * the band; a joint inside it is padded around evenly.
+ */
+function pad(lo: number, hi: number, v: number | null): [number, number] {
+  const need = 2 * MIN_HALF - (hi - lo);
+  if (need <= 0) return [lo, hi];
+  if (v !== null && v < lo) return [lo, hi + need];
+  if (v !== null && v > hi) return [lo - need, hi];
+  return [lo - need / 2, hi + need / 2];
+}
+
+/** Bounding box of points as a zone, padded (away from `avoid`) to be visible. */
+function boxOf(
+  pts: readonly Pt[],
+  kind: "box" | "band" = "box",
+  avoid: Pt | null = null,
+): Zone {
+  const [x0, x1] = pad(
+    Math.min(...pts.map((p) => p.x)),
+    Math.max(...pts.map((p) => p.x)),
+    avoid?.x ?? null,
+  );
+  const [y0, y1] = pad(
+    Math.min(...pts.map((p) => p.y)),
+    Math.max(...pts.map((p) => p.y)),
+    avoid?.y ?? null,
+  );
   return { kind, x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
@@ -162,7 +183,8 @@ export function checkGeometry(
   shot: Pick<
     ShotKeyframes,
     "facing" | "nearSide" | "shootingSide" | "xScale" | "lengths" | "centreLine"
-  >,
+  > &
+    Partial<Pick<ShotKeyframes, "points">>,
   checks: readonly OverlayCheck[],
 ): Record<string, CheckGeometry> {
   const xs = shot.xScale;
@@ -176,28 +198,42 @@ export function checkGeometry(
   const shoot = shot.shootingSide;
   const near = shot.nearSide;
   const far = near === "left" ? "right" : "left";
-  const wr = at(LM.wrist[shoot]);
-  const el = at(LM.elbow[shoot]);
-  const sh = at(LM.shoulder[shoot]);
-  const ix = at(LM.index[shoot]);
-  const hip = at(LM.hip[near]);
-  const kn = at(LM.knee[near]);
-  const an = at(LM.ankle[near]);
+  const rWr = at(LM.wrist[shoot]);
+  const rEl = at(LM.elbow[shoot]);
+  const rSh = at(LM.shoulder[shoot]);
+  const rIx = at(LM.index[shoot]);
+  const rHip = at(LM.hip[near]);
+  const rKn = at(LM.knee[near]);
+  const rAn = at(LM.ankle[near]);
   const hipFar = at(LM.hip[far]);
   const shNear = at(LM.shoulder[near]);
   const shFar = at(LM.shoulder[far]);
-  const hc = shot.centreLine && hip && hipFar ? mid(hip, hipFar) : hip;
-  const sc = shot.centreLine && shNear && shFar ? mid(shNear, shFar) : shNear;
-  const head = at(LM.ear[near], VIS) ?? at(LM.nose, VIS);
+  const rHc = shot.centreLine && rHip && hipFar ? mid(rHip, hipFar) : rHip;
+  const rSc = shot.centreLine && shNear && shFar ? mid(shNear, shFar) : shNear;
+  const rHead = at(LM.ear[near], VIS) ?? at(LM.nose, VIS);
+  // The joints the checks were measured from (smoothed, at the exact
+  // keyframe), when stored: dots and zones then match the scores exactly.
+  const kp = checks[0] ? shot.points?.[checks[0].keyframe] : null;
+  const J = {
+    wr: kp ? kp.wrist : rWr,
+    el: kp ? kp.elbow : rEl,
+    sh: kp ? kp.shoulder : rSh,
+    ix: kp ? kp.index : rIx,
+    hip: kp ? kp.hip : rHip,
+    kn: kp ? kp.knee : rKn,
+    an: kp ? kp.ankle : rAn,
+    hc: kp ? kp.hipCentre : rHc,
+    sc: kp ? kp.shoulderCentre : rSc,
+    head: kp ? kp.head : rHead,
+  };
   const torso = shot.lengths.torso;
   const thigh = shot.lengths.thigh;
   const f = shot.facing;
   const feet = FOOT.map((i) => at(i)).filter((p): p is Pt => p !== null);
   const ground = feet.length
     ? Math.max(...feet.map((p) => p.y))
-    : (an?.y ?? null);
+    : (rAn?.y ?? null);
 
-  const byCheck = new Map(checks.map((c) => [c.check, c]));
   const out: Record<string, CheckGeometry> = {};
   const put = (
     c: OverlayCheck,
@@ -225,33 +261,40 @@ export function checkGeometry(
   };
 
   const early = (k: Keyframe) => k === "setup" || k === "load";
+  const { wr, el, sh, ix, kn, an, hc, sc } = J;
   for (const c of checks) {
     switch (c.check) {
-      case "hand_height":
+      case "hand_height": {
+        // Where the hands should be vertically (vs hips early, head later).
+        const ref = early(c.keyframe) ? hc : J.head;
+        const zone =
+          wr && ref && torso
+            ? boxOf(
+                [
+                  { x: wr.x, y: ref.y - c.passMax * torso },
+                  { x: wr.x, y: ref.y - c.passMin * torso },
+                ],
+                "box",
+                wr,
+              )
+            : null;
+        put(c, "wrist", wr, zone, [ref, wr]);
+        break;
+      }
       case "ball_close": {
-        if (!wr) {
-          put(c, "wrist", null, null, []);
-          break;
-        }
-        const h = byCheck.get("hand_height");
-        const b = early(c.keyframe) ? byCheck.get("ball_close") : undefined;
-        const ref = early(c.keyframe) ? hc : head;
-        let ys: [number, number] = [wr.y - MIN_HALF, wr.y + MIN_HALF];
-        if (h && ref && torso)
-          ys = [ref.y - h.passMax * torso, ref.y - h.passMin * torso];
-        let xr: [number, number] = [wr.x - MIN_HALF, wr.x + MIN_HALF];
-        if (b && hc && torso)
-          xr = [hc.x + f * b.passMin * torso, hc.x + f * b.passMax * torso];
-        put(
-          c,
-          "wrist",
-          wr,
-          boxOf([
-            { x: xr[0], y: ys[0] },
-            { x: xr[1], y: ys[1] },
-          ]),
-          c.check === "ball_close" ? [hc, wr] : [ref, wr],
-        );
+        // How far in front of the hips the hands should be.
+        const zone =
+          wr && hc && torso
+            ? boxOf(
+                [
+                  { x: hc.x + f * c.passMin * torso, y: wr.y },
+                  { x: hc.x + f * c.passMax * torso, y: wr.y },
+                ],
+                "box",
+                wr,
+              )
+            : null;
+        put(c, "wrist", wr, zone, [hc, wr]);
         break;
       }
       case "wrist_hinge": {
@@ -259,6 +302,8 @@ export function checkGeometry(
           wr && el && ix
             ? boxOf(
                 steps(c.passMin, c.passMax).map((d) => endAt(wr, el, ix, d)),
+                "box",
+                ix,
               )
             : null;
         put(c, "wrist", wr, zone, [el, wr, ix]);
@@ -269,6 +314,8 @@ export function checkGeometry(
           sh && wr && el
             ? boxOf(
                 steps(c.passMin, c.passMax).map((d) => jointAt(sh, wr, el, d)),
+                "box",
+                el,
               )
             : null;
         put(c, "elbow", el, zone, [sh, el, wr]);
@@ -276,12 +323,16 @@ export function checkGeometry(
       }
       case "knee_bend": {
         const zone =
-          an && hip && kn
+          an && J.hip && kn
             ? boxOf(
-                steps(c.passMin, c.passMax).map((d) => jointAt(an, hip, kn, d)),
+                steps(c.passMin, c.passMax).map((d) =>
+                  jointAt(an, J.hip!, kn, d),
+                ),
+                "box",
+                kn,
               )
             : null;
-        put(c, "knee", kn, zone, [hip, kn, an]);
+        put(c, "knee", kn, zone, [J.hip, kn, an]);
         break;
       }
       case "back": {
@@ -299,19 +350,15 @@ export function checkGeometry(
       }
       case "hips_over_knees": {
         let zone: Zone | null = null;
-        if (kn && hip && thigh && ground !== null) {
+        const hp = J.hip;
+        if (kn && hp && thigh && ground !== null) {
           const a = kn.x + f * c.passMin * thigh;
           const b = kn.x + f * c.passMax * thigh;
-          const top = hip.y - 0.25 * thigh;
-          zone = boxOf(
-            [
-              { x: Math.min(a, b), y: top },
-              { x: Math.max(a, b), y: ground },
-            ],
-            "band",
-          );
+          const [x0, x1] = pad(Math.min(a, b), Math.max(a, b), hp.x);
+          const top = hp.y - 0.25 * thigh;
+          zone = { kind: "band", x: x0, y: top, w: x1 - x0, h: ground - top };
         }
-        put(c, "hip", hip, zone, [hip, kn]);
+        put(c, "hip", hp, zone, [hp, kn]);
         break;
       }
       case "hold":
