@@ -194,12 +194,18 @@ Checked on a real user clip: detection picks frames 141 / 155 / 163 / 166 /
 - E2E: review (keyframe nav, chooser, zones, filter + persistence, speaker),
   phone layout per keyframe, keyframe migration, practice → review.
 
-### Phase 4: live practice
+### Phase 4: live practice — done
 
-- Feedback pill on the practice screen opens the same `FeedbackSheet`
-  (replaces the focus chip + `FocusSheet`).
-- Post-shot card and voice use the filtered keyframe scorecard.
-- E2E: practice focus specs migrated to the feedback sheet.
+- The practice camera view's focus chip is replaced by a Feedback pill
+  (shows "All feedback", the preset name or "Custom") that opens the same
+  `FeedbackSheet` as shot review; the choice is saved to `feedbackChecks`
+  and applies to the score, card and voice from the next shot.
+- The practice store takes the filter directly (`setEnabled`); the legacy
+  focus-area plumbing is gone from practice (old saved areas are still read
+  once into the filter by `resolveEnabled`).
+- E2E: `feedback.spec.ts` (pill → preset → persisted, Pick checks → Custom;
+  Leg drive limits card and voice to knees/hips), per-user filter, phone
+  layout of the pill.
 
 ### Phase 5: cleanup
 

@@ -297,7 +297,9 @@ describe("LivePracticeStore — per-shot cycle", () => {
   it("applies the feedback filter to the score, the card and the voice", async () => {
     const offs = ["load.back", "setPoint.hand_height", "release.elbow_bend"];
     const focused = makeStore([[processed("s1", 4, offs, true)]]);
-    focused.store.setFocusAreas(["set-point"]);
+    focused.store.setEnabled(
+      new Set(ALL_CHECK_KEYS.filter((id) => id.startsWith("setPoint."))),
+    );
     focused.emit("repResult", repEvent());
     await vi.waitFor(() => expect(focused.store.cycle).toBe("tracking"));
     // Only set-point checks: the hands issue is coached, the others aren't.

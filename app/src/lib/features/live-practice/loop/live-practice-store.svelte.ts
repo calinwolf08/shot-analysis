@@ -30,7 +30,6 @@ import { landmarkFramesToPoseData } from "$lib/features/analysis/replay/replay-p
 import type { AudioFeedbackService } from "$lib/shared/audio";
 import type { KeyframeTargets } from "basketball-shot-analysis";
 import {
-  checksForAreas,
   feedbackChecks,
   scoreShotKeyframes,
   spokenReadback,
@@ -118,8 +117,6 @@ export interface LivePracticeStoreDeps {
   targets: KeyframeTargets;
   /** Feedback filter: enabled check ids; null = every check (the default). */
   enabled?: ReadonlySet<string> | null;
-  /** Legacy focus-area ids behind the in-loop focus chip (until phase 4). */
-  focusAreas?: string[];
   /** Shots already recorded today (continues the counter/average). */
   initialShots?: ShotEntry[];
 }
@@ -139,8 +136,6 @@ export class LivePracticeStore {
   wrongAngleFlash = $state(false);
   muted = $state(false);
   error = $state<string | null>(null);
-  /** Coaching focus (ids); [] = everything. Changeable mid-session. */
-  focusAreas = $state<string[]>([]);
   /** Feedback filter (enabled check ids; null = all). Changeable mid-session. */
   enabled = $state.raw<ReadonlySet<string> | null>(null);
 
@@ -161,7 +156,6 @@ export class LivePracticeStore {
   constructor(private readonly deps: LivePracticeStoreDeps) {
     this.maxWorstSpoken = deps.maxWorstSpoken ?? FEEDBACK_COUNT;
     this.muted = deps.audio.isMuted();
-    this.focusAreas = deps.focusAreas ?? [];
     this.enabled = deps.enabled ?? null;
     this.shots = deps.initialShots ?? [];
   }
@@ -172,18 +166,6 @@ export class LivePracticeStore {
    */
   setArmed(armed: boolean): void {
     this.deps.coordinator.setArmed(armed);
-  }
-
-  /**
-   * Change the coaching focus from the in-loop chip (applies to the next
-   * scored shot): the areas' keyframes become the feedback filter.
-   */
-  setFocusAreas(ids: string[]): void {
-    this.focusAreas = ids;
-    const checks = checksForAreas(ids);
-    // Replaced as a whole, never mutated (held in $state.raw).
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    this.enabled = checks.length > 0 ? new Set(checks) : null;
   }
 
   /** Change the feedback filter (applies to the next scored shot). */

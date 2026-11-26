@@ -4,7 +4,7 @@ import { onboard, screenPath } from "./helpers";
 
 /**
  * Phase 5 — the Practice tab IS the live loop (SwingCoach-style): the camera
- * opens on arrival, a one-time "Tap to start" unlocks audio, focus/mute/pause
+ * opens on arrival, a one-time "Tap to start" unlocks audio, feedback/mute/pause
  * float over the preview, and switching tabs stops / restarts the camera.
  */
 
@@ -44,7 +44,7 @@ test("camera opens on the tab; tap to start; tab switch stops and resumes it", a
 
   // Focus chip is overlaid ON the camera view.
   const pv = (await page.getByTestId("pose-indicator").boundingBox())!;
-  const chip = (await page.getByTestId("focus-chip").boundingBox())!;
+  const chip = (await page.getByTestId("practice-feedback").boundingBox())!;
   expect(chip.y).toBeGreaterThanOrEqual(pv.y);
   expect(chip.y + chip.height).toBeLessThanOrEqual(pv.y + pv.height);
 

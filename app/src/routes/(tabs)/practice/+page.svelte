@@ -39,11 +39,10 @@
     withAudioProbe,
   } from "$lib/shared/audio/audio-probe";
   import type { KeyframeTargets } from "basketball-shot-analysis";
-  import { normalizeAreas } from "$lib/features/scoring";
   import {
-    checksForAreas,
     loadEnabledChecks,
     loadKeyframeTargets,
+    saveEnabledChecks,
   } from "$lib/features/scoring/keyframes";
   import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
   import { useAppServices } from "$lib/shared/config/services-context";
@@ -129,7 +128,6 @@
   /** Feedback filter (enabled check ids; null = every check). */
   let enabled: ReadonlySet<string> | null = null;
   let captureHandle: CaptureHandle | null = null;
-  let focusAreas: string[] = [];
   let tuning = $state<LiveTuning>(DEFAULT_LIVE_TUNING);
   /** Shot detection + audio started (after the one-time tap). */
   let started = $state(audioUnlockState.unlocked);
@@ -138,17 +136,10 @@
   let wakeLock: { release(): Promise<void> } | null = null;
   let initialShots: ShotEntry[] = [];
 
-  function persistFocus(ids: string[]) {
-    focusAreas = ids;
-    void services.repos.settings.set("liveFocusAreas", ids);
-    // The focus chip drives the shared feedback filter until the Feedback
-    // sheet replaces it (docs/keyframe-review-plan.md, phase 4).
-    const checks = checksForAreas(ids);
-    enabled = checks.length > 0 ? new Set(checks) : null;
-    void services.repos.settings.set(
-      "feedbackChecks",
-      checks.length > 0 ? checks : null,
-    );
+  /** The Feedback sheet's selection, shared with shot review. */
+  function persistFeedback(next: ReadonlySet<string>) {
+    enabled = next;
+    void saveEnabledChecks(services.repos.settings, next);
   }
 
   $effect(() => {
@@ -173,9 +164,6 @@
     const loaded = await loadLiveTuning();
     tuning = loaded.tuning;
     for (const w of loaded.warnings) console.warn("[live-tuning]", w);
-    focusAreas = normalizeAreas(
-      await services.repos.settings.get("liveFocusAreas"),
-    );
     // Profile → "Voice feedback" off = practice starts muted (the speaker
     // button still unmutes for this session).
     audio.setMuted(!(await services.repos.settings.get("voiceFeedback")));
@@ -317,7 +305,6 @@
       targets,
       enabled,
       frameSize: () => session?.frameSize?.() ?? null,
-      focusAreas,
       initialShots,
     });
     // Already unlocked this page-load (came back from another tab): go.
@@ -511,7 +498,7 @@
     {clipStore}
     {refiner}
     stream={cameraStream}
-    onfocuschange={persistFocus}
+    onfeedbackchange={persistFeedback}
     {tuning}
     debug={liveDebug}
     capture={liveCapture}
