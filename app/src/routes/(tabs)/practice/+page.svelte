@@ -57,6 +57,7 @@
   import { getShotClipStore } from "$lib/shared/media/shot-clip-store";
   import {
     createFullRateRefiner,
+    keyframeSpan,
     type FullRateRefiner,
   } from "$lib/features/live-practice/refine/full-rate";
   import { getVideoRetention } from "$lib/shared/media/video-retention";
@@ -220,13 +221,39 @@
     // session (not replay) and clip recording.
     refiner =
       session.detectOffline && clipStore.cap > 0
-        ? createFullRateRefiner({ session })
+        ? createFullRateRefiner({
+            session,
+            // Re-detect only the scored part of the rep (Setup → Release).
+            // Dev/E2E: `?fullRefine=1` re-detects the whole window (A/B).
+            span:
+              devSurfaces && page.url.searchParams.has("fullRefine")
+                ? () => null
+                : keyframeSpan({
+                    shootingHand,
+                    aspect: () => {
+                      const f = session?.frameSize?.();
+                      return f && f.height > 0 ? f.width / f.height : null;
+                    },
+                  }),
+          })
         : null;
     const activeRefiner = refiner;
     coordinator = createLiveRepCoordinator(
       {
         analyze: (frames) => session!.analyzeWindow(frames),
-        ...(activeRefiner ? { refine: (w) => activeRefiner.refine(w) } : {}),
+        ...(activeRefiner
+          ? {
+              refine: async (w) => {
+                // Timeline marks for the latency benchmark.
+                performance.mark("sc:refine-start");
+                try {
+                  return await activeRefiner.refine(w);
+                } finally {
+                  performance.mark("sc:refine-end");
+                }
+              },
+            }
+          : {}),
       },
       { shootingHand },
     );
@@ -266,6 +293,7 @@
           async process(
             input: Parameters<typeof timedPipeline.process>[0],
           ): ReturnType<typeof timedPipeline.process> {
+            performance.mark("sc:pipeline-start");
             liveCapture.event("pipeline.start", {
               frames: input.poseData.frames.length,
               focusIndex: input.focusIndex,
@@ -273,6 +301,7 @@
             });
             try {
               const r = await timedPipeline.process(input);
+              performance.mark("sc:pipeline-end");
               liveCapture.event("pipeline.result", {
                 shots: r.shots.map((x) => ({
                   overall: x.scorecard.overall,

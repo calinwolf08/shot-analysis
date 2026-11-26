@@ -34,7 +34,9 @@ test("captured → spoken score latency", async ({ page }) => {
     (route) => route.fulfill({ contentType: "video/webm", body: bytes }),
   );
   await onboard(page, "?e2e=device", "Latency");
-  await page.goto(`/practice?e2e=device&debug=capture&liveVideo=/__livevideo`);
+  await page.goto(
+    `/practice?e2e=device&debug=capture&liveVideo=/__livevideo${process.env.FULL_REFINE ? "&fullRefine=1" : ""}`,
+  );
   await page.getByTestId("practice-loop").waitFor({ timeout: 150_000 });
   await startLiveLoop(page);
 
@@ -89,18 +91,31 @@ test("captured → spoken score latency", async ({ page }) => {
     .filter((e) => e.kind === "refine")
     .map((e) => e.data);
   const ms = done.map((c) => Math.round(c.spokeAt - c.capturedAt));
+  // What was heard after each "captured" earcon (ms after it).
+  const marks = await page.evaluate(() =>
+    performance
+      .getEntriesByType("mark")
+      .filter((m) => m.name.startsWith("sc:"))
+      .map((m) => ({ t: m.startTime, kind: m.name.slice(3) })),
+  );
+  const log = [...(await read()), ...marks].sort((a, b) => a.t - b.t);
+  const timelines = done.map((c) =>
+    log
+      .filter((e) => e.t >= c.capturedAt - 3000 && e.t <= c.spokeAt + 1)
+      .map(
+        (e) =>
+          `${Math.round(e.t - c.capturedAt)} ${e.kind}${e.text ? ` ${e.text.slice(0, 24)}` : ""}`,
+      ),
+  );
   console.log(
     JSON.stringify(
       {
         capturedToReadbackMs: ms,
         medianMs: [...ms].sort((a, b) => a - b)[Math.floor(ms.length / 2)],
-        refine: refines.map((r) => ({
-          ok: r?.ok,
-          ms: Math.round(r?.ms ?? 0),
-          frames: r?.frames,
-        })),
+        refine: refines,
         liveTiming: file.meta.timing,
         readback: done.map((c) => c.text),
+        timelines,
       },
       null,
       1,

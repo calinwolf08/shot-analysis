@@ -101,6 +101,13 @@ export function onsetBefore(
   dir: 1 | -1,
   lo: number,
   frac = ONSET_FRACTION,
+  /**
+   * Sample times (s). When given, velocity is per second rather than per
+   * sample, so unevenly spaced samples (live frames, or live frames merged
+   * with a full-rate stretch) don't skew the threshold. Identical results on
+   * evenly spaced samples.
+   */
+  t?: readonly number[],
 ): number | null {
   const p = Math.round(peak);
   const a = Math.max(0, Math.floor(lo));
@@ -109,7 +116,12 @@ export function onsetBefore(
   for (let i = a; i < p; i++) {
     const x = s[i];
     const y = s[i + 1];
-    v.push(x === null || x === undefined || y === null || y === undefined ? null : dir * (y - x));
+    const dt = t ? t[i + 1]! - t[i]! : 1;
+    v.push(
+      x === null || x === undefined || y === null || y === undefined || !(dt > 0)
+        ? null
+        : (dir * (y - x)) / dt,
+    );
   }
   // Fastest moment of the approach (the velocity is ~0 AT the peak itself).
   let vmax = 0;
@@ -317,13 +329,13 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
     tolOf(sig.wristY),
   );
   const ballDropStart =
-    ballLowest !== null ? onsetBefore(sig.wristY, ballLowest, 1, 0) : null;
+    ballLowest !== null ? onsetBefore(sig.wristY, ballLowest, 1, 0, ONSET_FRACTION, sig.t) : null;
   // Rise start: the hand's upward speed reaches 10 % of its peak (on the
   // labeled corpus this tracks "ball starts upward" best; the turning point
   // itself is often a flat stretch).
   const ballRiseStart =
     ballLowest !== null
-      ? onsetBefore(sig.wristY, peak, -1, ballLowest, 0.1)
+      ? onsetBefore(sig.wristY, peak, -1, ballLowest, 0.1, sig.t)
       : null;
 
   // The elbow can be nearly straight at the ball's lowest point (arm hanging
@@ -367,7 +379,7 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
       : null;
   const setPoint =
     elbowMax !== null && elbowMin !== null
-      ? (onsetBefore(sig.elbowAngle, elbowMax, 1, elbowMin) ?? elbowMin)
+      ? (onsetBefore(sig.elbowAngle, elbowMax, 1, elbowMin, ONSET_FRACTION, sig.t) ?? elbowMin)
       : null;
   const armExtended =
     setPoint !== null && elbowMax !== null && elbowMin !== null
@@ -381,7 +393,7 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
   const legHi = setPoint ?? peak;
   const hipLowest = extremum(sig.hipY, legLo, legHi, "max");
   const hipDropStart =
-    hipLowest !== null ? onsetBefore(sig.hipY, hipLowest, 1, 0) : null;
+    hipLowest !== null ? onsetBefore(sig.hipY, hipLowest, 1, 0, ONSET_FRACTION, sig.t) : null;
 
   // The deepest knee bend belongs with the hips' low point (an earlier bend —
   // a catch or dribble — must not be picked).
@@ -409,7 +421,7 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
       : null;
   const elbowBendStart =
     loadElbowMin !== null
-      ? onsetBefore(sig.elbowAngle, loadElbowMin, -1, 0)
+      ? onsetBefore(sig.elbowAngle, loadElbowMin, -1, 0, ONSET_FRACTION, sig.t)
       : null;
 
   return {
@@ -423,7 +435,7 @@ export function detectEvents(sig: ShotSignals): ShotEvents {
     // Knees START straightening: onset of extension after the deepest bend.
     kneesStartStraightening:
       kneeMin !== null && kneeMax !== null
-        ? (onsetBefore(sig.kneeAngle, kneeMax, 1, kneeMin) ?? kneeMin)
+        ? (onsetBefore(sig.kneeAngle, kneeMax, 1, kneeMin, ONSET_FRACTION, sig.t) ?? kneeMin)
         : kneeMin,
     kneesStraight,
     elbowBendStart,
