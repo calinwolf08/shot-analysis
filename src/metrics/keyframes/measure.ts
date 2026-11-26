@@ -48,8 +48,12 @@ import {
   type Keyframe,
 } from "./catalog";
 
-/** Bumped when a check's definition changes (stored shots are recomputed). */
-export const KEYFRAME_SCHEMA_VERSION = 1 as const;
+/**
+ * Bumped when a check's definition (or what's stored with it) changes, so
+ * stored shots are recomputed. 2: body lengths, x scale and centre-line flag
+ * stored for drawing the target zones.
+ */
+export const KEYFRAME_SCHEMA_VERSION = 2 as const;
 
 /**
  * The ball has "reached" set point once the wrist's upward speed falls below
@@ -78,6 +82,16 @@ export interface ShotKeyframes {
   readonly facing: 1 | -1;
   readonly nearSide: Side;
   readonly shootingSide: Side;
+  /**
+   * How the checks were measured, so a drawing of their target zones uses
+   * the same space: x was multiplied by `xScale` (frame aspect, corrected for
+   * camera angle on reference footage), y is frame-height units; body lengths
+   * (median over the shot) in those units; `centreLine` = hips / shoulders
+   * were measured at their midpoints (else the near side).
+   */
+  readonly xScale: number;
+  readonly lengths: Readonly<{ torso: number | null; thigh: number | null }>;
+  readonly centreLine: boolean;
 }
 
 export interface KeyframeOptions {
@@ -254,6 +268,9 @@ export function keyframesFromSignals(
     facing: sig.facing,
     nearSide: sig.nearSide,
     shootingSide: sig.shootingSide,
+    xScale: sig.aspect,
+    lengths: { torso: seg.torso, thigh: seg.thigh },
+    centreLine: sig.centreLine,
   };
 }
 

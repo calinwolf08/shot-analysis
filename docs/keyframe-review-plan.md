@@ -174,16 +174,25 @@ Checked on a real user clip: detection picks frames 141 / 155 / 163 / 166 /
   server), practice store (score, card, voice), practice breakdown, shot
   list, insights, debug replay page.
 
-### Phase 3: review screen
+### Phase 3: review screen — done
 
-- Overlay renderer (`reference/keyframe-overlay.ts`, pure geometry + paint):
-  joint dots and stacks, zones (including ends-fixed joint boxes), selection
-  focus, arrow, limbs, callout placement.
-- `ShotReviewScreen` rebuilt: phase icon bar, ticks + hold bracket, callout with
-  speaker, chooser, grey skeleton without a clip.
-- Shared `FeedbackSheet.svelte` (presets + pick checks).
-- E2E: review framing/clip specs updated; new specs for keyframe navigation,
-  stacked-dot chooser and the sheet.
+- Library: `ShotKeyframes` also stores how it was measured (`xScale`, body
+  `lengths`, `centreLine`) so the zones are drawn in the same space; schema
+  version 2 (stored shots are recomputed once).
+- `review/keyframe-overlay.ts` (pure, unit-tested): each check's joint, dot,
+  zone and limbs; ends-fixed joint boxes (`jointAt`), fingertip box for the
+  wrist hinge (`endAt`), back wedge, hips band down to the ground; dot stacks;
+  nearest-edge arrows; free-space callout placement; stick-figure phase icons.
+- `ShotReviewScreen` rebuilt: clip full-bleed (grey skeleton without one),
+  dots / stacks / chooser, selected zone bright with an arrow and the measured
+  limbs, others dashed; callout with speaker; Feedback pill; scrubber with
+  keyframe ticks colored by worst check and the hold bracket; five phase
+  icons (Rise and Set point can share a frame in a one-motion shot — the
+  tapped one is shown). The shot is fitted above the controls.
+- `FeedbackSheet.svelte` (shared, for phase 4): Focus areas / Pick checks,
+  saved to `feedbackChecks`.
+- E2E: review (keyframe nav, chooser, zones, filter + persistence, speaker),
+  phone layout per keyframe, keyframe migration, practice → review.
 
 ### Phase 4: live practice
 

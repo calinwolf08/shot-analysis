@@ -124,7 +124,7 @@ describe("analyzeAndScore (isomorphic core)", () => {
     } as unknown as typeof analysis;
     const refreshed = ensureKeyframes(outdated, stored, "right")!;
     expect(refreshed.recomputed).toBe(true);
-    expect(refreshed.analysis.keyframes!.schemaVersion).toBe(1);
+    expect(refreshed.analysis.keyframes!.schemaVersion).toBe(2);
     // …but without a track it keeps what it has.
     expect(ensureKeyframes(outdated, null, "right")!.recomputed).toBe(false);
     // Already current → untouched; no pose track → can't migrate.

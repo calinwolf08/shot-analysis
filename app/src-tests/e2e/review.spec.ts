@@ -1,35 +1,32 @@
 import { expect, test } from "./fixtures";
-import type { Locator, Page } from "@playwright/test";
-import { onboard, startLiveLoop } from "./helpers";
-
-/** Set a range input and fire `input` so Svelte's bound value updates. */
-async function setRange(input: Locator, value: number) {
-  await input.evaluate((el, v) => {
-    (el as HTMLInputElement).value = String(v);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  }, value);
-}
+import type { Page } from "@playwright/test";
+import { onboard, screenPath, startLiveLoop } from "./helpers";
 
 /**
- * Shot-review redesign: the pose fills the frame, off-target joints are marked,
- * and the overlaid metrics are phase-aware — scrubbing changes the phase, and
- * clicking a metric seeks to its phase. Pose comes from the replayed shot.
+ * Keyframe shot review (docs/keyframe-review-plan.md): dots on joints at each
+ * keyframe, a box for where each should be, a callout for the selected check,
+ * phase icons to jump between keyframes, and the shared Feedback filter.
  */
-async function openReview(page: Page) {
-  await onboard(page, "?e2e=replay", "Review");
+const KEYFRAMES = [
+  ["setup", "Setup"],
+  ["load", "Load"],
+  ["rise", "Rise"],
+  ["setPoint", "Set point"],
+  ["release", "Release"],
+] as const;
+
+interface Stack {
+  ids: string[];
+  x: number;
+  y: number;
+}
+
+async function openReview(page: Page, name = "Review") {
+  await onboard(page, "?e2e=replay", name);
   await startLiveLoop(page);
-  // Reset focus to "everything" so the overlay isn't filtered to a
-  // selection (a fresh account starts there anyway; settings are per user).
-  await page.getByTestId("focus-chip").click();
-  const clear = page.getByTestId("focus-clear");
-  if (await clear.isEnabled()) await clear.click();
-  await page
-    .getByTestId("sheet-backdrop")
-    .click({ position: { x: 10, y: 10 } });
   await expect(page.getByTestId("rep-feedback")).toBeVisible({
     timeout: 30_000,
   });
-  // Leaving the Practice tab stops the camera + loop.
   await page.getByTestId("tab-shots").click();
   const firstShot = page.locator('[data-testid^="shot-row-"]').first();
   await expect(firstShot).toBeVisible({ timeout: 10_000 });
@@ -38,87 +35,145 @@ async function openReview(page: Page) {
   await expect(page.getByTestId("review-skeleton")).toBeVisible();
 }
 
-test("review overlay is phase-aware as the scrubber moves", async ({
+async function stacks(page: Page): Promise<Stack[]> {
+  const raw = await page
+    .getByTestId("review-skeleton")
+    .getAttribute("data-stacks");
+  return raw ? (JSON.parse(raw) as Stack[]) : [];
+}
+
+async function tapStack(page: Page, s: Stack) {
+  const box = (await page.getByTestId("review-skeleton").boundingBox())!;
+  await page.mouse.click(box.x + s.x, box.y + s.y);
+}
+
+test("phase icons jump to each keyframe; its worst check is called out", async ({
   page,
 }) => {
   await openReview(page);
-
-  const scrubber = page.getByTestId("review-scrubber");
-  const min = Number(await scrubber.getAttribute("min"));
-  const max = Number(await scrubber.getAttribute("max"));
-
-  // Seek to the start: an early-phase label + the on-stage phase metric panel.
-  await setRange(scrubber, min);
-  await expect(page.getByTestId("review-phase-metrics")).toBeVisible();
-  const earlyPhase = await page.getByTestId("review-phase").textContent();
-
-  // Seek to the end: the phase label must change (phase-aware overlay).
-  await setRange(scrubber, max);
-  await expect(page.getByTestId("review-phase")).not.toHaveText(
-    earlyPhase ?? "",
-  );
+  const canvas = page.getByTestId("review-skeleton");
+  for (const [k, name] of KEYFRAMES) {
+    await page.getByTestId(`review-icon-${k}`).click();
+    await expect(page.getByTestId("review-phase")).toHaveText(name);
+    await expect(canvas).toHaveAttribute("data-keyframe", k);
+    // The keyframe's checks are drawn as dots on joints.
+    await expect
+      .poll(async () => (await stacks(page)).length)
+      .toBeGreaterThan(0);
+    const title = page.getByTestId("review-callout-title");
+    await expect(title).toBeVisible();
+    await expect(title).toHaveText(
+      /^([A-Z][a-z]+( [a-z]+)* too [a-z ]+ by (\d|10\+)|[A-Z][a-z ]+: (in range|not measured))$/,
+    );
+    // The selected check is one of this keyframe's.
+    expect(await canvas.getAttribute("data-selected")).toMatch(
+      new RegExp(`^${k}\\.`),
+    );
+  }
 });
 
-test("clicking a metric seeks the scrubber to its phase", async ({ page }) => {
-  await openReview(page);
-
-  const scrubber = page.getByTestId("review-scrubber");
-  const metrics = page.locator(
-    'section[data-testid^="v3-phase-"] [data-testid^="v3-row-"] button',
-  );
-  // Two metrics from opposite ends of the scorecard are in different phases,
-  // so clicking each seeks to a different frame — proving the seek works
-  // without depending on scorecard order or seek direction.
-  const first = metrics.first();
-  const last = metrics.last();
-
-  await first.scrollIntoViewIfNeeded();
-  await first.click();
-  const atFirst = Number(await scrubber.inputValue());
-
-  await last.scrollIntoViewIfNeeded();
-  await last.click();
-  const atLast = Number(await scrubber.inputValue());
-
-  expect(atFirst).not.toBe(atLast);
-});
-
-test("clicking a metric draws that metric (head pitch) in its own phase", async ({
+test("a joint with several checks opens a chooser; tapping a dot selects it", async ({
   page,
 }) => {
   await openReview(page);
-  await page.getByTestId("v3-row-load.head_pitch").locator("button").click();
-  await expect(page.getByTestId("review-phase")).toHaveText("Load");
-  await expect(page.getByTestId("review-skeleton")).toHaveAttribute(
-    "data-geometry",
-    "pitch",
+  const canvas = page.getByTestId("review-skeleton");
+  await page.getByTestId("review-icon-load").click();
+  // At Load the wrist carries hand height, ball close and wrist hinge.
+  const wrist = (await stacks(page)).find((s) => s.ids.length > 1)!;
+  expect(wrist.ids).toEqual(
+    expect.arrayContaining(["load.hand_height", "load.wrist_hinge"]),
   );
+  await tapStack(page, wrist);
+  await expect(page.getByTestId("review-chooser")).toBeVisible();
+  await page.getByTestId("review-chooser-load.wrist_hinge").click();
+  await expect(page.getByTestId("review-chooser")).toHaveCount(0);
+  await expect(canvas).toHaveAttribute("data-selected", "load.wrist_hinge");
+
+  // A single dot selects directly, and its target zone is drawn.
+  const knee = (await stacks(page)).find((s) =>
+    s.ids.includes("load.knee_bend"),
+  )!;
+  await tapStack(page, knee);
+  await expect(canvas).toHaveAttribute("data-selected", "load.knee_bend");
+  await expect(canvas).toHaveAttribute("data-zone", "box");
+  const hips = (await stacks(page)).find((s) =>
+    s.ids.includes("load.hips_over_knees"),
+  )!;
+  await tapStack(page, hips);
+  await expect(canvas).toHaveAttribute("data-zone", "band");
 });
 
-test("a picked metric shows its target zone; a timing metric its window on the scrubber", async ({
+test("the Feedback filter hides other checks, is remembered, and Pick checks edits it", async ({
   page,
 }) => {
-  await openReview(page);
-  const skeleton = page.getByTestId("review-skeleton");
-  await page.getByTestId("v3-row-load.knee_depth").locator("button").click();
-  await expect(skeleton).toHaveAttribute("data-zone", "rect");
-  await page.getByTestId("v3-row-load.spine_angle").locator("button").click();
-  await expect(skeleton).toHaveAttribute("data-zone", "wedge");
+  test.setTimeout(90_000);
+  await openReview(page, "Filter");
+  const pill = page.getByTestId("review-filter");
+  await expect(pill).toContainText("All feedback");
+  await pill.click();
+  await expect(page.getByTestId("feedback-sheet")).toBeVisible();
+  await page.getByTestId("feedback-preset-legs").click();
+  await page.screenshot({ path: screenPath("keyframes", "sheet-focus") });
+  await expect(page.getByTestId("feedback-count")).toHaveText(
+    "8 of 33 checks on",
+  );
+  await page.getByTestId("feedback-done").click();
+  await expect(pill).toContainText("Leg drive");
 
-  await page
-    .getByTestId("v3-row-rise.t_ball_vs_knee_bottom")
-    .locator("button")
-    .click();
-  await expect(page.getByTestId("review-timing-band")).toBeVisible();
-  await expect(page.getByTestId("review-timing-legend")).toBeVisible();
-  // Seeks to when the second event actually happened.
-  const actual = page.getByTestId("review-timing-actual");
-  const box = (await actual.boundingBox())!;
-  const track = (await page.getByTestId("review-scrubber").boundingBox())!;
-  expect(box.x).toBeGreaterThanOrEqual(track.x - 10);
+  // Setup has no leg-drive checks: nothing drawn, no callout.
+  await page.getByTestId("review-icon-setup").click();
+  await expect.poll(async () => (await stacks(page)).length).toBe(0);
+  await expect(page.getByTestId("review-callout")).toHaveCount(0);
+  // Rise: only knees and hips.
+  await page.getByTestId("review-icon-rise").click();
+  await expect
+    .poll(async () => (await stacks(page)).flatMap((s) => s.ids).sort())
+    .toEqual(["rise.hips_over_knees", "rise.knee_bend"]);
 
-  // Scrubbing away clears the pick (and its band).
-  const scrubber = page.getByTestId("review-scrubber");
-  await setRange(scrubber, Number(await scrubber.getAttribute("min")));
-  await expect(page.getByTestId("review-timing-band")).toHaveCount(0);
+  // Remembered (shared with practice).
+  await page.reload();
+  await expect(page.getByTestId("review-filter")).toContainText("Leg drive");
+
+  // Pick checks: one phase of one check off → "Custom".
+  await page.getByTestId("review-filter").click();
+  await page.getByTestId("feedback-tab-pick").click();
+  const chip = page.getByTestId("feedback-chip-rise.knee_bend");
+  await expect(chip).toHaveAttribute("aria-pressed", "true");
+  await chip.click();
+  await expect(chip).toHaveAttribute("aria-pressed", "false");
+  await page.screenshot({ path: screenPath("keyframes", "sheet-pick") });
+  await expect(page.getByTestId("feedback-count")).toHaveText(
+    "7 of 33 checks on",
+  );
+  await page.getByTestId("feedback-tab-focus").click();
+  await page.getByTestId("feedback-preset-all").click();
+  await page.getByTestId("feedback-done").click();
+  await expect(page.getByTestId("review-filter")).toContainText("All feedback");
+});
+
+test("the speaker says the callout's words with its keyframe", async ({
+  page,
+}) => {
+  await openReview(page, "Hear");
+  await page.getByTestId("review-icon-rise").click();
+  const title = (await page.getByTestId("review-callout-title").textContent())!;
+  await page.getByTestId("review-hear").click();
+  await expect
+    .poll(async () => {
+      const log = await page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __scAudioLog?: { kind: string; text?: string }[];
+            }
+          ).__scAudioLog ?? [],
+      );
+      return log.filter((h) => h.kind === "speak").at(-1)?.text ?? "";
+    })
+    .toBe(
+      / by /.test(title)
+        ? `When the ball reaches set point: ${title.charAt(0).toLowerCase()}${title.slice(1)}.`
+        : `${title.split(":")[0]} is in range.`,
+    );
+  await page.screenshot({ path: screenPath("keyframes", "review-desktop") });
 });

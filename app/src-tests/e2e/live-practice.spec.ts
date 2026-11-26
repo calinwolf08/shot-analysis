@@ -54,10 +54,10 @@ test("live practice: replayed reps score and persist to the Shots tab", async ({
 
   await expect(page.getByTestId("shot-review")).toBeVisible();
   await expect(page.getByTestId("review-scrubber")).toBeVisible();
-  // The v3 scorecard: the four phases in order.
-  await expect(page.getByTestId("scorecard-v3")).toBeVisible();
-  await expect(page.getByTestId("v3-phase-load")).toBeVisible();
-  await expect(page.getByTestId("v3-phase-release")).toBeVisible();
+  // The keyframe review: a phase icon per keyframe and the checks drawn.
+  await expect(page.getByTestId("review-icon-setup")).toBeVisible();
+  await expect(page.getByTestId("review-icon-release")).toBeVisible();
+  await expect(page.getByTestId("review-callout")).toBeVisible();
 });
 
 test("the voice says the card's words, with each keyframe's lead-in", async ({

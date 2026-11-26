@@ -157,3 +157,11 @@ export async function loadEnabledChecks(
   ]);
   return resolveEnabled(checks, areas);
 }
+
+/** Saves the selection (every check is stored as the full list). */
+export async function saveEnabledChecks(
+  settings: Pick<SettingsRepo, "set">,
+  enabled: ReadonlySet<string>,
+): Promise<void> {
+  await settings.set("feedbackChecks", normalizeChecks([...enabled]));
+}

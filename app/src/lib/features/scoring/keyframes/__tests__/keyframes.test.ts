@@ -70,12 +70,15 @@ function shot(values: Record<string, number> = {}): ShotKeyframes {
     };
   }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     keyframes: { setup: 1, load: 2, rise: 3, setPoint: 4, release: 5 },
     checks,
     facing: 1,
     nearSide: "right",
     shootingSide: "right",
+    xScale: 0.5625,
+    lengths: { torso: 0.3, thigh: 0.2 },
+    centreLine: true,
   };
 }
 
