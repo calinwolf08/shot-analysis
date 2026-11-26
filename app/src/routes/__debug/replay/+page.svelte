@@ -1,39 +1,37 @@
 <script lang="ts">
   /**
-   * Dev-only replay harness for live scoring (v3 metrics, 0–10+ scale).
+   * Dev-only replay harness for live scoring (keyframe checks, 0–10+ scale).
    *
    * Load a `poses.json` (anything from `test-data/`, e.g. the Curry clips) — it's
    * run through the SAME isomorphic core the live pipeline uses (`analyzeAndScore`)
-   * against the live targets, then each detected shot is rendered with the
-   * v3 scorecard plus the phase-grouped cues the live loop would speak.
+   * against the keyframe targets, then each detected shot is rendered with the
+   * keyframe scorecard plus the readback the live loop would speak.
    * Lets you validate scoring + targets from recorded clips with no camera.
    *
    * For the FULL live loop (rep detection + earcons + voice) driven from a video
    * instead of the webcam, use the practice route with `?liveVideo=<url>` in dev.
    */
-  import type { LiveTargetsV3, PoseData } from "basketball-shot-analysis";
+  import type { KeyframeTargets, PoseData } from "basketball-shot-analysis";
   import {
-    ScoreCardV3,
-    EMPTY_FEEDBACK_WORDING,
-    feedbackReadback,
-    loadFeedbackWording,
-    loadLiveTargetsV3,
-  } from "$lib/features/scoring/v3";
+    KeyframeScoreCard,
+    feedbackChecks,
+    loadKeyframeTargets,
+    spokenReadback,
+  } from "$lib/features/scoring/keyframes";
   import {
     analyzeAndScore,
     type ScoredShot,
   } from "$lib/features/live-practice";
-  import { feedbackItems } from "$lib/features/live-practice/loop/readback";
 
-  let targets = $state<LiveTargetsV3 | null>(null);
+  let targets = $state<KeyframeTargets | null>(null);
   let shots = $state<ScoredShot[]>([]);
   let shotIndex = $state(0);
   let hand = $state<"left" | "right">("right");
   let fileName = $state<string | null>(null);
   let error = $state<string | null>(null);
 
-  async function ensureTargets(): Promise<LiveTargetsV3> {
-    if (!targets) targets = await loadLiveTargetsV3();
+  async function ensureTargets(): Promise<KeyframeTargets> {
+    if (!targets) targets = await loadKeyframeTargets();
     return targets;
   }
 
@@ -65,17 +63,10 @@
   }
 
   const current = $derived(shots[shotIndex] ?? null);
-  let wording = $state.raw(EMPTY_FEEDBACK_WORDING);
-  void loadFeedbackWording().then((w) => (wording = w.wording));
-  // What the live loop would say: the 3 worst, in shot order, short wording.
+  // What the live loop would say: the 3 worst (one per body part), in shot order.
   const fb = $derived(
     current
-      ? {
-          spoken: feedbackReadback(
-            feedbackItems(current.scorecard.worst),
-            wording,
-          ),
-        }
+      ? { spoken: spokenReadback(feedbackChecks(current.scorecard)) }
       : null,
   );
 </script>
@@ -111,13 +102,13 @@
     </div>
     {#if current && fb}
       {#if fb.spoken}
-        <p class="readback" data-testid="replay-readback-v3">
+        <p class="readback" data-testid="replay-readback">
           🔊 “{fb.spoken}”
         </p>
       {:else}
         <p class="readback dim">On target — nothing to call out.</p>
       {/if}
-      <ScoreCardV3 card={current.scorecard} {wording} />
+      <KeyframeScoreCard card={current.scorecard} />
     {/if}
   {/if}
 </div>

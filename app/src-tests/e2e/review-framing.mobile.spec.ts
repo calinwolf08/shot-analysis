@@ -69,6 +69,10 @@ test("review pose: true proportions, one fixed zoom fitting the whole shot", asy
   expect(framing.aspect).toBeCloseTo(1080 / 1920, 6);
   await expect(page.getByTestId("review-approx-framing")).toHaveCount(0);
 
+  // The shot is fitted above the controls laid over the stage's bottom.
+  const fitHeight = Number(
+    await page.getByTestId("review-skeleton").getAttribute("data-fit-height"),
+  );
   const { boxes, framings, min } = await scrubAll(page);
   expect(boxes.length).toBeGreaterThan(10);
   // One transform for the whole shot (no per-frame recentering/zoom).
@@ -77,7 +81,7 @@ test("review pose: true proportions, one fixed zoom fitting the whole shot", asy
   for (const b of boxes) {
     expect(b.top).toBeGreaterThanOrEqual(0);
     expect(b.left).toBeGreaterThanOrEqual(0);
-    expect(b.bottom).toBeLessThanOrEqual(stage.height);
+    expect(b.bottom).toBeLessThanOrEqual(fitHeight + 1);
     expect(b.right).toBeLessThanOrEqual(stage.width);
   }
   // …and the extremes of the movement are JUST inside (fills the window):
@@ -86,7 +90,7 @@ test("review pose: true proportions, one fixed zoom fitting the whole shot", asy
   const bottom = Math.max(...boxes.map((b) => b.bottom));
   const left = Math.min(...boxes.map((b) => b.left));
   const right = Math.max(...boxes.map((b) => b.right));
-  const vFill = top / stage.height < 0.08 && 1 - bottom / stage.height < 0.08;
+  const vFill = top / fitHeight < 0.08 && 1 - bottom / fitHeight < 0.08;
   const hFill = left / stage.width < 0.08 && 1 - right / stage.width < 0.08;
   expect(
     vFill || hFill,
@@ -138,7 +142,7 @@ test("an older shot saved without its size is framed undistorted and marked appr
   await page.screenshot({ path: screenPath("phase6", "4-legacy-approx") });
 });
 
-test("review on a phone: pose, phase issues and scrubber all fit above the tab bar", async ({
+test("review on a phone: stage, controls and phase icons fit above the tab bar", async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -147,20 +151,26 @@ test("review on a phone: pose, phase issues and scrubber all fit above the tab b
   const tabTop = (await page.locator("nav.tab-bar").boundingBox())!.y;
   const stage = (await page.getByTestId("review-stage").boundingBox())!;
   const scrub = (await page.getByTestId("review-scrubber").boundingBox())!;
-  expect(stage.height).toBeGreaterThan(250);
+  const icon = (await page.getByTestId("review-icon-release").boundingBox())!;
+  expect(stage.height).toBeGreaterThan(400);
+  expect(stage.y + stage.height).toBeLessThanOrEqual(tabTop + 1);
   expect(scrub.y + scrub.height).toBeLessThanOrEqual(tabTop);
+  expect(icon.y + icon.height).toBeLessThanOrEqual(tabTop);
   // Phase label is written as-is (not title-cased).
   await expect(page.getByTestId("review-phase")).toHaveCSS(
     "text-transform",
     "none",
   );
-  const chips = page.locator(".po-chip");
-  if ((await chips.count()) > 0) {
-    const last = (await chips.last().boundingBox())!;
-    expect(last.y + last.height).toBeLessThanOrEqual(tabTop);
-    expect(await chips.first().textContent()).toMatch(
-      /^[A-Z][^:]* by (\d|10\+)$/,
-    );
+  // Each keyframe: the callout stays on the stage, above the controls.
+  for (const k of ["setup", "load", "rise", "setPoint", "release"]) {
+    await page.getByTestId(`review-icon-${k}`).click();
+    const callout = page.getByTestId("review-callout");
+    if ((await callout.count()) === 0) continue;
+    await expect(callout).not.toHaveAttribute("style", /visibility:hidden/);
+    const c = (await callout.boundingBox())!;
+    expect(c.x).toBeGreaterThanOrEqual(stage.x);
+    expect(c.x + c.width).toBeLessThanOrEqual(stage.x + stage.width + 1);
+    expect(c.y + c.height).toBeLessThanOrEqual(scrub.y);
+    await page.screenshot({ path: screenPath("keyframes", `phone-${k}`) });
   }
-  await page.screenshot({ path: screenPath("ux", "review-phone-layout") });
 });

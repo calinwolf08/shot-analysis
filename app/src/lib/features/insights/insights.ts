@@ -3,14 +3,15 @@
  *
  * Pure read-model over a set of scored shots: for a time window it ranks the
  * recurring issues (metrics that land off-target most often and most severely)
- * and builds the overall-score trend, on the v3 0–10+ scale (0 = on target).
+ * and builds the overall-score trend, on the 0–10+ scale (0 = on target), from
+ * the keyframe checks (with the player's feedback filter applied).
  * No session concept — shots are grouped purely by their timestamp, and
  * scores are recomputed from stored metrics by the caller (shots that can't be
  * re-analyzed are left out), never stored.
  *
  * @see docs/live-redesign-plan.md §3.10
  */
-import type { ScorecardV3 } from "$lib/features/scoring/v3";
+import type { KeyframeScorecard } from "$lib/features/scoring/keyframes";
 
 export type InsightsWindow = "today" | "7d" | "30d" | "all";
 
@@ -47,16 +48,18 @@ export function windowStart(key: InsightsWindow, now: number): number {
 
 export interface ScoredShotAt {
   readonly createdAt: number;
-  readonly scorecard: ScorecardV3;
+  readonly scorecard: KeyframeScorecard;
 }
 
 export interface RecurringIssue {
   readonly id: string;
+  /** Check name ("Knee bend"). */
   readonly label: string;
-  /** v3 phase id ("load" | "rise" | "setPoint" | "release"). */
+  /** Keyframe id ("setup" | "load" | "rise" | "setPoint" | "release"). */
   readonly phase: string;
-  readonly kind: string;
-  /** How it's usually off ("too shallow"), the most frequent direction. */
+  /** Body part ("hands" | "elbow" | "knees" | "back" | "hips"). */
+  readonly part: string;
+  /** How it's usually off ("Knees too bent"), the most frequent direction. */
   readonly phrase: string | null;
   /** Shots (in the window) where this metric was off-target. */
   readonly occurrences: number;
@@ -118,7 +121,7 @@ export function summarizeInsights(
   interface Agg {
     label: string;
     phase: string;
-    kind: string;
+    part: string;
     count: number;
     scoreSum: number;
     phrases: Map<string, number>;
@@ -132,7 +135,7 @@ export function summarizeInsights(
         ({
           label: w.label,
           phase: w.phase,
-          kind: w.kind,
+          part: w.part,
           count: 0,
           scoreSum: 0,
           phrases: new Map(),
@@ -153,7 +156,7 @@ export function summarizeInsights(
         id,
         label: e.label,
         phase: e.phase,
-        kind: e.kind,
+        part: e.part,
         phrase,
         occurrences: e.count,
         frequency: shotCount > 0 ? round(e.count / shotCount, 3) : 0,

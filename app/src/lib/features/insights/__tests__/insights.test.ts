@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { MetricResultV3, ScorecardV3 } from "$lib/features/scoring/v3";
+import type {
+  CheckResult,
+  KeyframeScorecard,
+} from "$lib/features/scoring/keyframes";
 import { summarizeInsights, windowStart, type ScoredShotAt } from "../insights";
 
-function worst(id: string, score: number, phrase = "too high"): MetricResultV3 {
+function worst(id: string, score: number, phrase = "too high"): CheckResult {
   return {
     id,
+    keyframe: "setPoint",
     phase: "setPoint",
-    kind: "structure",
+    check: "elbow_bend",
+    part: "elbow",
+    name: id.split(".").at(-1) ?? id,
     label: id.split(".").at(-1) ?? id,
     unit: "deg",
     value: 0,
@@ -17,28 +23,26 @@ function worst(id: string, score: number, phrase = "too high"): MetricResultV3 {
     magnitude: 1,
     passMin: 0,
     passMax: 0,
-    ideal: 0,
     phrase,
-    cue: "cue",
-    frames: [],
+    frame: null,
   };
 }
 
 function card(
   overall: number | null,
-  worstList: MetricResultV3[],
-): ScorecardV3 {
+  worstList: CheckResult[],
+): KeyframeScorecard {
   return {
     overall,
-    phases: [],
-    details: [],
+    keyframes: [],
+    checks: worstList,
     worst: worstList,
     measuredFraction: 1,
     belowCoverageGate: false,
   };
 }
 
-const shot = (createdAt: number, c: ScorecardV3): ScoredShotAt => ({
+const shot = (createdAt: number, c: KeyframeScorecard): ScoredShotAt => ({
   createdAt,
   scorecard: c,
 });

@@ -4,14 +4,14 @@ import { describe, expect, it } from "vitest";
 import type { PoseData } from "basketball-shot-analysis";
 import { profileForLevel } from "$lib/features/assessment";
 import type { AnalyzeOptions } from "$lib/features/analysis";
-import type { LiveTargetsV3 } from "basketball-shot-analysis";
+import type { KeyframeTargets } from "basketball-shot-analysis";
 import {
   POSE_PAD_AFTER,
   POSE_PAD_BEFORE,
-  ensureV3,
-  scoreShotV3,
-  v3ForPoses,
-} from "$lib/features/scoring/v3";
+  ensureKeyframes,
+  keyframesForPoses,
+  scoreShotKeyframes,
+} from "$lib/features/scoring/keyframes";
 import {
   allowedOrientations,
   analyzeAndScore,
@@ -21,10 +21,10 @@ import {
 // Real assets (tests run with cwd = app/).
 const targets = JSON.parse(
   readFileSync(
-    join(process.cwd(), "static", "reference", "live-targets-v3.json"),
+    join(process.cwd(), "static", "reference", "live-targets-keyframes.json"),
     "utf8",
   ),
-) as LiveTargetsV3;
+) as KeyframeTargets;
 const pose = JSON.parse(
   readFileSync(
     join(
@@ -52,26 +52,26 @@ describe("analyzeAndScore (isomorphic core)", () => {
     expect(shots[0]!.analysis.orientation).toBe("side-right");
 
     const { scorecard, worst, analysis, reviewPoses } = shots[0]!;
-    // v3: the four phases, in shot order, on the 0–10+ scale.
-    expect(scorecard.phases.map((p) => p.phase)).toEqual([
+    // The five keyframes, in shot order, on the 0–10+ scale.
+    expect(scorecard.keyframes.map((k) => k.keyframe)).toEqual([
+      "setup",
       "load",
       "rise",
       "setPoint",
       "release",
     ]);
-    for (const p of scorecard.phases) {
-      for (const m of p.metrics) {
-        if (m.score !== null) expect(m.score).toBeGreaterThanOrEqual(0);
-      }
+    expect(scorecard.checks).toHaveLength(33);
+    for (const c of scorecard.checks) {
+      if (c.score !== null) expect(c.score).toBeGreaterThanOrEqual(0);
     }
-    // Worst: off-target scored metrics, worst first.
+    // Worst: off-target scored checks, worst first.
     for (const w of worst) expect(w.score!).toBeGreaterThan(0);
     for (let i = 1; i < worst.length; i++) {
       expect(worst[i - 1]!.score!).toBeGreaterThanOrEqual(worst[i]!.score!);
     }
-    // The shot's phases were found, and v3 travels with the analysis.
-    expect(analysis.v3Metrics).toBeDefined();
-    expect(analysis.v3Metrics!.phases.rise).not.toBeNull();
+    // The shot's keyframes were found; the checks travel with the analysis.
+    expect(analysis.keyframes).toBeDefined();
+    expect(Object.values(analysis.keyframes!.keyframes)).not.toContain(null);
     expect(scorecard.overall).not.toBeNull();
 
     // Review poses: the shot's frame range plus context on each side (as far
@@ -97,37 +97,41 @@ describe("analyzeAndScore (isomorphic core)", () => {
     const { analysis, reviewPoses } = shots[0]!;
     // Round-trip the track through JSON, as storage does.
     const stored = JSON.parse(JSON.stringify(reviewPoses));
-    const again = v3ForPoses(stored, "right");
-    for (const [id, m] of Object.entries(analysis.v3Metrics!.metrics)) {
-      const r = again.metrics[id]!;
-      expect(r.reliable, id).toBe(m.reliable);
-      if (m.reliable) expect(r.value, id).toBeCloseTo(m.value, 6);
+    const again = keyframesForPoses(stored, "right");
+    for (const [id, c] of Object.entries(analysis.keyframes!.checks)) {
+      const r = again.checks[id]!;
+      expect(r.reliable, id).toBe(c.reliable);
+      if (c.reliable) expect(r.value, id).toBeCloseTo(c.value, 6);
     }
-    // And a v1 shot (no v3) is migrated to the same scorecard.
-    const { v3Metrics: _drop, ...v1 } = analysis;
-    const migrated = ensureV3(v1, stored, "right")!;
+    // And a shot stored before the keyframe checks is migrated to the same scorecard.
+    const { keyframes: _drop, ...old } = analysis;
+    const migrated = ensureKeyframes(old, stored, "right")!;
     expect(migrated.recomputed).toBe(true);
     expect(scorecardForShot(migrated.analysis, targets)!.overall).toBeCloseTo(
-      scoreShotV3(analysis.v3Metrics!.metrics, targets).overall!,
+      scoreShotKeyframes(analysis.keyframes!, targets).overall!,
       6,
     );
-    // An older v3 definition (before head pitch) is recomputed too.
+    // An older definition is recomputed too…
     const outdated = {
       ...analysis,
-      v3Metrics: { ...analysis.v3Metrics!, schemaVersion: 2 },
+      keyframes: { ...analysis.keyframes!, schemaVersion: 0 },
     } as unknown as typeof analysis;
-    const refreshed = ensureV3(outdated, stored, "right")!;
+    const refreshed = ensureKeyframes(outdated, stored, "right")!;
     expect(refreshed.recomputed).toBe(true);
-    expect(refreshed.analysis.v3Metrics!.schemaVersion).toBe(4);
-    expect(
-      refreshed.analysis.v3Metrics!.metrics["load.head_pitch"],
-    ).toBeDefined();
+    expect(refreshed.analysis.keyframes!.schemaVersion).toBe(2);
     // …but without a track it keeps what it has.
-    expect(ensureV3(outdated, null, "right")!.recomputed).toBe(false);
-    // Already v3 → untouched; no pose track → can't migrate.
-    expect(ensureV3(analysis, null, "right")!.recomputed).toBe(false);
-    expect(ensureV3(v1, null, "right")).toBeNull();
-    expect(scorecardForShot(v1, targets)).toBeNull();
+    expect(ensureKeyframes(outdated, null, "right")!.recomputed).toBe(false);
+    // Already current → untouched; no pose track → can't migrate.
+    expect(ensureKeyframes(analysis, null, "right")!.recomputed).toBe(false);
+    expect(ensureKeyframes(old, null, "right")).toBeNull();
+    expect(scorecardForShot(old, targets)).toBeNull();
+  });
+
+  it("scores with the feedback filter when given one", () => {
+    const { shots } = analyzeAndScore(pose, opts, targets);
+    const only = new Set(["rise.knee_bend", "setPoint.knee_bend"]);
+    const card = scorecardForShot(shots[0]!.analysis, targets, only)!;
+    expect(card.checks.map((c) => c.id)).toEqual([...only]);
   });
 
   it("omits the size when the pose data doesn't know it (1×1 placeholder)", () => {
@@ -186,7 +190,7 @@ describe("orientation gate", () => {
 
   it("reads the near side as the shooting side for an accepted shot", () => {
     const { shots } = analyzeAndScore(pose, opts, targets);
-    expect(shots[0]!.analysis.v3Metrics!.nearSide).toBe("right");
+    expect(shots[0]!.analysis.keyframes!.nearSide).toBe("right");
   });
 });
 

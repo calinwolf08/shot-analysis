@@ -35,6 +35,12 @@
     void load();
   });
 
+  /**
+   * "Score against [pro]" stays hidden until the pro videos are in and pro
+   * targets exist for the keyframe checks (docs/keyframe-review-plan.md).
+   */
+  const PRO_TARGETS_READY = false;
+
   async function load() {
     player = await services.repos.player.getFirst();
     voiceFeedback = await services.repos.settings.get("voiceFeedback");
@@ -150,7 +156,9 @@
         {/each}
       </select>
     </label>
-    {#if pros.length > 0}
+    <!-- Hidden until pro targets are built for the keyframe checks
+         (PRO_TARGETS_READY); everyone scores against the shipped targets. -->
+    {#if PRO_TARGETS_READY && pros.length > 0}
       <label class="row">
         <span>
           Score against

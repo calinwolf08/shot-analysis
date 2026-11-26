@@ -13,7 +13,13 @@ export const SETTINGS = {
   voiceFeedback: { schema: z.boolean(), default: true },
   activeBenchmarkId: { schema: z.string().nullable(), default: null },
   keepRepClips: { schema: z.boolean(), default: false },
-  /** Live-lesson focus-area ids; [] = coach on everything. */
+  /**
+   * Feedback filter: the keyframe check ids the player wants feedback on
+   * (`<keyframe>.<check>`), shared by shot review and live practice. null =
+   * never chosen (every check, or the legacy focus areas mapped onto checks).
+   */
+  feedbackChecks: { schema: z.array(z.string()).nullable(), default: null },
+  /** Legacy live-lesson focus-area ids (read once into `feedbackChecks`). */
   liveFocusAreas: { schema: z.array(z.string()), default: [] as string[] },
   /** Score against one pro (pro-profiles id) instead of all pros; null = all. */
   scoreAgainstPro: { schema: z.string().nullable(), default: null },

@@ -7,8 +7,8 @@
   /**
    * Continuous, session-less practice loop (live redesign — step 6). Renders a
    * LivePracticeStore: live preview + skeleton overlay, per-shot feedback (the
-   * overall 0–10+ score, the 3 worst issues by phase, and the full v3
-   * scorecard on demand), and a running history. No "End / summary" — you practice until you
+   * overall 0–10+ score, the 3 worst checks in shot order, and the full
+   * keyframe scorecard on demand), and a running history. No "End / summary" — you practice until you
    * leave, and every shot is already persisted.
    */
   import { onMount, untrack } from "svelte";
@@ -32,16 +32,17 @@
     drawSkeleton,
     type SkeletonLandmark,
   } from "$lib/shared/ui/pose-skeleton";
-  import { FocusSheet, focusSummary } from "$lib/features/scoring";
+  import { KEYFRAME_NAME } from "basketball-shot-analysis";
   import {
-    ScoreCardV3,
+    FeedbackSheet,
     displayScore,
-    feedbackText,
-    scoreBand,
-  } from "$lib/features/scoring/v3";
+    KeyframeScoreCard,
+    checkText,
+    filterLabel,
+    severity,
+  } from "$lib/features/scoring/keyframes";
   import type { SideOrientation } from "../setup/angle-gate";
   import { createPresenceTracker, type PresenceState } from "./presence";
-  import { phaseName } from "./readback";
   import {
     CUE_TEXT,
     READY_TEXT,
@@ -65,7 +66,7 @@
     requiredOrientation = null,
     clipStore = null,
     refiner = null,
-    onfocuschange = null,
+    onfeedbackchange = null,
     tuning = DEFAULT_LIVE_TUNING,
     debug = false,
     capture = null,
@@ -83,8 +84,8 @@
     clipStore?: ShotClipStore | null;
     /** Full-rate re-detection from the clip (takes the clip itself). */
     refiner?: FullRateRefiner | null;
-    /** Persist a focus change made from the in-loop picker. */
-    onfocuschange?: ((ids: string[]) => void) | null;
+    /** Persist a feedback-filter change made from the in-loop sheet. */
+    onfeedbackchange?: ((next: ReadonlySet<string>) => void) | null;
     /** Cue pacing + readiness thresholds (static/config/live-tuning.json). */
     tuning?: LiveTuning;
     /** Show the readiness/cue debug panel (dev/E2E only). */
@@ -96,11 +97,12 @@
     onstart?: () => void;
   } = $props();
 
-  let focusOpen = $state(false);
+  let feedbackOpen = $state(false);
 
-  function changeFocus(ids: string[]) {
-    store.setFocusAreas(ids);
-    onfocuschange?.(ids);
+  /** The filter applies from the next shot on (same sheet as shot review). */
+  function changeFeedback(next: ReadonlySet<string>) {
+    store.setEnabled(next);
+    onfeedbackchange?.(next);
   }
 
   /** The in-loop positioning gate is active only with a real camera. */
@@ -480,12 +482,27 @@
     {/if}
     <div class="hud-top">
       <button
-        class="chip-btn focus-chip"
-        data-testid="focus-chip"
-        aria-label="Change focus"
-        onclick={() => (focusOpen = true)}
+        class="chip-btn feedback-chip"
+        data-testid="practice-feedback"
+        aria-label="Choose feedback"
+        onclick={() => (feedbackOpen = true)}
       >
-        🎯 <span class="focus-text">{focusSummary(store.focusAreas)}</span>
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          aria-hidden="true"
+          ><path d="M3 5h8M15 5h2M3 10h2M9 10h8M3 15h10" /><circle
+            cx="13"
+            cy="5"
+            r="2"
+          /><circle cx="7" cy="10" r="2" /><circle cx="15" cy="15" r="2" /></svg
+        >
+        <span class="feedback-text">{filterLabel(store.enabled)}</span>
       </button>
       <div class="controls">
         <button
@@ -557,7 +574,7 @@
       <div class="feedback" data-testid="rep-feedback">
         <p
           class="score sc-numeral"
-          data-band={scoreBand(fb.overall) ?? "none"}
+          data-band={severity(fb.overall) ?? "none"}
           data-testid="rep-feedback-score"
         >
           {fmt(fb.overall)}
@@ -567,8 +584,8 @@
             <div class="chips">
               {#each fb.worst as m (m.id)}
                 <span class="chip" data-testid="feedback-item"
-                  ><b class="chip-phase">{phaseName(m.phase)}</b>
-                  {feedbackText(m, store.wording)}</span
+                  ><b class="chip-phase">{KEYFRAME_NAME[m.keyframe]}</b>
+                  {checkText(m)}</span
                 >
               {/each}
             </div>
@@ -639,16 +656,16 @@
       )}
       {#if entry}
         <div class="breakdown" data-testid="rep-breakdown">
-          <ScoreCardV3 card={entry.scorecard} wording={store.wording} />
+          <KeyframeScoreCard card={entry.scorecard} />
         </div>
       {/if}
     {/if}
   </Sheet>
 
-  <FocusSheet
-    bind:open={focusOpen}
-    selected={store.focusAreas}
-    onchange={changeFocus}
+  <FeedbackSheet
+    bind:open={feedbackOpen}
+    enabled={store.enabled}
+    onchange={changeFeedback}
   />
 </main>
 
@@ -700,7 +717,7 @@
     pointer-events: none;
   }
 
-  /* Overlaid controls (focus left, mute/pause right). */
+  /* Overlaid controls (feedback left, mute/pause right). */
   .hud-top {
     position: absolute;
     top: 8px;
@@ -729,7 +746,7 @@
     font-weight: 700;
     cursor: pointer;
   }
-  .focus-text {
+  .feedback-text {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -939,13 +956,10 @@
   .score[data-band="good"] {
     color: #34d399;
   }
-  .score[data-band="fair"] {
+  .score[data-band="warn"] {
     color: #fde047;
   }
-  .score[data-band="off"] {
-    color: #fb923c;
-  }
-  .score[data-band="far"] {
+  .score[data-band="bad"] {
     color: #f87171;
   }
   .fb-body {

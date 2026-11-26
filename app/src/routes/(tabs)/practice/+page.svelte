@@ -38,13 +38,12 @@
     simulatedSpeechMs,
     withAudioProbe,
   } from "$lib/shared/audio/audio-probe";
-  import type { LiveTargetsV3 } from "basketball-shot-analysis";
-  import { normalizeAreas } from "$lib/features/scoring";
+  import type { KeyframeTargets } from "basketball-shot-analysis";
   import {
-    loadFeedbackWording,
-    type FeedbackWording,
-  } from "$lib/features/scoring/v3";
-  import { loadScoringTargets } from "$lib/features/pros";
+    loadEnabledChecks,
+    loadKeyframeTargets,
+    saveEnabledChecks,
+  } from "$lib/features/scoring/keyframes";
   import { scoreStoredShots } from "$lib/features/live-practice/review/scored-shots";
   import { useAppServices } from "$lib/shared/config/services-context";
   import { createApiClient } from "$lib/shared/api/client";
@@ -125,10 +124,10 @@
   let shootingHand: "left" | "right" = "right";
   let requiredSide = $state<SideOrientation>("side-left");
   let playerId = "";
-  let targets: LiveTargetsV3 | null = null;
-  let feedbackWording: FeedbackWording | undefined;
+  let targets: KeyframeTargets | null = null;
+  /** Feedback filter (enabled check ids; null = every check). */
+  let enabled: ReadonlySet<string> | null = null;
   let captureHandle: CaptureHandle | null = null;
-  let focusAreas: string[] = [];
   let tuning = $state<LiveTuning>(DEFAULT_LIVE_TUNING);
   /** Shot detection + audio started (after the one-time tap). */
   let started = $state(audioUnlockState.unlocked);
@@ -137,9 +136,10 @@
   let wakeLock: { release(): Promise<void> } | null = null;
   let initialShots: ShotEntry[] = [];
 
-  function persistFocus(ids: string[]) {
-    focusAreas = ids;
-    void services.repos.settings.set("liveFocusAreas", ids);
+  /** The Feedback sheet's selection, shared with shot review. */
+  function persistFeedback(next: ReadonlySet<string>) {
+    enabled = next;
+    void saveEnabledChecks(services.repos.settings, next);
   }
 
   $effect(() => {
@@ -157,22 +157,17 @@
     playerId = player.id;
     shootingHand = player.shootingHand;
     requiredSide = requiredOrientation(shootingHand);
-    targets = (await loadScoringTargets(services.repos.settings)).targets;
-    const [loaded, fw] = await Promise.all([
-      loadLiveTuning(),
-      loadFeedbackWording(),
+    [targets, enabled] = await Promise.all([
+      loadKeyframeTargets(),
+      loadEnabledChecks(services.repos.settings),
     ]);
-    feedbackWording = fw.wording;
-    for (const w of fw.warnings) console.warn("[feedback-wording]", w);
+    const loaded = await loadLiveTuning();
     tuning = loaded.tuning;
     for (const w of loaded.warnings) console.warn("[live-tuning]", w);
-    focusAreas = normalizeAreas(
-      await services.repos.settings.get("liveFocusAreas"),
-    );
     // Profile → "Voice feedback" off = practice starts muted (the speaker
     // button still unmutes for this session).
     audio.setMuted(!(await services.repos.settings.get("voiceFeedback")));
-    initialShots = await loadTodaysShots(player.id, targets);
+    initialShots = await loadTodaysShots(player.id, targets, enabled);
     await clipStore.setCap(getVideoRetention()).catch(() => undefined);
     if (destroyed) return;
 
@@ -307,9 +302,9 @@
       playerId,
       opts: { shootingHand, profile: "pro-form" },
       fps: session.fps,
-      ...(feedbackWording ? { wording: feedbackWording } : {}),
+      targets,
+      enabled,
       frameSize: () => session?.frameSize?.() ?? null,
-      focusAreas,
       initialShots,
     });
     // Already unlocked this page-load (came back from another tab): go.
@@ -412,7 +407,8 @@
    */
   async function loadTodaysShots(
     id: string,
-    t: LiveTargetsV3,
+    t: KeyframeTargets,
+    on: ReadonlySet<string> | null,
   ): Promise<ShotEntry[]> {
     // Local midnight (plain timestamp math; no reactive Date needed).
     const now = Date.now();
@@ -431,6 +427,7 @@
         sorted,
         shootingHand,
         t,
+        on,
       );
       // Shots that can't be re-analyzed are left out of today's count.
       return scored
@@ -501,7 +498,7 @@
     {clipStore}
     {refiner}
     stream={cameraStream}
-    onfocuschange={persistFocus}
+    onfeedbackchange={persistFeedback}
     {tuning}
     debug={liveDebug}
     capture={liveCapture}

@@ -58,7 +58,10 @@ export interface LiveTargetsV3 {
 }
 
 /** The band actually used for scoring (override wins). */
-export function effectiveBand(t: TargetV3): {
+/** The fields scoring needs (shared with the keyframe catalog's targets). */
+export type BandTarget = Pick<TargetV3, "passMin" | "passMax" | "scored" | "rampSd" | "override">;
+
+export function effectiveBand(t: Omit<BandTarget, "rampSd">): {
   passMin: number;
   passMax: number;
   scored: boolean;
@@ -79,7 +82,7 @@ export const NEGLIGIBLE_SCORE = 0.05;
  * scoring rule shared by the app and the reference tools.
  */
 export function scoreValue(
-  t: TargetV3,
+  t: BandTarget,
   value: number,
 ): { score: number; direction: "low" | "high" | null; magnitude: number } {
   const band = effectiveBand(t);
@@ -98,7 +101,7 @@ export function scoreValue(
     : { score, direction, magnitude };
 }
 
-function rampScale(sd: number, range: number, ideal: number): number {
+export function rampScale(sd: number, range: number, ideal: number): number {
   if (sd > 0) return sd;
   if (range > 0) return range / 4;
   return Math.max(1e-6, Math.abs(ideal) * 0.05);

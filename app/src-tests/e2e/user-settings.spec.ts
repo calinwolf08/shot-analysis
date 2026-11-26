@@ -1,44 +1,43 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { onboard, startLiveLoop } from "./helpers";
 
 /**
- * Settings are per user (server migration 007): one account's focus or voice
+ * Settings are per user (server migration 007): one account's feedback filter or voice
  * choice never changes another's. And Profile → "Voice feedback" off makes
  * practice start muted.
  */
 
-function dismissSheet(page: Page) {
-  return page
-    .getByTestId("sheet-backdrop")
-    .click({ position: { x: 10, y: 10 } });
-}
-
-test("focus areas are per user", async ({ page, browser }) => {
+test("the feedback filter is per user", async ({ page, browser }) => {
   test.setTimeout(90_000);
   await onboard(page, "?e2e=replay", "Alice");
   await startLiveLoop(page);
-  await page.getByTestId("focus-chip").click();
-  await page.getByTestId("focus-area-rise").click();
-  await dismissSheet(page);
-  await expect(page.getByTestId("focus-chip")).toContainText("Rise");
+  await page.getByTestId("practice-feedback").click();
+  await page.getByTestId("feedback-preset-legs").click();
+  await page.getByTestId("feedback-done").click();
+  await expect(page.getByTestId("practice-feedback")).toContainText(
+    "Leg drive",
+  );
 
-  // Another account (its own browser) starts from "Everything"…
+  // Another account (its own browser) starts from "All feedback"…
   const context = await browser.newContext();
   const other = await context.newPage();
   await onboard(other, "?e2e=replay", "Bob");
   await startLiveLoop(other);
-  await expect(other.getByTestId("focus-chip")).toContainText("Everything");
-  await other.getByTestId("focus-chip").click();
-  await other.getByTestId("focus-area-load").click();
-  await dismissSheet(other);
-  await expect(other.getByTestId("focus-chip")).toContainText("Load");
+  await expect(other.getByTestId("practice-feedback")).toContainText(
+    "All feedback",
+  );
+  await other.getByTestId("practice-feedback").click();
+  await other.getByTestId("feedback-preset-release").click();
+  await other.getByTestId("feedback-done").click();
+  await expect(other.getByTestId("practice-feedback")).toContainText("Release");
   await context.close();
 
   // …and Bob's choice didn't change Alice's.
   await page.reload();
   await startLiveLoop(page);
-  await expect(page.getByTestId("focus-chip")).toContainText("Rise");
+  await expect(page.getByTestId("practice-feedback")).toContainText(
+    "Leg drive",
+  );
 });
 
 test("voice feedback off in Profile: practice starts muted and says nothing", async ({

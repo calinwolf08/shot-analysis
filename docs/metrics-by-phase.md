@@ -1,3 +1,10 @@
+> **Superseded for scoring.** The app now scores shots on the keyframe checks
+> (body positions at Setup, Load, Rise, Set point and Release) — see
+> [`keyframe-review-plan.md`](keyframe-review-plan.md). The v3 catalog below
+> is still in the library (`src/metrics/v3/`), and its signals and events are
+> what the keyframe checks are measured on, but the app no longer stores,
+> scores or shows v3 metrics.
+
 # Shot Metrics by Phase
 
 This is the **v3 metric catalog** that live practice scores every shot with

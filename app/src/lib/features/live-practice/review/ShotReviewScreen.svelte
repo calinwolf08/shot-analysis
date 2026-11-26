@@ -1,18 +1,25 @@
 <script lang="ts">
   /**
-   * Shot review: scrub a past shot and watch the pose play back, zoomed to fill
-   * the frame so form detail is legible. The v3 scorecard (Load → Rise → Set
-   * point → Release, 0–10+) highlights the phase the scrubber is in; the
-   * current phase's worst issues are drawn on the pose as what they measure
-   * (angle arc, offset, height bar…). Clicking a metric seeks to the frame it
-   * was measured at.
+   * Shot review (docs/keyframe-review-plan.md): the shot's clip full-bleed
+   * (or a grey skeleton when this device has no clip), with the keyframe
+   * checks drawn on the body at each of the five keyframes:
+   *  - a dot on the joint each check is about, colored by its score (green 0,
+   *    yellow 1–3, red 4+); checks on the same joint stack as overlapping
+   *    circles and open a chooser;
+   *  - a blue box / band / wedge for where that joint should be; the
+   *    selected check's zone is bright with an arrow from its dot, the others
+   *    fade to dashed outlines;
+   *  - a callout for the selected check (the keyframe's worst by default),
+   *    placed in free space, with a speaker to hear it.
+   * Phase icons (the player's own pose at each keyframe) jump between
+   * keyframes; the scrubber plays through the rest of the shot. The Feedback
+   * pill opens the shared filter sheet; turned-off checks are hidden.
    *
-   * Pose comes from the server-stored skeleton track (works for every shot,
-   * every device). A retained on-device clip renders behind this same overlay
-   * once per-shot video capture lands.
+   * Pose comes from the server-stored skeleton track (every shot, every
+   * device); a retained on-device clip renders behind it.
    */
   import { deviceDebugEnabled } from "$lib/shared/debug/debug-mode";
-  import { onDestroy } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { useAppServices } from "$lib/shared/config/services-context";
@@ -20,40 +27,48 @@
   import type { ShotRecord, ShotReviewPoses } from "$lib/shared/db/repos";
   import type { StoredShotAnalysis } from "$lib/features/analysis";
   import {
-    metricMatchesAreas,
-    normalizeAreas,
-  } from "$lib/features/scoring/focus";
+    KEYFRAMES,
+    KEYFRAME_NAME,
+    type Keyframe,
+    type KeyframeTargets,
+    type ShotKeyframes,
+  } from "basketball-shot-analysis";
   import {
-    ScoreCardV3,
-    feedbackText,
-    loadFeedbackWording,
-    EMPTY_FEEDBACK_WORDING,
-    type FeedbackWording,
-    type MetricResultV3,
-    type ScorecardV3,
-  } from "$lib/features/scoring/v3";
-  import { loadScoringTargets } from "$lib/features/pros";
-  import {
-    drawGeometry,
-    geometryFamily,
-    geometryFor,
-  } from "$lib/features/reference/metric-geometry";
+    FeedbackSheet,
+    checkText,
+    displayScore,
+    filterLabel,
+    loadEnabledChecks,
+    loadKeyframeTargets,
+    saveEnabledChecks,
+    scoreShotKeyframes,
+    severity,
+    spokenReadback,
+    type CheckResult,
+  } from "$lib/features/scoring/keyframes";
   import { scoreStoredShot } from "./scored-shots";
-  import { phaseAtFrame, phaseMarks } from "./phase-timeline";
+  import {
+    checkGeometry,
+    dotStacks,
+    nearestOnZone,
+    placeCallout,
+    poseIcons,
+    type DotStack,
+    type Obstacle,
+    type Pt,
+    type StageZone,
+    type Zone,
+  } from "./keyframe-overlay";
   import {
     extractClipFramesFromUrl,
     nearestFrame,
     type ClipFrames,
   } from "./clip-frames";
   import { REANALYSIS_UNAVAILABLE } from "./shot-list";
-  import { phaseName } from "../loop/readback";
   import { Button } from "$lib/shared/ui";
   import { drawSkeleton } from "$lib/shared/ui/pose-skeleton";
-  import {
-    drawTargetZone,
-    targetZone,
-  } from "$lib/features/reference/target-zone";
-  type Hand = "left" | "right";
+  import { createWebAudioFeedbackService } from "$lib/shared/audio";
+  import { withAudioProbe } from "$lib/shared/audio/audio-probe";
   import {
     MIN_VIS,
     computeShotFraming,
@@ -66,20 +81,44 @@
 
   const services = useAppServices();
   const clipStore = getShotClipStore();
+  // Dev/E2E: what's said is mirrored into window.__scAudioLog.
+  const devSurfaces = import.meta.env.DEV || import.meta.env.VITE_E2E === "1";
+  let audio: ReturnType<typeof createWebAudioFeedbackService> | null = null;
+  function voice() {
+    audio ??= devSurfaces
+      ? withAudioProbe(createWebAudioFeedbackService())
+      : createWebAudioFeedbackService();
+    return audio;
+  }
 
   let shot = $state<ShotRecord | null>(null);
   let poses = $state<ShotReviewPoses | null>(null);
-  let card = $state<ScorecardV3 | null>(null);
-  let wording = $state.raw<FeedbackWording>(EMPTY_FEEDBACK_WORDING);
-  /** Pre-v3 shot without a pose track: can't be scored on the new metrics. */
+  let checks = $state.raw<ShotKeyframes | null>(null);
+  let targets = $state.raw<KeyframeTargets | null>(null);
+  /** Feedback filter (enabled check ids; null = every check). */
+  let enabled = $state.raw<ReadonlySet<string> | null>(null);
+  /** Older shot without a pose track: can't be scored on the keyframe checks. */
   let unavailable = $state(false);
   let current = $state(0);
   let notFound = $state(false);
   let canvas = $state<HTMLCanvasElement | null>(null);
-  let hand = $state<Hand>("right");
-
-  // Coaching focus (from settings): emphasize these areas in the overlay.
-  let focusAreas = $state<string[]>([]);
+  let calloutEl = $state<HTMLElement | null>(null);
+  /** The selected check (its zone, arrow and callout are shown). */
+  let sel = $state<string | null>(null);
+  /** A stacked joint's chooser (stage position + its check ids). */
+  let chooser = $state<{ at: Pt; ids: readonly string[] } | null>(null);
+  let sheetOpen = $state(false);
+  let sheetTab = $state<"focus" | "pick">("focus");
+  let sheetScroll = $state<string | null>(null);
+  /** Height of the controls laid over the bottom of the stage. */
+  let controlsH = $state(0);
+  /** Where the callout sits (stage px). */
+  let calloutPos = $state<Pt | null>(null);
+  /**
+   * The keyframe last tapped: Rise and Set point share a frame in a
+   * one-motion shot, so the frame alone can't tell which one is shown.
+   */
+  let chosenKf = $state<Keyframe | null>(null);
 
   // Recorded clip of the actual shot (on-device only; absent on other devices).
   let clipUrl = $state<string | null>(null);
@@ -124,7 +163,8 @@
           : null;
     return computeShotFraming(
       poses.frames,
-      { width: stageW, height: stageH },
+      // Fit the shot above the controls laid over the stage's bottom.
+      { width: stageW, height: Math.max(160, stageH - controlsH) },
       source,
     );
   });
@@ -133,7 +173,6 @@
   const analysis = $derived(
     shot ? (shot.analysis as StoredShotAnalysis) : null,
   );
-  const v3 = $derived(analysis?.v3Metrics ?? null);
   /** The scrub range: the whole stored track (it's padded around the shot). */
   const start = $derived(
     poses && poses.frames.length > 0
@@ -145,94 +184,197 @@
       ? poses.frames.at(-1)!.frameIndex
       : (analysis?.frameRange.end ?? 0),
   );
-
-  /**
-   * A picked timing metric on the scrubber: its two events, and the window
-   * the second should fall in (first event + band × phase duration).
-   */
-  const timingBand = $derived.by(() => {
-    const m = picked;
-    if (!m || !v3 || geometryFamily(m.id) !== "timing" || m.frames.length < 2)
-      return null;
-    const win = v3.phases[m.phase as keyof typeof v3.phases];
-    if (!win) return null;
-    const d = win.end - win.start;
-    const a = m.frames[0]!;
-    const lo = Math.max(start, Math.min(end, a + m.passMin * d));
-    const hi = Math.max(start, Math.min(end, a + m.passMax * d));
-    return { a, b: m.frames[1]!, lo: Math.min(lo, hi), hi: Math.max(lo, hi) };
-  });
-
-  /** Phase markers (where each v3 phase begins) + the current phase. */
-  const phaseStarts = $derived(
-    v3
-      ? phaseMarks(v3)
-          .filter((m) => m.frame >= start && m.frame <= end)
-          .map((m) => ({ phase: m.phase, startFrame: m.frame }))
-      : [],
-  );
-  const currentPhase = $derived(v3 ? phaseAtFrame(v3, current) : null);
-
   const frame = $derived(
     poses?.frames.find((f) => f.frameIndex === current) ?? null,
   );
 
-  /**
-   * Off-target scored metrics in the current phase, worst first. When a focus
-   * is set, the overlay emphasizes only those areas (the full scorecard below
-   * still shows everything).
-   */
-  const phaseIssues = $derived<MetricResultV3[]>(
-    card && currentPhase
-      ? card.worst.filter(
-          (m) =>
-            m.phase === currentPhase &&
-            (focusAreas.length === 0 || metricMatchesAreas(m, focusAreas)),
-        )
-      : [],
+  /** The scorecard with the feedback filter applied. */
+  const card = $derived(
+    checks && targets ? scoreShotKeyframes(checks, targets, enabled) : null,
   );
+
+  /** Each keyframe's pose frame (the nearest stored frame). */
+  const kfFrame = $derived.by((): Record<Keyframe, number | null> => {
+    const out = {} as Record<Keyframe, number | null>;
+    for (const k of KEYFRAMES) {
+      const at = checks?.keyframes[k];
+      if (at === null || at === undefined || !poses?.frames.length) {
+        out[k] = null;
+        continue;
+      }
+      let best = poses.frames[0]!.frameIndex;
+      for (const f of poses.frames) {
+        if (Math.abs(f.frameIndex - at) < Math.abs(best - at))
+          best = f.frameIndex;
+      }
+      out[k] = best;
+    }
+    return out;
+  });
+  /** The keyframe being shown (null between keyframes). */
+  const atKeyframe = $derived(
+    chosenKf && kfFrame[chosenKf] === current
+      ? chosenKf
+      : (KEYFRAMES.find((k) => kfFrame[k] === current) ?? null),
+  );
+  /** The phase the scrubber is in (the last keyframe reached). */
+  const phaseNow = $derived.by((): Keyframe => {
+    if (atKeyframe) return atKeyframe;
+    let p: Keyframe = "setup";
+    for (const k of KEYFRAMES) {
+      const f = kfFrame[k];
+      if (f !== null && current >= f) p = k;
+    }
+    return p;
+  });
+
+  const resultsAt = (k: Keyframe): readonly CheckResult[] =>
+    card?.keyframes.find((x) => x.keyframe === k)?.checks ?? [];
+  /** The keyframe's worst check (ties: catalog order); null when none enabled. */
+  function worstAt(k: Keyframe): CheckResult | null {
+    let best: CheckResult | null = null;
+    for (const r of resultsAt(k)) {
+      if (!best || (r.score ?? -1) > (best.score ?? -1)) best = r;
+    }
+    return best;
+  }
+  const sevColor = (s: number | null) => {
+    const v = severity(s);
+    return v === "good"
+      ? "#34d399"
+      : v === "warn"
+        ? "#fde047"
+        : v === "bad"
+          ? "#f87171"
+          : "#98a2b3";
+  };
+  const SEV_WORD = (s: number | null) =>
+    s === null
+      ? "Not measured."
+      : displayScore(s) === "0"
+        ? "In range."
+        : displayScore(s) === "1"
+          ? "Almost there."
+          : Number(displayScore(s)) <= 3
+            ? "Worth watching."
+            : "Needs attention.";
+
+  const selected = $derived(
+    atKeyframe && sel
+      ? (resultsAt(atKeyframe).find((r) => r.id === sel) ?? null)
+      : null,
+  );
+
+  // Arriving at a keyframe (or changing the filter) selects its worst check.
+  $effect(() => {
+    const k = atKeyframe;
+    void card;
+    untrack(() => {
+      chooser = null;
+      if (!k) return;
+      if (!sel || !resultsAt(k).some((r) => r.id === sel)) {
+        sel = worstAt(k)?.id ?? null;
+      }
+    });
+  });
+
+  /** Stick figures of the player's own pose at each keyframe. */
+  const icons = $derived.by(() => {
+    if (!poses || !checks) return KEYFRAMES.map(() => null);
+    const lm = KEYFRAMES.map((k) => {
+      const f = kfFrame[k];
+      return f === null
+        ? null
+        : (poses!.frames.find((p) => p.frameIndex === f)?.landmarks ?? null);
+    });
+    return poseIcons(lm, checks.xScale, checks.nearSide);
+  });
 
   $effect(() => {
     void load(shotId);
   });
 
   async function load(id: string) {
-    const [s, p, targets, player, w] = await Promise.all([
+    const [s, p, t, player, en] = await Promise.all([
       services.repos.shot.get(id),
       services.repos.shot.getPoses(id),
-      loadScoringTargets(services.repos.settings).then((x) => x.targets),
+      loadKeyframeTargets(),
       services.repos.player.getFirst(),
-      loadFeedbackWording(),
+      loadEnabledChecks(services.repos.settings),
     ]);
-    wording = w.wording;
     if (!s) {
       notFound = true;
       return;
     }
-    if (player) hand = player.shootingHand;
-    // Pre-v3 shots are re-analyzed from this pose track (and saved) here.
+    const hand = player?.shootingHand ?? "right";
+    // Older shots get their keyframe checks computed from the pose track here.
     const scored = await scoreStoredShot(
       services.repos.shot,
       s,
       hand,
-      targets,
+      t,
       p,
+      en,
     );
     shot = scored.record;
     poses = p;
-    card = scored.card;
-    unavailable = scored.card === null;
-    const v = (scored.record.analysis as StoredShotAnalysis).v3Metrics;
-    const load = v?.phases.load?.start;
+    targets = t;
+    enabled = en;
+    checks = (scored.record.analysis as StoredShotAnalysis).keyframes ?? null;
+    unavailable = checks === null;
+    // Open on the keyframe of the shot's worst check (else Setup).
+    const worst = scored.card?.worst[0];
+    const k = worst?.keyframe ?? "setup";
+    chosenKf = k;
+    const at = checks?.keyframes[k];
+    const frames = p?.frames ?? [];
     current =
-      load !== undefined &&
-      p?.frames.some((f) => f.frameIndex === Math.round(load))
-        ? Math.round(load)
-        : (p?.frames[0]?.frameIndex ?? s.analysis.frameRange.start);
-    focusAreas = normalizeAreas(
-      await services.repos.settings.get("liveFocusAreas"),
-    );
+      at !== null && at !== undefined && frames.length
+        ? frames.reduce((b, f) =>
+            Math.abs(f.frameIndex - at) < Math.abs(b.frameIndex - at) ? f : b,
+          ).frameIndex
+        : (frames[0]?.frameIndex ?? s.analysis.frameRange.start);
     void loadClip(id);
+  }
+
+  function goTo(k: Keyframe) {
+    const f = kfFrame[k];
+    if (f === null) return;
+    stopPlaying();
+    chosenKf = k;
+    current = f;
+    sel = worstAt(k)?.id ?? null;
+  }
+
+  function stopPlaying() {
+    if (playing) {
+      videoEl?.pause();
+      playing = false;
+    }
+  }
+
+  function changeFilter(next: ReadonlySet<string>) {
+    enabled = next;
+    void saveEnabledChecks(services.repos.settings, next);
+  }
+
+  function openSheet(tab: "focus" | "pick", scrollTo: string | null = null) {
+    sheetTab = tab;
+    sheetScroll = scrollTo;
+    sheetOpen = true;
+  }
+
+  function hear() {
+    const r = selected;
+    if (!r) return;
+    const a = voice();
+    a.unlock();
+    void a.speak(r.score ? spokenReadback([r]) : `${r.name} is in range.`);
+  }
+
+  function markerLeft(f: number): number {
+    const span = Math.max(end - start, 1);
+    return ((f - start) / span) * 100;
   }
 
   async function loadClip(id: string) {
@@ -454,27 +596,6 @@
     revokeClip();
   });
 
-  function markerLeft(startFrame: number): number {
-    const span = Math.max(end - start, 1);
-    return ((startFrame - start) / span) * 100;
-  }
-  /** The metric last clicked in the scorecard (drawn on the stage). */
-  let picked = $state<MetricResultV3 | null>(null);
-
-  /** Seek to where a metric was measured (else to its phase's start). */
-  function seekToMetric(m: MetricResultV3) {
-    picked = m;
-    // The measured frame (a change's end; a timing metric's second event —
-    // when it actually happened).
-    const f = m.frames.at(-1);
-    if (f !== undefined && f >= start && f <= end) {
-      current = f;
-      return;
-    }
-    const kf = phaseStarts.find((p) => p.phase === m.phase);
-    if (kf) current = kf.startFrame;
-  }
-
   /**
    * Video time (s) for a pose frame. Exact when the clip's start and the
    * frame's capture time are both known (same clock); older clips fall back
@@ -611,15 +732,92 @@
     c.dataset.frameVideoTime = f.time.toFixed(3);
   });
 
+  /** The stacks drawn on the last frame (stage px), for tapping. */
+  let stacks: DotStack[] = [];
+  const BONES: [number, number][] = [
+    [11, 12],
+    [11, 23],
+    [12, 24],
+    [23, 24],
+    [12, 14],
+    [14, 16],
+    [16, 20],
+    [11, 13],
+    [13, 15],
+    [24, 26],
+    [26, 28],
+    [23, 25],
+    [25, 27],
+    [28, 32],
+    [27, 31],
+  ];
+
+  function toStageZone(z: Zone, P: (l: Pt) => Pt): StageZone {
+    if (z.kind === "wedge") return { kind: "poly", pts: z.pts.map(P) };
+    const a = P({ x: z.x, y: z.y });
+    const b = P({ x: z.x + z.w, y: z.y + z.h });
+    return { kind: "rect", x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
+  }
+
+  function drawZone(
+    ctx: CanvasRenderingContext2D,
+    z: StageZone,
+    kind: Zone["kind"],
+    on: boolean,
+  ) {
+    ctx.lineWidth = on ? 2.5 : 1;
+    ctx.setLineDash(on ? [] : [4, 3]);
+    ctx.strokeStyle = on ? "#ffffff" : "rgb(150 190 255 / 45%)";
+    ctx.fillStyle = on
+      ? kind === "box"
+        ? "rgb(36 84 200 / 82%)"
+        : "rgb(64 132 255 / 50%)"
+      : "rgb(56 120 235 / 13%)";
+    if (z.kind === "poly") {
+      ctx.beginPath();
+      z.pts.forEach((p, i) =>
+        i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y),
+      );
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(z.x, z.y, z.w, z.h);
+      ctx.strokeRect(z.x, z.y, z.w, z.h);
+    }
+    ctx.setLineDash([]);
+  }
+
+  function arrow(ctx: CanvasRenderingContext2D, a: Pt, b: Pt) {
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    ctx.strokeStyle = "#fff";
+    ctx.fillStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(a.x + Math.cos(ang) * 11, a.y + Math.sin(ang) * 11);
+    ctx.lineTo(b.x - Math.cos(ang) * 6, b.y - Math.sin(ang) * 6);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x - Math.cos(ang - 0.45) * 9, b.y - Math.sin(ang - 0.45) * 9);
+    ctx.lineTo(b.x - Math.cos(ang + 0.45) * 9, b.y - Math.sin(ang + 0.45) * 9);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   $effect(() => {
     const c = canvas;
     const f = frame;
+    const fr = framing;
+    const k = atKeyframe;
+    const shotChecks = checks;
+    const results = k ? resultsAt(k) : [];
+    const pick = sel;
+    const co = calloutEl;
+    void selected;
     if (!c) return;
     const ctx = c.getContext("2d");
     if (!ctx) return;
-    // Back the canvas with a DPR-scaled bitmap of the stage size so the pose
-    // is crisp, not a stretched 300×150 default.
-    const fr = framing;
     const w = stageW || 300;
     const h = stageH || 400;
     const dpr =
@@ -628,84 +826,231 @@
     c.height = Math.round(h * dpr);
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, w, h);
+    stacks = [];
+    c.dataset.zone = "";
+    c.dataset.stacks = "";
     if (!f || !fr) return;
 
     const lm = f.landmarks;
     const project = projectWith(fr);
     // Test/debug hook: where this frame's visible joints landed on the stage.
-    const pts = lm.filter((l) => l.visibility >= MIN_VIS).map(project);
-    if (pts.length > 0) {
+    const vis = lm.filter((l) => l.visibility >= MIN_VIS).map(project);
+    if (vis.length > 0) {
       c.dataset.frameBox = JSON.stringify({
-        top: Math.min(...pts.map((q) => q.y)),
-        bottom: Math.max(...pts.map((q) => q.y)),
-        left: Math.min(...pts.map((q) => q.x)),
-        right: Math.max(...pts.map((q) => q.x)),
+        top: Math.min(...vis.map((q) => q.y)),
+        bottom: Math.max(...vis.map((q) => q.y)),
+        left: Math.min(...vis.map((q) => q.x)),
+        right: Math.max(...vis.map((q) => q.x)),
       });
     }
 
-    // Base skeleton.
-    drawSkeleton(ctx, lm, w, h, {
-      strokeStyle: "rgb(64 224 120 / 85%)",
-      jointStyle: "rgb(255 255 255 / 85%)",
-      lineWidth: 3,
-      jointRadius: 3,
-      project,
-    });
+    // No clip on this device: a grey skeleton stands in for the video.
+    if (!clipUrl) {
+      drawSkeleton(ctx, lm, w, h, {
+        strokeStyle: "rgb(170 178 192 / 75%)",
+        jointStyle: "rgb(170 178 192 / 0%)",
+        lineWidth: 3,
+        jointRadius: 0,
+        project,
+      });
+    }
+    if (!k || !shotChecks || results.length === 0) {
+      calloutPos = null;
+      return;
+    }
 
-    // The current phase's worst issues (or the metric clicked in the
-    // scorecard, on its own until the scrubber moves): the measured body part
-    // highlighted, plus its target zone on the frame it was measured. Paths
-    // (no zone) still draw their trace.
-    const issues = picked ? [picked] : phaseIssues.slice(0, 2);
-    const drawn: string[] = [];
-    const zones: string[] = [];
-    const v = v3;
-    if (v) {
-      for (const m of issues) {
-        if (current === m.frames.at(-1)) {
-          const first = m.frames[0];
-          const z = targetZone(m, {
-            shootingHand: hand,
-            nearSide: v.nearSide,
-            project,
-            lm,
-            firstLm:
-              poses!.frames.find((p) => p.frameIndex === first)?.landmarks ??
-              null,
-            facing: v.facing,
-          });
-          if (z) {
-            drawTargetZone(ctx, z);
-            zones.push(z.kind);
-          }
-        }
-        const family = geometryFamily(m.id);
-        drawn.push(
-          ...drawGeometry(ctx, geometryFor(m.id), lm, {
-            shootingHand: hand,
-            nearSide: v.nearSide,
-            project,
-            highlightOnly: family !== "path",
-            pathFrames: poses!.frames
-              .filter(
-                (p) =>
-                  p.frameIndex >= Math.min(...m.frames, current) &&
-                  p.frameIndex <= Math.max(...m.frames, current),
-              )
-              .map((p) => p.landmarks),
-            color:
-              m.score === null || m.score === 0
-                ? "#34d399"
-                : m.score >= 3
-                  ? "#f87171"
-                  : "#fbbf24",
-          }),
-        );
+    const geo = checkGeometry(lm, shotChecks, results);
+    const P = (p: Pt) => project(p);
+    const selGeo = pick ? geo[pick] : undefined;
+    // Zones: the others faint, the selected one bright and on top.
+    const seen: string[] = [];
+    for (const r of results) {
+      const z = geo[r.id]?.zone;
+      if (!z || r.id === pick) continue;
+      const key = JSON.stringify(z);
+      if (
+        seen.includes(key) ||
+        (selGeo?.zone && JSON.stringify(selGeo.zone) === key)
+      )
+        continue;
+      seen.push(key);
+      drawZone(ctx, toStageZone(z, P), z.kind, false);
+    }
+    const selZone = selGeo?.zone ? toStageZone(selGeo.zone, P) : null;
+    if (selGeo?.zone && selZone) drawZone(ctx, selZone, selGeo.zone.kind, true);
+    c.dataset.zone = selGeo?.zone?.kind ?? "";
+
+    // The spine line (always), and the selected check's measured limbs.
+    const back = Object.values(geo).find((g) => g.joint === "shoulders");
+    if (back && back.limbs.length === 2) {
+      const [a, b] = back.limbs.map(P) as [Pt, Pt];
+      ctx.strokeStyle = "rgb(255 255 255 / 55%)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    if (selGeo && selGeo.limbs.length > 1) {
+      const pts = selGeo.limbs.map(P);
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      for (const p of pts) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3, 0, 7);
+        ctx.fill();
       }
     }
-    c.dataset.zone = zones.join(",");
-    c.dataset.geometry = drawn.join(",");
+
+    // Dots: stacks per joint (worst first); the selected one ringed, on top.
+    const byId = new Map(results.map((r) => [r.id, r]));
+    stacks = dotStacks(
+      results
+        .filter((r) => geo[r.id]?.dot)
+        .map((r) => ({ id: r.id, at: P(geo[r.id]!.dot!), score: r.score })),
+    );
+    const posOf = (id: string): Pt | null => {
+      for (const s of stacks) {
+        const i = s.ids.indexOf(id);
+        if (i >= 0) return s.pos[i]!;
+      }
+      return null;
+    };
+    const sp = pick ? posOf(pick) : null;
+    if (sp && selZone) {
+      const t = nearestOnZone(selZone, sp);
+      if (t && Math.hypot(t.x - sp.x, t.y - sp.y) > 12) arrow(ctx, sp, t);
+    }
+    for (const s of stacks) {
+      const order = s.ids
+        .map((_, i) => i)
+        .sort((a, b) => Number(s.ids[a] === pick) - Number(s.ids[b] === pick));
+      for (const i of order) {
+        const p = s.pos[i]!;
+        const id = s.ids[i]!;
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 8.5, 0, 7);
+        ctx.fill();
+        ctx.fillStyle = sevColor(byId.get(id)?.score ?? null);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6.5, 0, 7);
+        ctx.fill();
+        if (id === pick) {
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 13, 0, 7);
+          ctx.stroke();
+        }
+      }
+      if (s.ids.length > 1) {
+        const p = s.pos[s.ids.length - 1]!;
+        ctx.fillStyle = "#10131a";
+        ctx.beginPath();
+        ctx.arc(p.x + 9, p.y - 9, 6.5, 0, 7);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "700 9px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(s.ids.length), p.x + 9, p.y - 8.5);
+      }
+    }
+    // Test hook: each joint's checks and where its stack sits (stage px).
+    c.dataset.stacks = JSON.stringify(
+      stacks.map((s) => ({ ids: s.ids, x: s.at.x, y: s.at.y })),
+    );
+
+    // Callout: free space that covers the fewest dots / zone / body points.
+    if (!co || !pick) {
+      calloutPos = null;
+      return;
+    }
+    const anchor = sp ??
+      posOf(`${k}.hand_height`) ??
+      stacks[0]?.at ?? { x: w / 2, y: h / 3 };
+    const obstacles: Obstacle[] = [];
+    for (const s of stacks)
+      for (const p of s.pos)
+        obstacles.push({ x: p.x, y: p.y, weight: 40, radius: 16 });
+    if (selZone) {
+      if (selZone.kind === "poly")
+        for (const p of selZone.pts)
+          obstacles.push({ x: p.x, y: p.y, weight: 8, radius: 10 });
+      else
+        for (let i = 0; i <= 4; i++)
+          for (let j = 0; j <= 4; j++)
+            obstacles.push({
+              x: selZone.x + (selZone.w * i) / 4,
+              y: selZone.y + (selZone.h * j) / 4,
+              weight: 6,
+              radius: 6,
+            });
+    }
+    for (const [a, b] of BONES) {
+      const la = lm[a];
+      const lb = lm[b];
+      if (!la || !lb || la.visibility < 0.05 || lb.visibility < 0.05) continue;
+      const pa = P(la);
+      const pb = P(lb);
+      const n = Math.max(
+        1,
+        Math.round(Math.hypot(pb.x - pa.x, pb.y - pa.y) / 8),
+      );
+      for (let i = 0; i <= n; i++)
+        obstacles.push({
+          x: pa.x + ((pb.x - pa.x) * i) / n,
+          y: pa.y + ((pb.y - pa.y) * i) / n,
+          weight: 3,
+          radius: 14,
+        });
+    }
+    const cw = co.offsetWidth;
+    const ch = co.offsetHeight;
+    const pos = placeCallout({ w: cw, h: ch }, anchor, obstacles, {
+      x0: 10,
+      y0: 10,
+      x1: w - 10,
+      y1: Math.max(10 + ch, h - controlsH - 8),
+    });
+    calloutPos = pos;
+    const ex = Math.max(pos.x, Math.min(pos.x + cw, anchor.x));
+    const ey = pos.y + ch / 2 < anchor.y ? pos.y + ch : pos.y;
+    ctx.setLineDash([2, 4]);
+    ctx.strokeStyle = "rgb(255 255 255 / 85%)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(anchor.x, anchor.y);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.setLineDash([]);
   });
+
+  /** Tapping a dot selects its check; a stack opens the chooser. */
+  function onStageTap(e: MouseEvent) {
+    chooser = null;
+    if (!canvas || !atKeyframe) return;
+    const r = canvas.getBoundingClientRect();
+    const p = { x: e.clientX - r.left, y: e.clientY - r.top };
+    let best: DotStack | null = null;
+    let bd = Infinity;
+    for (const s of stacks) {
+      const d = Math.min(...s.pos.map((q) => Math.hypot(q.x - p.x, q.y - p.y)));
+      if (d < bd) {
+        bd = d;
+        best = s;
+      }
+    }
+    if (!best || bd > 28) return;
+    if (best.ids.length === 1) sel = best.ids[0]!;
+    else chooser = { at: best.at, ids: best.ids };
+  }
 </script>
 
 <main class="review" data-testid="shot-review">
@@ -719,6 +1064,14 @@
       ← Back
     </Button>
     <h1>Shot review</h1>
+    {#if card}
+      <span
+        class="overall"
+        data-severity={severity(card.overall) ?? "none"}
+        data-testid="review-overall"
+        title="Shot score">{displayScore(card.overall)}</span
+      >
+    {/if}
   </header>
 
   {#if notFound}
@@ -768,6 +1121,9 @@
           bind:this={canvas}
           class="skeleton"
           data-testid="review-skeleton"
+          data-keyframe={atKeyframe ?? ""}
+          data-fit-height={Math.max(160, stageH - controlsH)}
+          data-selected={sel ?? ""}
           data-framing={framing
             ? JSON.stringify({
                 scale: framing.scale,
@@ -778,6 +1134,7 @@
             : ""}
           data-approximate={framing?.approximate ?? false}
           data-frame-t={frame?.t ?? ""}
+          onclick={onStageTap}
         ></canvas>
         {#if framing?.approximate}
           <span class="approx" data-testid="review-approx-framing"
@@ -789,154 +1146,272 @@
           No pose data stored for this shot.
         </p>
       {/if}
-    </div>
-    <!-- Below the stage (not over it) so the chips never hide the feet. The
-         slot keeps its height when a phase has no issues, so the scrubber
-         doesn't jump while scrubbing. -->
-    {#if poses && poses.frames.length > 0 && phaseIssues.length === 0}
-      <div class="phase-overlay" aria-hidden="true">
-        <span class="po-head"
-          >{currentPhase ? phaseName(currentPhase) : ""} · on target</span
-        >
-      </div>
-    {:else if poses && poses.frames.length > 0}
-      <div class="phase-overlay" data-testid="review-phase-metrics">
-        <span class="po-head"
-          >{currentPhase ? phaseName(currentPhase) : ""} · off target</span
-        >
-        <div class="po-chips">
-          {#each phaseIssues.slice(0, 3) as m (m.id)}
-            <span class="po-chip" class:bad={(m.score ?? 0) >= 3}
-              >{feedbackText(m, wording)}</span
-            >
-          {/each}
-        </div>
-      </div>
-    {/if}
 
-    {#if poses && poses.frames.length > 0}
-      <div class="scrubber">
-        <div class="track" class:timing={!!timingBand}>
-          {#each phaseStarts as kf (kf.phase)}
-            <span
-              class="marker"
-              style="left:{markerLeft(kf.startFrame)}%"
-              title={phaseName(kf.phase)}
-            ></span>
-          {/each}
-          {#if timingBand}
-            <span
-              class="t-band"
-              data-testid="review-timing-band"
-              style="left:{markerLeft(timingBand.lo)}%;width:{Math.max(
-                0.8,
-                markerLeft(timingBand.hi) - markerLeft(timingBand.lo),
-              )}%"
-              title="Target window"
-            ></span>
-            <span
-              class="t-event first"
-              style="left:{markerLeft(timingBand.a)}%"
-              title="First event"
-            ></span>
-            <span
-              class="t-event second"
-              data-testid="review-timing-actual"
-              style="left:{markerLeft(timingBand.b)}%"
-              title="When it happened"
-            ></span>
-          {/if}
-        </div>
-        {#if clipUrl}
-          <button
-            class="play"
-            data-testid="review-play"
-            aria-label={playing ? "Pause video" : "Play video"}
-            disabled={!videoReady || framesProgress !== null}
-            onclick={() => void togglePlay()}
+      {#if selected && atKeyframe}
+        <div
+          class="callout"
+          bind:this={calloutEl}
+          style={calloutPos
+            ? `left:${calloutPos.x}px;top:${calloutPos.y}px`
+            : "visibility:hidden"}
+          data-testid="review-callout"
+          role="button"
+          tabindex="0"
+          aria-label="Choose feedback"
+          onclick={() => openSheet("pick", selected?.id ?? null)}
+          onkeydown={(e) =>
+            e.key === "Enter" && openSheet("pick", selected?.id ?? null)}
+        >
+          <span class="num" style="background:{sevColor(selected.score)}"
+            >{selected.score === null
+              ? "–"
+              : displayScore(selected.score)}</span
           >
-            {playing ? "⏸" : "▶"}
+          <span class="ct">
+            <b data-testid="review-callout-title">{checkText(selected)}</b>
+            <span class="sub"
+              >{selected.check === "hold" && selected.value !== null
+                ? `${selected.value.toFixed(2)} s from Rise to Set point · `
+                : ""}{SEV_WORD(selected.score)}</span
+            >
+          </span>
+          <button
+            class="spk"
+            aria-label="Hear this"
+            data-testid="review-hear"
+            onclick={(e) => {
+              e.stopPropagation();
+              hear();
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.9"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              ><path d="M3 8v4h3l4 3V5L6 8H3z" /><path
+                d="M13 7.5a3.5 3.5 0 0 1 0 5M15.5 5a7 7 0 0 1 0 10"
+              /></svg
+            >
           </button>
-        {/if}
-        <input
-          type="range"
-          min={start}
-          max={end}
-          oninput={() => {
-            picked = null;
-            if (playing) {
-              videoEl?.pause();
-              playing = false;
-            }
-          }}
-          bind:value={current}
-          data-testid="review-scrubber"
-          aria-label="Scrub shot"
-        />
-        {#if timingBand}
-          <p class="t-legend" data-testid="review-timing-legend">
-            <span class="dot first"></span> starts ·
-            <span class="dot second"></span> when it happened ·
-            <span class="swatch"></span> when it should happen
-          </p>
-        {/if}
-        <div class="scrub-meta">
-          <span>frame {current - start + 1} / {end - start + 1}</span>
-          {#if framesProgress}<span
-              class="frames-progress"
-              data-testid="review-frames-progress">{framesProgress}</span
-            >{/if}
-          {#if currentPhase}<span class="phase-tag" data-testid="review-phase"
-              >{phaseName(currentPhase)}</span
-            >{/if}
         </div>
-        {#if showClipInfo && clipInfo}
-          <p class="clip-info" data-testid="review-clip-info">
-            {#if clipProblem}Video can't reach every frame of this shot ·
-            {/if}clip {fmtSec(clipInfo.duration)}, seekable to {fmtSec(
-              clipInfo.seekableEnd,
-            )}{#if clipInfo.expectedEnd !== null}, shot ends at {fmtSec(
-                clipInfo.expectedEnd,
-              )}{/if}{#if clipMeta}
-              · {clipMeta.mime || "?"} · {(clipMeta.bytes / 1e6).toFixed(2)} MB{/if}
-          </p>
-        {/if}
-        {#if debugVideo}
-          <div class="video-debug" data-testid="review-video-debug">
-            <pre>{debugText()}</pre>
-            <div class="row">
-              {#if clipUrl}
-                <a
-                  class="dbg-btn"
-                  href={clipUrl}
-                  download="shot-{shotId}.{clipMeta?.mime.includes('mp4')
-                    ? 'mp4'
-                    : 'webm'}"
-                  data-testid="review-video-download">Download clip</a
-                >
-              {/if}
-              <button class="dbg-btn" onclick={() => void copyDebug()}
-                >{copied ? "Copied" : "Copy details"}</button
-              >
-            </div>
-          </div>
-        {/if}
-      </div>
-    {/if}
+      {/if}
 
-    {#if card}
-      <ScoreCardV3
-        {card}
-        highlightPhase={currentPhase}
-        onmetric={seekToMetric}
-        {wording}
-      />
-    {:else}
-      <p class="dim" data-testid="review-reanalysis-unavailable">
-        {REANALYSIS_UNAVAILABLE}: this shot was saved without the pose data the
-        new metrics need.
-      </p>
-    {/if}
+      {#if chooser && atKeyframe}
+        {@const k = atKeyframe}
+        <div
+          class="chooser"
+          data-testid="review-chooser"
+          style="left:{Math.max(
+            10,
+            Math.min(stageW - 230, chooser.at.x - 110),
+          )}px;top:{Math.max(
+            10,
+            chooser.at.y - 60 - chooser.ids.length * 46,
+          )}px"
+        >
+          <p>{chooser.ids.length} checks on this joint</p>
+          {#each chooser.ids as id (id)}
+            {@const r = resultsAt(k).find((x) => x.id === id)}
+            {#if r}
+              <button
+                class:on={id === sel}
+                data-testid="review-chooser-{id}"
+                onclick={() => {
+                  sel = id;
+                  chooser = null;
+                }}
+              >
+                <span class="chip" style="background:{sevColor(r.score)}"
+                  >{r.score === null ? "–" : displayScore(r.score)}</span
+                >
+                <span class="ct"
+                  >{r.score ? checkText(r) : r.name}<small
+                    >{r.score ? r.name : "In range"}</small
+                  ></span
+                >
+              </button>
+            {/if}
+          {/each}
+        </div>
+      {/if}
+
+      {#if poses && poses.frames.length > 0}
+        <div class="controls" bind:clientHeight={controlsH}>
+          <div class="row">
+            <span class="spacer" aria-hidden="true"></span>
+            <button
+              class="pill"
+              data-testid="review-filter"
+              onclick={() => openSheet("focus")}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                ><path d="M3 5h8M15 5h2M3 10h2M9 10h8M3 15h10" /><circle
+                  cx="13"
+                  cy="5"
+                  r="2"
+                /><circle cx="7" cy="10" r="2" /><circle
+                  cx="15"
+                  cy="15"
+                  r="2"
+                /></svg
+              >
+              {filterLabel(enabled)}
+            </button>
+            {#if clipUrl}
+              <button
+                class="round"
+                data-testid="review-play"
+                aria-label={playing ? "Pause video" : "Play video"}
+                disabled={!videoReady || framesProgress !== null}
+                onclick={() => void togglePlay()}
+              >
+                {playing ? "⏸" : "▶"}
+              </button>
+            {:else}
+              <span class="spacer" aria-hidden="true"></span>
+            {/if}
+          </div>
+          <div class="scrubber">
+            <div class="track">
+              {#each KEYFRAMES as k (k)}
+                {#if kfFrame[k] !== null}
+                  {@const w = worstAt(k)}
+                  <span
+                    class="tick"
+                    style="left:{markerLeft(kfFrame[k]!)}%;background:{w
+                      ? sevColor(w.score)
+                      : 'rgb(255 255 255 / 45%)'}"
+                    title={KEYFRAME_NAME[k]}
+                  ></span>
+                {/if}
+              {/each}
+              {#if kfFrame.rise !== null && kfFrame.setPoint !== null && resultsAt("setPoint").some((r) => r.check === "hold")}
+                <span
+                  class="hold"
+                  data-testid="review-hold"
+                  style="left:{markerLeft(kfFrame.rise!)}%;width:{Math.max(
+                    0.8,
+                    markerLeft(kfFrame.setPoint!) - markerLeft(kfFrame.rise!),
+                  )}%"
+                  title="Hold at set point"
+                ></span>
+              {/if}
+            </div>
+            <input
+              type="range"
+              min={start}
+              max={end}
+              oninput={() => {
+                chooser = null;
+                stopPlaying();
+              }}
+              bind:value={current}
+              data-testid="review-scrubber"
+              aria-label="Scrub shot"
+            />
+          </div>
+          <div class="icons">
+            {#each KEYFRAMES as k, i (k)}
+              {@const w = worstAt(k)}
+              {@const ic = icons[i]}
+              <button
+                class:on={phaseNow === k}
+                disabled={kfFrame[k] === null}
+                data-testid="review-icon-{k}"
+                aria-label={KEYFRAME_NAME[k]}
+                onclick={() => goTo(k)}
+              >
+                {#if ic}
+                  <svg viewBox="0 0 40 44" aria-hidden="true">
+                    <circle cx={ic.head.x} cy={ic.head.y} r="3.4" />
+                    {#each ic.lines as [a, b], j (j)}
+                      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
+                    {/each}
+                  </svg>
+                {/if}
+                {#if w}<span class="sev" style="background:{sevColor(w.score)}"
+                  ></span>{/if}
+              </button>
+            {/each}
+          </div>
+          <div class="labels">
+            {#each KEYFRAMES as k (k)}
+              <span
+                class:on={phaseNow === k}
+                data-testid={phaseNow === k ? "review-phase" : undefined}
+                >{KEYFRAME_NAME[k]}</span
+              >
+            {/each}
+          </div>
+        </div>
+      {/if}
+    </div>
+
+    <div class="below">
+      {#if unavailable}
+        <p class="dim" data-testid="review-reanalysis-unavailable">
+          {REANALYSIS_UNAVAILABLE}: this shot was saved without the pose data
+          the checks need.
+        </p>
+      {/if}
+      {#if framesProgress}<p
+          class="frames-progress"
+          data-testid="review-frames-progress"
+        >
+          {framesProgress}
+        </p>{/if}
+      {#if showClipInfo && clipInfo}
+        <p class="clip-info" data-testid="review-clip-info">
+          {#if clipProblem}Video can't reach every frame of this shot ·
+          {/if}clip {fmtSec(clipInfo.duration)}, seekable to {fmtSec(
+            clipInfo.seekableEnd,
+          )}{#if clipInfo.expectedEnd !== null}, shot ends at {fmtSec(
+              clipInfo.expectedEnd,
+            )}{/if}{#if clipMeta}
+            · {clipMeta.mime || "?"} · {(clipMeta.bytes / 1e6).toFixed(2)} MB{/if}
+        </p>
+      {/if}
+      {#if debugVideo}
+        <div class="video-debug" data-testid="review-video-debug">
+          <pre>{debugText()}</pre>
+          <div class="row">
+            {#if clipUrl}
+              <a
+                class="dbg-btn"
+                href={clipUrl}
+                download="shot-{shotId}.{clipMeta?.mime.includes('mp4')
+                  ? 'mp4'
+                  : 'webm'}"
+                data-testid="review-video-download">Download clip</a
+              >
+            {/if}
+            <button class="dbg-btn" onclick={() => void copyDebug()}
+              >{copied ? "Copied" : "Copy details"}</button
+            >
+          </div>
+        </div>
+      {/if}
+    </div>
+
+    <FeedbackSheet
+      bind:open={sheetOpen}
+      {enabled}
+      onchange={changeFilter}
+      initialTab={sheetTab}
+      scrollTo={sheetScroll}
+    />
   {:else}
     <p class="dim">Loading…</p>
   {/if}
@@ -944,13 +1419,12 @@
 
 <style>
   .review {
-    min-height: 100dvh;
     max-width: 560px;
     margin: 0 auto;
-    padding: var(--sc-space-4);
+    padding: var(--sc-space-3) var(--sc-space-4) var(--sc-space-4);
     display: flex;
     flex-direction: column;
-    gap: var(--sc-space-3);
+    gap: var(--sc-space-2);
   }
   header {
     display: flex;
@@ -960,49 +1434,44 @@
   h1 {
     margin: 0;
     font-size: 18px;
+    flex: 1;
   }
+  .overall {
+    min-width: 34px;
+    text-align: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 14px;
+    color: #10131a;
+    background: #98a2b3;
+    font-variant-numeric: tabular-nums;
+  }
+  .overall[data-severity="good"] {
+    background: #34d399;
+  }
+  .overall[data-severity="warn"] {
+    background: #fde047;
+  }
+  .overall[data-severity="bad"] {
+    background: #f87171;
+  }
+  /* Fills the screen above the tab bar (header ≈ 52, tab bar 84 + safe
+     area, padding); the framing fits the shot above the controls. */
   .stage {
     position: relative;
-    aspect-ratio: 3 / 4;
-    /* On a phone, keep the phase issues + scrubber on screen above the tab
-       bar (header ≈ 56, issues ≈ 64, scrubber ≈ 64, gaps/padding ≈ 64,
-       tab bar 84 + safe area). The framing adapts to any stage size. */
-    max-height: calc(100dvh - 332px - env(safe-area-inset-bottom));
-    min-height: 260px;
+    height: calc(100dvh - 160px - env(safe-area-inset-bottom));
+    min-height: 420px;
     background: #000;
     border-radius: var(--sc-radius);
     overflow: hidden;
     display: grid;
     place-content: center;
   }
-  /* Positioned + sized by the shot framing (same transform as the pose). */
-  .frames-progress {
-    color: var(--sc-text-dim);
-  }
   .clip {
     position: absolute;
     object-fit: fill;
     background: #000;
-  }
-  .play {
-    width: 40px;
-    height: 32px;
-    margin-right: 8px;
-    border: 1px solid var(--sc-border);
-    border-radius: 8px;
-    background: var(--sc-card);
-    color: var(--sc-text);
-    cursor: pointer;
-  }
-  .approx {
-    position: absolute;
-    right: 6px;
-    bottom: 6px;
-    padding: 2px 6px;
-    border-radius: 6px;
-    background: rgb(0 0 0 / 60%);
-    color: #cbd5e1;
-    font-size: 10px;
   }
   .skeleton {
     position: absolute;
@@ -1010,115 +1479,262 @@
     width: 100%;
     height: 100%;
   }
+  .approx {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 60%);
+    color: #cbd5e1;
+    font-size: 10px;
+  }
   .no-poses {
     padding: var(--sc-space-4);
     text-align: center;
   }
-  .phase-overlay {
-    padding: 6px 2px 0;
-    min-height: 58px;
+  .callout {
+    position: absolute;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    max-width: calc(100% - 20px);
+    background: rgb(250 250 252 / 96%);
+    color: #141821;
+    border-radius: 14px;
+    padding: 8px 8px 8px 10px;
+    box-shadow: 0 6px 20px rgb(0 0 0 / 30%);
+    cursor: pointer;
+    z-index: 2;
+  }
+  .callout .num {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 15px;
+    color: #141821;
+  }
+  .callout .ct {
+    min-width: 0;
+  }
+  .callout b {
+    display: block;
+    font-size: 15px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .callout .sub {
+    font-size: 12.5px;
+    color: #4a5263;
+  }
+  .spk {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: #e6e9ef;
+    color: #141821;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .chooser {
+    position: absolute;
+    z-index: 3;
+    width: 220px;
+    background: rgb(250 250 252 / 97%);
+    color: #141821;
+    border-radius: 14px;
+    padding: 8px;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
     display: flex;
     flex-direction: column;
     gap: 4px;
-    pointer-events: none;
   }
-  .po-head {
-    font-size: 0.68rem;
-    letter-spacing: 0.03em;
-    color: #cbd5e1;
+  .chooser p {
+    margin: 2px 6px 4px;
+    font-size: 11px;
+    color: #5d6677;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
-  .po-chips {
+  .chooser button {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    gap: 10px;
+    align-items: center;
+    text-align: left;
+    border: 1.5px solid transparent;
+    background: #eef0f4;
+    border-radius: 10px;
+    padding: 7px 9px;
+    font: 600 13.5px var(--sc-font);
+    color: #141821;
+    cursor: pointer;
   }
-  .po-chip {
-    font-size: 0.72rem;
-    padding: 2px 7px;
+  .chooser button.on {
+    border-color: var(--sc-primary);
+  }
+  .chooser small {
+    display: block;
+    font-weight: 400;
+    font-size: 11px;
+    color: #5d6677;
+  }
+  .chip {
+    flex: none;
+    min-width: 26px;
+    text-align: center;
+    padding: 1px 6px;
     border-radius: 999px;
-    background: rgb(251 191 36 / 18%);
-    border: 1px solid rgb(251 191 36 / 70%);
-    color: #fde68a;
+    font-weight: 800;
+    font-size: 12px;
+    color: #10131a;
   }
-  .po-chip.bad {
-    background: rgb(248 113 113 / 18%);
-    border-color: rgb(248 113 113 / 70%);
-    color: #fecaca;
+  .controls {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 18px 8px 6px;
+    background: linear-gradient(transparent, rgb(0 0 0 / 72%) 25%);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: #fff;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 4px;
+  }
+  .spacer {
+    width: 36px;
+  }
+  .pill {
+    height: 34px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: none;
+    background: rgb(255 255 255 / 22%);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    font: 600 14px var(--sc-font);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    cursor: pointer;
+  }
+  .round {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: rgb(255 255 255 / 22%);
+    color: #fff;
+    cursor: pointer;
   }
   .scrubber {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 4px;
   }
   .track {
     position: relative;
-    height: 6px;
-  }
-  .track.timing {
-    height: 14px;
-    margin-bottom: 4px;
-  }
-  .t-legend {
-    margin: 2px 0 0;
-    font-size: 0.75rem;
-    color: var(--sc-text-dim);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-  .t-legend .dot,
-  .t-legend .swatch {
-    display: inline-block;
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-  }
-  .t-legend .dot.first {
-    background: #94a3b8;
-  }
-  .t-legend .dot.second {
-    background: #fbbf24;
-  }
-  .t-legend .swatch {
-    width: 14px;
-    border-radius: 2px;
-    background: rgb(52 211 153 / 35%);
-    border: 1px dashed #34d399;
-  }
-  .t-band {
-    position: absolute;
-    top: 0;
     height: 12px;
-    border-radius: 3px;
-    background: rgb(52 211 153 / 35%);
-    border: 1px dashed #34d399;
+    margin: 0 8px;
   }
-  .t-event {
-    position: absolute;
-    top: 1px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    transform: translateX(-5px);
-    border: 2px solid #fff;
-  }
-  .t-event.first {
-    background: #94a3b8;
-  }
-  .t-event.second {
-    background: #fbbf24;
-  }
-  .marker {
+  .tick {
     position: absolute;
     top: 0;
-    width: 2px;
-    height: 6px;
-    background: var(--sc-primary);
-    transform: translateX(-1px);
+    width: 4px;
+    height: 12px;
+    border-radius: 2px;
+    transform: translateX(-2px);
+  }
+  .hold {
+    position: absolute;
+    bottom: -3px;
+    height: 3px;
+    border-radius: 2px;
+    background: #fff;
+    opacity: 0.85;
   }
   .scrubber input {
     width: 100%;
+    accent-color: #4aa3ff;
+    margin: 0;
+  }
+  .icons,
+  .labels {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    justify-items: center;
+  }
+  .icons button {
+    position: relative;
+    width: 44px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    background: none;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .icons button.on {
+    border-color: #fff;
+  }
+  .icons button:disabled {
+    opacity: 0.35;
+  }
+  .icons svg {
+    width: 70%;
+    height: 70%;
+    overflow: visible;
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+  }
+  .icons .sev {
+    position: absolute;
+    top: 3px;
+    right: 6px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1.5px solid #000;
+  }
+  .labels span {
+    font-size: 10px;
+    color: rgb(255 255 255 / 70%);
+  }
+  .labels span.on {
+    color: #fff;
+    font-weight: 600;
+  }
+  button:focus-visible,
+  .callout:focus-visible {
+    outline: 2px solid var(--sc-primary);
+    outline-offset: 2px;
+  }
+  .below {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .frames-progress {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--sc-text-dim);
   }
   .video-debug {
     margin-top: 0.5rem;
@@ -1147,16 +1763,6 @@
     margin: 0.25rem 0 0;
     font-size: 0.75rem;
     color: var(--sc-text-dim);
-  }
-  .scrub-meta {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.78rem;
-    color: var(--sc-text-dim);
-  }
-  .phase-tag {
-    color: var(--sc-primary);
-    font-weight: 600;
   }
   .dim {
     color: var(--sc-text-dim);

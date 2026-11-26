@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { LiveTargetsV3, PoseData } from "basketball-shot-analysis";
+import type { KeyframeTargets, PoseData } from "basketball-shot-analysis";
 import { poseDataToLandmarkFrames } from "$lib/features/analysis/replay/replay-pipeline";
 import {
   captureTiming,
@@ -12,10 +12,10 @@ import { replayCapture } from "../replay-capture";
 
 const targets = JSON.parse(
   readFileSync(
-    join(process.cwd(), "static", "reference", "live-targets-v3.json"),
+    join(process.cwd(), "static", "reference", "live-targets-keyframes.json"),
     "utf8",
   ),
-) as LiveTargetsV3;
+) as KeyframeTargets;
 const fixture = JSON.parse(
   readFileSync(
     join(

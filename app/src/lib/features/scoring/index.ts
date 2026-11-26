@@ -29,13 +29,3 @@ export {
   type ScoringService,
   type ScoringServiceDeps,
 } from "./service";
-export { default as FocusSheet } from "./FocusSheet.svelte";
-export {
-  FOCUS_AREAS,
-  focusSummary,
-  metricMatchesAreas,
-  normalizeAreas,
-  selectFocusWorst,
-  type FocusArea,
-  type FocusMetric,
-} from "./focus";

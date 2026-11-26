@@ -1,7 +1,7 @@
 /**
- * How much do shot detection and v3 metrics change when pose frames arrive
+ * How much do shot detection and the keyframe checks change when pose frames arrive
  * at 10 or 15 fps instead of 30? Subsamples every recorded pose track
- * (test-data/ + the app fixtures), runs the same detection + v3 metrics, and
+ * (test-data/ + the app fixtures), runs the same detection + keyframe checks, and
  * matches shots by time.
  *
  *   FPS_REPORT=1 npx vitest run src/lib/features/live-practice/debug/__tests__/fps-compare.test.ts
@@ -17,7 +17,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "vitest";
-import type { LiveTargetsV3, PoseData } from "basketball-shot-analysis";
+import type { KeyframeTargets, PoseData } from "basketball-shot-analysis";
 import type { LandmarkFrame } from "$lib/features/analysis";
 import {
   landmarkFramesToPoseData,
@@ -27,18 +27,18 @@ import {
 import {
   POSE_PAD_AFTER,
   POSE_PAD_BEFORE,
-  scoreShotV3,
-  v3ForPoses,
-} from "$lib/features/scoring/v3";
+  keyframesForPoses,
+  scoreShotKeyframes,
+} from "$lib/features/scoring/keyframes";
 import type { ReviewPoseFrame, ShotReviewPoses } from "$lib/shared/db/repos";
 
 const ROOT = join(process.cwd(), "..", "test-data");
 const targets = JSON.parse(
   readFileSync(
-    join(process.cwd(), "static", "reference", "live-targets-v3.json"),
+    join(process.cwd(), "static", "reference", "live-targets-keyframes.json"),
     "utf8",
   ),
-) as LiveTargetsV3;
+) as KeyframeTargets;
 
 interface ShotOut {
   /** Mid time of the shot (ms). */
@@ -47,7 +47,7 @@ interface ShotOut {
   metrics: Record<string, { value: number; reliable: boolean; unit: string }>;
 }
 
-/** Detection + v3 for a frame stream, with `fps` passed to the detector. */
+/** Detection + keyframe checks for a frame stream, with `fps` passed to the detector. */
 function analyse(
   frames: LandmarkFrame[],
   fps: number,
@@ -85,12 +85,12 @@ function analyse(
         a.frameRange.end + POSE_PAD_AFTER + 1,
       ),
     };
-    const v3 = v3ForPoses(poses, hand);
-    const card = scoreShotV3(v3.metrics, targets);
+    const kf = keyframesForPoses(poses, hand);
+    const card = scoreShotKeyframes(kf, targets);
     const t0 = review[a.frameRange.start]?.t ?? 0;
     const t1 = review[a.frameRange.end]?.t ?? t0;
     const metrics: ShotOut["metrics"] = {};
-    for (const [id, m] of Object.entries(v3.metrics))
+    for (const [id, m] of Object.entries(kf.checks))
       if (typeof m.value === "number" && isFinite(m.value))
         metrics[id] = { value: m.value, reliable: m.reliable, unit: m.unit };
     return { t: (t0 + t1) / 2, overall: card.overall, metrics };
