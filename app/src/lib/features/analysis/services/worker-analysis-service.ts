@@ -78,6 +78,8 @@ export const DEFAULT_LIVE_SESSION_OPTIONS: Required<LiveSessionOptions> = {
   windowFrames: 30,
   warmupFrames: 15,
   debugDetectDelayMs: 0,
+  delegate: "GPU",
+  offlineModel: "full",
 };
 
 function defaultMakeWorker(): WorkerLike {
@@ -113,6 +115,8 @@ export class AnalysisWorkerError extends Error {
 
 interface WorkerHandle {
   worker: WorkerLike;
+  /** Where the worker's detector runs (from its last "ready"; null = unknown). */
+  readonly delegate: "GPU" | "CPU" | null;
   send(message: ToWorkerMessage, transfer?: Transferable[]): void;
   waitReady(): Promise<void>;
   waitResult(): Promise<AnalysisResult>;
@@ -131,6 +135,7 @@ function wrapWorker(worker: WorkerLike): WorkerHandle {
   let posesReject: ((err: Error) => void) | null = null;
   let progressCb: ProgressCallback | null = null;
   let landmarksCb: ((frame: LandmarkFrame) => void) | null = null;
+  let delegate: "GPU" | "CPU" | null = null;
 
   const fail = (err: Error) => {
     readyReject?.(err);
@@ -151,6 +156,7 @@ function wrapWorker(worker: WorkerLike): WorkerHandle {
     }
     switch (message.type) {
       case "ready":
+        delegate = message.delegate ?? null;
         readyResolve?.();
         readyResolve = readyReject = null;
         break;
@@ -183,6 +189,9 @@ function wrapWorker(worker: WorkerLike): WorkerHandle {
 
   return {
     worker,
+    get delegate() {
+      return delegate;
+    },
     send: (message, transfer) => worker.postMessage(message, transfer),
     waitReady: () =>
       new Promise<void>((resolve, reject) => {
@@ -395,11 +404,13 @@ export function createWorkerAnalysisService(
           opts: { shootingHand: opts.shootingHand, profile: opts.profile },
           mode: "live",
           fps,
-          // Always the full model: this is the accurate pass.
+          // The accurate pass: the full model unless told otherwise.
           assets: {
             wasmBasePath: assets.wasmBasePath,
-            modelPath: assets.modelPath,
+            modelPath:
+              live.offlineModel === "lite" ? liteModelPath : assets.modelPath,
           },
+          delegate: live.delegate,
           ...(live.debugDetectDelayMs > 0
             ? { debugDetectDelayMs: live.debugDetectDelayMs }
             : {}),
@@ -475,6 +486,7 @@ export function createWorkerAnalysisService(
               wasmBasePath: assets.wasmBasePath,
               modelPath: model === "lite" ? liteModelPath : assets.modelPath,
             },
+            delegate: live.delegate,
             ...(live.debugDetectDelayMs > 0
               ? { debugDetectDelayMs: live.debugDetectDelayMs }
               : {}),
@@ -607,6 +619,9 @@ export function createWorkerAnalysisService(
             framesSkipped: skipped,
             maxInFlight,
             fallbacks,
+            delegate: handle?.delegate ?? null,
+            offlineDelegate: offline?.delegate ?? null,
+            offlineModel: live.offlineModel,
           };
         },
 

@@ -81,6 +81,9 @@ export interface PoseDetector {
    */
   detect(frame: VideoFrame): Promise<PoseDetectionResult>;
 
+  /** Where detection runs, when the detector knows (browser MediaPipe). */
+  readonly delegate?: "GPU" | "CPU";
+
   /**
    * Releases resources used by the detector.
    *

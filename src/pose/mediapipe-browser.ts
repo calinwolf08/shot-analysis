@@ -139,18 +139,43 @@ export interface MediaPipeBrowserConfig {
  *
  * @returns true if WebGL is available, false otherwise
  */
-export function detectWebGLSupport(): boolean {
-  if (typeof document === "undefined") {
-    return false;
-  }
+/** Software WebGL (no real GPU): slower than MediaPipe's CPU path. */
+const SOFTWARE_RENDERER =
+  /swiftshader|llvmpipe|softpipe|software|basic render/i;
 
+type GL = WebGLRenderingContext | WebGL2RenderingContext;
+
+/** A real (hardware) WebGL context: present, and not a software renderer. */
+function isHardware(gl: GL | null): boolean {
+  if (!gl) return false;
   try {
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = info
+      ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))
+      : String(gl.getParameter(gl.RENDERER));
+    return !SOFTWARE_RENDERER.test(renderer);
+  } catch {
+    return true;
+  }
+}
+
+export function detectWebGLSupport(): boolean {
+  // Web workers have no document; WebGL there goes through OffscreenCanvas
+  // (where MediaPipe's GPU delegate runs too). A software renderer (a
+  // blocklisted GPU, a headless browser) counts as no WebGL: MediaPipe's
+  // GPU delegate on it is several times slower than its CPU path.
+  try {
+    if (typeof document === "undefined") {
+      if (typeof OffscreenCanvas === "undefined") return false;
+      const c = new OffscreenCanvas(1, 1);
+      return isHardware(
+        (c.getContext("webgl2") ?? c.getContext("webgl")) as GL | null,
+      );
+    }
     const canvas = document.createElement("canvas");
-    const gl =
-      canvas.getContext("webgl2") ||
-      canvas.getContext("webgl") ||
-      canvas.getContext("experimental-webgl");
-    return gl !== null;
+    return isHardware(
+      (canvas.getContext("webgl2") ?? canvas.getContext("webgl")) as GL | null,
+    );
   } catch {
     return false;
   }
@@ -185,6 +210,8 @@ export function detectWebGLSupport(): boolean {
 export class MediaPipeBrowserDetector implements PoseDetector {
   private readonly landmarker: PoseLandmarker;
   private readonly runningMode: "IMAGE" | "VIDEO";
+  /** Where detection actually runs (after any fallback). */
+  readonly delegate: "GPU" | "CPU";
   private closed = false;
 
   /**
@@ -193,9 +220,11 @@ export class MediaPipeBrowserDetector implements PoseDetector {
   private constructor(
     landmarker: PoseLandmarker,
     runningMode: "IMAGE" | "VIDEO",
+    delegate: "GPU" | "CPU",
   ) {
     this.landmarker = landmarker;
     this.runningMode = runningMode;
+    this.delegate = delegate;
   }
 
   /**
@@ -252,12 +281,11 @@ export class MediaPipeBrowserDetector implements PoseDetector {
     }
 
     let landmarker: PoseLandmarker;
-
-    try {
-      landmarker = await PoseLandmarker.createFromOptions(vision, {
+    const createWith = (d: RuntimeDelegate) =>
+      PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath: modelPath,
-          delegate: actualDelegate,
+          delegate: d,
         },
         runningMode: runningMode,
         numPoses: 1,
@@ -265,6 +293,21 @@ export class MediaPipeBrowserDetector implements PoseDetector {
         minTrackingConfidence: minTrackingConfidence,
         minPosePresenceConfidence: minPresenceConfidence,
       });
+
+    try {
+      try {
+        landmarker = await createWith(actualDelegate);
+      } catch (gpuError) {
+        // WebGL present but the GPU delegate still failed (driver, context
+        // limits): fall back to CPU, as for missing WebGL.
+        if (
+          actualDelegate !== RuntimeDelegate.GPU ||
+          webglFallback !== WebGLFallbackBehavior.AUTO
+        )
+          throw gpuError;
+        actualDelegate = RuntimeDelegate.CPU;
+        landmarker = await createWith(actualDelegate);
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -288,7 +331,11 @@ export class MediaPipeBrowserDetector implements PoseDetector {
       );
     }
 
-    return new MediaPipeBrowserDetector(landmarker, runningMode);
+    return new MediaPipeBrowserDetector(
+      landmarker,
+      runningMode,
+      actualDelegate === RuntimeDelegate.GPU ? "GPU" : "CPU",
+    );
   }
 
   /**

@@ -157,11 +157,19 @@ async function createDetector(
     wasmBasePath,
     modelPath,
     runningMode: "VIDEO",
+    ...(delegate ? { delegate } : {}),
   });
+}
+
+/** The detector's delegate, for the "ready" reply. */
+function ready(): void {
+  const d = state.detector?.delegate;
+  post(d ? { type: "ready", delegate: d } : { type: "ready" });
 }
 
 let wasmBasePath = "";
 let debugDetectDelayMs = 0;
+let delegate: "GPU" | "CPU" | undefined;
 
 /**
  * Messages are handled strictly in order: handlers are async (detection
@@ -206,11 +214,12 @@ async function handle(
         state.height = 0;
         wasmBasePath = message.assets.wasmBasePath;
         debugDetectDelayMs = message.debugDetectDelayMs ?? 0;
+        delegate = message.delegate;
         state.detector = await createDetector(
           wasmBasePath,
           message.assets.modelPath,
         );
-        post({ type: "ready" });
+        ready();
         break;
       }
       case "setModel": {
@@ -218,7 +227,7 @@ async function handle(
         state.detector = null;
         await old?.close();
         state.detector = await createDetector(wasmBasePath, message.modelPath);
-        post({ type: "ready" });
+        ready();
         break;
       }
       case "frames":

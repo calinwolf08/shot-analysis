@@ -6,7 +6,7 @@
  *
  *   setup    = ballDropStart   — the moment before the ball starts dropping
  *   load     = ballRiseStart   — the moment before the wrists/ball start rising
- *   rise     = setPointReached — the ball reaches set point
+ *   rise     = setPointReached — the ball reaches set point (80 % of the climb)
  *   setPoint = setPoint        — last moment before the release (elbow starts extending)
  *   release  = armExtended     — the arm finishes extending
  *
@@ -22,8 +22,8 @@
  */
 import {
   detectEvents,
-  extremum,
   frameAt,
+  reachFraction,
   sampleAt,
   timeAt,
   valueAt,
@@ -55,9 +55,13 @@ import {
  * stored shots are recomputed. 2: body lengths, x scale and centre-line flag
  * stored for drawing the target zones. 3: every check measured from the
  * smoothed joint positions at the keyframe, which are stored (`points`) so
- * the review draws exactly what was measured.
+ * the review draws exactly what was measured. 4: set point / release found
+ * past a hitch on the way up (a deep re-bend of the elbow), not at it.
+ * 5: measured on an even time grid (dropped frames / sampling phase no longer
+ * move the keyframes); Rise from the hand's height, Load past one-sample
+ * stalls.
  */
-export const KEYFRAME_SCHEMA_VERSION = 3 as const;
+export const KEYFRAME_SCHEMA_VERSION = 5 as const;
 
 /** Joints a keyframe's checks are measured from (stored per keyframe). */
 export const KEYFRAME_JOINTS = [
@@ -80,10 +84,10 @@ export type KeyframePoints = Readonly<
 >;
 
 /**
- * The ball has "reached" set point once the wrist's upward speed falls below
- * this share of its fastest rise.
+ * The ball has "reached" set point once the hand has covered this share of
+ * its climb, from its lowest point to its height at the set point.
  */
-export const ARRIVAL_SPEED_FRACTION = 0.35;
+export const ARRIVAL_HEIGHT_FRACTION = 0.8;
 
 export interface KeyframeCheck {
   readonly keyframe: Keyframe;
@@ -132,11 +136,66 @@ export interface KeyframeOptions {
   segmentLengths?: SegmentLengths;
 }
 
+/**
+ * The frames on an even time grid (the median frame spacing), landmarks
+ * interpolated between neighbouring frames. Smoothing and onset detection
+ * work per sample, so without this a dropped frame (recordings drop ~1 in
+ * 15) or a different sampling phase of the same motion moves the keyframes —
+ * by up to ~150 ms on a real clip. On the grid, the same motion gives the
+ * same keyframes however it was sampled. `frameIndex` is interpolated too,
+ * so keyframes still come back as (fractional) source frames.
+ */
+export function resampleUniform(frames: readonly SignalFrame[]): SignalFrame[] {
+  if (frames.length < 3) return [...frames];
+  const ts = frames.map((f) => f.timestamp);
+  const d: number[] = [];
+  for (let i = 1; i < ts.length; i++) {
+    const x = ts[i]! - ts[i - 1]!;
+    if (x > 0) d.push(x);
+  }
+  if (d.length === 0) return [...frames];
+  const dt = [...d].sort((a, b) => a - b)[Math.floor(d.length / 2)]!;
+  const t0 = ts[0]!;
+  const tN = ts.at(-1)!;
+  const n = Math.floor((tN - t0) / dt + 1e-9) + 1;
+  const out: SignalFrame[] = [];
+  let i = 0;
+  for (let k = 0; k < n; k++) {
+    const t = t0 + k * dt;
+    while (i < ts.length - 2 && ts[i + 1]! <= t) i++;
+    const a = frames[i]!;
+    const b = frames[i + 1]!;
+    const span = ts[i + 1]! - ts[i]!;
+    const u = span > 0 ? Math.max(0, Math.min(1, (t - ts[i]!) / span)) : 0;
+    const la = a.landmarks;
+    const lb = b.landmarks;
+    const landmarks =
+      la && lb && la.length === lb.length
+        ? la.map((p, j) => {
+            const q = lb[j]!;
+            return {
+              x: p.x + u * (q.x - p.x),
+              y: p.y + u * (q.y - p.y),
+              visibility: p.visibility + u * (q.visibility - p.visibility),
+            };
+          })
+        : u < 0.5
+          ? la
+          : lb;
+    out.push({
+      frameIndex: a.frameIndex + u * (b.frameIndex - a.frameIndex),
+      timestamp: t,
+      landmarks,
+    });
+  }
+  return out;
+}
+
 export function computeShotKeyframes(
   frames: readonly SignalFrame[],
   opts: KeyframeOptions,
 ): ShotKeyframes {
-  const sig = computeSignals(frames, opts);
+  const sig = computeSignals(resampleUniform(frames), opts);
   const detected = detectEvents(sig);
   const ev = opts.events
     ? overrideEvents(sig, detected, opts.events)
@@ -145,10 +204,12 @@ export function computeShotKeyframes(
 }
 
 /**
- * The ball reaching set point: after the elbow is most bent on the way up,
- * the first point where the wrist's upward speed drops below
- * `ARRIVAL_SPEED_FRACTION` of its fastest rise — interpolated. Never after
- * `setPoint` (a one-motion shot arrives and releases together).
+ * The ball reaching set point: the first point after the ball's lowest where
+ * the hand has covered `ARRIVAL_HEIGHT_FRACTION` of its climb to its height
+ * at `setPoint` — interpolated, never after `setPoint` (a one-motion shot
+ * arrives and releases together). Read from the hand's height, not its
+ * speed: the speed of a fast-moving wrist is noisy (small, blurred frames),
+ * its height isn't.
  */
 export function setPointReached(
   sig: ShotSignals,
@@ -156,38 +217,12 @@ export function setPointReached(
 ): number | null {
   const sp = ev.setPoint;
   if (sp === null) return null;
-  const from = ev.ballRiseStart ?? ev.ballLowest;
+  const from = ev.ballLowest ?? ev.ballRiseStart;
   if (from === null || from >= sp) return sp;
-  const elbowMin = extremum(sig.elbowAngle, from, sp, "min") ?? from;
-  // Upward speed between samples i and i+1 (screen y grows downward).
-  const up = (i: number): number | null => {
-    const a = sig.wristY[i];
-    const b = sig.wristY[i + 1];
-    if (a === null || a === undefined || b === null || b === undefined)
-      return null;
-    const dt = sig.t[i + 1]! - sig.t[i]!;
-    return dt > 0 ? (a - b) / dt : null;
-  };
-  let peak = 0;
-  for (let i = Math.floor(from); i < Math.ceil(sp); i++) {
-    const v = up(i);
-    if (v !== null && v > peak) peak = v;
-  }
-  if (peak <= 0) return sp;
-  const thr = ARRIVAL_SPEED_FRACTION * peak;
-  let prev: { at: number; v: number } | null = null;
-  for (let i = Math.floor(elbowMin); i < Math.ceil(sp); i++) {
-    const v = up(i);
-    if (v === null) continue;
-    const at = i + 0.5;
-    if (v < thr) {
-      if (!prev) return Math.max(elbowMin, Math.min(sp, at));
-      const f = prev.v === v ? 0 : (prev.v - thr) / (prev.v - v);
-      return Math.max(elbowMin, Math.min(sp, prev.at + f * (at - prev.at)));
-    }
-    prev = { at, v };
-  }
-  return sp;
+  const at = reachFraction(sig.wristY, from, sp, ARRIVAL_HEIGHT_FRACTION);
+  if (at === null) return sp;
+  const lo = ev.ballRiseStart ?? from;
+  return Math.max(Math.min(lo, sp), Math.min(sp, at));
 }
 
 /** The five keyframes as fractional SAMPLE indexes. */

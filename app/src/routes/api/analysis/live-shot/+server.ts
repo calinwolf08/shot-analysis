@@ -35,6 +35,7 @@ export const POST = withUser(async (ctx, event) => {
       profile: profileForLevel(player.level),
     },
     ...(body.focusIndex !== undefined ? { focusIndex: body.focusIndex } : {}),
+    ...(body.missedStartMs ? { missedStartMs: body.missedStartMs } : {}),
   });
   // { shots, rejected } — rejected = detected but wrong camera angle.
   return json(result, 201);

@@ -150,6 +150,10 @@ export interface LiveSessionOptions {
   readonly warmupFrames?: number;
   /** Dev/E2E only: extra ms per detection in the worker (slow-phone sim). */
   readonly debugDetectDelayMs?: number;
+  /** Where to run pose detection (default GPU, falling back to CPU). */
+  readonly delegate?: "GPU" | "CPU";
+  /** Model for the full-rate (offline) re-check (default full). */
+  readonly offlineModel?: "full" | "lite";
 }
 
 export interface LiveSessionStats {
@@ -165,6 +169,11 @@ export interface LiveSessionStats {
   readonly maxInFlight: number;
   /** Times the session fell back to the lite model. */
   readonly fallbacks: number;
+  /** Where live detection actually runs (null = not known yet). */
+  readonly delegate?: "GPU" | "CPU" | null;
+  /** The full-rate re-check's detector: where it runs, and its model. */
+  readonly offlineDelegate?: "GPU" | "CPU" | null;
+  readonly offlineModel?: "full" | "lite";
 }
 
 /** One batch of offline (full-rate) pose detection; see detectOffline. */

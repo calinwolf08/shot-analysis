@@ -118,7 +118,7 @@ describe("analyzeAndScore (isomorphic core)", () => {
     } as unknown as typeof analysis;
     const refreshed = ensureKeyframes(outdated, stored, "right")!;
     expect(refreshed.recomputed).toBe(true);
-    expect(refreshed.analysis.keyframes!.schemaVersion).toBe(3);
+    expect(refreshed.analysis.keyframes!.schemaVersion).toBe(5);
     // …but without a track it keeps what it has.
     expect(ensureKeyframes(outdated, null, "right")!.recomputed).toBe(false);
     // Already current → untouched; no pose track → can't migrate.
@@ -237,5 +237,39 @@ describe("one shot per rep (focusIndex)", () => {
     );
     expect(shots).toEqual([]);
     expect(rejected).toHaveLength(1);
+  });
+});
+
+describe("a rep whose start wasn't tracked (missedStartMs)", () => {
+  // Cut the track just after the first shot's Setup: tracking began mid-dip.
+  const first = analyzeAndScore(pose, opts, targets).shots[0]!;
+  const setupFrame = first.reviewPoses.frames.find(
+    (f) =>
+      f.frameIndex >= Math.floor(first.analysis.keyframes!.keyframes.setup!),
+  )!;
+  const cutAt = pose.frames.findIndex(
+    (f) => f.timestamp * 1000 > (setupFrame.t ?? 0) + 30,
+  );
+  const cut: PoseData = { ...pose, frames: pose.frames.slice(cutAt) };
+  const setupChecks = (r: ReturnType<typeof analyzeAndScore>) =>
+    Object.values(r.shots[0]!.analysis.keyframes!.checks).filter(
+      (c) => c.keyframe === "setup",
+    );
+
+  it("leaves Setup unscored when it sits at the first tracked frame", () => {
+    const r = analyzeAndScore(cut, opts, targets, undefined, undefined, 1000);
+    expect(r.shots.length).toBeGreaterThan(0);
+    const setup = setupChecks(r);
+    expect(setup.length).toBeGreaterThan(0);
+    expect(setup.every((c) => !c.reliable)).toBe(true);
+    // The rest is still measured.
+    expect(
+      r.shots[0]!.analysis.keyframes!.checks["release.elbow_bend"]!.reliable,
+    ).toBe(true);
+  });
+
+  it("scores Setup as usual when the whole pre-roll was tracked", () => {
+    const r = analyzeAndScore(pose, opts, targets, undefined, undefined, 0);
+    expect(setupChecks(r).some((c) => c.reliable)).toBe(true);
   });
 });

@@ -36,24 +36,30 @@ function recorder(startTs: number): ShotClipRecorder & { starts: number } {
   return r as unknown as ShotClipRecorder & { starts: number };
 }
 
-/** Detector returning a pose for every pushed frame (or `posed` of them). */
+/** Detector returning a pose for every pushed frame (or `posed` of them); one batch per call. */
 function session(posedEvery = 1) {
   const pushed: { timestamp: number }[] = [];
   return {
     pushed,
-    detectOffline: () => ({
-      push: (f: { timestamp: number; frameIndex: number }) => pushed.push(f),
-      finish: async () =>
-        pushed.map(
-          (f, i): LandmarkFrame => ({
-            frameIndex: i,
-            timestamp: f.timestamp,
-            poseConfidence: 0.9,
-            landmarks: i % posedEvery === 0 ? lm : null,
-          }),
-        ),
-      cancel: vi.fn(),
-    }),
+    detectOffline: () => {
+      const batch: { timestamp: number }[] = [];
+      return {
+        push: (f: { timestamp: number; frameIndex: number }) => {
+          batch.push(f);
+          pushed.push(f);
+        },
+        finish: async () =>
+          batch.map(
+            (f, i): LandmarkFrame => ({
+              frameIndex: i,
+              timestamp: f.timestamp,
+              poseConfidence: 0.9,
+              landmarks: i % posedEvery === 0 ? lm : null,
+            }),
+          ),
+        cancel: vi.fn(),
+      };
+    },
   };
 }
 
@@ -125,6 +131,110 @@ describe("full-rate refiner", () => {
       ok: false,
       reason: "too few posed frames",
     });
+  });
+
+  it("re-detects only the guessed keyframe span, keeping live frames around it", async () => {
+    decode30.mockClear();
+    const reports: RefineReport[] = [];
+    const r = createFullRateRefiner({
+      session: session(),
+      decode: decode30,
+      span: () => ({ fromTs: 1500, toTs: 2200 }),
+    });
+    r.onReport((x) => reports.push(x));
+    r.setRecorder(recorder(500));
+    const out = (await r.refine(liveWindow()))!;
+    // Span ± 200 ms margin: pose clock 1300 → 2400 = clip 0.8 → 1.9 s.
+    expect(decode30).toHaveBeenCalledTimes(1);
+    expect(decode30.mock.calls[0]![1]).toBeCloseTo(0.8);
+    expect(decode30.mock.calls[0]![2]).toBeCloseTo(1.9);
+    // Live frames (10 fps) before and after, 30 fps in between.
+    expect(out.filter((f) => f.timestamp < 1300).length).toBe(3);
+    expect(out.filter((f) => f.timestamp > 2450).length).toBe(6);
+    expect(
+      out.filter((f) => f.timestamp >= 1300 && f.timestamp <= 2400).length,
+    ).toBeGreaterThan(30);
+    for (let i = 1; i < out.length; i++)
+      expect(out[i]!.timestamp).toBeGreaterThan(out[i - 1]!.timestamp);
+    expect(reports[0]).toMatchObject({
+      ok: true,
+      spanMs: 1100,
+      windowMs: 2000,
+      extended: false,
+    });
+  });
+
+  it("extends the span once when a keyframe lands at its edge", async () => {
+    decode30.mockClear();
+    const reports: RefineReport[] = [];
+    let calls = 0;
+    const r = createFullRateRefiner({
+      session: session(),
+      decode: decode30,
+      // Live guess, then (on the merged frames) Setup right at the edge.
+      span: () =>
+        calls++ === 0
+          ? { fromTs: 1500, toTs: 2200 }
+          : { fromTs: 1350, toTs: 2200 },
+    });
+    r.onReport((x) => reports.push(x));
+    r.setRecorder(recorder(500));
+    const out = (await r.refine(liveWindow()))!;
+    expect(decode30).toHaveBeenCalledTimes(2);
+    // Extended 300 ms earlier: 1000 → 1299 ms = clip 0.5 → 0.799 s.
+    expect(decode30.mock.calls[1]![1]).toBeCloseTo(0.5);
+    expect(reports[0]).toMatchObject({
+      ok: true,
+      extended: true,
+      spanMs: 1400,
+    });
+    expect(out[0]!.timestamp).toBeCloseTo(1000, 0);
+  });
+
+  it("re-detects the whole window without a guess", async () => {
+    decode30.mockClear();
+    const r = createFullRateRefiner({
+      session: session(),
+      decode: decode30,
+      span: () => null,
+    });
+    r.setRecorder(recorder(500));
+    await r.refine(liveWindow());
+    expect(decode30.mock.calls[0]![1]).toBeCloseTo(0.5);
+    expect(decode30.mock.calls[0]![2]).toBeCloseTo(2.5);
+  });
+
+  it("re-detects the whole window when the guess is implausibly short", async () => {
+    decode30.mockClear();
+    const r = createFullRateRefiner({
+      session: session(),
+      decode: decode30,
+      // Release guessed right at the window's start: 1000 → 1200 ms inside it.
+      span: () => ({ fromTs: 0, toTs: 1000 }),
+    });
+    r.setRecorder(recorder(500));
+    await r.refine(liveWindow());
+    expect(decode30).toHaveBeenCalledTimes(1);
+    expect(decode30.mock.calls[0]![1]).toBeCloseTo(0.5);
+    expect(decode30.mock.calls[0]![2]).toBeCloseTo(2.5);
+  });
+
+  it("re-detects the pre-roll live tracking missed, from the recording", async () => {
+    decode30.mockClear();
+    const r = createFullRateRefiner({ session: session(), decode: decode30 });
+    const rec = recorder(200);
+    r.setRecorder(rec);
+    // Live frames only from 1000 ms (tracking was paused), but the window
+    // should start at 400 ms.
+    const out = (await r.refine({ ...liveWindow(), fromTs: 400 }))!;
+    expect(rec.takeCovering).toHaveBeenCalledWith(400);
+    expect(decode30.mock.calls[0]![1]).toBeCloseTo(0.2);
+    expect(out[0]!.timestamp).toBeLessThan(450);
+    // Not before the recording started.
+    decode30.mockClear();
+    r.setRecorder(recorder(700));
+    await r.refine({ ...liveWindow(), fromTs: 400 });
+    expect(decode30.mock.calls[0]![1]).toBeCloseTo(0);
   });
 
   it("falls back without a recording", async () => {

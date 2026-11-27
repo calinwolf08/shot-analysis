@@ -133,6 +133,8 @@ export const analyzeLiveShotBody = z.object({
   poseData: z.unknown(),
   /** Posed-frame index of the rep trigger (one shot per rep). */
   focusIndex: z.number().int().nonnegative().optional(),
+  /** Ms of the rep's pre-roll with no frames. */
+  missedStartMs: z.number().nonnegative().optional(),
 });
 export const analyzeSessionBody = z.object({
   playerId: z.string().min(1),

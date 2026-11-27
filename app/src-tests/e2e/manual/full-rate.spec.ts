@@ -49,8 +49,11 @@ test("shots are scored from frames re-detected at full rate", async ({
       });
       const play = HTMLMediaElement.prototype.play;
       HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
-        if (seeked.has(this) && isFinite(this.duration))
-          d.set!.call(this, this.duration);
+        if (seeked.has(this)) {
+          if (isFinite(this.duration)) d.set!.call(this, this.duration);
+          // Recordings (unknown duration): nothing plays at all.
+          else return Promise.resolve();
+        }
         return play.call(this);
       };
     });

@@ -21,7 +21,7 @@ import {
   type StoredShotAnalysis,
 } from "$lib/features/analysis/replay/replay-pipeline";
 import type { AnalyzeOptions } from "$lib/features/analysis";
-import type { KeyframeTargets } from "basketball-shot-analysis";
+import type { KeyframeTargets, ShotKeyframes } from "basketball-shot-analysis";
 import {
   POSE_PAD_AFTER,
   POSE_PAD_BEFORE,
@@ -132,6 +132,12 @@ export function analyzeAndScore(
    * (e.g. a whole uploaded video).
    */
   focusIndex?: number,
+  /**
+   * Live rep windows: ms of the rep's pre-roll that has no frames (tracking
+   * paused and the recording didn't cover it). A Setup this close to the
+   * first frame was pinned there, not found: its checks aren't scored.
+   */
+  missedStartMs = 0,
 ): AnalyzeAndScoreResult {
   const frames = poseDataToLandmarkFrames(pose);
   const allowed = allowedOrientations(opts.shootingHand);
@@ -172,12 +178,50 @@ export function analyzeAndScore(
     };
     const analysis: StoredShotAnalysis = {
       ...(a as StoredShotAnalysis),
-      keyframes: keyframesForPoses(reviewPoses, opts.shootingHand),
+      keyframes: setupUnseen(
+        keyframesForPoses(reviewPoses, opts.shootingHand),
+        reviewPoses,
+        allFrames[0]?.t,
+        missedStartMs,
+      ),
     };
     const scorecard = scoreShotKeyframes(analysis.keyframes!, targets);
     return { analysis, scorecard, worst: scorecard.worst, reviewPoses };
   });
   return { shots, rejected };
+}
+
+/** Pre-roll missing beyond this (ms) makes an early Setup suspect. */
+export const MISSED_START_MIN_MS = 300;
+/** A Setup within this (ms) of the first tracked frame is pinned there. */
+export const PINNED_SETUP_MS = 500;
+
+/**
+ * Setup's checks left unmeasured when the rep's start wasn't tracked and
+ * Setup sits at the first tracked frame: the dip began before tracking did.
+ */
+export function setupUnseen(
+  kf: ShotKeyframes,
+  poses: ShotReviewPoses,
+  firstTs: number | undefined,
+  missedStartMs: number,
+): ShotKeyframes {
+  const setup = kf.keyframes.setup;
+  if (missedStartMs < MISSED_START_MIN_MS || setup === null) return kf;
+  // Keyframes are source frame indexes (the review frames' frameIndex).
+  const t = poses.frames.find((f) => f.frameIndex >= Math.floor(setup))?.t;
+  if (t === undefined || firstTs === undefined) return kf;
+  if (t - firstTs > PINNED_SETUP_MS) return kf;
+  const checks = { ...kf.checks };
+  for (const [id, c] of Object.entries(checks))
+    if (c.keyframe === "setup")
+      checks[id] = {
+        ...c,
+        value: NaN,
+        reliable: false,
+        note: "the start of the shot wasn't tracked",
+      };
+  return { ...kf, checks };
 }
 
 /** The shot whose frame range is nearest `index` (inside = distance 0). */

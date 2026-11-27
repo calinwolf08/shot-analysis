@@ -12,9 +12,19 @@
  * kept for the shot's review: `takeClip`), so the recorder restarts at once
  * for the next shot.
  *
+ * Only the part of the rep that is scored is re-detected: the keyframes are
+ * guessed from the live frames (`span`), and the clip is decoded and
+ * re-detected from Setup − SPAN_MARGIN_MS to Release + SPAN_MARGIN_MS. Those
+ * frames replace the live ones in that span; the live frames around it stay,
+ * so shot detection and the keyframe search keep their context. If a keyframe
+ * found on the merged frames lands near an edge of the re-detected span (the
+ * live guess was off), that side is extended once. Without a guess, the whole
+ * rep window is re-detected.
+ *
  * Returns null (→ the caller falls back to the live frames) when there's no
  * recorder or clip, decoding fails, or too few frames come back with a pose.
  */
+import { computeShotKeyframes } from "basketball-shot-analysis";
 import type {
   LandmarkFrame,
   LiveAnalysisSession,
@@ -22,6 +32,7 @@ import type {
 } from "$lib/features/analysis";
 import {
   decodeClipRange,
+  type DecodeClipOptions,
   type DecodeClipStats,
   type DecodedClipFrame,
 } from "$lib/shared/media/clip-decode";
@@ -30,6 +41,102 @@ import type {
   ShotClipRecorder,
 } from "$lib/shared/media/shot-clip-recorder";
 import type { RepWindow } from "../coordinator/coordinator";
+
+/** Re-detected span: this much before Setup and after Release (ms). */
+export const SPAN_MARGIN_MS = 200;
+/**
+ * The span also reaches this far before Load (ms). Setup marks the slow start
+ * of the dip, which sparse live frames can place up to ~0.9 s late; Load (the
+ * ball turning up) they find reliably. 1.5 s keeps every recorded shot's
+ * Setup inside the re-detected span (see __tests__/span-compare.test.ts).
+ */
+export const SETUP_LOOKBACK_MS = 1500;
+/** A keyframe (Setup / Release) this close to the span's edge (ms) extends that side. */
+export const SPAN_EDGE_MS = 100;
+/** How far an edge is extended (ms). */
+export const SPAN_EXTEND_MS = 300;
+/**
+ * A guessed span shorter than this inside the window (ms) is a bad live
+ * guess (a real one is at least SETUP_LOOKBACK_MS long): the whole window is
+ * re-detected instead.
+ */
+export const MIN_SPAN_MS = 1000;
+
+/** Where the scored keyframes are (pose clock, ms); null = no guess. */
+export type KeyframeSpan = (
+  frames: readonly LandmarkFrame[],
+) => { readonly fromTs: number; readonly toTs: number } | null;
+
+interface LiveKeyframeOpts {
+  shootingHand: "left" | "right";
+  /** Frame width ÷ height (null = not known yet → no guess). */
+  aspect: () => number | null;
+}
+
+/** Setup / Load / Release on the pose clock, from (live) frames. */
+function keyframeTimes(
+  frames: readonly LandmarkFrame[],
+  opts: LiveKeyframeOpts,
+): {
+  setup: number | null;
+  load: number | null;
+  release: number | null;
+} | null {
+  const aspect = opts.aspect();
+  const posed = frames.filter((f) => f.landmarks && f.landmarks.length > 0);
+  if (!aspect || posed.length < 8) return null;
+  const kf = computeShotKeyframes(
+    posed.map((f, i) => ({
+      frameIndex: i,
+      timestamp: f.timestamp,
+      landmarks: f.landmarks,
+    })),
+    { aspect, shootingHand: opts.shootingHand },
+  );
+  // Fractional frame index → pose-clock time.
+  const at = (x: number | null) => {
+    if (x === null) return null;
+    const i = Math.max(0, Math.min(posed.length - 1, Math.floor(x)));
+    const j = Math.min(posed.length - 1, i + 1);
+    return (
+      posed[i]!.timestamp +
+      (x - i) * (posed[j]!.timestamp - posed[i]!.timestamp)
+    );
+  };
+  return {
+    setup: at(kf.keyframes.setup),
+    load: at(kf.keyframes.load),
+    release: at(kf.keyframes.release),
+  };
+}
+
+/**
+ * The keyframe span guess the practice loop uses: the keyframe checks'
+ * detection run on the (live) frames; Setup → Release on the pose clock.
+ */
+export function keyframeSpan(opts: LiveKeyframeOpts): KeyframeSpan {
+  return (frames) => {
+    const k = keyframeTimes(frames, opts);
+    if (!k) return null;
+    const setup = k.setup ?? k.load;
+    const r = k.release;
+    if (setup === null || r === null || !(r > setup)) return null;
+    const from =
+      k.load !== null ? Math.min(setup, k.load - SETUP_LOOKBACK_MS) : setup;
+    return { fromTs: from, toTs: r };
+  };
+}
+
+/**
+ * The shot's release (pose clock) in the live frames so far, for ending a
+ * rep at the release (LiveRepCoordinatorDeps.releaseAt): the same keyframe
+ * detection the scoring uses, so the two can't disagree about the moment.
+ */
+export function keyframeRelease(
+  opts: LiveKeyframeOpts,
+): (frames: readonly LandmarkFrame[]) => number | null {
+  return (frames) => keyframeTimes(frames, opts)?.release ?? null;
+}
 
 export interface RefineReport {
   readonly ok: boolean;
@@ -42,6 +149,11 @@ export interface RefineReport {
   /** Frames per second of the refined window (pose clock). */
   readonly fps: number | null;
   readonly decode?: DecodeClipStats;
+  /** Re-detected span (ms) vs the whole rep window (ms). */
+  readonly spanMs?: number;
+  readonly windowMs?: number;
+  /** The span was extended after the first pass. */
+  readonly extended?: boolean;
 }
 
 export interface FullRateRefiner {
@@ -57,7 +169,11 @@ export interface FullRateRefiner {
 
 export interface FullRateRefinerDeps {
   session: Pick<LiveAnalysisSession, "detectOffline">;
+  /** Guesses the keyframes' span from frames; omit to re-detect the whole window. */
+  span?: KeyframeSpan;
   decode?: typeof decodeClipRange;
+  /** Options for the decode (e.g. seek: false — fast-forward only). */
+  decodeOptions?: Pick<DecodeClipOptions, "seek" | "fastForwardRate">;
   /** Whole refinement budget (ms); past it the frames so far are used. */
   timeoutMs?: number;
   /** Fewer posed frames than this share of the live window's → fall back. */
@@ -120,68 +236,145 @@ export function createFullRateRefiner(
       // Pose clock → performance.now() (the recorder's clock).
       const frameToWall =
         last.captureTs !== undefined ? last.captureTs - last.timestamp : 0;
-      const take = await recorder.takeCovering(first.timestamp + frameToWall);
+      // From where the window should start: live tracking may have been
+      // paused for part of the pre-roll (the previous rep's re-check), but the
+      // recording kept going.
+      const wantFrom = Math.min(first.timestamp, window.fromTs ?? Infinity);
+      const take = await recorder.takeCovering(wantFrom + frameToWall);
       restart?.();
       if (!take) return fail("no clip");
       stash = { repStartTs: window.startedAt, take };
       const clipStartPose = take.startTs - frameToWall;
-      const fromS = Math.max(0, (first.timestamp - clipStartPose) / 1000);
-      const toS = (window.endedAt - clipStartPose) / 1000;
+      const winFrom = Math.min(
+        first.timestamp,
+        Math.max(wantFrom, clipStartPose),
+      );
+      const winTo = window.endedAt;
 
-      const detector: OfflinePoseDetector = deps.session.detectOffline();
-      let pushed = 0;
-      let lastTs = -Infinity;
-      let timedOut = false;
-      const timer = setTimeout(() => {
-        timedOut = true;
-        detector.cancel();
-      }, timeoutMs);
       let decodeStats: DecodeClipStats | undefined;
-      let frames: LandmarkFrame[] = [];
-      try {
-        decodeStats = await decode(
-          take.blob,
-          fromS,
-          toS,
-          (f: DecodedClipFrame) => {
-            const ts = Math.max(lastTs + 1, clipStartPose + f.mediaTime * 1000);
-            lastTs = ts;
-            detector.push({
-              data: f.data,
-              width: f.width,
-              height: f.height,
-              frameIndex: pushed++,
-              timestamp: ts,
-            });
+      let timedOut = false;
+      const deadline = t0 + timeoutMs;
+      /** Decode + re-detect one stretch of the clip (pose clock, ms). */
+      const detectRange = async (
+        fromTs: number,
+        toTs: number,
+      ): Promise<LandmarkFrame[]> => {
+        const detector: OfflinePoseDetector = deps.session.detectOffline!();
+        let pushed = 0;
+        let lastTs = -Infinity;
+        const timer = setTimeout(
+          () => {
+            timedOut = true;
+            detector.cancel();
           },
-          { cancelled: () => timedOut },
+          Math.max(0, deadline - now()),
         );
-        frames = await detector.finish();
+        try {
+          decodeStats = await decode(
+            take.blob,
+            Math.max(0, (fromTs - clipStartPose) / 1000),
+            (toTs - clipStartPose) / 1000,
+            (f: DecodedClipFrame) => {
+              const ts = Math.max(
+                lastTs + 1,
+                clipStartPose + f.mediaTime * 1000,
+              );
+              lastTs = ts;
+              detector.push({
+                data: f.data,
+                width: f.width,
+                height: f.height,
+                frameIndex: pushed++,
+                timestamp: ts,
+              });
+            },
+            { ...deps.decodeOptions, cancelled: () => timedOut },
+          );
+          return await detector.finish();
+        } catch (err) {
+          detector.cancel();
+          throw err;
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
+      // The scored span, guessed from the live frames (else the whole window).
+      const guess = deps.span?.(live) ?? null;
+      let from = guess
+        ? Math.max(winFrom, guess.fromTs - SPAN_MARGIN_MS)
+        : winFrom;
+      let to = guess ? Math.min(winTo, guess.toTs + SPAN_MARGIN_MS) : winTo;
+      if (!(to - from >= MIN_SPAN_MS)) [from, to] = [winFrom, winTo];
+
+      /** Live frames outside [a, b] around the re-detected ones. */
+      const merge = (
+        dense: LandmarkFrame[],
+        a: number,
+        b: number,
+      ): LandmarkFrame[] => [
+        ...live.filter((f) => f.timestamp < a),
+        ...dense,
+        ...live.filter((f) => f.timestamp > b),
+      ];
+
+      let dense: LandmarkFrame[] = [];
+      let extended = false;
+      try {
+        dense = await detectRange(from, to);
+        // A keyframe at an edge of the span: the live guess was off.
+        if (guess && dense.length > 0 && !timedOut) {
+          const again = deps.span!(merge(dense, from, to));
+          if (again) {
+            const before = again.fromTs < from + SPAN_EDGE_MS && from > winFrom;
+            const after = again.toTs > to - SPAN_EDGE_MS && to < winTo;
+            if (before) {
+              const nf = Math.max(
+                winFrom,
+                Math.min(from - SPAN_EXTEND_MS, again.fromTs - SPAN_MARGIN_MS),
+              );
+              dense = [...(await detectRange(nf, from - 1)), ...dense];
+              from = nf;
+              extended = true;
+            }
+            if (after && !timedOut) {
+              const nt = Math.min(
+                winTo,
+                Math.max(to + SPAN_EXTEND_MS, again.toTs + SPAN_MARGIN_MS),
+              );
+              dense = [...dense, ...(await detectRange(to + 1, nt))];
+              to = nt;
+              extended = true;
+            }
+          }
+        }
       } catch (err) {
-        detector.cancel();
         return fail(err instanceof Error ? err.message : String(err), {
           ...(decodeStats ? { decode: decodeStats } : {}),
         });
-      } finally {
-        clearTimeout(timer);
       }
-      const posed = frames.filter((f) => f.landmarks).length;
-      const livePosed = live.filter((f) => f.landmarks).length;
+      const posed = dense.filter((f) => f.landmarks).length;
+      const livePosed = live.filter(
+        (f) => f.landmarks && f.timestamp >= from && f.timestamp <= to,
+      ).length;
       const span =
-        frames.length > 1
-          ? (frames.at(-1)!.timestamp - frames[0]!.timestamp) / 1000
+        dense.length > 1
+          ? (dense.at(-1)!.timestamp - dense[0]!.timestamp) / 1000
           : 0;
       const stats = {
-        frames: frames.length,
+        frames: dense.length,
         posed,
-        fps: span > 0 ? (frames.length - 1) / span : null,
+        fps: span > 0 ? (dense.length - 1) / span : null,
+        spanMs: Math.round(to - from),
+        windowMs: Math.round(winTo - winFrom),
+        extended,
         ...(decodeStats ? { decode: decodeStats } : {}),
       };
       if (posed < Math.max(5, livePosed * minPosedShare))
         return fail(timedOut ? "timed out" : "too few posed frames", stats);
       report({ ok: true, ms: now() - t0, liveFrames: live.length, ...stats });
       // Same clock mapping as the live frames (the clip is aligned by it).
-      return frames.map((f) => ({
+      return merge(dense, from, to).map((f) => ({
         ...f,
         captureTs: f.timestamp + frameToWall,
       }));

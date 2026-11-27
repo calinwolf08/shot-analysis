@@ -71,7 +71,7 @@ function shot(values: Record<string, number> = {}): ShotKeyframes {
     };
   }
   return {
-    schemaVersion: 3,
+    schemaVersion: 5,
     keyframes: { setup: 1, load: 2, rise: 3, setPoint: 4, release: 5 },
     checks,
     facing: 1,
