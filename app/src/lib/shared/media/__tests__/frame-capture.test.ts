@@ -197,6 +197,29 @@ describe("frame capture backpressure", () => {
     handle?.stop();
   });
 
+  it("with a frame cache, grabs every tick: all cached, only free ticks sent", () => {
+    const sent: FrameData[] = [];
+    const cached: FrameData[] = [];
+    let busy = false;
+    const session = {
+      pushFrame: (f: FrameData) => {
+        if (!busy) sent.push(f);
+      },
+      isBusy: () => busy,
+      cacheFrame: (f: FrameData) => cached.push(f),
+    };
+    const handle = createLiveFrameCapture(makeVideo(), session, { fps: 10 });
+    busy = true;
+    vi.advanceTimersByTime(500);
+    busy = false;
+    vi.advanceTimersByTime(200);
+    expect(cached).toHaveLength(8); // every tick
+    expect(sent).toHaveLength(3); // the first grab + 2 free ticks
+    // The cache keeps its own copy (the sent buffer is transferred away).
+    expect(cached[0]!.data).not.toBe(sent[0]!.data);
+    handle?.stop();
+  });
+
   it("sends the next frame as soon as landmarks come back, not at the next tick", () => {
     const frames: FrameData[] = [];
     let busy = false;

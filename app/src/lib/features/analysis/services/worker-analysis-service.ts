@@ -20,6 +20,7 @@ import type {
   LiveSessionOptions,
   LiveSessionStats,
   OfflinePoseDetector,
+  CachedFrame,
   ProgressCallback,
 } from "../types";
 import {
@@ -70,6 +71,9 @@ const DEFAULT_ASSETS: WorkerAssets = {
   modelPath: "/mediapipe/pose_landmarker_full.task",
   liteModelPath: "/mediapipe/pose_landmarker_lite.task",
 };
+
+/** How much captured video the frame cache keeps (ms). */
+export const FRAME_CACHE_MS = 4000;
 
 /** Live latency defaults (overridable from the tuning file). */
 export const DEFAULT_LIVE_SESSION_OPTIONS: Required<LiveSessionOptions> = {
@@ -388,6 +392,9 @@ export function createWorkerAnalysisService(
       // the live detector's VIDEO-mode tracking and timestamps are untouched.
       // Created on first use and kept for the session.
       let offline: WorkerHandle | null = null;
+      /** Recent captured frames (see cacheFrame). */
+      const frameCache: CachedFrame[] = [];
+      const cacheSubscribers = new Set<(f: CachedFrame) => void>();
       let offlineReady: Promise<void> | null = null;
       let offlineBusy = false;
       let offlineCb: ((f: LandmarkFrame) => void) | null = null;
@@ -531,8 +538,30 @@ export function createWorkerAnalysisService(
           return lastSize;
         },
 
-        detectOffline(): OfflinePoseDetector {
-          offlineBusy = true;
+        cacheFrame(frame: CachedFrame) {
+          const last = frameCache.at(-1);
+          if (last && frame.timestamp <= last.timestamp) return;
+          frameCache.push(frame);
+          const cutoff = frame.timestamp - FRAME_CACHE_MS;
+          while (frameCache.length > 0 && frameCache[0]!.timestamp < cutoff)
+            frameCache.shift();
+          for (const cb of cacheSubscribers) cb(frame);
+        },
+
+        cachedFrames(fromTs: number, toTs: number): CachedFrame[] {
+          return frameCache
+            .filter((f) => f.timestamp >= fromTs && f.timestamp <= toTs)
+            .map((f) => ({ ...f, data: f.data.slice() }));
+        },
+
+        onCachedFrame(cb: (frame: CachedFrame) => void) {
+          cacheSubscribers.add(cb);
+          return () => cacheSubscribers.delete(cb);
+        },
+
+        detectOffline(o: { pauseLive?: boolean } = {}): OfflinePoseDetector {
+          let pausing = o.pauseLive ?? true;
+          if (pausing) offlineBusy = true;
           const out: LandmarkFrame[] = [];
           const queued: {
             data: Uint8ClampedArray;
@@ -607,6 +636,11 @@ export function createWorkerAnalysisService(
               offlineCb = null;
               finishResolve?.(out);
               finishResolve = null;
+            },
+            pauseLive(on: boolean) {
+              if (cancelled) return;
+              pausing = on;
+              offlineBusy = on;
             },
           };
         },

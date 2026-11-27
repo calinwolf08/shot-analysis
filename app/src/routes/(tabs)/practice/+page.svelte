@@ -19,6 +19,7 @@
   import type { LiveAnalysisSession } from "$lib/features/analysis";
   import {
     createLiveRepCoordinator,
+    DEFAULT_LIVE_REP_CONFIG,
     createLiveShotPipeline,
     createRepoShotStore,
     LiveDebugHud,
@@ -236,6 +237,12 @@
       session.detectOffline && clipStore.cap > 0
         ? createFullRateRefiner({
             session,
+            // Dev/E2E: `?refineFrom=video` re-detects from the recording, not
+            // the frame cache (A/B).
+            ...(devSurfaces &&
+            page.url.searchParams.get("refineFrom") === "video"
+              ? { source: "video" as const }
+              : {}),
             // Dev/E2E: `?noSeek=1` decodes as before (no seek, 4× fast-forward).
             ...(devSurfaces && page.url.searchParams.has("noSeek")
               ? { decodeOptions: { seek: false, fastForwardRate: 4 } }
@@ -291,7 +298,15 @@
       activeRefiner.onReport((r) => liveCapture.event("refine", r));
     const activeCoordinator = coordinator;
     // Timeline mark for the latency benchmark (the shot's start).
-    activeCoordinator.on("repStarted", () => performance.mark("sc:rep-start"));
+    activeCoordinator.on("repStarted", ({ timestamp }) => {
+      performance.mark("sc:rep-start");
+      // Start re-detecting the rep's cached frames at full rate now, while
+      // the shot is still going (frame-cache mode).
+      activeRefiner?.begin?.(
+        timestamp,
+        timestamp - DEFAULT_LIVE_REP_CONFIG.preRollMs,
+      );
+    });
     session.onFrame((frame) => activeCoordinator.pushFrame(frame));
     if (liveCapture) recordLoop(liveCapture, activeCoordinator, session);
 

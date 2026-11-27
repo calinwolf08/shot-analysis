@@ -246,3 +246,101 @@ describe("full-rate refiner", () => {
     expect(await r.refine(liveWindow())).toBeNull();
   });
 });
+
+describe("full-rate refiner: frame cache", () => {
+  /** A session whose frame cache holds 30 fps frames from `from` ms. */
+  function cachedSession(from: number, to = 3000) {
+    const s = session();
+    const frames: {
+      data: Uint8ClampedArray;
+      width: number;
+      height: number;
+      timestamp: number;
+    }[] = [];
+    const add = (t: number) =>
+      frames.push({
+        data: new Uint8ClampedArray(4),
+        width: 1,
+        height: 1,
+        timestamp: t,
+      });
+    for (let t = from; t <= to + 1e-9; t += 1000 / 30) add(t);
+    const subs = new Set<(f: (typeof frames)[number]) => void>();
+    return {
+      ...s,
+      cachedFrames: (a: number, b: number) =>
+        frames
+          .filter((f) => f.timestamp >= a && f.timestamp <= b)
+          .map((f) => ({ ...f })),
+      onCachedFrame: (cb: (f: (typeof frames)[number]) => void) => {
+        subs.add(cb);
+        return () => subs.delete(cb);
+      },
+      /** A new frame arrives (the shot goes on). */
+      arrive(t: number) {
+        add(t);
+        for (const cb of subs) cb(frames.at(-1)!);
+      },
+    };
+  }
+
+  it("re-detects the span from the cache: no recording, no decode", async () => {
+    decode30.mockClear();
+    const reports: RefineReport[] = [];
+    const s = cachedSession(0);
+    const r = createFullRateRefiner({
+      session: s,
+      decode: decode30,
+      span: () => ({ fromTs: 1500, toTs: 2200 }),
+    });
+    r.onReport((x) => reports.push(x));
+    const out = (await r.refine(liveWindow()))!;
+    expect(decode30).not.toHaveBeenCalled();
+    expect(reports[0]).toMatchObject({
+      ok: true,
+      source: "cache",
+      earlyFrames: 0,
+    });
+    // 30 fps over the span ± margin (1300 → 2400), live frames around it.
+    const dense = out.filter((f) => f.timestamp >= 1300 && f.timestamp <= 2400);
+    expect(dense.length).toBeGreaterThan(30);
+    expect(out.filter((f) => f.timestamp < 1300).length).toBe(3);
+  });
+
+  it("starts at the trigger and keeps up with new frames, then finishes at the span's end", async () => {
+    const reports: RefineReport[] = [];
+    const s = cachedSession(0, 2000);
+    const r = createFullRateRefiner({
+      session: s,
+      decode: decode30,
+      span: () => ({ fromTs: 1500, toTs: 2200 }),
+    });
+    r.onReport((x) => reports.push(x));
+    // Trigger at 2000: window from 500.
+    r.begin!(2000, 500);
+    const atTrigger = s.pushed.length;
+    expect(atTrigger).toBeGreaterThan(40); // 500 → 2000 at 30 fps
+    for (let t = 2000 + 1000 / 30; t <= 3000; t += 1000 / 30) s.arrive(t);
+    expect(s.pushed.length).toBeGreaterThan(atTrigger + 25);
+    const out = (await r.refine({ ...liveWindow(), fromTs: 500 }))!;
+    expect(reports[0]).toMatchObject({ ok: true, source: "cache" });
+    expect(reports[0]!.earlyFrames).toBeGreaterThan(70);
+    // Dense from the window's start (500), not just the span.
+    expect(out[0]!.timestamp).toBeLessThan(500 + 1000 / 30 + 1);
+  });
+
+  it("falls back to the recording when the cache doesn't reach back", async () => {
+    decode30.mockClear();
+    const reports: RefineReport[] = [];
+    const r = createFullRateRefiner({
+      session: cachedSession(1800),
+      decode: decode30,
+      span: () => null,
+    });
+    r.onReport((x) => reports.push(x));
+    r.setRecorder(recorder(500));
+    await r.refine(liveWindow());
+    expect(decode30).toHaveBeenCalledTimes(1);
+    expect(reports[0]).toMatchObject({ ok: true, source: "video" });
+  });
+});
