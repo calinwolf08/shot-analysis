@@ -12,6 +12,7 @@
     type LiveCapture,
     type LiveCaptureFile,
   } from "$lib/features/live-practice/debug/live-capture";
+  import { createLatencyLog } from "$lib/features/live-practice/debug/latency-log";
   import LiveCapturePanel from "$lib/features/live-practice/debug/LiveCapturePanel.svelte";
   import { deviceDebugEnabled } from "$lib/shared/debug/debug-mode";
   import { goto } from "$app/navigation";
@@ -110,6 +111,8 @@
   // the last ~20 s of poses and the loop's decisions, exportable for
   // diagnosis (live-capture.ts).
   const liveCapture = deviceDebugEnabled(page.url) ? createLiveCapture() : null;
+  /** Per-shot timings for the whole session (debug capture). */
+  const latencyLog = liveCapture ? createLatencyLog() : null;
 
   const liveDebug =
     import.meta.env.VITE_LIVE_DEBUG === "1" ||
@@ -232,8 +235,24 @@
     beginLoop();
   }
 
+  /**
+   * Early start (the cache re-check begins at the rep trigger, alongside
+   * live detection): on for devices with 4+ cores. VITE_EARLY_REFINE=0 / 1
+   * turns it off / on for a build; in dev, `?earlyRefine=0|1` per visit.
+   */
+  function earlyRefineSetting(): { on: boolean; why: string } {
+    const url = devSurfaces ? page.url.searchParams.get("earlyRefine") : null;
+    if (url !== null) return { on: url !== "0", why: `url earlyRefine=${url}` };
+    const env = import.meta.env.VITE_EARLY_REFINE as string | undefined;
+    if (env === "0" || env === "1")
+      return { on: env === "1", why: `env VITE_EARLY_REFINE=${env}` };
+    const cores = navigator.hardwareConcurrency ?? 0;
+    return { on: cores >= 4, why: `${cores} cores` };
+  }
+
   function beginLoop() {
     if (!session || !targets) return;
+    const earlyRefine = earlyRefineSetting();
     // Every shot is scored from the rep re-detected at FULL frame rate from
     // its clip (live tracking may only manage ~10 fps); needs a worker
     // session (not replay) and clip recording.
@@ -248,9 +267,7 @@
             page.url.searchParams.get("refineFrom") === "video"
               ? { source: "video" as const }
               : {}),
-            ...(devSurfaces && page.url.searchParams.has("earlyRefine")
-              ? { earlyStart: true }
-              : {}),
+            earlyStart: earlyRefine.on,
             // Dev/E2E: `?noSeek=1` decodes as before (no seek, 4× fast-forward).
             ...(devSurfaces && page.url.searchParams.has("noSeek")
               ? { decodeOptions: { seek: false, fastForwardRate: 4 } }
@@ -303,7 +320,36 @@
       { shootingHand },
     );
     if (liveCapture && activeRefiner)
-      activeRefiner.onReport((r) => liveCapture.event("refine", r));
+      activeRefiner.onReport((r) => {
+        liveCapture.event("refine", r);
+        latencyLog?.refined(r);
+      });
+    if (liveCapture) {
+      coordinator.on("repStarted", () => latencyLog?.repStarted());
+      coordinator.on("repAnalyzing", ({ trigger }) =>
+        latencyLog?.repEnded(trigger),
+      );
+      coordinator.on("noShot", () => latencyLog?.scored("no-shot"));
+      liveCapture.setMeta({
+        device: {
+          cores: navigator.hardwareConcurrency ?? null,
+          memoryGb:
+            (navigator as Navigator & { deviceMemory?: number }).deviceMemory ??
+            null,
+        },
+        refineConfig: activeRefiner
+          ? {
+              source:
+                devSurfaces &&
+                page.url.searchParams.get("refineFrom") === "video"
+                  ? "video"
+                  : "cache",
+              earlyStart: earlyRefine.on,
+              earlyStartWhy: earlyRefine.why,
+            }
+          : null,
+      });
+    }
     const activeCoordinator = coordinator;
     // Timeline mark for the latency benchmark (the shot's start).
     activeCoordinator.on("repStarted", ({ timestamp }) => {
@@ -357,6 +403,13 @@
             try {
               const r = await timedPipeline.process(input);
               performance.mark("sc:pipeline-end");
+              latencyLog?.scored(
+                r.shots.length > 0
+                  ? "scored"
+                  : r.rejected.length > 0
+                    ? "wrong-angle"
+                    : "no-shot",
+              );
               liveCapture.event("pipeline.result", {
                 shots: r.shots.map((x) => ({
                   overall: x.scorecard.overall,
@@ -370,6 +423,7 @@
               });
               return r;
             } catch (e) {
+              latencyLog?.scored("error");
               liveCapture.event("pipeline.error", {
                 message: e instanceof Error ? e.message : String(e),
               });
@@ -382,7 +436,16 @@
       coordinator,
       pipeline,
       shotStore,
-      audio,
+      // Debug capture: note when the score starts being spoken.
+      audio: latencyLog
+        ? {
+            ...audio,
+            speak(text: string) {
+              if (store?.cycle === "readback") latencyLog?.spoken(text);
+              return audio.speak(text);
+            },
+          }
+        : audio,
       playerId,
       opts: { shootingHand, profile: "pro-form" },
       fps: session.fps,
@@ -470,6 +533,9 @@
       shotsThisSession: store?.shots.length ?? 0,
       poseStats: stats,
       frameSize: session?.frameSize?.() ?? null,
+      latency: latencyLog
+        ? { summary: latencyLog.summary(), shots: latencyLog.shots }
+        : null,
     });
     return cap.export({
       fps: session?.fps ?? 30,
