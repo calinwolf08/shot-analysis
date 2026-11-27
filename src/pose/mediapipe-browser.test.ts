@@ -549,6 +549,72 @@ describe("MediaPipeBrowserDetector", () => {
       // In Node.js test environment, document is not defined
       expect(detectWebGLSupport()).toBe(false);
     });
+
+    /** A worker-like global: no document, an OffscreenCanvas with WebGL. */
+    function stubWorkerGL(renderer: string | null) {
+      const gl =
+        renderer === null
+          ? null
+          : {
+              RENDERER: 0x1f01,
+              getExtension: () => ({ UNMASKED_RENDERER_WEBGL: 0x9246 }),
+              getParameter: () => renderer,
+            };
+      vi.stubGlobal(
+        "OffscreenCanvas",
+        class {
+          getContext() {
+            return gl;
+          }
+        },
+      );
+    }
+
+    it("finds a hardware GPU from a web worker (OffscreenCanvas)", () => {
+      stubWorkerGL("Adreno (TM) 650");
+      expect(detectWebGLSupport()).toBe(true);
+      vi.unstubAllGlobals();
+    });
+
+    it("treats a software renderer, or no WebGL, as no GPU", () => {
+      for (const r of [
+        "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device), SwiftShader driver)",
+        "llvmpipe (LLVM 15.0.7, 256 bits)",
+        null,
+      ]) {
+        stubWorkerGL(r);
+        expect(detectWebGLSupport(), String(r)).toBe(false);
+        vi.unstubAllGlobals();
+      }
+    });
+  });
+
+  describe("GPU delegate that fails to start", () => {
+    it("retries on the CPU and reports it", async () => {
+      vi.stubGlobal(
+        "OffscreenCanvas",
+        class {
+          getContext() {
+            return {
+              getExtension: () => ({ UNMASKED_RENDERER_WEBGL: 1 }),
+              getParameter: () => "Mali-G78",
+            };
+          }
+        },
+      );
+      const create = vi.mocked(PoseLandmarker.createFromOptions);
+      create.mockRejectedValueOnce(new Error("GPU context lost"));
+      const detector = await createMediaPipeBrowserDetector({
+        delegate: RuntimeDelegate.GPU,
+      });
+      const delegates = create.mock.calls
+        .slice(-2)
+        .map((c) => c[1]?.baseOptions?.delegate);
+      expect(delegates).toEqual(["GPU", "CPU"]);
+      expect((detector as { delegate?: string }).delegate).toBe("CPU");
+      await detector.close();
+      vi.unstubAllGlobals();
+    });
   });
 
   describe("MediaPipeBrowserConfig type", () => {

@@ -139,26 +139,43 @@ export interface MediaPipeBrowserConfig {
  *
  * @returns true if WebGL is available, false otherwise
  */
+/** Software WebGL (no real GPU): slower than MediaPipe's CPU path. */
+const SOFTWARE_RENDERER =
+  /swiftshader|llvmpipe|softpipe|software|basic render/i;
+
+type GL = WebGLRenderingContext | WebGL2RenderingContext;
+
+/** A real (hardware) WebGL context: present, and not a software renderer. */
+function isHardware(gl: GL | null): boolean {
+  if (!gl) return false;
+  try {
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = info
+      ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))
+      : String(gl.getParameter(gl.RENDERER));
+    return !SOFTWARE_RENDERER.test(renderer);
+  } catch {
+    return true;
+  }
+}
+
 export function detectWebGLSupport(): boolean {
   // Web workers have no document; WebGL there goes through OffscreenCanvas
-  // (where MediaPipe's GPU delegate runs too).
-  if (typeof document === "undefined") {
-    if (typeof OffscreenCanvas === "undefined") return false;
-    try {
-      const c = new OffscreenCanvas(1, 1);
-      return (c.getContext("webgl2") ?? c.getContext("webgl")) !== null;
-    } catch {
-      return false;
-    }
-  }
-
+  // (where MediaPipe's GPU delegate runs too). A software renderer (a
+  // blocklisted GPU, a headless browser) counts as no WebGL: MediaPipe's
+  // GPU delegate on it is several times slower than its CPU path.
   try {
+    if (typeof document === "undefined") {
+      if (typeof OffscreenCanvas === "undefined") return false;
+      const c = new OffscreenCanvas(1, 1);
+      return isHardware(
+        (c.getContext("webgl2") ?? c.getContext("webgl")) as GL | null,
+      );
+    }
     const canvas = document.createElement("canvas");
-    const gl =
-      canvas.getContext("webgl2") ||
-      canvas.getContext("webgl") ||
-      canvas.getContext("experimental-webgl");
-    return gl !== null;
+    return isHardware(
+      (canvas.getContext("webgl2") ?? canvas.getContext("webgl")) as GL | null,
+    );
   } catch {
     return false;
   }
