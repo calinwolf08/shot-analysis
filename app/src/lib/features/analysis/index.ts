@@ -10,6 +10,7 @@ export type {
   LiveSessionOptions,
   LiveSessionStats,
   OfflinePoseDetector,
+  CachedFrame,
   ProgressCallback,
 } from "./types";
 export { isFixtureRef } from "./types";

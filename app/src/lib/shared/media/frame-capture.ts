@@ -148,6 +148,8 @@ export function createLiveFrameCapture(
     pushFrame?(frame: FrameData): void;
     isBusy?(): boolean;
     onFrame?(cb: (frame: unknown) => void): () => void;
+    /** Frame cache (see LiveAnalysisSession.cacheFrame). */
+    cacheFrame?(frame: FrameData): void;
   },
   options?: FrameCaptureOptions,
 ): FrameCaptureHandle | null {
@@ -156,11 +158,22 @@ export function createLiveFrameCapture(
     return null;
   }
 
-  const pushFrame = session.pushFrame.bind(session);
+  const push = session.pushFrame.bind(session);
   const isBusy = session.isBusy?.bind(session);
-  const handle = startFrameCapture(video, pushFrame, {
+  const cache = session.cacheFrame?.bind(session);
+  // With a frame cache every tick is grabbed — the frames live detection
+  // can't keep up with are cached for the full-rate re-check — and only
+  // sent on when the detector is free (pushFrame counts the rest skipped).
+  // Without one, a busy tick isn't even grabbed.
+  const onFrame = cache
+    ? (f: FrameData) => {
+        cache({ ...f, data: f.data.slice() });
+        push(f);
+      }
+    : push;
+  const handle = startFrameCapture(video, onFrame, {
     ...options,
-    ...(isBusy ? { shouldSkip: isBusy } : {}),
+    ...(isBusy && !cache ? { shouldSkip: isBusy } : {}),
   });
   // Result-driven: the moment a frame's landmarks are back the detector is
   // free, so send the next frame then rather than waiting up to a tick (on a

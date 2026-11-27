@@ -26,6 +26,7 @@
  */
 import { computeShotKeyframes } from "basketball-shot-analysis";
 import type {
+  CachedFrame,
   LandmarkFrame,
   LiveAnalysisSession,
   OfflinePoseDetector,
@@ -154,6 +155,16 @@ export interface RefineReport {
   readonly windowMs?: number;
   /** The span was extended after the first pass. */
   readonly extended?: boolean;
+  /** Where the frames came from: the frame cache, or the recorded clip. */
+  readonly source?: "cache" | "video";
+  /** Frames already being re-detected before the rep ended (early start). */
+  readonly earlyFrames?: number;
+  /**
+   * From the rep's end until every frame had been handed to the detector
+   * (ms): the cost of getting the frames — the recording's take, load,
+   * seek and 1× playback, or reading the cache. Detection overlaps it.
+   */
+  readonly framesMs?: number;
 }
 
 export interface FullRateRefiner {
@@ -165,10 +176,32 @@ export interface FullRateRefiner {
   takeClip(repStartTs: number): ClipTake | null;
   /** Called with each refinement's outcome (diagnostics). */
   onReport(cb: (r: RefineReport) => void): () => void;
+  /**
+   * A rep just started (trigger at `startedAt`, window from `fromTs`): start
+   * re-detecting its cached frames now, while the shot is still going, and
+   * keep up with new ones; `refine` finishes it. Frame-cache mode only.
+   */
+  begin?(startedAt: number, fromTs: number): void;
 }
 
 export interface FullRateRefinerDeps {
-  session: Pick<LiveAnalysisSession, "detectOffline">;
+  session: Pick<
+    LiveAnalysisSession,
+    "detectOffline" | "cachedFrames" | "onCachedFrame"
+  >;
+  /**
+   * Where the full-rate frames come from: the session's frame cache (default
+   * when it has one; ~6% faster shot → score than the recording, same frames
+   * and keyframes), or the recorded clip. Cache mode falls back to the clip
+   * when the cache doesn't reach back far enough.
+   */
+  source?: "cache" | "video";
+  /**
+   * Cache mode only: start re-detecting at the rep trigger (begin), while
+   * live detection keeps running, instead of at the rep's end. Off by
+   * default: a separate experiment from the frame source.
+   */
+  earlyStart?: boolean;
   /** Guesses the keyframes' span from frames; omit to re-detect the whole window. */
   span?: KeyframeSpan;
   decode?: typeof decodeClipRange;
@@ -195,8 +228,212 @@ export function createFullRateRefiner(
   const report = (r: RefineReport) => {
     for (const cb of listeners) cb(r);
   };
+  const session = deps.session;
+  const useCache =
+    (deps.source ?? "cache") === "cache" &&
+    !!session.cachedFrames &&
+    !!session.onCachedFrame;
+
+  /** The early catch-up of the rep in progress (see begin). */
+  let early: {
+    startedAt: number;
+    fromTs: number;
+    detector: OfflinePoseDetector;
+    pushed: number;
+    lastTs: number;
+    off: () => void;
+    push: (f: CachedFrame) => void;
+  } | null = null;
+  const dropEarly = () => {
+    if (!early) return;
+    early.off();
+    early.detector.cancel();
+    early = null;
+  };
+  /** Cached frames [from, to] into a detector (in order, data owned). */
+  const feed = (
+    detector: OfflinePoseDetector,
+    frames: CachedFrame[],
+    start: number,
+  ) => {
+    let i = start;
+    for (const f of frames)
+      detector.push({
+        data: f.data,
+        width: f.width,
+        height: f.height,
+        frameIndex: i++,
+        timestamp: f.timestamp,
+      });
+    return i;
+  };
+
+  /**
+   * The re-check from the frame cache: no recording, no decode. With an early
+   * catch-up (begin) for this rep, most frames are already done; it's pushed
+   * up to the span's end and finished. "no-cache" = the cache doesn't reach
+   * back to the window's start (use the clip).
+   */
+  async function refineFromCache(
+    window: RepWindow,
+    mine: typeof early,
+    t0: number,
+    fail: (reason: string, extra?: Partial<RefineReport>) => null,
+  ): Promise<LandmarkFrame[] | null | "no-cache"> {
+    const live = window.frames;
+    const first = live[0]!;
+    const last = live.at(-1)!;
+    const frameToWall =
+      last.captureTs !== undefined ? last.captureTs - last.timestamp : 0;
+    const wantFrom = Math.min(first.timestamp, window.fromTs ?? Infinity);
+    const winTo = window.endedAt;
+    const head = session.cachedFrames!(wantFrom - 40, wantFrom + 70);
+    if (!mine && head.length === 0) return "no-cache";
+    const winFrom = mine ? Math.min(mine.fromTs, first.timestamp) : wantFrom;
+
+    let timedOut = false;
+    const deadline = t0 + timeoutMs;
+    const withTimeout = async (detector: OfflinePoseDetector) => {
+      const timer = setTimeout(
+        () => {
+          timedOut = true;
+          detector.cancel();
+        },
+        Math.max(0, deadline - now()),
+      );
+      try {
+        return await detector.finish();
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+    let framesMs: number | undefined;
+    const detectRange = (fromTs: number, toTs: number) => {
+      const detector = session.detectOffline!();
+      feed(detector, session.cachedFrames!(fromTs, toTs), 0);
+      framesMs ??= now() - t0;
+      return withTimeout(detector);
+    };
+
+    const guess = deps.span?.(live) ?? null;
+    let from = guess
+      ? Math.max(winFrom, guess.fromTs - SPAN_MARGIN_MS)
+      : winFrom;
+    let to = guess ? Math.min(winTo, guess.toTs + SPAN_MARGIN_MS) : winTo;
+    if (!(to - from >= MIN_SPAN_MS)) [from, to] = [winFrom, winTo];
+
+    const merge = (dense: LandmarkFrame[]): LandmarkFrame[] => {
+      const a = dense[0]?.timestamp ?? Infinity;
+      const b = dense.at(-1)?.timestamp ?? -Infinity;
+      return [
+        ...live.filter((f) => f.timestamp < a),
+        ...dense,
+        ...live.filter((f) => f.timestamp > b),
+      ];
+    };
+
+    let dense: LandmarkFrame[] = [];
+    let extended = false;
+    let earlyFrames = 0;
+    try {
+      if (mine) {
+        // The catch-up started at the trigger: it covers the window from its
+        // start; finish it at the span's end.
+        early = null;
+        mine.off();
+        earlyFrames = mine.pushed;
+        for (const f of session.cachedFrames!(mine.lastTs + 0.001, to))
+          mine.push(f);
+        mine.detector.pauseLive?.(true);
+        framesMs = now() - t0;
+        dense = await withTimeout(mine.detector);
+        from = mine.fromTs;
+      } else {
+        dense = await detectRange(from, to);
+      }
+      if (guess && dense.length > 0 && !timedOut) {
+        const again = deps.span!(merge(dense));
+        const lo = dense[0]!.timestamp;
+        const hi = dense.at(-1)!.timestamp;
+        if (again) {
+          if (again.fromTs < lo + SPAN_EDGE_MS && lo > winFrom + 40) {
+            const nf = Math.max(
+              winFrom,
+              Math.min(lo - SPAN_EXTEND_MS, again.fromTs - SPAN_MARGIN_MS),
+            );
+            dense = [...(await detectRange(nf, lo - 0.001)), ...dense];
+            from = nf;
+            extended = true;
+          }
+          if (again.toTs > hi - SPAN_EDGE_MS && hi < winTo - 40 && !timedOut) {
+            const nt = Math.min(
+              winTo,
+              Math.max(hi + SPAN_EXTEND_MS, again.toTs + SPAN_MARGIN_MS),
+            );
+            dense = [...dense, ...(await detectRange(hi + 0.001, nt))];
+            to = nt;
+            extended = true;
+          }
+        }
+      }
+    } catch (err) {
+      return fail(err instanceof Error ? err.message : String(err), {
+        source: "cache",
+      });
+    }
+    const posed = dense.filter((f) => f.landmarks).length;
+    const a = dense[0]?.timestamp ?? from;
+    const b = dense.at(-1)?.timestamp ?? to;
+    const livePosed = live.filter(
+      (f) => f.landmarks && f.timestamp >= a && f.timestamp <= b,
+    ).length;
+    const span = dense.length > 1 ? (b - a) / 1000 : 0;
+    const stats = {
+      frames: dense.length,
+      posed,
+      fps: span > 0 ? (dense.length - 1) / span : null,
+      spanMs: Math.round(b - a),
+      windowMs: Math.round(winTo - winFrom),
+      extended,
+      source: "cache" as const,
+      earlyFrames,
+      ...(framesMs !== undefined ? { framesMs: Math.round(framesMs) } : {}),
+    };
+    if (posed < Math.max(5, livePosed * minPosedShare))
+      return fail(timedOut ? "timed out" : "too few posed frames", stats);
+    report({ ok: true, ms: now() - t0, liveFrames: live.length, ...stats });
+    return merge(dense).map((f) => ({
+      ...f,
+      captureTs: f.timestamp + frameToWall,
+    }));
+  }
 
   return {
+    begin(startedAt, fromTs) {
+      dropEarly();
+      if (!useCache || !deps.earlyStart || !session.detectOffline) return;
+      // Live detection keeps running: it's still watching the shot.
+      const detector = session.detectOffline({ pauseLive: false });
+      const e = {
+        startedAt,
+        fromTs,
+        detector,
+        pushed: 0,
+        lastTs: -Infinity,
+        off: () => {},
+        push(f: CachedFrame) {
+          if (f.timestamp <= e.lastTs) return;
+          e.lastTs = f.timestamp;
+          e.pushed = feed(detector, [f], e.pushed);
+        },
+      };
+      for (const f of session.cachedFrames!(fromTs, Infinity)) e.push(f);
+      e.off = session.onCachedFrame!((f) =>
+        e.push({ ...f, data: f.data.slice() }),
+      );
+      early = e;
+    },
+
     setRecorder(r, re) {
       recorder = r;
       restart = re ?? null;
@@ -228,11 +465,18 @@ export function createFullRateRefiner(
         return null;
       };
       stash = null;
+      const mine = early && early.startedAt === window.startedAt ? early : null;
+      if (!mine) dropEarly();
       if (!deps.session.detectOffline) return fail("no offline detector");
-      if (!recorder?.recording) return fail("no clip recording");
       const first = live[0];
       const last = live.at(-1);
       if (!first || !last) return fail("empty window");
+      if (useCache) {
+        const r = await refineFromCache(window, mine, t0, fail);
+        if (r !== "no-cache") return r;
+      }
+      dropEarly();
+      if (!recorder?.recording) return fail("no clip recording");
       // Pose clock → performance.now() (the recorder's clock).
       const frameToWall =
         last.captureTs !== undefined ? last.captureTs - last.timestamp : 0;
@@ -252,6 +496,7 @@ export function createFullRateRefiner(
       const winTo = window.endedAt;
 
       let decodeStats: DecodeClipStats | undefined;
+      let framesMs: number | undefined;
       let timedOut = false;
       const deadline = t0 + timeoutMs;
       /** Decode + re-detect one stretch of the clip (pose clock, ms). */
@@ -290,6 +535,7 @@ export function createFullRateRefiner(
             },
             { ...deps.decodeOptions, cancelled: () => timedOut },
           );
+          framesMs ??= now() - t0;
           return await detector.finish();
         } catch (err) {
           detector.cancel();
@@ -372,7 +618,14 @@ export function createFullRateRefiner(
       };
       if (posed < Math.max(5, livePosed * minPosedShare))
         return fail(timedOut ? "timed out" : "too few posed frames", stats);
-      report({ ok: true, ms: now() - t0, liveFrames: live.length, ...stats });
+      report({
+        ok: true,
+        ms: now() - t0,
+        liveFrames: live.length,
+        source: "video",
+        ...(framesMs !== undefined ? { framesMs: Math.round(framesMs) } : {}),
+        ...stats,
+      });
       // Same clock mapping as the live frames (the clip is aligned by it).
       return merge(dense, from, to).map((f) => ({
         ...f,

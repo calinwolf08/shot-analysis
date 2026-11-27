@@ -101,7 +101,17 @@ export interface LiveAnalysisSession {
    * only). While it works, live detection pauses (isBusy is true), giving it
    * the CPU — the player is waiting for that shot's score anyway.
    */
-  detectOffline?(): OfflinePoseDetector;
+  detectOffline?(opts?: { pauseLive?: boolean }): OfflinePoseDetector;
+  /**
+   * Frame cache: every captured frame (also the ones live detection skipped)
+   * for the last few seconds, so a shot can be re-detected at full frame rate
+   * without its recording. `cacheFrame` takes ownership of the frame's data.
+   */
+  cacheFrame?(frame: CachedFrame): void;
+  /** Cached frames with from ≤ timestamp ≤ to, oldest first (data copied). */
+  cachedFrames?(fromTs: number, toTs: number): CachedFrame[];
+  /** Called with each newly cached frame; returns an unsubscribe. */
+  onCachedFrame?(cb: (frame: CachedFrame) => void): () => void;
   /** Live latency/model diagnostics (debug HUD + e2e). */
   stats?(): LiveSessionStats;
   /**
@@ -154,6 +164,11 @@ export interface LiveSessionOptions {
   readonly delegate?: "GPU" | "CPU";
   /** Model for the full-rate (offline) re-check (default full). */
   readonly offlineModel?: "full" | "lite";
+  /**
+   * Keep a cache of every captured frame (cacheFrame), for the full-rate
+   * re-check (default true).
+   */
+  readonly frameCache?: boolean;
 }
 
 export interface LiveSessionStats {
@@ -177,6 +192,15 @@ export interface LiveSessionStats {
 }
 
 /** One batch of offline (full-rate) pose detection; see detectOffline. */
+/** A captured, downsampled frame (pose clock timestamp, ms). */
+export interface CachedFrame {
+  readonly data: Uint8ClampedArray;
+  readonly width: number;
+  readonly height: number;
+  readonly timestamp: number;
+  readonly captureTs?: number;
+}
+
 export interface OfflinePoseDetector {
   /** Queue a frame (its data buffer is transferred). Strictly increasing timestamps. */
   push(frame: {
@@ -190,4 +214,6 @@ export interface OfflinePoseDetector {
   finish(): Promise<LandmarkFrame[]>;
   /** Abandon the batch (results still in flight are dropped). */
   cancel(): void;
+  /** Pause live detection while this batch works (or resume it). */
+  pauseLive?(on: boolean): void;
 }
