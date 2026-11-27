@@ -183,6 +183,18 @@
       {
         ...tuning.latency,
         ...(detectDelay > 0 ? { debugDetectDelayMs: detectDelay } : {}),
+        // Dev/E2E A/B: `?delegate=cpu|gpu`, `?offlineModel=lite`.
+        ...(devSurfaces && page.url.searchParams.get("delegate")
+          ? {
+              delegate:
+                page.url.searchParams.get("delegate")!.toLowerCase() === "cpu"
+                  ? ("CPU" as const)
+                  : ("GPU" as const),
+            }
+          : {}),
+        ...(devSurfaces && page.url.searchParams.get("offlineModel") === "lite"
+          ? { offlineModel: "lite" as const }
+          : {}),
       },
     );
     session = s;

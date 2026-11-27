@@ -39,6 +39,8 @@ export const toWorkerSchema = z.discriminatedUnion("type", [
     }),
     /** Dev/E2E only: extra ms per detection, to imitate a slow phone. */
     debugDetectDelayMs: z.number().nonnegative().optional(),
+    /** Where to run detection (default GPU, falling back to CPU). */
+    delegate: z.enum(["GPU", "CPU"]).optional(),
   }),
   z.object({
     type: z.literal("frames"),
@@ -103,7 +105,11 @@ const poseDataSchema = z.object({
 });
 
 export const fromWorkerSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("ready") }),
+  z.object({
+    type: z.literal("ready"),
+    /** Where detection actually runs (after any fallback). */
+    delegate: z.enum(["GPU", "CPU"]).optional(),
+  }),
   z.object({ type: z.literal("progress"), progress: progressSchema }),
   z.object({ type: z.literal("landmarks"), frame: landmarkFrameSchema }),
   z.object({ type: z.literal("result"), result: resultSchema }),

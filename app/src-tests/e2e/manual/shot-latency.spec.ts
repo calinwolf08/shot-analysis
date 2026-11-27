@@ -35,7 +35,7 @@ test("captured → spoken score latency", async ({ page }) => {
   );
   await onboard(page, "?e2e=device", "Latency");
   await page.goto(
-    `/practice?e2e=device&debug=capture&liveVideo=/__livevideo${process.env.FULL_REFINE ? "&fullRefine=1" : ""}${process.env.SETTLE_END ? "&settleEnd=1" : ""}${process.env.NO_SEEK ? "&noSeek=1" : ""}`,
+    `/practice?e2e=device&debug=capture&liveVideo=/__livevideo${process.env.FULL_REFINE ? "&fullRefine=1" : ""}${process.env.SETTLE_END ? "&settleEnd=1" : ""}${process.env.NO_SEEK ? "&noSeek=1" : ""}${process.env.EXTRA_QUERY ?? ""}`,
   );
   await page.getByTestId("practice-loop").waitFor({ timeout: 150_000 });
   await startLiveLoop(page);
@@ -88,7 +88,7 @@ test("captured → spoken score latency", async ({ page }) => {
       kind: string;
       data?: { ok?: boolean; ms?: number; frames?: number };
     }[];
-    meta: { timing?: unknown };
+    meta: { timing?: unknown; poseStats?: unknown };
   };
   const refines = file.events
     .filter((e) => e.kind === "refine")
@@ -126,6 +126,7 @@ test("captured → spoken score latency", async ({ page }) => {
         medianMs: [...ms].sort((a, b) => a - b)[Math.floor(ms.length / 2)],
         refine: refines,
         liveTiming: file.meta.timing,
+        poseStats: file.meta.poseStats,
         repStartToReadbackMs: fromShot,
         readback: done.map((c) => c.text),
         timelines,
