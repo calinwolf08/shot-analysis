@@ -35,7 +35,7 @@ test("captured → spoken score latency", async ({ page }) => {
   );
   await onboard(page, "?e2e=device", "Latency");
   await page.goto(
-    `/practice?e2e=device&debug=capture&liveVideo=/__livevideo${process.env.FULL_REFINE ? "&fullRefine=1" : ""}${process.env.SETTLE_END ? "&settleEnd=1" : ""}`,
+    `/practice?e2e=device&debug=capture&liveVideo=/__livevideo${process.env.FULL_REFINE ? "&fullRefine=1" : ""}${process.env.SETTLE_END ? "&settleEnd=1" : ""}${process.env.NO_SEEK ? "&noSeek=1" : ""}`,
   );
   await page.getByTestId("practice-loop").waitFor({ timeout: 150_000 });
   await startLiveLoop(page);

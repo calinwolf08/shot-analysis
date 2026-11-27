@@ -224,6 +224,10 @@
       session.detectOffline && clipStore.cap > 0
         ? createFullRateRefiner({
             session,
+            // Dev/E2E: `?noSeek=1` decodes as before (no seek, 4× fast-forward).
+            ...(devSurfaces && page.url.searchParams.has("noSeek")
+              ? { decodeOptions: { seek: false, fastForwardRate: 4 } }
+              : {}),
             // Re-detect only the scored part of the rep (Setup → Release).
             // Dev/E2E: `?fullRefine=1` re-detects the whole window (A/B).
             span:

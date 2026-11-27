@@ -32,6 +32,7 @@ import type {
 } from "$lib/features/analysis";
 import {
   decodeClipRange,
+  type DecodeClipOptions,
   type DecodeClipStats,
   type DecodedClipFrame,
 } from "$lib/shared/media/clip-decode";
@@ -171,6 +172,8 @@ export interface FullRateRefinerDeps {
   /** Guesses the keyframes' span from frames; omit to re-detect the whole window. */
   span?: KeyframeSpan;
   decode?: typeof decodeClipRange;
+  /** Options for the decode (e.g. seek: false — fast-forward only). */
+  decodeOptions?: Pick<DecodeClipOptions, "seek" | "fastForwardRate">;
   /** Whole refinement budget (ms); past it the frames so far are used. */
   timeoutMs?: number;
   /** Fewer posed frames than this share of the live window's → fall back. */
@@ -285,7 +288,7 @@ export function createFullRateRefiner(
                 timestamp: ts,
               });
             },
-            { cancelled: () => timedOut },
+            { ...deps.decodeOptions, cancelled: () => timedOut },
           );
           return await detector.finish();
         } catch (err) {
