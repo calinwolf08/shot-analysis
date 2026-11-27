@@ -86,7 +86,7 @@ export const DEFAULT_LIVE_SESSION_OPTIONS: Required<LiveSessionOptions> = {
   debugDetectDelayMs: 0,
   delegate: "GPU",
   offlineModel: "full",
-  frameCache: false,
+  frameCache: true,
 };
 
 function defaultMakeWorker(): WorkerLike {

@@ -247,17 +247,26 @@ describe("full-rate refiner", () => {
   });
 });
 
-describe("full-rate refiner: frame cache (opt-in)", () => {
-  it("uses the recording unless asked for the cache", async () => {
+describe("full-rate refiner: frame cache", () => {
+  it("uses the cache by default, the recording when asked", async () => {
     decode30.mockClear();
-    const r = createFullRateRefiner({
+    const byDefault = createFullRateRefiner({
       session: cachedSession(0),
       decode: decode30,
       span: () => null,
     });
-    r.setRecorder(recorder(500));
-    r.begin!(2000, 500); // ignored without source: "cache" + earlyStart
-    await r.refine(liveWindow());
+    byDefault.setRecorder(recorder(500));
+    await byDefault.refine(liveWindow());
+    expect(decode30).not.toHaveBeenCalled();
+    const video = createFullRateRefiner({
+      session: cachedSession(0),
+      source: "video",
+      decode: decode30,
+      span: () => null,
+    });
+    video.setRecorder(recorder(500));
+    video.begin!(2000, 500); // ignored: early start is cache-only
+    await video.refine(liveWindow());
     expect(decode30).toHaveBeenCalledTimes(1);
   });
 

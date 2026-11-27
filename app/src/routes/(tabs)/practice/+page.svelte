@@ -196,10 +196,9 @@
         ...(devSurfaces && page.url.searchParams.get("offlineModel") === "lite"
           ? { offlineModel: "lite" as const }
           : {}),
-        // Only the frame-cache re-check (`?refineFrom=cache`) needs every
-        // frame grabbed; it costs live tracking frame rate.
-        ...(devSurfaces && page.url.searchParams.get("refineFrom") === "cache"
-          ? { frameCache: true }
+        // The recording re-check (`?refineFrom=video`) needs no frame cache.
+        ...(devSurfaces && page.url.searchParams.get("refineFrom") === "video"
+          ? { frameCache: false }
           : {}),
       },
     );
@@ -242,15 +241,15 @@
       session.detectOffline && clipStore.cap > 0
         ? createFullRateRefiner({
             session,
-            // Dev/E2E: `?refineFrom=cache` re-detects from the frame cache
-            // instead of the recording (A/B); `&earlyRefine=1` also starts
-            // it at the rep trigger (a separate experiment).
+            // Dev/E2E: `?refineFrom=video` re-detects from the recording
+            // instead of the frame cache (A/B); `?earlyRefine=1` starts the
+            // cache re-check at the rep trigger (experiment).
             ...(devSurfaces &&
-            page.url.searchParams.get("refineFrom") === "cache"
-              ? {
-                  source: "cache" as const,
-                  earlyStart: page.url.searchParams.has("earlyRefine"),
-                }
+            page.url.searchParams.get("refineFrom") === "video"
+              ? { source: "video" as const }
+              : {}),
+            ...(devSurfaces && page.url.searchParams.has("earlyRefine")
+              ? { earlyStart: true }
               : {}),
             // Dev/E2E: `?noSeek=1` decodes as before (no seek, 4× fast-forward).
             ...(devSurfaces && page.url.searchParams.has("noSeek")

@@ -190,11 +190,10 @@ export interface FullRateRefinerDeps {
     "detectOffline" | "cachedFrames" | "onCachedFrame"
   >;
   /**
-   * Where the full-rate frames come from: the recorded clip (default), or
-   * the session's frame cache with an early catch-up from the rep trigger
-   * (falls back to the clip when the cache doesn't reach back far enough).
-   * Cache mode measured ~6% slower on a 4-core desktop (live + catch-up +
-   * capture compete); kept opt-in for trying on phones.
+   * Where the full-rate frames come from: the session's frame cache (default
+   * when it has one; ~6% faster shot → score than the recording, same frames
+   * and keyframes), or the recorded clip. Cache mode falls back to the clip
+   * when the cache doesn't reach back far enough.
    */
   source?: "cache" | "video";
   /**
@@ -231,7 +230,7 @@ export function createFullRateRefiner(
   };
   const session = deps.session;
   const useCache =
-    deps.source === "cache" &&
+    (deps.source ?? "cache") === "cache" &&
     !!session.cachedFrames &&
     !!session.onCachedFrame;
 

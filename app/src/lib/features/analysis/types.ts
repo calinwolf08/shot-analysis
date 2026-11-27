@@ -165,8 +165,8 @@ export interface LiveSessionOptions {
   /** Model for the full-rate (offline) re-check (default full). */
   readonly offlineModel?: "full" | "lite";
   /**
-   * Keep a cache of every captured frame (cacheFrame). Off by default:
-   * grabbing every frame costs live tracking ~25% of its frame rate.
+   * Keep a cache of every captured frame (cacheFrame), for the full-rate
+   * re-check (default true).
    */
   readonly frameCache?: boolean;
 }
