@@ -164,6 +164,11 @@ export interface LiveSessionOptions {
   readonly delegate?: "GPU" | "CPU";
   /** Model for the full-rate (offline) re-check (default full). */
   readonly offlineModel?: "full" | "lite";
+  /**
+   * Keep a cache of every captured frame (cacheFrame). Off by default:
+   * grabbing every frame costs live tracking ~25% of its frame rate.
+   */
+  readonly frameCache?: boolean;
 }
 
 export interface LiveSessionStats {

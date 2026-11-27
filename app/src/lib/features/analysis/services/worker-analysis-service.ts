@@ -84,6 +84,7 @@ export const DEFAULT_LIVE_SESSION_OPTIONS: Required<LiveSessionOptions> = {
   debugDetectDelayMs: 0,
   delegate: "GPU",
   offlineModel: "full",
+  frameCache: false,
 };
 
 function defaultMakeWorker(): WorkerLike {
@@ -395,6 +396,17 @@ export function createWorkerAnalysisService(
       /** Recent captured frames (see cacheFrame). */
       const frameCache: CachedFrame[] = [];
       const cacheSubscribers = new Set<(f: CachedFrame) => void>();
+      /** Adds a captured frame to the cache (see LiveAnalysisSession). */
+      function cacheFrame(frame: CachedFrame): void {
+        const last = frameCache.at(-1);
+        if (last && frame.timestamp <= last.timestamp) return;
+        frameCache.push(frame);
+        const cutoff = frame.timestamp - FRAME_CACHE_MS;
+        while (frameCache.length > 0 && frameCache[0]!.timestamp < cutoff)
+          frameCache.shift();
+        for (const cb of cacheSubscribers) cb(frame);
+      }
+
       let offlineReady: Promise<void> | null = null;
       let offlineBusy = false;
       let offlineCb: ((f: LandmarkFrame) => void) | null = null;
@@ -538,15 +550,7 @@ export function createWorkerAnalysisService(
           return lastSize;
         },
 
-        cacheFrame(frame: CachedFrame) {
-          const last = frameCache.at(-1);
-          if (last && frame.timestamp <= last.timestamp) return;
-          frameCache.push(frame);
-          const cutoff = frame.timestamp - FRAME_CACHE_MS;
-          while (frameCache.length > 0 && frameCache[0]!.timestamp < cutoff)
-            frameCache.shift();
-          for (const cb of cacheSubscribers) cb(frame);
-        },
+        ...(live.frameCache ? { cacheFrame } : {}),
 
         cachedFrames(fromTs: number, toTs: number): CachedFrame[] {
           return frameCache

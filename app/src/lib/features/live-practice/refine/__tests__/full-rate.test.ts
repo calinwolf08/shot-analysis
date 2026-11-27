@@ -247,7 +247,20 @@ describe("full-rate refiner", () => {
   });
 });
 
-describe("full-rate refiner: frame cache", () => {
+describe("full-rate refiner: frame cache (opt-in)", () => {
+  it("uses the recording unless asked for the cache", async () => {
+    decode30.mockClear();
+    const r = createFullRateRefiner({
+      session: cachedSession(0),
+      decode: decode30,
+      span: () => null,
+    });
+    r.setRecorder(recorder(500));
+    r.begin!(2000, 500); // ignored without source: "cache"
+    await r.refine(liveWindow());
+    expect(decode30).toHaveBeenCalledTimes(1);
+  });
+
   /** A session whose frame cache holds 30 fps frames from `from` ms. */
   function cachedSession(from: number, to = 3000) {
     const s = session();
@@ -290,6 +303,7 @@ describe("full-rate refiner: frame cache", () => {
     const s = cachedSession(0);
     const r = createFullRateRefiner({
       session: s,
+      source: "cache",
       decode: decode30,
       span: () => ({ fromTs: 1500, toTs: 2200 }),
     });
@@ -312,6 +326,7 @@ describe("full-rate refiner: frame cache", () => {
     const s = cachedSession(0, 2000);
     const r = createFullRateRefiner({
       session: s,
+      source: "cache",
       decode: decode30,
       span: () => ({ fromTs: 1500, toTs: 2200 }),
     });
@@ -334,6 +349,7 @@ describe("full-rate refiner: frame cache", () => {
     const reports: RefineReport[] = [];
     const r = createFullRateRefiner({
       session: cachedSession(1800),
+      source: "cache",
       decode: decode30,
       span: () => null,
     });
