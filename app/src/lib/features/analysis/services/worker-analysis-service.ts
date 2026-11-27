@@ -74,6 +74,8 @@ const DEFAULT_ASSETS: WorkerAssets = {
 
 /** How much captured video the frame cache keeps (ms). */
 export const FRAME_CACHE_MS = 4000;
+/** Frames closer than this (ms) to the last cached one are skipped (≤ 30 fps). */
+export const CACHE_MIN_GAP_MS = 1000 / 30 - 5;
 
 /** Live latency defaults (overridable from the tuning file). */
 export const DEFAULT_LIVE_SESSION_OPTIONS: Required<LiveSessionOptions> = {
@@ -399,7 +401,10 @@ export function createWorkerAnalysisService(
       /** Adds a captured frame to the cache (see LiveAnalysisSession). */
       function cacheFrame(frame: CachedFrame): void {
         const last = frameCache.at(-1);
-        if (last && frame.timestamp <= last.timestamp) return;
+        // One frame per 30 fps slot, like a recording: capture also grabs
+        // an extra frame whenever live detection frees up early, which the
+        // re-check would otherwise pay for as real frames.
+        if (last && frame.timestamp - last.timestamp < CACHE_MIN_GAP_MS) return;
         frameCache.push(frame);
         const cutoff = frame.timestamp - FRAME_CACHE_MS;
         while (frameCache.length > 0 && frameCache[0]!.timestamp < cutoff)

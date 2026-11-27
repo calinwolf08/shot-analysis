@@ -256,7 +256,7 @@ describe("full-rate refiner: frame cache (opt-in)", () => {
       span: () => null,
     });
     r.setRecorder(recorder(500));
-    r.begin!(2000, 500); // ignored without source: "cache"
+    r.begin!(2000, 500); // ignored without source: "cache" + earlyStart
     await r.refine(liveWindow());
     expect(decode30).toHaveBeenCalledTimes(1);
   });
@@ -327,6 +327,7 @@ describe("full-rate refiner: frame cache (opt-in)", () => {
     const r = createFullRateRefiner({
       session: s,
       source: "cache",
+      earlyStart: true,
       decode: decode30,
       span: () => ({ fromTs: 1500, toTs: 2200 }),
     });
@@ -342,6 +343,13 @@ describe("full-rate refiner: frame cache (opt-in)", () => {
     expect(reports[0]!.earlyFrames).toBeGreaterThan(70);
     // Dense from the window's start (500), not just the span.
     expect(out[0]!.timestamp).toBeLessThan(500 + 1000 / 30 + 1);
+  });
+
+  it("cache mode alone doesn't start early: begin is a no-op", async () => {
+    const s = cachedSession(0, 2000);
+    const r = createFullRateRefiner({ session: s, source: "cache" });
+    r.begin!(2000, 500);
+    expect(s.pushed).toHaveLength(0);
   });
 
   it("falls back to the recording when the cache doesn't reach back", async () => {

@@ -242,11 +242,15 @@
       session.detectOffline && clipStore.cap > 0
         ? createFullRateRefiner({
             session,
-            // Dev/E2E: `?refineFrom=cache` re-detects from the frame cache,
-            // starting at the rep trigger, instead of the recording (A/B).
+            // Dev/E2E: `?refineFrom=cache` re-detects from the frame cache
+            // instead of the recording (A/B); `&earlyRefine=1` also starts
+            // it at the rep trigger (a separate experiment).
             ...(devSurfaces &&
             page.url.searchParams.get("refineFrom") === "cache"
-              ? { source: "cache" as const }
+              ? {
+                  source: "cache" as const,
+                  earlyStart: page.url.searchParams.has("earlyRefine"),
+                }
               : {}),
             // Dev/E2E: `?noSeek=1` decodes as before (no seek, 4× fast-forward).
             ...(devSurfaces && page.url.searchParams.has("noSeek")

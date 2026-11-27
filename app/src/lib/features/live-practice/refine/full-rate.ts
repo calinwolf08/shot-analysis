@@ -159,6 +159,12 @@ export interface RefineReport {
   readonly source?: "cache" | "video";
   /** Frames already being re-detected before the rep ended (early start). */
   readonly earlyFrames?: number;
+  /**
+   * From the rep's end until every frame had been handed to the detector
+   * (ms): the cost of getting the frames — the recording's take, load,
+   * seek and 1× playback, or reading the cache. Detection overlaps it.
+   */
+  readonly framesMs?: number;
 }
 
 export interface FullRateRefiner {
@@ -191,6 +197,12 @@ export interface FullRateRefinerDeps {
    * capture compete); kept opt-in for trying on phones.
    */
   source?: "cache" | "video";
+  /**
+   * Cache mode only: start re-detecting at the rep trigger (begin), while
+   * live detection keeps running, instead of at the rep's end. Off by
+   * default: a separate experiment from the frame source.
+   */
+  earlyStart?: boolean;
   /** Guesses the keyframes' span from frames; omit to re-detect the whole window. */
   span?: KeyframeSpan;
   decode?: typeof decodeClipRange;
@@ -296,9 +308,11 @@ export function createFullRateRefiner(
         clearTimeout(timer);
       }
     };
+    let framesMs: number | undefined;
     const detectRange = (fromTs: number, toTs: number) => {
       const detector = session.detectOffline!();
       feed(detector, session.cachedFrames!(fromTs, toTs), 0);
+      framesMs ??= now() - t0;
       return withTimeout(detector);
     };
 
@@ -332,6 +346,7 @@ export function createFullRateRefiner(
         for (const f of session.cachedFrames!(mine.lastTs + 0.001, to))
           mine.push(f);
         mine.detector.pauseLive?.(true);
+        framesMs = now() - t0;
         dense = await withTimeout(mine.detector);
         from = mine.fromTs;
       } else {
@@ -383,6 +398,7 @@ export function createFullRateRefiner(
       extended,
       source: "cache" as const,
       earlyFrames,
+      ...(framesMs !== undefined ? { framesMs: Math.round(framesMs) } : {}),
     };
     if (posed < Math.max(5, livePosed * minPosedShare))
       return fail(timedOut ? "timed out" : "too few posed frames", stats);
@@ -396,7 +412,7 @@ export function createFullRateRefiner(
   return {
     begin(startedAt, fromTs) {
       dropEarly();
-      if (!useCache || !session.detectOffline) return;
+      if (!useCache || !deps.earlyStart || !session.detectOffline) return;
       // Live detection keeps running: it's still watching the shot.
       const detector = session.detectOffline({ pauseLive: false });
       const e = {
@@ -481,6 +497,7 @@ export function createFullRateRefiner(
       const winTo = window.endedAt;
 
       let decodeStats: DecodeClipStats | undefined;
+      let framesMs: number | undefined;
       let timedOut = false;
       const deadline = t0 + timeoutMs;
       /** Decode + re-detect one stretch of the clip (pose clock, ms). */
@@ -519,6 +536,7 @@ export function createFullRateRefiner(
             },
             { ...deps.decodeOptions, cancelled: () => timedOut },
           );
+          framesMs ??= now() - t0;
           return await detector.finish();
         } catch (err) {
           detector.cancel();
@@ -606,6 +624,7 @@ export function createFullRateRefiner(
         ms: now() - t0,
         liveFrames: live.length,
         source: "video",
+        ...(framesMs !== undefined ? { framesMs: Math.round(framesMs) } : {}),
         ...stats,
       });
       // Same clock mapping as the live frames (the clip is aligned by it).
